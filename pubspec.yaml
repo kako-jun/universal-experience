@@ -1,0 +1,43 @@
+name: universal_experience
+description: Universal accessibility experience simulator for multiple sensory disabilities
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  provider: ^6.1.1
+
+  # UI Components
+  cupertino_icons: ^1.0.6
+  flutter_svg: ^2.0.9
+
+  # Platform Integration
+  path_provider: ^2.1.1
+  shared_preferences: ^2.2.2
+  window_manager: ^0.3.7
+  tray_manager: ^0.2.1
+
+  # Local Plugin
+  color_vision_filter:
+    path: plugins/color_vision_filter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/fonts/
+
+  # Multi-platform support
+  # Note: iOS intentionally excluded due to platform restrictions

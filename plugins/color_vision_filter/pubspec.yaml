@@ -1,0 +1,31 @@
+name: color_vision_filter
+description: Platform plugin for applying color vision deficiency filters system-wide
+version: 0.1.0
+homepage: https://github.com/kako-jun/universal-experience
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+  flutter: ">=3.2.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.1.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.universalexperience.color_vision_filter
+        pluginClass: ColorVisionFilterPlugin
+      windows:
+        pluginClass: ColorVisionFilterPlugin
+      macos:
+        pluginClass: ColorVisionFilterPlugin
+      linux:
+        pluginClass: ColorVisionFilterPlugin
