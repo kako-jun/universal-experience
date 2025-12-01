@@ -100,3 +100,4 @@ coverage/
 !**/ios/**/default.pbxuser
 !**/ios/**/default.perspectivev3
 .claude/settings.local.json
+.serena/
