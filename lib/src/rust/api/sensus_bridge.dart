@@ -5,52 +5,53 @@
 
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
+import 'package:freezed_annotation/freezed_annotation.dart' hide protected;
+part 'sensus_bridge.freezed.dart';
 
-// These functions are ignored because they are not marked as `pub`: `color_matrix_flat`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `eq`, `fmt`
+// These functions are ignored because they are not marked as `pub`: `color_matrix_flat`, `to_sensus`, `to_sensus`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`
 
 /// 指定フィルタの GLSL ES 3.00 ソースを返す。
 ///
 /// **用途**: ビルド時に Flutter アセット（または impeller 変換前の中間 `.frag`）
 /// へ書き出す同期スクリプト用。実機ランタイムでこの文字列を直接 Flutter の
 /// `FragmentProgram` に流し込むことはできない（理由は docs/sensus-integration.md）。
+///
+/// sensus_core の全 vision フィルタに `*_glsl()` getter が存在するため、本関数は
+/// 全 [`VisionFilter`] で非空ソースを返す（shader 非対応フィルタは無い）。
 String visionShaderGlsl({required VisionFilter filter}) =>
     RustLib.instance.api.crateApiSensusBridgeVisionShaderGlsl(filter: filter);
 
 /// 指定フィルタの uniform を、FragmentProgram に `setFloat(i, ..)` する順序の
 /// flat な `Vec<f32>` にして返す。
 ///
-/// `sampler2D uTexture`（= 入力画像）は `setFloat` の対象外なので含めない。
-/// Flutter 側では float uniform を `setFloat(0..)` で順に積み、サンプラは
-/// `setImageSampler(0, ..)` で別途渡す。各インデックスの意味は
-/// [`vision_uniform_layout`] が返すラベルと一致する（同じ順序）。
+/// `sampler2D uTexture`（= 入力画像）および `uMask`（floaters のマスク）は
+/// `setFloat` の対象外なので含めない。Flutter 側では float uniform を `setFloat(0..)`
+/// で順に積み、サンプラは `setImageSampler(..)` で別途渡す。各インデックスの意味は
+/// [`vision_uniform_layout`] が返すラベルと一致する（同じ順序、同じ長さ）。
 ///
 /// # 引数
-/// - `strength`: 0.0..=1.0（範囲外は sensus 側で clamp される）。
-/// - `width` / `height`: 入力画像のピクセルサイズ。解像度依存フィルタ
-///   （Myopia / Photophobia）の半径・texel size 算出に使う。色覚 4 種では未使用。
-/// - `seed`: ランダム系フィルタ用シード。MVP のフィルタでは未使用だが、後続で
-///   Cataract / Floaters 等を足すときに使う（署名を安定させるため今から受ける）。
+/// - `strength`: 0.0..=1.0（範囲外・NaN は sensus 側 `normalize_strength` で clamp / NaN→0）。
+/// - `time`: 秒単位の時間。時間依存フィルタ（Vertigo / BppvRotation）の `uTime` に渡す。
+///   それ以外のフィルタでは無視される（sensus の uniforms getter が time を取らないため）。
+/// - `width` / `height`: 入力画像のピクセルサイズ。解像度依存フィルタの半径・texel size・
+///   resolution・aspect の算出に使う。
 ///
-/// # 各フィルタの返却レイアウト
-/// - Protanopia / Deuteranopia / Tritanopia:
-///   `[uStrength, uMatrix0, uMatrix1, .., uMatrix8]`（計 10 要素）
-/// - Achromatopsia: `[uStrength, uRWeight, uGWeight, uBWeight]`（計 4 要素）
-/// - Myopia: `[uStrength, uRadiusPx, uTexelSizeX, uTexelSizeY]`（計 4 要素）
-/// - Photophobia: `[uRadiusPx, uTexelSizeX, uTexelSizeY]`（計 3 要素。
-///   photophobia.frag は `uStrength` を持たない — strength は半径へ畳み込み済み）
+/// # u32 シード / count / int の扱い
+/// GLSL で `uint`/`int` の uniform（`uSeed`, `uCount`）も f32 に詰める。f32 は 2^24 を
+/// 超える整数を正確に表せないため、seed が巨大だと精度が落ちる（モジュール doc 参照）。
 Float32List visionUniforms(
         {required VisionFilter filter,
         required double strength,
+        required double time,
         required int width,
-        required int height,
-        required BigInt seed}) =>
+        required int height}) =>
     RustLib.instance.api.crateApiSensusBridgeVisionUniforms(
         filter: filter,
         strength: strength,
+        time: time,
         width: width,
-        height: height,
-        seed: seed);
+        height: height);
 
 /// 指定フィルタの uniform レイアウト（各 `setFloat` インデックスのラベル）を返す。
 ///
@@ -61,11 +62,11 @@ List<String> visionUniformLayout({required VisionFilter filter}) =>
     RustLib.instance.api
         .crateApiSensusBridgeVisionUniformLayout(filter: filter);
 
-/// （将来用）sensus-core の CPU `apply` を 1 つだけ薄く公開する。
+/// sensus-core の CPU `apply` を薄く公開する。全 [`VisionFilter`] に対応する
+/// （sensus の `apply` は網羅 match なので payload 付きフィルタも CPU で適用可能）。
 ///
-/// GPU（FragmentProgram）経路が主のため MVP では未使用だが、テストや
-/// GPU 非対応環境のフォールバックに備えて残す。生 RGBA8（`width * height * 4`
-/// バイト）を入力し、同じレイアウトの RGBA8 を返す。
+/// GPU（FragmentProgram）経路が主だが、テストや GPU 非対応環境のフォールバックに使う。
+/// 生 RGBA8（`width * height * 4` バイト）を入力し、同じレイアウトの RGBA8 を返す。
 ///
 /// 注意: これは sensus の `image::DynamicImage` 経路を通すため GPU 経路より遅い。
 /// 大きな画像をリアルタイム処理する用途には使わないこと。
@@ -82,31 +83,153 @@ Uint8List applyVisionCpuRgba8(
         height: height,
         strength: strength);
 
-/// Dart 側で扱う vision フィルタ（MVP サブセット）。
-///
-/// sensus_core::Filter のうち、本 Issue (#7, sensus 連携 1/3) でブリッジを
-/// 通すものだけを列挙する。MVP は色覚 4 種 + 解像度依存の 2 例。全フィルタ網羅は
-/// 後続フェーズで `sensus_core::Filter` 全バリアントへ拡張する。
-///
-/// パラメータは MVP では `strength` 中心とし、解像度依存フィルタは
-/// [`vision_uniforms`] へ `width`/`height` を、ランダム系は `seed` を渡す。
-enum VisionFilter {
+@freezed
+sealed class VisionFilter with _$VisionFilter {
+  const VisionFilter._();
+
   /// 1型2色覚（赤）。uniform: uStrength + uMatrix[9]。
-  protanopia,
+  const factory VisionFilter.protanopia() = VisionFilter_Protanopia;
 
   /// 2型2色覚（緑）。uniform: uStrength + uMatrix[9]。
-  deuteranopia,
+  const factory VisionFilter.deuteranopia() = VisionFilter_Deuteranopia;
 
   /// 3型2色覚（青黄）。uniform: uStrength + uMatrix[9]。
-  tritanopia,
+  const factory VisionFilter.tritanopia() = VisionFilter_Tritanopia;
 
   /// 全色盲。uniform: uStrength + RGB luma weights。
-  achromatopsia,
+  const factory VisionFilter.achromatopsia() = VisionFilter_Achromatopsia;
 
-  /// 近視（解像度依存の disk blur）。uniform: uStrength + uRadiusPx + uTexelSize。
-  myopia,
+  /// 四色型色覚。uniform: uStrength。
+  const factory VisionFilter.tetrachromacy() = VisionFilter_Tetrachromacy;
 
-  /// 羞明（解像度依存の bloom）。uniform: uRadiusPx + uTexelSize（uStrength なし）。
-  photophobia,
+  /// 近視（解像度依存の disk blur）。
+  const factory VisionFilter.myopia() = VisionFilter_Myopia;
+
+  /// 遠視（disk blur）。
+  const factory VisionFilter.hyperopia() = VisionFilter_Hyperopia;
+
+  /// 老視（disk blur）。
+  const factory VisionFilter.presbyopia() = VisionFilter_Presbyopia;
+
+  /// 乱視。`axis_deg`: シャープ方向の経線角（度数法、医学慣習）。
+  const factory VisionFilter.astigmatism({
+    required double axisDeg,
+  }) = VisionFilter_Astigmatism;
+
+  /// 緑内障。`mode`: 暗点モード。
+  const factory VisionFilter.glaucoma({
+    required VisionGlaucomaMode mode,
+  }) = VisionFilter_Glaucoma;
+
+  /// 加齢黄斑変性。
+  const factory VisionFilter.macularDegeneration() =
+      VisionFilter_MacularDegeneration;
+
+  /// 半盲。`side`: 0.0 = 左視野消失, 1.0 = 右視野消失。
+  const factory VisionFilter.hemianopia({
+    required double side,
+  }) = VisionFilter_Hemianopia;
+
+  /// 視野狭窄（トンネル視）。
+  const factory VisionFilter.tunnelVision() = VisionFilter_TunnelVision;
+
+  /// 白内障。`seed`: 散乱グレア生成シード。
+  const factory VisionFilter.cataract({
+    required BigInt seed,
+  }) = VisionFilter_Cataract;
+
+  /// 飛蚊症。`seed`/`density`/`size`/`gaze_x`/`gaze_y`。
+  const factory VisionFilter.floaters({
+    required BigInt seed,
+    required double density,
+    required double size,
+    required double gazeX,
+    required double gazeY,
+  }) = VisionFilter_Floaters;
+
+  /// 羞明（解像度依存の bloom）。
+  const factory VisionFilter.photophobia() = VisionFilter_Photophobia;
+
+  /// 夜盲。
+  const factory VisionFilter.nightBlindness() = VisionFilter_NightBlindness;
+
+  /// 浮動性めまい（時間依存）。
+  const factory VisionFilter.vertigo() = VisionFilter_Vertigo;
+
+  /// BPPV 回転性めまい（時間依存）。
+  const factory VisionFilter.bppvRotation() = VisionFilter_BppvRotation;
+
+  /// 前庭神経炎。
+  const factory VisionFilter.vestibularNeuritis() =
+      VisionFilter_VestibularNeuritis;
+
+  /// 複視。`offset_x`/`offset_y`: 幽霊像のずれ（min(W,H) 比のピクセル）, `ghost_strength`: 幽霊像強度。
+  const factory VisionFilter.diplopia({
+    required double offsetX,
+    required double offsetY,
+    required double ghostStrength,
+  }) = VisionFilter_Diplopia;
+
+  /// 眼振。`amplitude`: 振幅（min(W,H) 比）, `direction_deg`: 揺れ方向（度数法）。
+  const factory VisionFilter.nystagmus({
+    required double amplitude,
+    required double directionDeg,
+  }) = VisionFilter_Nystagmus;
+
+  /// 光芒。`num_rays`/`ray_length_ratio`/`threshold`/`dispersion`。
+  const factory VisionFilter.starbursts({
+    required int numRays,
+    required double rayLengthRatio,
+    required double threshold,
+    required double dispersion,
+  }) = VisionFilter_Starbursts;
+
+  /// 眼精疲労。
+  const factory VisionFilter.eyeStrain() = VisionFilter_EyeStrain;
+
+  /// ドライアイ。
+  const factory VisionFilter.dryEye() = VisionFilter_DryEye;
+
+  /// 変視症（歪み）。`freq`: 空間周波数, `seed`: 歪み場シード。
+  const factory VisionFilter.metamorphopsia({
+    required double freq,
+    required BigInt seed,
+  }) = VisionFilter_Metamorphopsia;
+
+  /// コントラスト感度低下。
+  const factory VisionFilter.contrastSensitivity() =
+      VisionFilter_ContrastSensitivity;
+
+  /// ディテールロス（ピクセル化）。`cell_size`: タイルサイズ (px)。
+  const factory VisionFilter.detailLoss({
+    required int cellSize,
+  }) = VisionFilter_DetailLoss;
+
+  /// 閃輝暗点。
+  const factory VisionFilter.teichopsia() = VisionFilter_Teichopsia;
+
+  /// 閃輝（光の星）。`seed`: ランダムシード。
+  const factory VisionFilter.flickeringStars({
+    required BigInt seed,
+  }) = VisionFilter_FlickeringStars;
+}
+
+/// 緑内障の暗点モード。`sensus_core::vision::GlaucomaMode` の FRB 公開ミラー。
+///
+/// FRB は外部クレートの enum を直接 Dart へ出せないため、ue 側で同型を定義して
+/// [`to_sensus`](VisionGlaucomaMode::to_sensus) で変換する。値は
+/// `glaucoma.frag` の `uMode`（0..3）に 1 対 1 対応する。
+enum VisionGlaucomaMode {
+  /// 中心保存 + 周辺 smoothstep vignetting（既定）。uMode=0。
+  vignette,
+
+  /// 上方弧状暗点（Bjerrum 上方）。uMode=1。
+  arcuateSuperior,
+
+  /// 下方弧状暗点（Bjerrum 下方）。uMode=2。
+  arcuateInferior,
+
+  /// 両弧状暗点（進行例）。uMode=3。
+  biarcuate,
   ;
 }

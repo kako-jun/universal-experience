@@ -94,9 +94,9 @@ abstract class RustLibApi extends BaseApi {
   Float32List crateApiSensusBridgeVisionUniforms(
       {required VisionFilter filter,
       required double strength,
+      required double time,
       required int width,
-      required int height,
-      required BigInt seed});
+      required int height});
 }
 
 class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
@@ -116,7 +116,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       required double strength}) {
     return handler.executeSync(SyncTask(
       callFfi: () {
-        var arg0 = cst_encode_vision_filter(filter);
+        var arg0 = cst_encode_box_autoadd_vision_filter(filter);
         var arg1 = cst_encode_list_prim_u_8_loose(rgba8);
         var arg2 = cst_encode_u_32(width);
         var arg3 = cst_encode_u_32(height);
@@ -144,7 +144,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   String crateApiSensusBridgeVisionShaderGlsl({required VisionFilter filter}) {
     return handler.executeSync(SyncTask(
       callFfi: () {
-        var arg0 = cst_encode_vision_filter(filter);
+        var arg0 = cst_encode_box_autoadd_vision_filter(filter);
         return wire.wire__crate__api__sensus_bridge__vision_shader_glsl(arg0);
       },
       codec: DcoCodec(
@@ -168,7 +168,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       {required VisionFilter filter}) {
     return handler.executeSync(SyncTask(
       callFfi: () {
-        var arg0 = cst_encode_vision_filter(filter);
+        var arg0 = cst_encode_box_autoadd_vision_filter(filter);
         return wire
             .wire__crate__api__sensus_bridge__vision_uniform_layout(arg0);
       },
@@ -192,16 +192,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Float32List crateApiSensusBridgeVisionUniforms(
       {required VisionFilter filter,
       required double strength,
+      required double time,
       required int width,
-      required int height,
-      required BigInt seed}) {
+      required int height}) {
     return handler.executeSync(SyncTask(
       callFfi: () {
-        var arg0 = cst_encode_vision_filter(filter);
+        var arg0 = cst_encode_box_autoadd_vision_filter(filter);
         var arg1 = cst_encode_f_32(strength);
-        var arg2 = cst_encode_u_32(width);
-        var arg3 = cst_encode_u_32(height);
-        var arg4 = cst_encode_u_64(seed);
+        var arg2 = cst_encode_f_32(time);
+        var arg3 = cst_encode_u_32(width);
+        var arg4 = cst_encode_u_32(height);
         return wire.wire__crate__api__sensus_bridge__vision_uniforms(
             arg0, arg1, arg2, arg3, arg4);
       },
@@ -210,7 +210,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         decodeErrorData: null,
       ),
       constMeta: kCrateApiSensusBridgeVisionUniformsConstMeta,
-      argValues: [filter, strength, width, height, seed],
+      argValues: [filter, strength, time, width, height],
       apiImpl: this,
     ));
   }
@@ -218,13 +218,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiSensusBridgeVisionUniformsConstMeta =>
       const TaskConstMeta(
         debugName: 'vision_uniforms',
-        argNames: ['filter', 'strength', 'width', 'height', 'seed'],
+        argNames: ['filter', 'strength', 'time', 'width', 'height'],
       );
 
   @protected
   String dco_decode_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as String;
+  }
+
+  @protected
+  VisionFilter dco_decode_box_autoadd_vision_filter(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_vision_filter(raw);
   }
 
   @protected
@@ -290,7 +296,109 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @protected
   VisionFilter dco_decode_vision_filter(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    return VisionFilter.values[raw as int];
+    switch (raw[0]) {
+      case 0:
+        return const VisionFilter_Protanopia();
+      case 1:
+        return const VisionFilter_Deuteranopia();
+      case 2:
+        return const VisionFilter_Tritanopia();
+      case 3:
+        return const VisionFilter_Achromatopsia();
+      case 4:
+        return const VisionFilter_Tetrachromacy();
+      case 5:
+        return const VisionFilter_Myopia();
+      case 6:
+        return const VisionFilter_Hyperopia();
+      case 7:
+        return const VisionFilter_Presbyopia();
+      case 8:
+        return VisionFilter_Astigmatism(
+          axisDeg: dco_decode_f_32(raw[1]),
+        );
+      case 9:
+        return VisionFilter_Glaucoma(
+          mode: dco_decode_vision_glaucoma_mode(raw[1]),
+        );
+      case 10:
+        return const VisionFilter_MacularDegeneration();
+      case 11:
+        return VisionFilter_Hemianopia(
+          side: dco_decode_f_32(raw[1]),
+        );
+      case 12:
+        return const VisionFilter_TunnelVision();
+      case 13:
+        return VisionFilter_Cataract(
+          seed: dco_decode_u_64(raw[1]),
+        );
+      case 14:
+        return VisionFilter_Floaters(
+          seed: dco_decode_u_64(raw[1]),
+          density: dco_decode_f_32(raw[2]),
+          size: dco_decode_f_32(raw[3]),
+          gazeX: dco_decode_f_32(raw[4]),
+          gazeY: dco_decode_f_32(raw[5]),
+        );
+      case 15:
+        return const VisionFilter_Photophobia();
+      case 16:
+        return const VisionFilter_NightBlindness();
+      case 17:
+        return const VisionFilter_Vertigo();
+      case 18:
+        return const VisionFilter_BppvRotation();
+      case 19:
+        return const VisionFilter_VestibularNeuritis();
+      case 20:
+        return VisionFilter_Diplopia(
+          offsetX: dco_decode_f_32(raw[1]),
+          offsetY: dco_decode_f_32(raw[2]),
+          ghostStrength: dco_decode_f_32(raw[3]),
+        );
+      case 21:
+        return VisionFilter_Nystagmus(
+          amplitude: dco_decode_f_32(raw[1]),
+          directionDeg: dco_decode_f_32(raw[2]),
+        );
+      case 22:
+        return VisionFilter_Starbursts(
+          numRays: dco_decode_u_32(raw[1]),
+          rayLengthRatio: dco_decode_f_32(raw[2]),
+          threshold: dco_decode_f_32(raw[3]),
+          dispersion: dco_decode_f_32(raw[4]),
+        );
+      case 23:
+        return const VisionFilter_EyeStrain();
+      case 24:
+        return const VisionFilter_DryEye();
+      case 25:
+        return VisionFilter_Metamorphopsia(
+          freq: dco_decode_f_32(raw[1]),
+          seed: dco_decode_u_64(raw[2]),
+        );
+      case 26:
+        return const VisionFilter_ContrastSensitivity();
+      case 27:
+        return VisionFilter_DetailLoss(
+          cellSize: dco_decode_u_32(raw[1]),
+        );
+      case 28:
+        return const VisionFilter_Teichopsia();
+      case 29:
+        return VisionFilter_FlickeringStars(
+          seed: dco_decode_u_64(raw[1]),
+        );
+      default:
+        throw Exception('unreachable');
+    }
+  }
+
+  @protected
+  VisionGlaucomaMode dco_decode_vision_glaucoma_mode(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return VisionGlaucomaMode.values[raw as int];
   }
 
   @protected
@@ -298,6 +406,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_list_prim_u_8_strict(deserializer);
     return utf8.decoder.convert(inner);
+  }
+
+  @protected
+  VisionFilter sse_decode_box_autoadd_vision_filter(
+      SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_vision_filter(deserializer));
   }
 
   @protected
@@ -371,8 +486,115 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @protected
   VisionFilter sse_decode_vision_filter(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var tag_ = sse_decode_i_32(deserializer);
+    switch (tag_) {
+      case 0:
+        return const VisionFilter_Protanopia();
+      case 1:
+        return const VisionFilter_Deuteranopia();
+      case 2:
+        return const VisionFilter_Tritanopia();
+      case 3:
+        return const VisionFilter_Achromatopsia();
+      case 4:
+        return const VisionFilter_Tetrachromacy();
+      case 5:
+        return const VisionFilter_Myopia();
+      case 6:
+        return const VisionFilter_Hyperopia();
+      case 7:
+        return const VisionFilter_Presbyopia();
+      case 8:
+        var var_axisDeg = sse_decode_f_32(deserializer);
+        return VisionFilter_Astigmatism(axisDeg: var_axisDeg);
+      case 9:
+        var var_mode = sse_decode_vision_glaucoma_mode(deserializer);
+        return VisionFilter_Glaucoma(mode: var_mode);
+      case 10:
+        return const VisionFilter_MacularDegeneration();
+      case 11:
+        var var_side = sse_decode_f_32(deserializer);
+        return VisionFilter_Hemianopia(side: var_side);
+      case 12:
+        return const VisionFilter_TunnelVision();
+      case 13:
+        var var_seed = sse_decode_u_64(deserializer);
+        return VisionFilter_Cataract(seed: var_seed);
+      case 14:
+        var var_seed = sse_decode_u_64(deserializer);
+        var var_density = sse_decode_f_32(deserializer);
+        var var_size = sse_decode_f_32(deserializer);
+        var var_gazeX = sse_decode_f_32(deserializer);
+        var var_gazeY = sse_decode_f_32(deserializer);
+        return VisionFilter_Floaters(
+            seed: var_seed,
+            density: var_density,
+            size: var_size,
+            gazeX: var_gazeX,
+            gazeY: var_gazeY);
+      case 15:
+        return const VisionFilter_Photophobia();
+      case 16:
+        return const VisionFilter_NightBlindness();
+      case 17:
+        return const VisionFilter_Vertigo();
+      case 18:
+        return const VisionFilter_BppvRotation();
+      case 19:
+        return const VisionFilter_VestibularNeuritis();
+      case 20:
+        var var_offsetX = sse_decode_f_32(deserializer);
+        var var_offsetY = sse_decode_f_32(deserializer);
+        var var_ghostStrength = sse_decode_f_32(deserializer);
+        return VisionFilter_Diplopia(
+            offsetX: var_offsetX,
+            offsetY: var_offsetY,
+            ghostStrength: var_ghostStrength);
+      case 21:
+        var var_amplitude = sse_decode_f_32(deserializer);
+        var var_directionDeg = sse_decode_f_32(deserializer);
+        return VisionFilter_Nystagmus(
+            amplitude: var_amplitude, directionDeg: var_directionDeg);
+      case 22:
+        var var_numRays = sse_decode_u_32(deserializer);
+        var var_rayLengthRatio = sse_decode_f_32(deserializer);
+        var var_threshold = sse_decode_f_32(deserializer);
+        var var_dispersion = sse_decode_f_32(deserializer);
+        return VisionFilter_Starbursts(
+            numRays: var_numRays,
+            rayLengthRatio: var_rayLengthRatio,
+            threshold: var_threshold,
+            dispersion: var_dispersion);
+      case 23:
+        return const VisionFilter_EyeStrain();
+      case 24:
+        return const VisionFilter_DryEye();
+      case 25:
+        var var_freq = sse_decode_f_32(deserializer);
+        var var_seed = sse_decode_u_64(deserializer);
+        return VisionFilter_Metamorphopsia(freq: var_freq, seed: var_seed);
+      case 26:
+        return const VisionFilter_ContrastSensitivity();
+      case 27:
+        var var_cellSize = sse_decode_u_32(deserializer);
+        return VisionFilter_DetailLoss(cellSize: var_cellSize);
+      case 28:
+        return const VisionFilter_Teichopsia();
+      case 29:
+        var var_seed = sse_decode_u_64(deserializer);
+        return VisionFilter_FlickeringStars(seed: var_seed);
+      default:
+        throw UnimplementedError('');
+    }
+  }
+
+  @protected
+  VisionGlaucomaMode sse_decode_vision_glaucoma_mode(
+      SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
-    return VisionFilter.values[inner];
+    return VisionGlaucomaMode.values[inner];
   }
 
   @protected
@@ -412,7 +634,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  int cst_encode_vision_filter(VisionFilter raw) {
+  int cst_encode_vision_glaucoma_mode(VisionGlaucomaMode raw) {
     // Codec=Cst (C-struct based), see doc to use other codecs
     return cst_encode_i_32(raw.index);
   }
@@ -421,6 +643,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_String(String self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_list_prim_u_8_strict(utf8.encoder.convert(self), serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_vision_filter(
+      VisionFilter self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_vision_filter(self, serializer);
   }
 
   @protected
@@ -494,6 +723,114 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   void sse_encode_vision_filter(VisionFilter self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    switch (self) {
+      case VisionFilter_Protanopia():
+        sse_encode_i_32(0, serializer);
+      case VisionFilter_Deuteranopia():
+        sse_encode_i_32(1, serializer);
+      case VisionFilter_Tritanopia():
+        sse_encode_i_32(2, serializer);
+      case VisionFilter_Achromatopsia():
+        sse_encode_i_32(3, serializer);
+      case VisionFilter_Tetrachromacy():
+        sse_encode_i_32(4, serializer);
+      case VisionFilter_Myopia():
+        sse_encode_i_32(5, serializer);
+      case VisionFilter_Hyperopia():
+        sse_encode_i_32(6, serializer);
+      case VisionFilter_Presbyopia():
+        sse_encode_i_32(7, serializer);
+      case VisionFilter_Astigmatism(axisDeg: final axisDeg):
+        sse_encode_i_32(8, serializer);
+        sse_encode_f_32(axisDeg, serializer);
+      case VisionFilter_Glaucoma(mode: final mode):
+        sse_encode_i_32(9, serializer);
+        sse_encode_vision_glaucoma_mode(mode, serializer);
+      case VisionFilter_MacularDegeneration():
+        sse_encode_i_32(10, serializer);
+      case VisionFilter_Hemianopia(side: final side):
+        sse_encode_i_32(11, serializer);
+        sse_encode_f_32(side, serializer);
+      case VisionFilter_TunnelVision():
+        sse_encode_i_32(12, serializer);
+      case VisionFilter_Cataract(seed: final seed):
+        sse_encode_i_32(13, serializer);
+        sse_encode_u_64(seed, serializer);
+      case VisionFilter_Floaters(
+          seed: final seed,
+          density: final density,
+          size: final size,
+          gazeX: final gazeX,
+          gazeY: final gazeY
+        ):
+        sse_encode_i_32(14, serializer);
+        sse_encode_u_64(seed, serializer);
+        sse_encode_f_32(density, serializer);
+        sse_encode_f_32(size, serializer);
+        sse_encode_f_32(gazeX, serializer);
+        sse_encode_f_32(gazeY, serializer);
+      case VisionFilter_Photophobia():
+        sse_encode_i_32(15, serializer);
+      case VisionFilter_NightBlindness():
+        sse_encode_i_32(16, serializer);
+      case VisionFilter_Vertigo():
+        sse_encode_i_32(17, serializer);
+      case VisionFilter_BppvRotation():
+        sse_encode_i_32(18, serializer);
+      case VisionFilter_VestibularNeuritis():
+        sse_encode_i_32(19, serializer);
+      case VisionFilter_Diplopia(
+          offsetX: final offsetX,
+          offsetY: final offsetY,
+          ghostStrength: final ghostStrength
+        ):
+        sse_encode_i_32(20, serializer);
+        sse_encode_f_32(offsetX, serializer);
+        sse_encode_f_32(offsetY, serializer);
+        sse_encode_f_32(ghostStrength, serializer);
+      case VisionFilter_Nystagmus(
+          amplitude: final amplitude,
+          directionDeg: final directionDeg
+        ):
+        sse_encode_i_32(21, serializer);
+        sse_encode_f_32(amplitude, serializer);
+        sse_encode_f_32(directionDeg, serializer);
+      case VisionFilter_Starbursts(
+          numRays: final numRays,
+          rayLengthRatio: final rayLengthRatio,
+          threshold: final threshold,
+          dispersion: final dispersion
+        ):
+        sse_encode_i_32(22, serializer);
+        sse_encode_u_32(numRays, serializer);
+        sse_encode_f_32(rayLengthRatio, serializer);
+        sse_encode_f_32(threshold, serializer);
+        sse_encode_f_32(dispersion, serializer);
+      case VisionFilter_EyeStrain():
+        sse_encode_i_32(23, serializer);
+      case VisionFilter_DryEye():
+        sse_encode_i_32(24, serializer);
+      case VisionFilter_Metamorphopsia(freq: final freq, seed: final seed):
+        sse_encode_i_32(25, serializer);
+        sse_encode_f_32(freq, serializer);
+        sse_encode_u_64(seed, serializer);
+      case VisionFilter_ContrastSensitivity():
+        sse_encode_i_32(26, serializer);
+      case VisionFilter_DetailLoss(cellSize: final cellSize):
+        sse_encode_i_32(27, serializer);
+        sse_encode_u_32(cellSize, serializer);
+      case VisionFilter_Teichopsia():
+        sse_encode_i_32(28, serializer);
+      case VisionFilter_FlickeringStars(seed: final seed):
+        sse_encode_i_32(29, serializer);
+        sse_encode_u_64(seed, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_vision_glaucoma_mode(
+      VisionGlaucomaMode self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
   }

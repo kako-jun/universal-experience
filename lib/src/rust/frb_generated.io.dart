@@ -22,6 +22,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  VisionFilter dco_decode_box_autoadd_vision_filter(dynamic raw);
+
+  @protected
   double dco_decode_f_32(dynamic raw);
 
   @protected
@@ -55,7 +58,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   VisionFilter dco_decode_vision_filter(dynamic raw);
 
   @protected
+  VisionGlaucomaMode dco_decode_vision_glaucoma_mode(dynamic raw);
+
+  @protected
   String sse_decode_String(SseDeserializer deserializer);
+
+  @protected
+  VisionFilter sse_decode_box_autoadd_vision_filter(
+      SseDeserializer deserializer);
 
   @protected
   double sse_decode_f_32(SseDeserializer deserializer);
@@ -91,12 +101,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   VisionFilter sse_decode_vision_filter(SseDeserializer deserializer);
 
   @protected
+  VisionGlaucomaMode sse_decode_vision_glaucoma_mode(
+      SseDeserializer deserializer);
+
+  @protected
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
   ffi.Pointer<wire_cst_list_prim_u_8_strict> cst_encode_String(String raw) {
     // Codec=Cst (C-struct based), see doc to use other codecs
     return cst_encode_list_prim_u_8_strict(utf8.encoder.convert(raw));
+  }
+
+  @protected
+  ffi.Pointer<wire_cst_vision_filter> cst_encode_box_autoadd_vision_filter(
+      VisionFilter raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    final ptr = wire.cst_new_box_autoadd_vision_filter();
+    cst_api_fill_to_wire_vision_filter(raw, ptr.ref);
+    return ptr;
   }
 
   @protected
@@ -143,6 +166,181 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   }
 
   @protected
+  void cst_api_fill_to_wire_box_autoadd_vision_filter(
+      VisionFilter apiObj, ffi.Pointer<wire_cst_vision_filter> wireObj) {
+    cst_api_fill_to_wire_vision_filter(apiObj, wireObj.ref);
+  }
+
+  @protected
+  void cst_api_fill_to_wire_vision_filter(
+      VisionFilter apiObj, wire_cst_vision_filter wireObj) {
+    if (apiObj is VisionFilter_Protanopia) {
+      wireObj.tag = 0;
+      return;
+    }
+    if (apiObj is VisionFilter_Deuteranopia) {
+      wireObj.tag = 1;
+      return;
+    }
+    if (apiObj is VisionFilter_Tritanopia) {
+      wireObj.tag = 2;
+      return;
+    }
+    if (apiObj is VisionFilter_Achromatopsia) {
+      wireObj.tag = 3;
+      return;
+    }
+    if (apiObj is VisionFilter_Tetrachromacy) {
+      wireObj.tag = 4;
+      return;
+    }
+    if (apiObj is VisionFilter_Myopia) {
+      wireObj.tag = 5;
+      return;
+    }
+    if (apiObj is VisionFilter_Hyperopia) {
+      wireObj.tag = 6;
+      return;
+    }
+    if (apiObj is VisionFilter_Presbyopia) {
+      wireObj.tag = 7;
+      return;
+    }
+    if (apiObj is VisionFilter_Astigmatism) {
+      var pre_axis_deg = cst_encode_f_32(apiObj.axisDeg);
+      wireObj.tag = 8;
+      wireObj.kind.Astigmatism.axis_deg = pre_axis_deg;
+      return;
+    }
+    if (apiObj is VisionFilter_Glaucoma) {
+      var pre_mode = cst_encode_vision_glaucoma_mode(apiObj.mode);
+      wireObj.tag = 9;
+      wireObj.kind.Glaucoma.mode = pre_mode;
+      return;
+    }
+    if (apiObj is VisionFilter_MacularDegeneration) {
+      wireObj.tag = 10;
+      return;
+    }
+    if (apiObj is VisionFilter_Hemianopia) {
+      var pre_side = cst_encode_f_32(apiObj.side);
+      wireObj.tag = 11;
+      wireObj.kind.Hemianopia.side = pre_side;
+      return;
+    }
+    if (apiObj is VisionFilter_TunnelVision) {
+      wireObj.tag = 12;
+      return;
+    }
+    if (apiObj is VisionFilter_Cataract) {
+      var pre_seed = cst_encode_u_64(apiObj.seed);
+      wireObj.tag = 13;
+      wireObj.kind.Cataract.seed = pre_seed;
+      return;
+    }
+    if (apiObj is VisionFilter_Floaters) {
+      var pre_seed = cst_encode_u_64(apiObj.seed);
+      var pre_density = cst_encode_f_32(apiObj.density);
+      var pre_size = cst_encode_f_32(apiObj.size);
+      var pre_gaze_x = cst_encode_f_32(apiObj.gazeX);
+      var pre_gaze_y = cst_encode_f_32(apiObj.gazeY);
+      wireObj.tag = 14;
+      wireObj.kind.Floaters.seed = pre_seed;
+      wireObj.kind.Floaters.density = pre_density;
+      wireObj.kind.Floaters.size = pre_size;
+      wireObj.kind.Floaters.gaze_x = pre_gaze_x;
+      wireObj.kind.Floaters.gaze_y = pre_gaze_y;
+      return;
+    }
+    if (apiObj is VisionFilter_Photophobia) {
+      wireObj.tag = 15;
+      return;
+    }
+    if (apiObj is VisionFilter_NightBlindness) {
+      wireObj.tag = 16;
+      return;
+    }
+    if (apiObj is VisionFilter_Vertigo) {
+      wireObj.tag = 17;
+      return;
+    }
+    if (apiObj is VisionFilter_BppvRotation) {
+      wireObj.tag = 18;
+      return;
+    }
+    if (apiObj is VisionFilter_VestibularNeuritis) {
+      wireObj.tag = 19;
+      return;
+    }
+    if (apiObj is VisionFilter_Diplopia) {
+      var pre_offset_x = cst_encode_f_32(apiObj.offsetX);
+      var pre_offset_y = cst_encode_f_32(apiObj.offsetY);
+      var pre_ghost_strength = cst_encode_f_32(apiObj.ghostStrength);
+      wireObj.tag = 20;
+      wireObj.kind.Diplopia.offset_x = pre_offset_x;
+      wireObj.kind.Diplopia.offset_y = pre_offset_y;
+      wireObj.kind.Diplopia.ghost_strength = pre_ghost_strength;
+      return;
+    }
+    if (apiObj is VisionFilter_Nystagmus) {
+      var pre_amplitude = cst_encode_f_32(apiObj.amplitude);
+      var pre_direction_deg = cst_encode_f_32(apiObj.directionDeg);
+      wireObj.tag = 21;
+      wireObj.kind.Nystagmus.amplitude = pre_amplitude;
+      wireObj.kind.Nystagmus.direction_deg = pre_direction_deg;
+      return;
+    }
+    if (apiObj is VisionFilter_Starbursts) {
+      var pre_num_rays = cst_encode_u_32(apiObj.numRays);
+      var pre_ray_length_ratio = cst_encode_f_32(apiObj.rayLengthRatio);
+      var pre_threshold = cst_encode_f_32(apiObj.threshold);
+      var pre_dispersion = cst_encode_f_32(apiObj.dispersion);
+      wireObj.tag = 22;
+      wireObj.kind.Starbursts.num_rays = pre_num_rays;
+      wireObj.kind.Starbursts.ray_length_ratio = pre_ray_length_ratio;
+      wireObj.kind.Starbursts.threshold = pre_threshold;
+      wireObj.kind.Starbursts.dispersion = pre_dispersion;
+      return;
+    }
+    if (apiObj is VisionFilter_EyeStrain) {
+      wireObj.tag = 23;
+      return;
+    }
+    if (apiObj is VisionFilter_DryEye) {
+      wireObj.tag = 24;
+      return;
+    }
+    if (apiObj is VisionFilter_Metamorphopsia) {
+      var pre_freq = cst_encode_f_32(apiObj.freq);
+      var pre_seed = cst_encode_u_64(apiObj.seed);
+      wireObj.tag = 25;
+      wireObj.kind.Metamorphopsia.freq = pre_freq;
+      wireObj.kind.Metamorphopsia.seed = pre_seed;
+      return;
+    }
+    if (apiObj is VisionFilter_ContrastSensitivity) {
+      wireObj.tag = 26;
+      return;
+    }
+    if (apiObj is VisionFilter_DetailLoss) {
+      var pre_cell_size = cst_encode_u_32(apiObj.cellSize);
+      wireObj.tag = 27;
+      wireObj.kind.DetailLoss.cell_size = pre_cell_size;
+      return;
+    }
+    if (apiObj is VisionFilter_Teichopsia) {
+      wireObj.tag = 28;
+      return;
+    }
+    if (apiObj is VisionFilter_FlickeringStars) {
+      var pre_seed = cst_encode_u_64(apiObj.seed);
+      wireObj.tag = 29;
+      wireObj.kind.FlickeringStars.seed = pre_seed;
+      return;
+    }
+  }
+
+  @protected
   double cst_encode_f_32(double raw);
 
   @protected
@@ -158,10 +356,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void cst_encode_unit(void raw);
 
   @protected
-  int cst_encode_vision_filter(VisionFilter raw);
+  int cst_encode_vision_glaucoma_mode(VisionGlaucomaMode raw);
 
   @protected
   void sse_encode_String(String self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_vision_filter(
+      VisionFilter self, SseSerializer serializer);
 
   @protected
   void sse_encode_f_32(double self, SseSerializer serializer);
@@ -197,6 +399,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_vision_filter(VisionFilter self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_vision_glaucoma_mode(
+      VisionGlaucomaMode self, SseSerializer serializer);
 
   @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
@@ -240,7 +446,7 @@ class RustLibWire implements BaseWire {
       .asFunction<void Function(DartPostCObjectFnType)>();
 
   WireSyncRust2DartDco wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
-    int filter,
+    ffi.Pointer<wire_cst_vision_filter> filter,
     ffi.Pointer<wire_cst_list_prim_u_8_loose> rgba8,
     int width,
     int height,
@@ -259,7 +465,7 @@ class RustLibWire implements BaseWire {
       _lookup<
           ffi.NativeFunction<
               WireSyncRust2DartDco Function(
-                ffi.Int32,
+                ffi.Pointer<wire_cst_vision_filter>,
                 ffi.Pointer<wire_cst_list_prim_u_8_loose>,
                 ffi.Uint32,
                 ffi.Uint32,
@@ -270,7 +476,7 @@ class RustLibWire implements BaseWire {
   late final _wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8 =
       _wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8Ptr.asFunction<
           WireSyncRust2DartDco Function(
-            int,
+            ffi.Pointer<wire_cst_vision_filter>,
             ffi.Pointer<wire_cst_list_prim_u_8_loose>,
             int,
             int,
@@ -278,63 +484,84 @@ class RustLibWire implements BaseWire {
           )>();
 
   WireSyncRust2DartDco wire__crate__api__sensus_bridge__vision_shader_glsl(
-    int filter,
+    ffi.Pointer<wire_cst_vision_filter> filter,
   ) {
     return _wire__crate__api__sensus_bridge__vision_shader_glsl(filter);
   }
 
-  late final _wire__crate__api__sensus_bridge__vision_shader_glslPtr =
-      _lookup<ffi.NativeFunction<WireSyncRust2DartDco Function(ffi.Int32)>>(
+  late final _wire__crate__api__sensus_bridge__vision_shader_glslPtr = _lookup<
+      ffi.NativeFunction<
+          WireSyncRust2DartDco Function(ffi.Pointer<wire_cst_vision_filter>)>>(
     'frbgen_universal_experience_wire__crate__api__sensus_bridge__vision_shader_glsl',
   );
   late final _wire__crate__api__sensus_bridge__vision_shader_glsl =
-      _wire__crate__api__sensus_bridge__vision_shader_glslPtr
-          .asFunction<WireSyncRust2DartDco Function(int)>();
+      _wire__crate__api__sensus_bridge__vision_shader_glslPtr.asFunction<
+          WireSyncRust2DartDco Function(ffi.Pointer<wire_cst_vision_filter>)>();
 
   WireSyncRust2DartDco wire__crate__api__sensus_bridge__vision_uniform_layout(
-    int filter,
+    ffi.Pointer<wire_cst_vision_filter> filter,
   ) {
     return _wire__crate__api__sensus_bridge__vision_uniform_layout(filter);
   }
 
   late final _wire__crate__api__sensus_bridge__vision_uniform_layoutPtr =
-      _lookup<ffi.NativeFunction<WireSyncRust2DartDco Function(ffi.Int32)>>(
+      _lookup<
+          ffi.NativeFunction<
+              WireSyncRust2DartDco Function(
+                  ffi.Pointer<wire_cst_vision_filter>)>>(
     'frbgen_universal_experience_wire__crate__api__sensus_bridge__vision_uniform_layout',
   );
   late final _wire__crate__api__sensus_bridge__vision_uniform_layout =
-      _wire__crate__api__sensus_bridge__vision_uniform_layoutPtr
-          .asFunction<WireSyncRust2DartDco Function(int)>();
+      _wire__crate__api__sensus_bridge__vision_uniform_layoutPtr.asFunction<
+          WireSyncRust2DartDco Function(ffi.Pointer<wire_cst_vision_filter>)>();
 
   WireSyncRust2DartDco wire__crate__api__sensus_bridge__vision_uniforms(
-    int filter,
+    ffi.Pointer<wire_cst_vision_filter> filter,
     double strength,
+    double time,
     int width,
     int height,
-    int _seed,
   ) {
     return _wire__crate__api__sensus_bridge__vision_uniforms(
       filter,
       strength,
+      time,
       width,
       height,
-      _seed,
     );
   }
 
   late final _wire__crate__api__sensus_bridge__vision_uniformsPtr = _lookup<
       ffi.NativeFunction<
           WireSyncRust2DartDco Function(
-            ffi.Int32,
+            ffi.Pointer<wire_cst_vision_filter>,
+            ffi.Float,
             ffi.Float,
             ffi.Uint32,
             ffi.Uint32,
-            ffi.Uint64,
           )>>(
     'frbgen_universal_experience_wire__crate__api__sensus_bridge__vision_uniforms',
   );
   late final _wire__crate__api__sensus_bridge__vision_uniforms =
       _wire__crate__api__sensus_bridge__vision_uniformsPtr.asFunction<
-          WireSyncRust2DartDco Function(int, double, int, int, int)>();
+          WireSyncRust2DartDco Function(
+            ffi.Pointer<wire_cst_vision_filter>,
+            double,
+            double,
+            int,
+            int,
+          )>();
+
+  ffi.Pointer<wire_cst_vision_filter> cst_new_box_autoadd_vision_filter() {
+    return _cst_new_box_autoadd_vision_filter();
+  }
+
+  late final _cst_new_box_autoadd_vision_filterPtr = _lookup<
+          ffi.NativeFunction<ffi.Pointer<wire_cst_vision_filter> Function()>>(
+      'frbgen_universal_experience_cst_new_box_autoadd_vision_filter');
+  late final _cst_new_box_autoadd_vision_filter =
+      _cst_new_box_autoadd_vision_filterPtr
+          .asFunction<ffi.Pointer<wire_cst_vision_filter> Function()>();
 
   ffi.Pointer<wire_cst_list_String> cst_new_list_String(int len) {
     return _cst_new_list_String(len);
@@ -406,6 +633,125 @@ typedef DartDartPostCObjectFnTypeFunction = bool Function(
     DartDartPort port_id, ffi.Pointer<ffi.Void> message);
 typedef DartPostCObjectFnType
     = ffi.Pointer<ffi.NativeFunction<DartPostCObjectFnTypeFunction>>;
+
+final class wire_cst_VisionFilter_Astigmatism extends ffi.Struct {
+  @ffi.Float()
+  external double axis_deg;
+}
+
+final class wire_cst_VisionFilter_Glaucoma extends ffi.Struct {
+  @ffi.Int32()
+  external int mode;
+}
+
+final class wire_cst_VisionFilter_Hemianopia extends ffi.Struct {
+  @ffi.Float()
+  external double side;
+}
+
+final class wire_cst_VisionFilter_Cataract extends ffi.Struct {
+  @ffi.Uint64()
+  external int seed;
+}
+
+final class wire_cst_VisionFilter_Floaters extends ffi.Struct {
+  @ffi.Uint64()
+  external int seed;
+
+  @ffi.Float()
+  external double density;
+
+  @ffi.Float()
+  external double size;
+
+  @ffi.Float()
+  external double gaze_x;
+
+  @ffi.Float()
+  external double gaze_y;
+}
+
+final class wire_cst_VisionFilter_Diplopia extends ffi.Struct {
+  @ffi.Float()
+  external double offset_x;
+
+  @ffi.Float()
+  external double offset_y;
+
+  @ffi.Float()
+  external double ghost_strength;
+}
+
+final class wire_cst_VisionFilter_Nystagmus extends ffi.Struct {
+  @ffi.Float()
+  external double amplitude;
+
+  @ffi.Float()
+  external double direction_deg;
+}
+
+final class wire_cst_VisionFilter_Starbursts extends ffi.Struct {
+  @ffi.Uint32()
+  external int num_rays;
+
+  @ffi.Float()
+  external double ray_length_ratio;
+
+  @ffi.Float()
+  external double threshold;
+
+  @ffi.Float()
+  external double dispersion;
+}
+
+final class wire_cst_VisionFilter_Metamorphopsia extends ffi.Struct {
+  @ffi.Float()
+  external double freq;
+
+  @ffi.Uint64()
+  external int seed;
+}
+
+final class wire_cst_VisionFilter_DetailLoss extends ffi.Struct {
+  @ffi.Uint32()
+  external int cell_size;
+}
+
+final class wire_cst_VisionFilter_FlickeringStars extends ffi.Struct {
+  @ffi.Uint64()
+  external int seed;
+}
+
+final class VisionFilterKind extends ffi.Union {
+  external wire_cst_VisionFilter_Astigmatism Astigmatism;
+
+  external wire_cst_VisionFilter_Glaucoma Glaucoma;
+
+  external wire_cst_VisionFilter_Hemianopia Hemianopia;
+
+  external wire_cst_VisionFilter_Cataract Cataract;
+
+  external wire_cst_VisionFilter_Floaters Floaters;
+
+  external wire_cst_VisionFilter_Diplopia Diplopia;
+
+  external wire_cst_VisionFilter_Nystagmus Nystagmus;
+
+  external wire_cst_VisionFilter_Starbursts Starbursts;
+
+  external wire_cst_VisionFilter_Metamorphopsia Metamorphopsia;
+
+  external wire_cst_VisionFilter_DetailLoss DetailLoss;
+
+  external wire_cst_VisionFilter_FlickeringStars FlickeringStars;
+}
+
+final class wire_cst_vision_filter extends ffi.Struct {
+  @ffi.Int32()
+  external int tag;
+
+  external VisionFilterKind kind;
+}
 
 final class wire_cst_list_prim_u_8_loose extends ffi.Struct {
   external ffi.Pointer<ffi.Uint8> ptr;

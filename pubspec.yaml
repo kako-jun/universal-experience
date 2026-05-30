@@ -34,6 +34,8 @@ dependencies:
   # codegen ツール (2.11.1) と生成物のバージョンスタンプを一致させるため exact pin。
   # （^ にすると 2.12.0 が入り forceSameCodegenVersion で実機初期化に失敗しうる）
   flutter_rust_bridge: 2.11.1
+  # FRB 2.11.1 は freezed 2.x 系を前提（3.x prerelease は非互換）。
+  freezed_annotation: ^2.4.4
 
 dev_dependencies:
   flutter_test:
@@ -41,6 +43,8 @@ dev_dependencies:
   flutter_lints: ^3.0.1
   # flutter_rust_bridge_codegen が生成時に要求する。
   ffigen: ^20.1.1
+  freezed: ^2.5.7
+  build_runner: ^2.4.13
 
 flutter:
   uses-material-design: true
