@@ -1,0 +1,9 @@
+# flutter_rust_bridge v2 configuration
+# https://cjycode.com/flutter_rust_bridge/
+
+rust_input: crate::api
+rust_root: rust/
+dart_output: lib/src/rust
+
+# Extra configuration
+full_dep: true

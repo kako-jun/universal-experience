@@ -4,7 +4,9 @@ publish_to: 'none'
 version: 0.1.0+1
 
 environment:
-  sdk: '>=3.2.0 <4.0.0'
+  # flutter_rust_bridge 生成の frb_generated.web.dart が inline-class
+  # (extension type) を使うため Dart 3.3+ が必要。
+  sdk: '>=3.3.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -27,10 +29,18 @@ dependencies:
   color_vision_filter:
     path: plugins/color_vision_filter
 
+  # Rust Bridge (sensus-core 連携: シェーダ取得 + uniform 計算)
+  # selona と同じ 2.11.1 系を採用（selona は ^ だが、ここは exact pin）。
+  # codegen ツール (2.11.1) と生成物のバージョンスタンプを一致させるため exact pin。
+  # （^ にすると 2.12.0 が入り forceSameCodegenVersion で実機初期化に失敗しうる）
+  flutter_rust_bridge: 2.11.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
+  # flutter_rust_bridge_codegen が生成時に要求する。
+  ffigen: ^20.1.1
 
 flutter:
   uses-material-design: true

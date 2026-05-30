@@ -1,0 +1,26 @@
+[package]
+name = "universal_experience_rust"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+# flutter_rust_bridge は selona と同一バージョンに固定する（codegen の
+# forceSameCodegenVersion 前提）。
+flutter_rust_bridge = "=2.11.1"
+# 感覚障害シミュレーションのアルゴリズム正本。シェーダ文字列と uniform 計算を
+# 提供する（sensus_core::shaders）。GLSL/uniform を ue 内で再実装しないための
+# 一元化依存。
+sensus-core = "0.5"
+# CPU フォールバック (apply_vision_cpu_rgba8) で RgbaImage を組むため。
+# sensus-core が使う image 0.25 系に合わせる（DynamicImage の型整合のため）。
+image = { version = "0.25", default-features = false }
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = true
