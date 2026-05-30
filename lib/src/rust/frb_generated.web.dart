@@ -3,7 +3,6 @@
 
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
-
 // Static analysis wrongly picks the IO variant, thus ignore this
 // ignore_for_file: argument_type_not_assignable
 
@@ -13,150 +12,378 @@ import 'dart:convert';
 import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_web.dart';
 
+abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
+  RustLibApiImplPlatform({
+    required super.handler,
+    required super.wire,
+    required super.generalizedFrbRustBinding,
+    required super.portManager,
+  });
 
+  @protected
+  String dco_decode_String(dynamic raw);
 
+  @protected
+  VisionFilter dco_decode_box_autoadd_vision_filter(dynamic raw);
 
-                abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
-                  RustLibApiImplPlatform({
-                    required super.handler,
-                    required super.wire,
-                    required super.generalizedFrbRustBinding,
-                    required super.portManager,
-                  });
+  @protected
+  double dco_decode_f_32(dynamic raw);
 
-                  
+  @protected
+  int dco_decode_i_32(dynamic raw);
 
-                  @protected String dco_decode_String(dynamic raw);
+  @protected
+  List<String> dco_decode_list_String(dynamic raw);
 
-@protected double dco_decode_f_32(dynamic raw);
+  @protected
+  Float32List dco_decode_list_prim_f_32_strict(dynamic raw);
 
-@protected int dco_decode_i_32(dynamic raw);
+  @protected
+  List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
 
-@protected List<String> dco_decode_list_String(dynamic raw);
+  @protected
+  Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
-@protected Float32List dco_decode_list_prim_f_32_strict(dynamic raw);
+  @protected
+  int dco_decode_u_32(dynamic raw);
 
-@protected List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
+  @protected
+  BigInt dco_decode_u_64(dynamic raw);
 
-@protected Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+  @protected
+  int dco_decode_u_8(dynamic raw);
 
-@protected int dco_decode_u_32(dynamic raw);
+  @protected
+  void dco_decode_unit(dynamic raw);
 
-@protected BigInt dco_decode_u_64(dynamic raw);
+  @protected
+  VisionFilter dco_decode_vision_filter(dynamic raw);
 
-@protected int dco_decode_u_8(dynamic raw);
+  @protected
+  VisionGlaucomaMode dco_decode_vision_glaucoma_mode(dynamic raw);
 
-@protected void dco_decode_unit(dynamic raw);
+  @protected
+  String sse_decode_String(SseDeserializer deserializer);
 
-@protected VisionFilter dco_decode_vision_filter(dynamic raw);
+  @protected
+  VisionFilter sse_decode_box_autoadd_vision_filter(
+      SseDeserializer deserializer);
 
-@protected String sse_decode_String(SseDeserializer deserializer);
+  @protected
+  double sse_decode_f_32(SseDeserializer deserializer);
 
-@protected double sse_decode_f_32(SseDeserializer deserializer);
+  @protected
+  int sse_decode_i_32(SseDeserializer deserializer);
 
-@protected int sse_decode_i_32(SseDeserializer deserializer);
+  @protected
+  List<String> sse_decode_list_String(SseDeserializer deserializer);
 
-@protected List<String> sse_decode_list_String(SseDeserializer deserializer);
+  @protected
+  Float32List sse_decode_list_prim_f_32_strict(SseDeserializer deserializer);
 
-@protected Float32List sse_decode_list_prim_f_32_strict(SseDeserializer deserializer);
+  @protected
+  List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
 
-@protected List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
+  @protected
+  Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
-@protected Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+  @protected
+  int sse_decode_u_32(SseDeserializer deserializer);
 
-@protected int sse_decode_u_32(SseDeserializer deserializer);
+  @protected
+  BigInt sse_decode_u_64(SseDeserializer deserializer);
 
-@protected BigInt sse_decode_u_64(SseDeserializer deserializer);
+  @protected
+  int sse_decode_u_8(SseDeserializer deserializer);
 
-@protected int sse_decode_u_8(SseDeserializer deserializer);
+  @protected
+  void sse_decode_unit(SseDeserializer deserializer);
 
-@protected void sse_decode_unit(SseDeserializer deserializer);
+  @protected
+  VisionFilter sse_decode_vision_filter(SseDeserializer deserializer);
 
-@protected VisionFilter sse_decode_vision_filter(SseDeserializer deserializer);
+  @protected
+  VisionGlaucomaMode sse_decode_vision_glaucoma_mode(
+      SseDeserializer deserializer);
 
-@protected bool sse_decode_bool(SseDeserializer deserializer);
+  @protected
+  bool sse_decode_bool(SseDeserializer deserializer);
 
-@protected String cst_encode_String(String raw){ // Codec=Cst (C-struct based), see doc to use other codecs
-return raw; }
+  @protected
+  String cst_encode_String(String raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return raw;
+  }
 
-@protected JSAny cst_encode_list_String(List<String> raw){ // Codec=Cst (C-struct based), see doc to use other codecs
-return raw.map(cst_encode_String).toList().jsify()!; }
+  @protected
+  JSAny cst_encode_box_autoadd_vision_filter(VisionFilter raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return cst_encode_vision_filter(raw);
+  }
 
-@protected JSAny cst_encode_list_prim_f_32_strict(Float32List raw){ // Codec=Cst (C-struct based), see doc to use other codecs
-return raw.jsify()!; }
+  @protected
+  JSAny cst_encode_list_String(List<String> raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return raw.map(cst_encode_String).toList().jsify()!;
+  }
 
-@protected JSAny cst_encode_list_prim_u_8_loose(List<int> raw){ // Codec=Cst (C-struct based), see doc to use other codecs
-return raw.jsify()!; }
+  @protected
+  JSAny cst_encode_list_prim_f_32_strict(Float32List raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return raw.jsify()!;
+  }
 
-@protected JSAny cst_encode_list_prim_u_8_strict(Uint8List raw){ // Codec=Cst (C-struct based), see doc to use other codecs
-return raw.jsify()!; }
+  @protected
+  JSAny cst_encode_list_prim_u_8_loose(List<int> raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return raw.jsify()!;
+  }
 
-@protected JSAny cst_encode_u_64(BigInt raw){ // Codec=Cst (C-struct based), see doc to use other codecs
-return castNativeBigInt(raw); }
+  @protected
+  JSAny cst_encode_list_prim_u_8_strict(Uint8List raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return raw.jsify()!;
+  }
 
-@protected double cst_encode_f_32(double raw);
+  @protected
+  JSAny cst_encode_u_64(BigInt raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return castNativeBigInt(raw);
+  }
 
-@protected int cst_encode_i_32(int raw);
+  @protected
+  JSAny cst_encode_vision_filter(VisionFilter raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    if (raw is VisionFilter_Protanopia) {
+      return [0].jsify()!;
+    }
+    if (raw is VisionFilter_Deuteranopia) {
+      return [1].jsify()!;
+    }
+    if (raw is VisionFilter_Tritanopia) {
+      return [2].jsify()!;
+    }
+    if (raw is VisionFilter_Achromatopsia) {
+      return [3].jsify()!;
+    }
+    if (raw is VisionFilter_Tetrachromacy) {
+      return [4].jsify()!;
+    }
+    if (raw is VisionFilter_Myopia) {
+      return [5].jsify()!;
+    }
+    if (raw is VisionFilter_Hyperopia) {
+      return [6].jsify()!;
+    }
+    if (raw is VisionFilter_Presbyopia) {
+      return [7].jsify()!;
+    }
+    if (raw is VisionFilter_Astigmatism) {
+      return [8, cst_encode_f_32(raw.axisDeg)].jsify()!;
+    }
+    if (raw is VisionFilter_Glaucoma) {
+      return [9, cst_encode_vision_glaucoma_mode(raw.mode)].jsify()!;
+    }
+    if (raw is VisionFilter_MacularDegeneration) {
+      return [10].jsify()!;
+    }
+    if (raw is VisionFilter_Hemianopia) {
+      return [11, cst_encode_f_32(raw.side)].jsify()!;
+    }
+    if (raw is VisionFilter_TunnelVision) {
+      return [12].jsify()!;
+    }
+    if (raw is VisionFilter_Cataract) {
+      return [13, cst_encode_u_64(raw.seed)].jsify()!;
+    }
+    if (raw is VisionFilter_Floaters) {
+      return [
+        14,
+        cst_encode_u_64(raw.seed),
+        cst_encode_f_32(raw.density),
+        cst_encode_f_32(raw.size),
+        cst_encode_f_32(raw.gazeX),
+        cst_encode_f_32(raw.gazeY)
+      ].jsify()!;
+    }
+    if (raw is VisionFilter_Photophobia) {
+      return [15].jsify()!;
+    }
+    if (raw is VisionFilter_NightBlindness) {
+      return [16].jsify()!;
+    }
+    if (raw is VisionFilter_Vertigo) {
+      return [17].jsify()!;
+    }
+    if (raw is VisionFilter_BppvRotation) {
+      return [18].jsify()!;
+    }
+    if (raw is VisionFilter_VestibularNeuritis) {
+      return [19].jsify()!;
+    }
+    if (raw is VisionFilter_Diplopia) {
+      return [
+        20,
+        cst_encode_f_32(raw.offsetX),
+        cst_encode_f_32(raw.offsetY),
+        cst_encode_f_32(raw.ghostStrength)
+      ].jsify()!;
+    }
+    if (raw is VisionFilter_Nystagmus) {
+      return [
+        21,
+        cst_encode_f_32(raw.amplitude),
+        cst_encode_f_32(raw.directionDeg)
+      ].jsify()!;
+    }
+    if (raw is VisionFilter_Starbursts) {
+      return [
+        22,
+        cst_encode_u_32(raw.numRays),
+        cst_encode_f_32(raw.rayLengthRatio),
+        cst_encode_f_32(raw.threshold),
+        cst_encode_f_32(raw.dispersion)
+      ].jsify()!;
+    }
+    if (raw is VisionFilter_EyeStrain) {
+      return [23].jsify()!;
+    }
+    if (raw is VisionFilter_DryEye) {
+      return [24].jsify()!;
+    }
+    if (raw is VisionFilter_Metamorphopsia) {
+      return [25, cst_encode_f_32(raw.freq), cst_encode_u_64(raw.seed)]
+          .jsify()!;
+    }
+    if (raw is VisionFilter_ContrastSensitivity) {
+      return [26].jsify()!;
+    }
+    if (raw is VisionFilter_DetailLoss) {
+      return [27, cst_encode_u_32(raw.cellSize)].jsify()!;
+    }
+    if (raw is VisionFilter_Teichopsia) {
+      return [28].jsify()!;
+    }
+    if (raw is VisionFilter_FlickeringStars) {
+      return [29, cst_encode_u_64(raw.seed)].jsify()!;
+    }
 
-@protected int cst_encode_u_32(int raw);
+    throw Exception('unreachable');
+  }
 
-@protected int cst_encode_u_8(int raw);
+  @protected
+  double cst_encode_f_32(double raw);
 
-@protected void cst_encode_unit(void raw);
+  @protected
+  int cst_encode_i_32(int raw);
 
-@protected int cst_encode_vision_filter(VisionFilter raw);
+  @protected
+  int cst_encode_u_32(int raw);
 
-@protected void sse_encode_String(String self, SseSerializer serializer);
+  @protected
+  int cst_encode_u_8(int raw);
 
-@protected void sse_encode_f_32(double self, SseSerializer serializer);
+  @protected
+  void cst_encode_unit(void raw);
 
-@protected void sse_encode_i_32(int self, SseSerializer serializer);
+  @protected
+  int cst_encode_vision_glaucoma_mode(VisionGlaucomaMode raw);
 
-@protected void sse_encode_list_String(List<String> self, SseSerializer serializer);
+  @protected
+  void sse_encode_String(String self, SseSerializer serializer);
 
-@protected void sse_encode_list_prim_f_32_strict(Float32List self, SseSerializer serializer);
+  @protected
+  void sse_encode_box_autoadd_vision_filter(
+      VisionFilter self, SseSerializer serializer);
 
-@protected void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
+  @protected
+  void sse_encode_f_32(double self, SseSerializer serializer);
 
-@protected void sse_encode_list_prim_u_8_strict(Uint8List self, SseSerializer serializer);
+  @protected
+  void sse_encode_i_32(int self, SseSerializer serializer);
 
-@protected void sse_encode_u_32(int self, SseSerializer serializer);
+  @protected
+  void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
-@protected void sse_encode_u_64(BigInt self, SseSerializer serializer);
+  @protected
+  void sse_encode_list_prim_f_32_strict(
+      Float32List self, SseSerializer serializer);
 
-@protected void sse_encode_u_8(int self, SseSerializer serializer);
+  @protected
+  void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
 
-@protected void sse_encode_unit(void self, SseSerializer serializer);
+  @protected
+  void sse_encode_list_prim_u_8_strict(
+      Uint8List self, SseSerializer serializer);
 
-@protected void sse_encode_vision_filter(VisionFilter self, SseSerializer serializer);
+  @protected
+  void sse_encode_u_32(int self, SseSerializer serializer);
 
-@protected void sse_encode_bool(bool self, SseSerializer serializer);
-                }
-                
+  @protected
+  void sse_encode_u_64(BigInt self, SseSerializer serializer);
 
+  @protected
+  void sse_encode_u_8(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_unit(void self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_vision_filter(VisionFilter self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_vision_glaucoma_mode(
+      VisionGlaucomaMode self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_bool(bool self, SseSerializer serializer);
+}
 
 // Section: wire_class
 
 class RustLibWire implements BaseWire {
-            RustLibWire.fromExternalLibrary(ExternalLibrary lib);
+  RustLibWire.fromExternalLibrary(ExternalLibrary lib);
 
-            JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */ wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(int filter,JSAny rgba8,int width,int height,double strength) => wasmModule.wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(filter,rgba8,width,height,strength);
+  JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(JSAny filter,
+              JSAny rgba8, int width, int height, double strength) =>
+          wasmModule.wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
+              filter, rgba8, width, height, strength);
 
-JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */ wire__crate__api__sensus_bridge__vision_shader_glsl(int filter) => wasmModule.wire__crate__api__sensus_bridge__vision_shader_glsl(filter);
+  JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__vision_shader_glsl(JSAny filter) =>
+          wasmModule
+              .wire__crate__api__sensus_bridge__vision_shader_glsl(filter);
 
-JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */ wire__crate__api__sensus_bridge__vision_uniform_layout(int filter) => wasmModule.wire__crate__api__sensus_bridge__vision_uniform_layout(filter);
+  JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__vision_uniform_layout(JSAny filter) =>
+          wasmModule
+              .wire__crate__api__sensus_bridge__vision_uniform_layout(filter);
 
-JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */ wire__crate__api__sensus_bridge__vision_uniforms(int filter,double strength,int width,int height,JSAny seed) => wasmModule.wire__crate__api__sensus_bridge__vision_uniforms(filter,strength,width,height,seed);
-        }
-        @JS('wasm_bindgen') external RustLibWasmModule get wasmModule;
+  JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__vision_uniforms(JSAny filter,
+              double strength, double time, int width, int height) =>
+          wasmModule.wire__crate__api__sensus_bridge__vision_uniforms(
+              filter, strength, time, width, height);
+}
 
-        @JS() @anonymous extension type RustLibWasmModule._(JSObject _) implements JSObject {
-            external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */ wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(int filter,JSAny rgba8,int width,int height,double strength);
+@JS('wasm_bindgen')
+external RustLibWasmModule get wasmModule;
 
-external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */ wire__crate__api__sensus_bridge__vision_shader_glsl(int filter);
+@JS()
+@anonymous
+extension type RustLibWasmModule._(JSObject _) implements JSObject {
+  external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
+          JSAny filter, JSAny rgba8, int width, int height, double strength);
 
-external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */ wire__crate__api__sensus_bridge__vision_uniform_layout(int filter);
+  external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__vision_shader_glsl(JSAny filter);
 
-external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */ wire__crate__api__sensus_bridge__vision_uniforms(int filter,double strength,int width,int height,JSAny _seed);
-        }
-        
+  external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__vision_uniform_layout(JSAny filter);
+
+  external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__vision_uniforms(
+          JSAny filter, double strength, double time, int width, int height);
+}

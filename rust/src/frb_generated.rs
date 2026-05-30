@@ -119,9 +119,9 @@ fn wire__crate__api__sensus_bridge__vision_uniform_layout_impl(
 fn wire__crate__api__sensus_bridge__vision_uniforms_impl(
     filter: impl CstDecode<crate::api::sensus_bridge::VisionFilter>,
     strength: impl CstDecode<f32>,
+    time: impl CstDecode<f32>,
     width: impl CstDecode<u32>,
     height: impl CstDecode<u32>,
-    _seed: impl CstDecode<u64>,
 ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::DcoCodec, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
@@ -132,16 +132,16 @@ fn wire__crate__api__sensus_bridge__vision_uniforms_impl(
         move || {
             let api_filter = filter.cst_decode();
             let api_strength = strength.cst_decode();
+            let api_time = time.cst_decode();
             let api_width = width.cst_decode();
             let api_height = height.cst_decode();
-            let api__seed = _seed.cst_decode();
             transform_result_dco::<_, _, ()>((move || {
                 let output_ok = Result::<_, ()>::Ok(crate::api::sensus_bridge::vision_uniforms(
                     api_filter,
                     api_strength,
+                    api_time,
                     api_width,
                     api_height,
-                    api__seed,
                 ))?;
                 Ok(output_ok)
             })())
@@ -181,17 +181,15 @@ impl CstDecode<u8> for u8 {
         self
     }
 }
-impl CstDecode<crate::api::sensus_bridge::VisionFilter> for i32 {
+impl CstDecode<crate::api::sensus_bridge::VisionGlaucomaMode> for i32 {
     // Codec=Cst (C-struct based), see doc to use other codecs
-    fn cst_decode(self) -> crate::api::sensus_bridge::VisionFilter {
+    fn cst_decode(self) -> crate::api::sensus_bridge::VisionGlaucomaMode {
         match self {
-            0 => crate::api::sensus_bridge::VisionFilter::Protanopia,
-            1 => crate::api::sensus_bridge::VisionFilter::Deuteranopia,
-            2 => crate::api::sensus_bridge::VisionFilter::Tritanopia,
-            3 => crate::api::sensus_bridge::VisionFilter::Achromatopsia,
-            4 => crate::api::sensus_bridge::VisionFilter::Myopia,
-            5 => crate::api::sensus_bridge::VisionFilter::Photophobia,
-            _ => unreachable!("Invalid variant for VisionFilter: {}", self),
+            0 => crate::api::sensus_bridge::VisionGlaucomaMode::Vignette,
+            1 => crate::api::sensus_bridge::VisionGlaucomaMode::ArcuateSuperior,
+            2 => crate::api::sensus_bridge::VisionGlaucomaMode::ArcuateInferior,
+            3 => crate::api::sensus_bridge::VisionGlaucomaMode::Biarcuate,
+            _ => unreachable!("Invalid variant for VisionGlaucomaMode: {}", self),
         }
     }
 }
@@ -282,15 +280,163 @@ impl SseDecode for () {
 impl SseDecode for crate::api::sensus_bridge::VisionFilter {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut tag_ = <i32>::sse_decode(deserializer);
+        match tag_ {
+            0 => {
+                return crate::api::sensus_bridge::VisionFilter::Protanopia;
+            }
+            1 => {
+                return crate::api::sensus_bridge::VisionFilter::Deuteranopia;
+            }
+            2 => {
+                return crate::api::sensus_bridge::VisionFilter::Tritanopia;
+            }
+            3 => {
+                return crate::api::sensus_bridge::VisionFilter::Achromatopsia;
+            }
+            4 => {
+                return crate::api::sensus_bridge::VisionFilter::Tetrachromacy;
+            }
+            5 => {
+                return crate::api::sensus_bridge::VisionFilter::Myopia;
+            }
+            6 => {
+                return crate::api::sensus_bridge::VisionFilter::Hyperopia;
+            }
+            7 => {
+                return crate::api::sensus_bridge::VisionFilter::Presbyopia;
+            }
+            8 => {
+                let mut var_axisDeg = <f32>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::VisionFilter::Astigmatism {
+                    axis_deg: var_axisDeg,
+                };
+            }
+            9 => {
+                let mut var_mode =
+                    <crate::api::sensus_bridge::VisionGlaucomaMode>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::VisionFilter::Glaucoma { mode: var_mode };
+            }
+            10 => {
+                return crate::api::sensus_bridge::VisionFilter::MacularDegeneration;
+            }
+            11 => {
+                let mut var_side = <f32>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::VisionFilter::Hemianopia { side: var_side };
+            }
+            12 => {
+                return crate::api::sensus_bridge::VisionFilter::TunnelVision;
+            }
+            13 => {
+                let mut var_seed = <u64>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::VisionFilter::Cataract { seed: var_seed };
+            }
+            14 => {
+                let mut var_seed = <u64>::sse_decode(deserializer);
+                let mut var_density = <f32>::sse_decode(deserializer);
+                let mut var_size = <f32>::sse_decode(deserializer);
+                let mut var_gazeX = <f32>::sse_decode(deserializer);
+                let mut var_gazeY = <f32>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::VisionFilter::Floaters {
+                    seed: var_seed,
+                    density: var_density,
+                    size: var_size,
+                    gaze_x: var_gazeX,
+                    gaze_y: var_gazeY,
+                };
+            }
+            15 => {
+                return crate::api::sensus_bridge::VisionFilter::Photophobia;
+            }
+            16 => {
+                return crate::api::sensus_bridge::VisionFilter::NightBlindness;
+            }
+            17 => {
+                return crate::api::sensus_bridge::VisionFilter::Vertigo;
+            }
+            18 => {
+                return crate::api::sensus_bridge::VisionFilter::BppvRotation;
+            }
+            19 => {
+                return crate::api::sensus_bridge::VisionFilter::VestibularNeuritis;
+            }
+            20 => {
+                let mut var_offsetX = <f32>::sse_decode(deserializer);
+                let mut var_offsetY = <f32>::sse_decode(deserializer);
+                let mut var_ghostStrength = <f32>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::VisionFilter::Diplopia {
+                    offset_x: var_offsetX,
+                    offset_y: var_offsetY,
+                    ghost_strength: var_ghostStrength,
+                };
+            }
+            21 => {
+                let mut var_amplitude = <f32>::sse_decode(deserializer);
+                let mut var_directionDeg = <f32>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::VisionFilter::Nystagmus {
+                    amplitude: var_amplitude,
+                    direction_deg: var_directionDeg,
+                };
+            }
+            22 => {
+                let mut var_numRays = <u32>::sse_decode(deserializer);
+                let mut var_rayLengthRatio = <f32>::sse_decode(deserializer);
+                let mut var_threshold = <f32>::sse_decode(deserializer);
+                let mut var_dispersion = <f32>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::VisionFilter::Starbursts {
+                    num_rays: var_numRays,
+                    ray_length_ratio: var_rayLengthRatio,
+                    threshold: var_threshold,
+                    dispersion: var_dispersion,
+                };
+            }
+            23 => {
+                return crate::api::sensus_bridge::VisionFilter::EyeStrain;
+            }
+            24 => {
+                return crate::api::sensus_bridge::VisionFilter::DryEye;
+            }
+            25 => {
+                let mut var_freq = <f32>::sse_decode(deserializer);
+                let mut var_seed = <u64>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::VisionFilter::Metamorphopsia {
+                    freq: var_freq,
+                    seed: var_seed,
+                };
+            }
+            26 => {
+                return crate::api::sensus_bridge::VisionFilter::ContrastSensitivity;
+            }
+            27 => {
+                let mut var_cellSize = <u32>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::VisionFilter::DetailLoss {
+                    cell_size: var_cellSize,
+                };
+            }
+            28 => {
+                return crate::api::sensus_bridge::VisionFilter::Teichopsia;
+            }
+            29 => {
+                let mut var_seed = <u64>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::VisionFilter::FlickeringStars { seed: var_seed };
+            }
+            _ => {
+                unimplemented!("");
+            }
+        }
+    }
+}
+
+impl SseDecode for crate::api::sensus_bridge::VisionGlaucomaMode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <i32>::sse_decode(deserializer);
         return match inner {
-            0 => crate::api::sensus_bridge::VisionFilter::Protanopia,
-            1 => crate::api::sensus_bridge::VisionFilter::Deuteranopia,
-            2 => crate::api::sensus_bridge::VisionFilter::Tritanopia,
-            3 => crate::api::sensus_bridge::VisionFilter::Achromatopsia,
-            4 => crate::api::sensus_bridge::VisionFilter::Myopia,
-            5 => crate::api::sensus_bridge::VisionFilter::Photophobia,
-            _ => unreachable!("Invalid variant for VisionFilter: {}", inner),
+            0 => crate::api::sensus_bridge::VisionGlaucomaMode::Vignette,
+            1 => crate::api::sensus_bridge::VisionGlaucomaMode::ArcuateSuperior,
+            2 => crate::api::sensus_bridge::VisionGlaucomaMode::ArcuateInferior,
+            3 => crate::api::sensus_bridge::VisionGlaucomaMode::Biarcuate,
+            _ => unreachable!("Invalid variant for VisionGlaucomaMode: {}", inner),
         };
     }
 }
@@ -333,13 +479,106 @@ fn pde_ffi_dispatcher_sync_impl(
 impl flutter_rust_bridge::IntoDart for crate::api::sensus_bridge::VisionFilter {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         match self {
-            Self::Protanopia => 0.into_dart(),
-            Self::Deuteranopia => 1.into_dart(),
-            Self::Tritanopia => 2.into_dart(),
-            Self::Achromatopsia => 3.into_dart(),
-            Self::Myopia => 4.into_dart(),
-            Self::Photophobia => 5.into_dart(),
-            _ => unreachable!(),
+            crate::api::sensus_bridge::VisionFilter::Protanopia => [0.into_dart()].into_dart(),
+            crate::api::sensus_bridge::VisionFilter::Deuteranopia => [1.into_dart()].into_dart(),
+            crate::api::sensus_bridge::VisionFilter::Tritanopia => [2.into_dart()].into_dart(),
+            crate::api::sensus_bridge::VisionFilter::Achromatopsia => [3.into_dart()].into_dart(),
+            crate::api::sensus_bridge::VisionFilter::Tetrachromacy => [4.into_dart()].into_dart(),
+            crate::api::sensus_bridge::VisionFilter::Myopia => [5.into_dart()].into_dart(),
+            crate::api::sensus_bridge::VisionFilter::Hyperopia => [6.into_dart()].into_dart(),
+            crate::api::sensus_bridge::VisionFilter::Presbyopia => [7.into_dart()].into_dart(),
+            crate::api::sensus_bridge::VisionFilter::Astigmatism { axis_deg } => {
+                [8.into_dart(), axis_deg.into_into_dart().into_dart()].into_dart()
+            }
+            crate::api::sensus_bridge::VisionFilter::Glaucoma { mode } => {
+                [9.into_dart(), mode.into_into_dart().into_dart()].into_dart()
+            }
+            crate::api::sensus_bridge::VisionFilter::MacularDegeneration => {
+                [10.into_dart()].into_dart()
+            }
+            crate::api::sensus_bridge::VisionFilter::Hemianopia { side } => {
+                [11.into_dart(), side.into_into_dart().into_dart()].into_dart()
+            }
+            crate::api::sensus_bridge::VisionFilter::TunnelVision => [12.into_dart()].into_dart(),
+            crate::api::sensus_bridge::VisionFilter::Cataract { seed } => {
+                [13.into_dart(), seed.into_into_dart().into_dart()].into_dart()
+            }
+            crate::api::sensus_bridge::VisionFilter::Floaters {
+                seed,
+                density,
+                size,
+                gaze_x,
+                gaze_y,
+            } => [
+                14.into_dart(),
+                seed.into_into_dart().into_dart(),
+                density.into_into_dart().into_dart(),
+                size.into_into_dart().into_dart(),
+                gaze_x.into_into_dart().into_dart(),
+                gaze_y.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
+            crate::api::sensus_bridge::VisionFilter::Photophobia => [15.into_dart()].into_dart(),
+            crate::api::sensus_bridge::VisionFilter::NightBlindness => [16.into_dart()].into_dart(),
+            crate::api::sensus_bridge::VisionFilter::Vertigo => [17.into_dart()].into_dart(),
+            crate::api::sensus_bridge::VisionFilter::BppvRotation => [18.into_dart()].into_dart(),
+            crate::api::sensus_bridge::VisionFilter::VestibularNeuritis => {
+                [19.into_dart()].into_dart()
+            }
+            crate::api::sensus_bridge::VisionFilter::Diplopia {
+                offset_x,
+                offset_y,
+                ghost_strength,
+            } => [
+                20.into_dart(),
+                offset_x.into_into_dart().into_dart(),
+                offset_y.into_into_dart().into_dart(),
+                ghost_strength.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
+            crate::api::sensus_bridge::VisionFilter::Nystagmus {
+                amplitude,
+                direction_deg,
+            } => [
+                21.into_dart(),
+                amplitude.into_into_dart().into_dart(),
+                direction_deg.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
+            crate::api::sensus_bridge::VisionFilter::Starbursts {
+                num_rays,
+                ray_length_ratio,
+                threshold,
+                dispersion,
+            } => [
+                22.into_dart(),
+                num_rays.into_into_dart().into_dart(),
+                ray_length_ratio.into_into_dart().into_dart(),
+                threshold.into_into_dart().into_dart(),
+                dispersion.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
+            crate::api::sensus_bridge::VisionFilter::EyeStrain => [23.into_dart()].into_dart(),
+            crate::api::sensus_bridge::VisionFilter::DryEye => [24.into_dart()].into_dart(),
+            crate::api::sensus_bridge::VisionFilter::Metamorphopsia { freq, seed } => [
+                25.into_dart(),
+                freq.into_into_dart().into_dart(),
+                seed.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
+            crate::api::sensus_bridge::VisionFilter::ContrastSensitivity => {
+                [26.into_dart()].into_dart()
+            }
+            crate::api::sensus_bridge::VisionFilter::DetailLoss { cell_size } => {
+                [27.into_dart(), cell_size.into_into_dart().into_dart()].into_dart()
+            }
+            crate::api::sensus_bridge::VisionFilter::Teichopsia => [28.into_dart()].into_dart(),
+            crate::api::sensus_bridge::VisionFilter::FlickeringStars { seed } => {
+                [29.into_dart(), seed.into_into_dart().into_dart()].into_dart()
+            }
+            _ => {
+                unimplemented!("");
+            }
         }
     }
 }
@@ -351,6 +590,29 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::sensus_bridge::VisionFilter>
     for crate::api::sensus_bridge::VisionFilter
 {
     fn into_into_dart(self) -> crate::api::sensus_bridge::VisionFilter {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::sensus_bridge::VisionGlaucomaMode {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Vignette => 0.into_dart(),
+            Self::ArcuateSuperior => 1.into_dart(),
+            Self::ArcuateInferior => 2.into_dart(),
+            Self::Biarcuate => 3.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::sensus_bridge::VisionGlaucomaMode
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::sensus_bridge::VisionGlaucomaMode>
+    for crate::api::sensus_bridge::VisionGlaucomaMode
+{
+    fn into_into_dart(self) -> crate::api::sensus_bridge::VisionGlaucomaMode {
         self
     }
 }
@@ -435,14 +697,153 @@ impl SseEncode for () {
 impl SseEncode for crate::api::sensus_bridge::VisionFilter {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        match self {
+            crate::api::sensus_bridge::VisionFilter::Protanopia => {
+                <i32>::sse_encode(0, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Deuteranopia => {
+                <i32>::sse_encode(1, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Tritanopia => {
+                <i32>::sse_encode(2, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Achromatopsia => {
+                <i32>::sse_encode(3, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Tetrachromacy => {
+                <i32>::sse_encode(4, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Myopia => {
+                <i32>::sse_encode(5, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Hyperopia => {
+                <i32>::sse_encode(6, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Presbyopia => {
+                <i32>::sse_encode(7, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Astigmatism { axis_deg } => {
+                <i32>::sse_encode(8, serializer);
+                <f32>::sse_encode(axis_deg, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Glaucoma { mode } => {
+                <i32>::sse_encode(9, serializer);
+                <crate::api::sensus_bridge::VisionGlaucomaMode>::sse_encode(mode, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::MacularDegeneration => {
+                <i32>::sse_encode(10, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Hemianopia { side } => {
+                <i32>::sse_encode(11, serializer);
+                <f32>::sse_encode(side, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::TunnelVision => {
+                <i32>::sse_encode(12, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Cataract { seed } => {
+                <i32>::sse_encode(13, serializer);
+                <u64>::sse_encode(seed, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Floaters {
+                seed,
+                density,
+                size,
+                gaze_x,
+                gaze_y,
+            } => {
+                <i32>::sse_encode(14, serializer);
+                <u64>::sse_encode(seed, serializer);
+                <f32>::sse_encode(density, serializer);
+                <f32>::sse_encode(size, serializer);
+                <f32>::sse_encode(gaze_x, serializer);
+                <f32>::sse_encode(gaze_y, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Photophobia => {
+                <i32>::sse_encode(15, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::NightBlindness => {
+                <i32>::sse_encode(16, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Vertigo => {
+                <i32>::sse_encode(17, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::BppvRotation => {
+                <i32>::sse_encode(18, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::VestibularNeuritis => {
+                <i32>::sse_encode(19, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Diplopia {
+                offset_x,
+                offset_y,
+                ghost_strength,
+            } => {
+                <i32>::sse_encode(20, serializer);
+                <f32>::sse_encode(offset_x, serializer);
+                <f32>::sse_encode(offset_y, serializer);
+                <f32>::sse_encode(ghost_strength, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Nystagmus {
+                amplitude,
+                direction_deg,
+            } => {
+                <i32>::sse_encode(21, serializer);
+                <f32>::sse_encode(amplitude, serializer);
+                <f32>::sse_encode(direction_deg, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Starbursts {
+                num_rays,
+                ray_length_ratio,
+                threshold,
+                dispersion,
+            } => {
+                <i32>::sse_encode(22, serializer);
+                <u32>::sse_encode(num_rays, serializer);
+                <f32>::sse_encode(ray_length_ratio, serializer);
+                <f32>::sse_encode(threshold, serializer);
+                <f32>::sse_encode(dispersion, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::EyeStrain => {
+                <i32>::sse_encode(23, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::DryEye => {
+                <i32>::sse_encode(24, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Metamorphopsia { freq, seed } => {
+                <i32>::sse_encode(25, serializer);
+                <f32>::sse_encode(freq, serializer);
+                <u64>::sse_encode(seed, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::ContrastSensitivity => {
+                <i32>::sse_encode(26, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::DetailLoss { cell_size } => {
+                <i32>::sse_encode(27, serializer);
+                <u32>::sse_encode(cell_size, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::Teichopsia => {
+                <i32>::sse_encode(28, serializer);
+            }
+            crate::api::sensus_bridge::VisionFilter::FlickeringStars { seed } => {
+                <i32>::sse_encode(29, serializer);
+                <u64>::sse_encode(seed, serializer);
+            }
+            _ => {
+                unimplemented!("");
+            }
+        }
+    }
+}
+
+impl SseEncode for crate::api::sensus_bridge::VisionGlaucomaMode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <i32>::sse_encode(
             match self {
-                crate::api::sensus_bridge::VisionFilter::Protanopia => 0,
-                crate::api::sensus_bridge::VisionFilter::Deuteranopia => 1,
-                crate::api::sensus_bridge::VisionFilter::Tritanopia => 2,
-                crate::api::sensus_bridge::VisionFilter::Achromatopsia => 3,
-                crate::api::sensus_bridge::VisionFilter::Myopia => 4,
-                crate::api::sensus_bridge::VisionFilter::Photophobia => 5,
+                crate::api::sensus_bridge::VisionGlaucomaMode::Vignette => 0,
+                crate::api::sensus_bridge::VisionGlaucomaMode::ArcuateSuperior => 1,
+                crate::api::sensus_bridge::VisionGlaucomaMode::ArcuateInferior => 2,
+                crate::api::sensus_bridge::VisionGlaucomaMode::Biarcuate => 3,
                 _ => {
                     unimplemented!("");
                 }
@@ -486,6 +887,13 @@ mod io {
             String::from_utf8(vec).unwrap()
         }
     }
+    impl CstDecode<crate::api::sensus_bridge::VisionFilter> for *mut wire_cst_vision_filter {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> crate::api::sensus_bridge::VisionFilter {
+            let wrap = unsafe { flutter_rust_bridge::for_generated::box_from_leak_ptr(self) };
+            CstDecode::<crate::api::sensus_bridge::VisionFilter>::cst_decode(*wrap).into()
+        }
+    }
     impl CstDecode<Vec<String>> for *mut wire_cst_list_String {
         // Codec=Cst (C-struct based), see doc to use other codecs
         fn cst_decode(self) -> Vec<String> {
@@ -523,10 +931,127 @@ mod io {
             }
         }
     }
+    impl CstDecode<crate::api::sensus_bridge::VisionFilter> for wire_cst_vision_filter {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> crate::api::sensus_bridge::VisionFilter {
+            match self.tag {
+                0 => crate::api::sensus_bridge::VisionFilter::Protanopia,
+                1 => crate::api::sensus_bridge::VisionFilter::Deuteranopia,
+                2 => crate::api::sensus_bridge::VisionFilter::Tritanopia,
+                3 => crate::api::sensus_bridge::VisionFilter::Achromatopsia,
+                4 => crate::api::sensus_bridge::VisionFilter::Tetrachromacy,
+                5 => crate::api::sensus_bridge::VisionFilter::Myopia,
+                6 => crate::api::sensus_bridge::VisionFilter::Hyperopia,
+                7 => crate::api::sensus_bridge::VisionFilter::Presbyopia,
+                8 => {
+                    let ans = unsafe { self.kind.Astigmatism };
+                    crate::api::sensus_bridge::VisionFilter::Astigmatism {
+                        axis_deg: ans.axis_deg.cst_decode(),
+                    }
+                }
+                9 => {
+                    let ans = unsafe { self.kind.Glaucoma };
+                    crate::api::sensus_bridge::VisionFilter::Glaucoma {
+                        mode: ans.mode.cst_decode(),
+                    }
+                }
+                10 => crate::api::sensus_bridge::VisionFilter::MacularDegeneration,
+                11 => {
+                    let ans = unsafe { self.kind.Hemianopia };
+                    crate::api::sensus_bridge::VisionFilter::Hemianopia {
+                        side: ans.side.cst_decode(),
+                    }
+                }
+                12 => crate::api::sensus_bridge::VisionFilter::TunnelVision,
+                13 => {
+                    let ans = unsafe { self.kind.Cataract };
+                    crate::api::sensus_bridge::VisionFilter::Cataract {
+                        seed: ans.seed.cst_decode(),
+                    }
+                }
+                14 => {
+                    let ans = unsafe { self.kind.Floaters };
+                    crate::api::sensus_bridge::VisionFilter::Floaters {
+                        seed: ans.seed.cst_decode(),
+                        density: ans.density.cst_decode(),
+                        size: ans.size.cst_decode(),
+                        gaze_x: ans.gaze_x.cst_decode(),
+                        gaze_y: ans.gaze_y.cst_decode(),
+                    }
+                }
+                15 => crate::api::sensus_bridge::VisionFilter::Photophobia,
+                16 => crate::api::sensus_bridge::VisionFilter::NightBlindness,
+                17 => crate::api::sensus_bridge::VisionFilter::Vertigo,
+                18 => crate::api::sensus_bridge::VisionFilter::BppvRotation,
+                19 => crate::api::sensus_bridge::VisionFilter::VestibularNeuritis,
+                20 => {
+                    let ans = unsafe { self.kind.Diplopia };
+                    crate::api::sensus_bridge::VisionFilter::Diplopia {
+                        offset_x: ans.offset_x.cst_decode(),
+                        offset_y: ans.offset_y.cst_decode(),
+                        ghost_strength: ans.ghost_strength.cst_decode(),
+                    }
+                }
+                21 => {
+                    let ans = unsafe { self.kind.Nystagmus };
+                    crate::api::sensus_bridge::VisionFilter::Nystagmus {
+                        amplitude: ans.amplitude.cst_decode(),
+                        direction_deg: ans.direction_deg.cst_decode(),
+                    }
+                }
+                22 => {
+                    let ans = unsafe { self.kind.Starbursts };
+                    crate::api::sensus_bridge::VisionFilter::Starbursts {
+                        num_rays: ans.num_rays.cst_decode(),
+                        ray_length_ratio: ans.ray_length_ratio.cst_decode(),
+                        threshold: ans.threshold.cst_decode(),
+                        dispersion: ans.dispersion.cst_decode(),
+                    }
+                }
+                23 => crate::api::sensus_bridge::VisionFilter::EyeStrain,
+                24 => crate::api::sensus_bridge::VisionFilter::DryEye,
+                25 => {
+                    let ans = unsafe { self.kind.Metamorphopsia };
+                    crate::api::sensus_bridge::VisionFilter::Metamorphopsia {
+                        freq: ans.freq.cst_decode(),
+                        seed: ans.seed.cst_decode(),
+                    }
+                }
+                26 => crate::api::sensus_bridge::VisionFilter::ContrastSensitivity,
+                27 => {
+                    let ans = unsafe { self.kind.DetailLoss };
+                    crate::api::sensus_bridge::VisionFilter::DetailLoss {
+                        cell_size: ans.cell_size.cst_decode(),
+                    }
+                }
+                28 => crate::api::sensus_bridge::VisionFilter::Teichopsia,
+                29 => {
+                    let ans = unsafe { self.kind.FlickeringStars };
+                    crate::api::sensus_bridge::VisionFilter::FlickeringStars {
+                        seed: ans.seed.cst_decode(),
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
+    impl NewWithNullPtr for wire_cst_vision_filter {
+        fn new_with_null_ptr() -> Self {
+            Self {
+                tag: -1,
+                kind: VisionFilterKind { nil__: () },
+            }
+        }
+    }
+    impl Default for wire_cst_vision_filter {
+        fn default() -> Self {
+            Self::new_with_null_ptr()
+        }
+    }
 
     #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_universal_experience_wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
-        filter: i32,
+        filter: *mut wire_cst_vision_filter,
         rgba8: *mut wire_cst_list_prim_u_8_loose,
         width: u32,
         height: u32,
@@ -539,28 +1064,34 @@ mod io {
 
     #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_universal_experience_wire__crate__api__sensus_bridge__vision_shader_glsl(
-        filter: i32,
+        filter: *mut wire_cst_vision_filter,
     ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
         wire__crate__api__sensus_bridge__vision_shader_glsl_impl(filter)
     }
 
     #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_universal_experience_wire__crate__api__sensus_bridge__vision_uniform_layout(
-        filter: i32,
+        filter: *mut wire_cst_vision_filter,
     ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
         wire__crate__api__sensus_bridge__vision_uniform_layout_impl(filter)
     }
 
     #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_universal_experience_wire__crate__api__sensus_bridge__vision_uniforms(
-        filter: i32,
+        filter: *mut wire_cst_vision_filter,
         strength: f32,
+        time: f32,
         width: u32,
         height: u32,
-        _seed: u64,
     ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
-        wire__crate__api__sensus_bridge__vision_uniforms_impl(
-            filter, strength, width, height, _seed,
+        wire__crate__api__sensus_bridge__vision_uniforms_impl(filter, strength, time, width, height)
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_universal_experience_cst_new_box_autoadd_vision_filter(
+    ) -> *mut wire_cst_vision_filter {
+        flutter_rust_bridge::for_generated::new_leak_box_ptr(
+            wire_cst_vision_filter::new_with_null_ptr(),
         )
     }
 
@@ -635,6 +1166,94 @@ mod io {
         ptr: *mut u8,
         len: i32,
     }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_vision_filter {
+        tag: i32,
+        kind: VisionFilterKind,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub union VisionFilterKind {
+        Astigmatism: wire_cst_VisionFilter_Astigmatism,
+        Glaucoma: wire_cst_VisionFilter_Glaucoma,
+        Hemianopia: wire_cst_VisionFilter_Hemianopia,
+        Cataract: wire_cst_VisionFilter_Cataract,
+        Floaters: wire_cst_VisionFilter_Floaters,
+        Diplopia: wire_cst_VisionFilter_Diplopia,
+        Nystagmus: wire_cst_VisionFilter_Nystagmus,
+        Starbursts: wire_cst_VisionFilter_Starbursts,
+        Metamorphopsia: wire_cst_VisionFilter_Metamorphopsia,
+        DetailLoss: wire_cst_VisionFilter_DetailLoss,
+        FlickeringStars: wire_cst_VisionFilter_FlickeringStars,
+        nil__: (),
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_VisionFilter_Astigmatism {
+        axis_deg: f32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_VisionFilter_Glaucoma {
+        mode: i32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_VisionFilter_Hemianopia {
+        side: f32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_VisionFilter_Cataract {
+        seed: u64,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_VisionFilter_Floaters {
+        seed: u64,
+        density: f32,
+        size: f32,
+        gaze_x: f32,
+        gaze_y: f32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_VisionFilter_Diplopia {
+        offset_x: f32,
+        offset_y: f32,
+        ghost_strength: f32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_VisionFilter_Nystagmus {
+        amplitude: f32,
+        direction_deg: f32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_VisionFilter_Starbursts {
+        num_rays: u32,
+        ray_length_ratio: f32,
+        threshold: f32,
+        dispersion: f32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_VisionFilter_Metamorphopsia {
+        freq: f32,
+        seed: u64,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_VisionFilter_DetailLoss {
+        cell_size: u32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_VisionFilter_FlickeringStars {
+        seed: u64,
+    }
 }
 #[cfg(not(target_family = "wasm"))]
 pub use io::*;
@@ -690,6 +1309,80 @@ mod web {
             self.into_vec()
         }
     }
+    impl CstDecode<crate::api::sensus_bridge::VisionFilter>
+        for flutter_rust_bridge::for_generated::wasm_bindgen::JsValue
+    {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> crate::api::sensus_bridge::VisionFilter {
+            let self_ = self.unchecked_into::<flutter_rust_bridge::for_generated::js_sys::Array>();
+            match self_.get(0).unchecked_into_f64() as _ {
+                0 => crate::api::sensus_bridge::VisionFilter::Protanopia,
+                1 => crate::api::sensus_bridge::VisionFilter::Deuteranopia,
+                2 => crate::api::sensus_bridge::VisionFilter::Tritanopia,
+                3 => crate::api::sensus_bridge::VisionFilter::Achromatopsia,
+                4 => crate::api::sensus_bridge::VisionFilter::Tetrachromacy,
+                5 => crate::api::sensus_bridge::VisionFilter::Myopia,
+                6 => crate::api::sensus_bridge::VisionFilter::Hyperopia,
+                7 => crate::api::sensus_bridge::VisionFilter::Presbyopia,
+                8 => crate::api::sensus_bridge::VisionFilter::Astigmatism {
+                    axis_deg: self_.get(1).cst_decode(),
+                },
+                9 => crate::api::sensus_bridge::VisionFilter::Glaucoma {
+                    mode: self_.get(1).cst_decode(),
+                },
+                10 => crate::api::sensus_bridge::VisionFilter::MacularDegeneration,
+                11 => crate::api::sensus_bridge::VisionFilter::Hemianopia {
+                    side: self_.get(1).cst_decode(),
+                },
+                12 => crate::api::sensus_bridge::VisionFilter::TunnelVision,
+                13 => crate::api::sensus_bridge::VisionFilter::Cataract {
+                    seed: self_.get(1).cst_decode(),
+                },
+                14 => crate::api::sensus_bridge::VisionFilter::Floaters {
+                    seed: self_.get(1).cst_decode(),
+                    density: self_.get(2).cst_decode(),
+                    size: self_.get(3).cst_decode(),
+                    gaze_x: self_.get(4).cst_decode(),
+                    gaze_y: self_.get(5).cst_decode(),
+                },
+                15 => crate::api::sensus_bridge::VisionFilter::Photophobia,
+                16 => crate::api::sensus_bridge::VisionFilter::NightBlindness,
+                17 => crate::api::sensus_bridge::VisionFilter::Vertigo,
+                18 => crate::api::sensus_bridge::VisionFilter::BppvRotation,
+                19 => crate::api::sensus_bridge::VisionFilter::VestibularNeuritis,
+                20 => crate::api::sensus_bridge::VisionFilter::Diplopia {
+                    offset_x: self_.get(1).cst_decode(),
+                    offset_y: self_.get(2).cst_decode(),
+                    ghost_strength: self_.get(3).cst_decode(),
+                },
+                21 => crate::api::sensus_bridge::VisionFilter::Nystagmus {
+                    amplitude: self_.get(1).cst_decode(),
+                    direction_deg: self_.get(2).cst_decode(),
+                },
+                22 => crate::api::sensus_bridge::VisionFilter::Starbursts {
+                    num_rays: self_.get(1).cst_decode(),
+                    ray_length_ratio: self_.get(2).cst_decode(),
+                    threshold: self_.get(3).cst_decode(),
+                    dispersion: self_.get(4).cst_decode(),
+                },
+                23 => crate::api::sensus_bridge::VisionFilter::EyeStrain,
+                24 => crate::api::sensus_bridge::VisionFilter::DryEye,
+                25 => crate::api::sensus_bridge::VisionFilter::Metamorphopsia {
+                    freq: self_.get(1).cst_decode(),
+                    seed: self_.get(2).cst_decode(),
+                },
+                26 => crate::api::sensus_bridge::VisionFilter::ContrastSensitivity,
+                27 => crate::api::sensus_bridge::VisionFilter::DetailLoss {
+                    cell_size: self_.get(1).cst_decode(),
+                },
+                28 => crate::api::sensus_bridge::VisionFilter::Teichopsia,
+                29 => crate::api::sensus_bridge::VisionFilter::FlickeringStars {
+                    seed: self_.get(1).cst_decode(),
+                },
+                _ => unreachable!(),
+            }
+        }
+    }
     impl CstDecode<String> for flutter_rust_bridge::for_generated::wasm_bindgen::JsValue {
         // Codec=Cst (C-struct based), see doc to use other codecs
         fn cst_decode(self) -> String {
@@ -742,18 +1435,18 @@ mod web {
             self.unchecked_into_f64() as _
         }
     }
-    impl CstDecode<crate::api::sensus_bridge::VisionFilter>
+    impl CstDecode<crate::api::sensus_bridge::VisionGlaucomaMode>
         for flutter_rust_bridge::for_generated::wasm_bindgen::JsValue
     {
         // Codec=Cst (C-struct based), see doc to use other codecs
-        fn cst_decode(self) -> crate::api::sensus_bridge::VisionFilter {
+        fn cst_decode(self) -> crate::api::sensus_bridge::VisionGlaucomaMode {
             (self.unchecked_into_f64() as i32).cst_decode()
         }
     }
 
     #[wasm_bindgen]
     pub fn wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
-        filter: i32,
+        filter: flutter_rust_bridge::for_generated::wasm_bindgen::JsValue,
         rgba8: Box<[u8]>,
         width: u32,
         height: u32,
@@ -766,29 +1459,27 @@ mod web {
 
     #[wasm_bindgen]
     pub fn wire__crate__api__sensus_bridge__vision_shader_glsl(
-        filter: i32,
+        filter: flutter_rust_bridge::for_generated::wasm_bindgen::JsValue,
     ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
         wire__crate__api__sensus_bridge__vision_shader_glsl_impl(filter)
     }
 
     #[wasm_bindgen]
     pub fn wire__crate__api__sensus_bridge__vision_uniform_layout(
-        filter: i32,
+        filter: flutter_rust_bridge::for_generated::wasm_bindgen::JsValue,
     ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
         wire__crate__api__sensus_bridge__vision_uniform_layout_impl(filter)
     }
 
     #[wasm_bindgen]
     pub fn wire__crate__api__sensus_bridge__vision_uniforms(
-        filter: i32,
+        filter: flutter_rust_bridge::for_generated::wasm_bindgen::JsValue,
         strength: f32,
+        time: f32,
         width: u32,
         height: u32,
-        _seed: flutter_rust_bridge::for_generated::wasm_bindgen::JsValue,
     ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
-        wire__crate__api__sensus_bridge__vision_uniforms_impl(
-            filter, strength, width, height, _seed,
-        )
+        wire__crate__api__sensus_bridge__vision_uniforms_impl(filter, strength, time, width, height)
     }
 }
 #[cfg(target_family = "wasm")]
