@@ -277,4 +277,128 @@ mod tests {
         let out = apply_vision_cpu_rgba8(VisionFilter::Protanopia, buf, w, h, 1.0).unwrap();
         assert_eq!(out.len(), (w * h * 4) as usize);
     }
+
+    /// 全フィルタを 1 ループで列挙するためのヘルパ。バリアントが増えたら
+    /// ここに追加するだけで全網羅テストが拾う。
+    const ALL_FILTERS: [VisionFilter; 6] = [
+        VisionFilter::Protanopia,
+        VisionFilter::Deuteranopia,
+        VisionFilter::Tritanopia,
+        VisionFilter::Achromatopsia,
+        VisionFilter::Myopia,
+        VisionFilter::Photophobia,
+    ];
+
+    /// 最重要不変条件: 全バリアントで uniforms の長さが layout の長さと一致する。
+    /// ズレると Dart 側 setFloat(i, ..) のインデックスが壊れる。
+    #[test]
+    fn all_filters_uniforms_len_matches_layout() {
+        for f in ALL_FILTERS {
+            let u = vision_uniforms(f, 0.5, 256, 128, 0);
+            let l = vision_uniform_layout(f);
+            assert_eq!(
+                u.len(),
+                l.len(),
+                "{f:?}: uniforms len {} != layout len {}",
+                u.len(),
+                l.len()
+            );
+            assert!(!l.is_empty(), "{f:?}: layout must not be empty");
+        }
+    }
+
+    /// 全バリアントで layout が非空ラベルを返す（空文字のプレースホルダ混入を防ぐ）。
+    #[test]
+    fn all_filters_layout_labels_non_empty() {
+        for f in ALL_FILTERS {
+            for (i, label) in vision_uniform_layout(f).iter().enumerate() {
+                assert!(!label.is_empty(), "{f:?}: layout[{i}] is empty");
+            }
+        }
+    }
+
+    /// 解像度依存フィルタ（Myopia）: width/height を変えると texel size と
+    /// 半径が変わる。解像度に依存しない色覚フィルタは値が変わらないことも確認。
+    #[test]
+    fn myopia_uniforms_track_resolution() {
+        let small = vision_uniforms(VisionFilter::Myopia, 1.0, 100, 100, 0);
+        let large = vision_uniforms(VisionFilter::Myopia, 1.0, 400, 400, 0);
+        // texel size = 1/dim なので解像度で変わる。
+        assert!((small[2] - 1.0 / 100.0).abs() < 1e-6);
+        assert!((large[2] - 1.0 / 400.0).abs() < 1e-6);
+        assert_ne!(small[2], large[2]);
+        // radius_px は min(width,height) に比例するので大きい画像ほど大きい。
+        assert!(large[1] > small[1]);
+    }
+
+    /// 解像度依存フィルタ（Photophobia）: 解像度で radius と texel が変わる。
+    #[test]
+    fn photophobia_uniforms_track_resolution() {
+        let small = vision_uniforms(VisionFilter::Photophobia, 1.0, 100, 100, 0);
+        let large = vision_uniforms(VisionFilter::Photophobia, 1.0, 400, 400, 0);
+        // layout: [uRadiusPx, uTexelSize.x, uTexelSize.y]
+        assert!((small[1] - 1.0 / 100.0).abs() < 1e-6);
+        assert!((large[1] - 1.0 / 400.0).abs() < 1e-6);
+        assert!(large[0] > small[0]); // radius_px が解像度で増える
+    }
+
+    /// 色覚フィルタは解像度に依存しない（width/height を変えても uniform 不変）。
+    #[test]
+    fn color_matrix_uniforms_ignore_resolution() {
+        for f in [
+            VisionFilter::Protanopia,
+            VisionFilter::Deuteranopia,
+            VisionFilter::Tritanopia,
+            VisionFilter::Achromatopsia,
+        ] {
+            let a = vision_uniforms(f, 0.7, 100, 100, 0);
+            let b = vision_uniforms(f, 0.7, 999, 333, 0);
+            assert_eq!(
+                a, b,
+                "{f:?}: color filter uniforms must not depend on resolution"
+            );
+        }
+    }
+
+    /// Photophobia は uStrength uniform を持たないが、strength は radius_px に
+    /// 畳み込まれている。strength を上げると radius_px が増えることの回帰。
+    #[test]
+    fn photophobia_strength_folds_into_radius() {
+        let weak = vision_uniforms(VisionFilter::Photophobia, 0.1, 200, 200, 0);
+        let strong = vision_uniforms(VisionFilter::Photophobia, 0.9, 200, 200, 0);
+        // index 0 = uRadiusPx
+        assert!(strong[0] > weak[0]);
+        // strength=0 なら bloom 半径は 0。
+        let zero = vision_uniforms(VisionFilter::Photophobia, 0.0, 200, 200, 0);
+        assert!(zero[0].abs() < 1e-6);
+    }
+
+    /// strength の境界・異常値を渡しても panic せず、長さ不変・有限値が返る
+    /// （clamp / NaN→0 は sensus 側 normalize_strength に委譲）。
+    #[test]
+    fn strength_extremes_do_not_panic() {
+        for f in ALL_FILTERS {
+            let layout_len = vision_uniform_layout(f).len();
+            for s in [0.0_f32, 1.0, -5.0, 100.0, f32::NAN, f32::INFINITY] {
+                let u = vision_uniforms(f, s, 256, 128, 0);
+                assert_eq!(u.len(), layout_len, "{f:?} s={s}: length changed");
+                for (i, v) in u.iter().enumerate() {
+                    assert!(v.is_finite(), "{f:?} s={s}: uniform[{i}] not finite ({v})");
+                }
+            }
+        }
+    }
+
+    /// 全バリアントで CPU apply が入力と同サイズの RGBA を返す（非正方・矩形含む）。
+    #[test]
+    fn cpu_apply_roundtrips_size_all_filters_non_square() {
+        let w = 8u32;
+        let h = 5u32;
+        let len = (w * h * 4) as usize;
+        for f in ALL_FILTERS {
+            let buf = vec![64u8; len];
+            let out = apply_vision_cpu_rgba8(f, buf, w, h, 0.6).unwrap();
+            assert_eq!(out.len(), len, "{f:?}: output size mismatch");
+        }
+    }
 }
