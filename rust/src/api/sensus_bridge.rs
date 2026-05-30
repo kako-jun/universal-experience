@@ -401,7 +401,10 @@ mod tests {
             for (w, h) in [(0u32, 0u32), (0, 128), (256, 0)] {
                 let u = vision_uniforms(f, 1.0, w, h, 0);
                 for (i, v) in u.iter().enumerate() {
-                    assert!(v.is_finite(), "{f:?} {w}x{h}: uniform[{i}] not finite ({v})");
+                    assert!(
+                        v.is_finite(),
+                        "{f:?} {w}x{h}: uniform[{i}] not finite ({v})"
+                    );
                 }
             }
         }
