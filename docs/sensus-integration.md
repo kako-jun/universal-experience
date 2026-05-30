@@ -122,7 +122,7 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
 
 - `rust/` crate を追加（selona と同構成、`flutter_rust_bridge = "=2.11.1"`、
   `sensus-core = "0.5"` 依存）。`cargo build` / `cargo fmt` / `cargo clippy` 通過。
-- ブリッジ API（上記 4 関数 + `VisionFilter` enum 6 種）を実装。`cargo test` 7 件通過。
+- ブリッジ API（上記 4 関数 + `VisionFilter` enum 6 種）を実装。`cargo test` 16 件通過。
 - FRB codegen 実行、`lib/src/rust/` に Dart バインディング生成。`flutter analyze`
   エラー 0（生成 web 版が inline-class を使うため Dart SDK 下限を 3.3 に引き上げ）。
 - 本ドキュメントで方言の結論と統合方針を確定。

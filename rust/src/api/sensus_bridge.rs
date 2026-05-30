@@ -87,6 +87,10 @@ pub fn vision_uniforms(
     height: u32,
     _seed: u64,
 ) -> Vec<f32> {
+    // texel_size = 1/dim を計算する際、0 だと +inf が下流（setFloat → シェーダ）へ
+    // 流れてしまう。呼び元は実画像サイズを渡す前提だが、防御的に最低 1 にする。
+    let width = width.max(1);
+    let height = height.max(1);
     match filter {
         VisionFilter::Protanopia => {
             let u = shaders::protanopia_uniforms(strength);
@@ -384,6 +388,20 @@ mod tests {
                 assert_eq!(u.len(), layout_len, "{f:?} s={s}: length changed");
                 for (i, v) in u.iter().enumerate() {
                     assert!(v.is_finite(), "{f:?} s={s}: uniform[{i}] not finite ({v})");
+                }
+            }
+        }
+    }
+
+    /// width/height が 0 でも texel_size が +inf にならず有限値が返る
+    /// （`width.max(1)` ガードの回帰。0 除算で inf が下流に流れるのを防ぐ）。
+    #[test]
+    fn zero_dimensions_produce_finite_uniforms() {
+        for f in ALL_FILTERS {
+            for (w, h) in [(0u32, 0u32), (0, 128), (256, 0)] {
+                let u = vision_uniforms(f, 1.0, w, h, 0);
+                for (i, v) in u.iter().enumerate() {
+                    assert!(v.is_finite(), "{f:?} {w}x{h}: uniform[{i}] not finite ({v})");
                 }
             }
         }

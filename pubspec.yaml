@@ -30,7 +30,7 @@ dependencies:
     path: plugins/color_vision_filter
 
   # Rust Bridge (sensus-core 連携: シェーダ取得 + uniform 計算)
-  # selona と同一バージョンに固定（flutter_rust_bridge.yaml の codegen 前提）。
+  # selona と同じ 2.11.1 系を採用（selona は ^ だが、ここは exact pin）。
   # codegen ツール (2.11.1) と生成物のバージョンスタンプを一致させるため exact pin。
   # （^ にすると 2.12.0 が入り forceSameCodegenVersion で実機初期化に失敗しうる）
   flutter_rust_bridge: 2.11.1
