@@ -314,7 +314,7 @@ pub fn vision_uniforms(
     let min_dim = width.min(height);
     let texel_x = 1.0 / width as f32;
     let texel_y = 1.0 / height as f32;
-    match filter {
+    let mut uniforms = match filter {
         VisionFilter::Protanopia => color_matrix_flat(shaders::protanopia_uniforms(strength)),
         VisionFilter::Deuteranopia => color_matrix_flat(shaders::deuteranopia_uniforms(strength)),
         VisionFilter::Tritanopia => color_matrix_flat(shaders::tritanopia_uniforms(strength)),
@@ -503,7 +503,17 @@ pub fn vision_uniforms(
                 height as f32,
             ]
         }
+    };
+    // 防御境界: payload 数値（axis_deg / freq / offset 等）に NaN/Inf が紛れ込んでも、
+    // Dart→FragmentProgram の setFloat に非有限値を渡さない。strength は sensus 側で
+    // normalize 済みだが、payload 由来の値はここが Dart への最後の関門。非有限は 0.0 に潰す
+    // （半径・係数いずれも 0 は「効果なし」側で安全）。呼び元は有限値を渡す前提。
+    for v in uniforms.iter_mut() {
+        if !v.is_finite() {
+            *v = 0.0;
+        }
     }
+    uniforms
 }
 
 /// `ColorMatrixUniforms` を `[uStrength, uMatrix0..8]` の flat 配列へ展開する。
@@ -650,6 +660,9 @@ mod tests {
 
     /// 全 vision バリアントを 1 ループで列挙するためのヘルパ。バリアントが増えたら
     /// ここに追加するだけで全網羅テストが拾う。payload 付きは代表値を入れる。
+    // 新しい VisionFilter variant を追加したらこの配列にも足すこと（網羅テスト用）。
+    // 本体の `vision_uniforms`/`vision_shader_glsl`/`to_sensus` は網羅 match なので、
+    // variant 追加自体はコンパイルエラーで気付ける。
     const ALL_FILTERS: [VisionFilter; 30] = [
         VisionFilter::Protanopia,
         VisionFilter::Deuteranopia,
@@ -767,6 +780,47 @@ mod tests {
                         "{f:?} {w}x{h}: uniform[{i}] not finite ({v})"
                     );
                 }
+            }
+        }
+    }
+
+    /// payload 数値に NaN/Inf が紛れても、出力 uniform は全て有限（境界ガードの回帰）。
+    #[test]
+    fn non_finite_payloads_are_sanitized() {
+        let nan = f32::NAN;
+        let inf = f32::INFINITY;
+        let cases = [
+            VisionFilter::Astigmatism { axis_deg: nan },
+            VisionFilter::Hemianopia { side: inf },
+            VisionFilter::Diplopia {
+                offset_x: nan,
+                offset_y: inf,
+                ghost_strength: nan,
+            },
+            VisionFilter::Nystagmus {
+                amplitude: inf,
+                direction_deg: nan,
+            },
+            VisionFilter::Starbursts {
+                num_rays: 6,
+                ray_length_ratio: nan,
+                threshold: inf,
+                dispersion: nan,
+            },
+            VisionFilter::Metamorphopsia { freq: inf, seed: 0 },
+            VisionFilter::Floaters {
+                seed: 0,
+                density: nan,
+                size: inf,
+                gaze_x: nan,
+                gaze_y: inf,
+            },
+        ];
+        for f in cases {
+            // time にも異常値を入れて二重に確認
+            let u = vision_uniforms(f, nan, inf, 128, 64);
+            for (i, v) in u.iter().enumerate() {
+                assert!(v.is_finite(), "{f:?}: uniform[{i}] not finite ({v})");
             }
         }
     }
