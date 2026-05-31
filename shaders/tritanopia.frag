@@ -1,6 +1,6 @@
 // GENERATED FILE - DO NOT EDIT.
 //
-// Source of truth: sensus-core vision filter "protanopia".
+// Source of truth: sensus-core vision filter "tritanopia".
 // Regenerate with: dart run tools/generate_shaders.dart
 // (input: tools/sensus_shaders.g.json).
 //
