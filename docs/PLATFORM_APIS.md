@@ -1,5 +1,12 @@
 # Platform-Specific APIs Research
 
+> **現状（#13 反映）**: 以下は「システム全体（他アプリ含む全画面）への色覚フィルタ
+> 適用」を実現するためのネイティブ API 調査の歴史的記録。この system-wide 経路を
+> 実装していた `color_vision_filter` プラグインは撤去済みで、現状の ue は sensus-core
+> 由来の GPU シェーダ（`lib/rendering/shader_filter.dart`）で画像にフィルタを適用する。
+> ライブ画面キャプチャ経路（#1/#3/#4）が入った段階で、本調査の Magnification API /
+> AccessibilityService / ガンマテーブル等が改めて参照される想定。
+
 各プラットフォームでのシステム全体への色覚フィルタ適用のための技術調査結果。
 
 ## Android Implementation

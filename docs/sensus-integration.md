@@ -179,4 +179,29 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
    広げる（cataract/floaters の seed、glaucoma の mode、astigmatism の axis_deg、
    時間依存の vertigo/bppv など、payload を FRB へ反映）。
 5. 既存 `lib/core/color_vision_simulator.dart`（ue 内の LMS 実装）の撤去は
-   **別 Issue（3/3）**。本フェーズでは触らない。
+   **別 Issue（3/3）**。→ **#13 で撤去済み**（下記 §5）。
+
+---
+
+## 5. 重複ロジック撤去（3/3）— #13 で完了
+
+ue が二重に持っていた色覚ロジックを撤去し、アルゴリズム正本を sensus に一本化した。
+
+- **削除**: `lib/core/color_vision_simulator.dart`（ue 内 LMS 実装）。
+- **削除**: `plugins/color_vision_filter/`（OS 全体 system-wide フィルタを適用する
+  独自ネイティブプラグイン）と `pubspec.yaml` の `color_vision_filter` path 依存。
+- **`FilterService` の一本化**: plugin 呼び出し（apply/setIntensity/remove/getState）と
+  permission 概念、`colorMatrix` getter（simulator 依存）を撤去。現在は純粋な
+  選択状態モデル（`currentFilter` / `intensity` / `isActive`）で、選択・強度変更で
+  `notifyListeners` するだけ。`ColorVisionType` → sensus `VisionFilter` の
+  マッピング（`VisionFilter? get sensusFilter`）を追加した。none→null、
+  protanopia/deuteranopia/tritanopia/achromatopsia→対応する `VisionFilter`、
+  -anomaly 系は sensus が severity を `strength` で表すため base の -opia へマップ
+  （anomaly は強度 < 1 相当）。
+- **UI**: `filter_selector` / `intensity_slider` は `ColorVisionType` のまま動く
+  （FilterService の公開 API を維持）。home_screen は system-wide 適用前提の文言を
+  外し、「ライブ画面への適用は画面キャプチャ経路（#1/#3/#4）実装後」と明記した。
+- **テスト**: `test/filter_service_test.dart` を追加（選択状態の遷移・clamp・
+  sensusFilter マッピング）。protanopia golden は維持。
+- **残課題（このフェーズ外）**: ライブ画面キャプチャ経路（#1/#3/#4）、
+  `ColorVisionType` の全面 sensus `VisionFilter` 化や category/param パネル（#16）。
