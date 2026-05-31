@@ -7,6 +7,8 @@
 ///
 /// Input:  tools/sensus_shaders.g.json (vendored from sensus-core dump_shaders).
 /// Output: shaders/<name>.frag + pubspec.yaml shaders: block.
+library;
+
 import 'dart:convert';
 import 'dart:io';
 

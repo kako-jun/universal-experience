@@ -39,6 +39,19 @@ String convertShaderToImpeller(
   List<String> layout,
   String filterName,
 ) {
+  // Compute the scalar-float layout that the source *implies*, and assert it
+  // matches the provided [layout]. This is the real guard: it fails loudly if
+  // the vendored layout drifts from the actual shader source (wrong order,
+  // missing vec2 component, stray scalar, etc.).
+  final expectedLayout = deriveLayoutFromSource(glsl, filterName);
+  if (!_listEquals(expectedLayout, layout)) {
+    throw StateError(
+      'Shader "$filterName": provided layout does not match the layout implied '
+      'by the source.\n  source-implied: $expectedLayout\n  provided:       '
+      '$layout',
+    );
+  }
+
   // Collect the names of the original `vec2` uniforms so we can rewrite their
   // body references to `vec2(<name>_x, <name>_y)`.
   final vec2Names = <String>[];
@@ -110,10 +123,66 @@ String convertShaderToImpeller(
   final header = _headerComment(filterName, layout);
   final result = '$header\n${uniformBlock.toString()}\n$bodyTrimmed';
 
-  // Rule 6: assert the emitted `uniform float` order (up to uTexture) == layout.
-  _assertUniformOrder(result, layout, filterName);
-
   return result.endsWith('\n') ? result : '$result\n';
+}
+
+/// Derives the `setFloat`-ordered scalar uniform layout implied by a sensus
+/// GLSL ES 3.00 [glsl] source, mirroring the Rust dumper's `derive_layout`.
+///
+/// Declaration order of `uniform float`/`uniform vec2`:
+///   - `uniform float uMatrix[9];` -> `uMatrix0`..`uMatrix8`
+///   - `uniform float uXxx;`       -> `uXxx`
+///   - `uniform vec2  uXxx;`       -> `uXxx_x`, `uXxx_y`
+/// Then appends the synthetic `uResolution_x`, `uResolution_y` pair.
+///
+/// Throws [StateError] for uniform kinds outside the host-compatible scope
+/// (anything other than `sampler2D uTexture`, `float`, `vec2`).
+List<String> deriveLayoutFromSource(String glsl, String filterName) {
+  final layout = <String>[];
+  for (final raw in glsl.split('\n')) {
+    // Strip trailing `// ...` comments and surrounding whitespace.
+    final line = (raw.contains('//') ? raw.substring(0, raw.indexOf('//')) : raw)
+        .trim();
+    if (!line.startsWith('uniform ')) continue;
+    final rest =
+        line.substring('uniform '.length).replaceAll(';', '').trim();
+    final parts = rest.split(RegExp(r'\s+'));
+    final ty = parts.isNotEmpty ? parts[0] : '';
+    final ident = parts.length > 1 ? parts[1] : '';
+
+    switch (ty) {
+      case 'sampler2D':
+        if (ident != 'uTexture') {
+          throw StateError(
+            'Shader "$filterName": only the single sampler `uTexture` is '
+            'supported, got `$ident`.',
+          );
+        }
+      case 'float':
+        final bracket = ident.indexOf('[');
+        if (bracket >= 0) {
+          final base = ident.substring(0, bracket);
+          final count =
+              int.parse(ident.substring(bracket + 1, ident.indexOf(']')));
+          for (var i = 0; i < count; i++) {
+            layout.add('$base$i');
+          }
+        } else {
+          layout.add(ident);
+        }
+      case 'vec2':
+        layout.add('${ident}_x');
+        layout.add('${ident}_y');
+      default:
+        throw StateError(
+          'Shader "$filterName": uniform kind `$ty` ($ident) is outside the '
+          'host-compatible scope (only sampler2D uTexture / float / vec2).',
+        );
+    }
+  }
+  layout.add('${kResolutionBase}_x');
+  layout.add('${kResolutionBase}_y');
+  return layout;
 }
 
 String _headerComment(String filterName, List<String> layout) {
@@ -137,16 +206,6 @@ List<String> extractUniformFloatOrder(String glsl) {
     names.add(m.group(1)!);
   }
   return names;
-}
-
-void _assertUniformOrder(String glsl, List<String> layout, String filterName) {
-  final actual = extractUniformFloatOrder(glsl);
-  if (actual.length != layout.length || !_listEquals(actual, layout)) {
-    throw StateError(
-      'Shader "$filterName": generated uniform float order does not match the '
-      'sensus layout.\n  expected: $layout\n  actual:   $actual',
-    );
-  }
 }
 
 bool _listEquals(List<String> a, List<String> b) {

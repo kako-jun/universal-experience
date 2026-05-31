@@ -140,11 +140,40 @@ void main() {
     });
   });
 
-  test('convertShaderToImpeller asserts layout/declaration mismatch', () {
+  group('deriveLayoutFromSource', () {
+    test('expands uMatrix[9] and appends the resolution pair', () {
+      expect(
+        deriveLayoutFromSource(_matrixGlsl, 'protanopia'),
+        _matrixLayout,
+      );
+    });
+
+    test('splits vec2 uniforms into _x / _y in declaration order', () {
+      expect(deriveLayoutFromSource(_payloadGlsl, 'myopia'), _payloadLayout);
+    });
+
+    test('throws on an out-of-scope uniform kind (int)', () {
+      const g = '''
+#version 300 es
+precision mediump float;
+uniform sampler2D uTexture;
+uniform float uStrength;
+uniform int uMode;
+out vec4 fragColor;
+void main() { fragColor = vec4(uStrength); }
+''';
+      expect(
+        () => deriveLayoutFromSource(g, 'glaucoma'),
+        throwsA(isA<StateError>()),
+      );
+    });
+  });
+
+  test('convertShaderToImpeller throws when layout drifts from the source', () {
     expect(
       () => convertShaderToImpeller(
         _payloadGlsl,
-        // Missing uTexelSize components -> emitted decls will not match.
+        // Missing uTexelSize components -> does not match the source layout.
         const <String>['uStrength', 'uResolution_x', 'uResolution_y'],
         'broken',
       ),
