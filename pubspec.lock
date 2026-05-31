@@ -169,13 +169,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.19.1"
-  color_vision_filter:
-    dependency: "direct main"
-    description:
-      path: "plugins/color_vision_filter"
-      relative: true
-    source: path
-    version: "0.1.0"
   convert:
     dependency: transitive
     description:
