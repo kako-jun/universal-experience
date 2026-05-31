@@ -1,0 +1,242 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+
+import '../tools/shader_codegen.dart';
+
+/// A 3x3-matrix + strength shader, structurally identical to what sensus-core
+/// emits for the colour-vision filters (protanopia etc.).
+const String _matrixGlsl = '''
+#version 300 es
+precision mediump float;
+
+uniform sampler2D uTexture;
+uniform float uStrength;
+uniform float uMatrix[9];
+
+in vec2 vTexCoord;
+out vec4 fragColor;
+
+float srgbToLinear(float c) {
+    return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4);
+}
+
+void main() {
+    vec4 tex = texture(uTexture, vTexCoord);
+    float r = srgbToLinear(tex.r);
+    float sr = uMatrix[0] * r + uMatrix[1] * r + uMatrix[2] * r;
+    float sb = uMatrix[6] * r + uMatrix[7] * r + uMatrix[8] * r;
+    fragColor = vec4(sr * uStrength, 0.0, sb, tex.a);
+}
+''';
+
+const List<String> _matrixLayout = <String>[
+  'uStrength',
+  'uMatrix0', 'uMatrix1', 'uMatrix2',
+  'uMatrix3', 'uMatrix4', 'uMatrix5',
+  'uMatrix6', 'uMatrix7', 'uMatrix8',
+  'uResolution_x', 'uResolution_y',
+];
+
+/// A shader with a `vec2 uTexelSize` payload uniform (like myopia / starbursts),
+/// to exercise the vec2-splitting rule.
+const String _payloadGlsl = '''
+#version 300 es
+precision highp float;
+
+uniform sampler2D uTexture;
+uniform float uStrength;
+uniform vec2  uTexelSize;
+
+in vec2 vTexCoord;
+out vec4 fragColor;
+
+void main() {
+    vec2 uv = vTexCoord + uTexelSize;
+    vec4 src = texture(uTexture, uv);
+    fragColor = vec4(src.rgb * uStrength, src.a);
+}
+''';
+
+const List<String> _payloadLayout = <String>[
+  'uStrength',
+  'uTexelSize_x',
+  'uTexelSize_y',
+  'uResolution_x',
+  'uResolution_y',
+];
+
+const String _varying = 'vTexCoord';
+const String _fragCoordCall = 'FlutterFragCoord()';
+
+void main() {
+  group('convertShaderToImpeller (matrix shader)', () {
+    late String out;
+
+    setUpAll(() {
+      out = convertShaderToImpeller(_matrixGlsl, _matrixLayout, 'protanopia');
+    });
+
+    test('drops #version and precision header, prepends runtime_effect', () {
+      expect(out.contains('#version'), isFalse);
+      expect(out.contains('precision mediump float;'), isFalse);
+      expect(out.contains('#include <flutter/runtime_effect.glsl>'), isTrue);
+    });
+
+    test('keeps fragColor out', () {
+      expect(out.contains('out vec4 fragColor;'), isTrue);
+    });
+
+    test('removes every reference to the GLSL ES varying', () {
+      expect(out.contains(_varying), isFalse);
+    });
+
+    test('derives UV from FlutterFragCoord and the resolution pair', () {
+      expect(out.contains(_fragCoordCall), isTrue);
+      expect(
+        out.contains('$_fragCoordCall.xy / '
+            'vec2(uResolution_x, uResolution_y)'),
+        isTrue,
+      );
+    });
+
+    test('expands uMatrix[k] to uMatrixk in the body', () {
+      expect(out.contains('uMatrix['), isFalse);
+      expect(out.contains('uMatrix0 * r'), isTrue);
+      expect(out.contains('uMatrix8 * r'), isTrue);
+    });
+
+    test('keeps prelude helpers', () {
+      expect(out.contains('srgbToLinear'), isTrue);
+    });
+
+    test('re-emits uniform float declarations in layout order + uTexture', () {
+      expect(extractUniformFloatOrder(out), _matrixLayout);
+      expect(out.contains('uniform sampler2D uTexture;'), isTrue);
+    });
+
+    test('has a do-not-edit header comment naming the filter', () {
+      expect(out.contains(kGeneratedHeaderMarker), isTrue);
+      expect(out.contains('protanopia'), isTrue);
+    });
+  });
+
+  group('convertShaderToImpeller (vec2 payload shader)', () {
+    late String out;
+
+    setUpAll(() {
+      out = convertShaderToImpeller(_payloadGlsl, _payloadLayout, 'myopia');
+    });
+
+    test('splits vec2 uniform body refs into vec2(name_x, name_y)', () {
+      // The bare `uTexelSize` token must be gone; its scalar components remain.
+      expect(RegExp(r'\buTexelSize\b').hasMatch(out), isFalse);
+      expect(out.contains('vec2(uTexelSize_x, uTexelSize_y)'), isTrue);
+    });
+
+    test('emits scalar uniforms in layout order', () {
+      expect(extractUniformFloatOrder(out), _payloadLayout);
+    });
+  });
+
+  test('convertShaderToImpeller asserts layout/declaration mismatch', () {
+    expect(
+      () => convertShaderToImpeller(
+        _payloadGlsl,
+        // Missing uTexelSize components -> emitted decls will not match.
+        const <String>['uStrength', 'uResolution_x', 'uResolution_y'],
+        'broken',
+      ),
+      throwsA(isA<StateError>()),
+    );
+  });
+
+  group('buildPubspecShadersBlock / updatePubspecShaders', () {
+    test('emits alphabetically sorted entries under shaders:', () {
+      final block = buildPubspecShadersBlock(<String>['myopia', 'achromatopsia']);
+      expect(block, '''
+  shaders:
+    - shaders/achromatopsia.frag
+    - shaders/myopia.frag''');
+    });
+
+    test('replaces an existing shaders block, leaving the rest intact', () {
+      const pubspec = '''
+name: demo
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+
+  shaders:
+    - shaders/old.frag
+''';
+      final updated = updatePubspecShaders(pubspec, <String>['b', 'a']);
+      expect(updated.contains('- shaders/old.frag'), isFalse);
+      expect(updated.contains('- shaders/a.frag'), isTrue);
+      expect(updated.contains('- shaders/b.frag'), isTrue);
+      // The assets block must survive untouched.
+      expect(updated.contains('- assets/images/'), isTrue);
+      expect(updated.contains('uses-material-design: true'), isTrue);
+    });
+  });
+
+  group('generated shaders/*.frag (committed artifacts)', () {
+    final fragDir = Directory('shaders');
+    final fragFiles = fragDir
+        .listSync()
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.frag'))
+        .toList();
+
+    test('at least one .frag is generated', () {
+      expect(fragFiles, isNotEmpty);
+    });
+
+    for (final f in fragFiles) {
+      final name = f.uri.pathSegments.last;
+      test('$name follows Impeller conventions', () {
+        final src = f.readAsStringSync();
+        expect(src.contains('#version'), isFalse, reason: '$name has #version');
+        expect(src.contains('precision mediump float;'), isFalse,
+            reason: '$name has mediump precision line');
+        expect(src.contains('precision highp float;'), isFalse,
+            reason: '$name has highp precision line');
+        expect(src.contains('uMatrix['), isFalse,
+            reason: '$name has unexpanded uMatrix[]');
+        expect(src.contains(_varying), isFalse,
+            reason: '$name still references the GLSL ES varying');
+        expect(src.contains('#include <flutter/runtime_effect.glsl>'), isTrue,
+            reason: '$name missing runtime_effect include');
+      });
+    }
+  });
+
+  group('layout consistency (.frag vs sensus dump)', () {
+    final dump = jsonDecode(
+      File('tools/sensus_shaders.g.json').readAsStringSync(),
+    ) as List<dynamic>;
+
+    for (final entry in dump) {
+      final e = entry as Map<String, dynamic>;
+      final name = e['name'] as String;
+      final layout = (e['layout'] as List<dynamic>).cast<String>();
+      test('$name uniform float order matches sensus layout', () {
+        final src = File('shaders/$name.frag').readAsStringSync();
+        expect(extractUniformFloatOrder(src), layout);
+      });
+    }
+  });
+
+  test('generate_shaders.dart --check reports no drift (committed in sync)', () {
+    final result = Process.runSync(
+      'dart',
+      <String>['run', 'tools/generate_shaders.dart', '--check'],
+    );
+    expect(result.exitCode, 0,
+        reason: 'shaders are stale; run dart run tools/generate_shaders.dart\n'
+            '${result.stdout}\n${result.stderr}');
+  });
+}
