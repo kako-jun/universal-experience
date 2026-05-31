@@ -28,7 +28,7 @@ void main() async {
     // backgroundColor は透過が既定 (LoupeWindowPolicy.defaultTransparent)。
     // window_manager の backgroundColor は非 null の Color のため、
     // 透過 ON のとき transparent、OFF のとき不透明黒を渡す。
-    final windowOptions = WindowOptions(
+    const windowOptions = WindowOptions(
       size: LoupeWindowPolicy.defaultSize,
       minimumSize: LoupeWindowPolicy.minimumSize,
       center: true,

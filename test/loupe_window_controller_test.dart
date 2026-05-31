@@ -20,7 +20,7 @@ void main() {
     });
 
     test('minimum size keeps a 4:3 aspect ratio', () {
-      final s = LoupeWindowPolicy.minimumSize;
+      const s = LoupeWindowPolicy.minimumSize;
       expect(s.width / s.height, closeTo(4 / 3, 0.0001));
     });
   });

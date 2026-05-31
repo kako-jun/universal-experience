@@ -10,6 +10,65 @@
 > 保持する。他アプリ含む全画面への適用は画面キャプチャ経路（#1/#3/#4）の実装後。
 > 以下の Platform Channel / Native 実装の節は当初設計の歴史的記述として残す。
 
+## ルーペ窓挙動 (#14)
+
+ルーペ窓のウィンドウ設定の責務。実装は `lib/services/loupe_window_controller.dart`
+(window_manager ラッパ + 純粋ロジック `LoupeWindowPolicy`) と `lib/main.dart` の配線。
+画面キャプチャ (#3/#4/#5)・ライブ適用・描画 (#11)・フィルタ UI (#16)・トレイ (#15) は本節のスコープ外。
+
+### 最小サイズ
+
+- **320x240 (QVGA, 4:3)**。従来の 600x400 から引き下げた。
+- 根拠: ルーペは「画面の一部に小さくかざす」使い方が主眼。320px あれば
+  色覚/視野/コントラストのフィルタ差は判別できる下限。これ以下だと枠操作
+  領域が窮屈で実用性を失う。4:3 は覗き窓の直感的比率 (アスペクト強制ではなく、
+  リサイズで自由に変えられる)。
+
+### 状態遷移と枠ポリシー
+
+状態は enum `LoupeWindowMode { normal, maximized, fullscreen }`。
+
+| モード | 縁(フレーム/タイトルバー) | 用途 |
+|---|---|---|
+| normal | あり | 通常。掴んで移動・リサイズ |
+| maximized | **あり** | 画面いっぱいでも縁を残す |
+| fullscreen | なし | 没入。画面全域をフィルタ |
+
+- 最大化で **縁を残す**のが要点。ルーペは「枠の向こうにフィルタ済みデスクトップ」
+  が見える体験なので、最大化で縁が消えると「どこが覗き窓か」が破綻する。
+  全画面だけは没入用に縁を消す。
+- 遷移は `LoupeWindowPolicy.resolveMode` (純粋関数) で解決。toggle 系は
+  同じモード再要求で normal に戻る。実 I/O は window_manager の
+  `maximize`/`unmaximize`/`setFullScreen` + `setTitleBarStyle` で反映。
+
+### リサイズ追従
+
+`WindowListener.onWindowResize` でサイズを取得し state 更新 -> `onChanged`
+コールバックで UI に伝える (中身がウィンドウに貼り付く責務)。
+
+### 透過・最前面・クリックスルー (既定方針)
+
+- **透明背景**: 既定 ON。枠の外は完全透過、枠の中だけ描画 (VIP-Sim / Sim Daltonism 型, #6)。
+  `WindowOptions.backgroundColor = transparent`。
+- **最前面**: 既定 ON (`setAlwaysOnTop(true)`)。下のアプリより手前にいないと
+  「かざして見る」が成立しない。
+- **クリックスルー**: 既定 **OFF**、切替式。起動直後は窓を掴んで移動・リサイズ
+  したいのでイベントを受け取り、下のアプリを操作したいときユーザーが ON する。
+  実装は `setIgnoreMouseEvents(true, forward: true)`。
+- フレームレス/クリックスルー forward 引数はプラットフォーム差・未対応があるため、
+  全 window_manager I/O は try/catch + ログで握り、未対応でも落とさない。
+
+### マルチモニタ
+
+- **第1弾はメインモニタのみ対象**。サブモニタへの移動追従や、モニタごとの
+  DPR 換算 (#5) はスコープ外。window_manager のメインモニタ座標系で動作する前提。
+
+### 実機目視について
+
+透過・クリックスルー・最大化時の縁などの GUI 目視確認は、Wayland/grim 制約と
+#11 描画統合前のため本実装段階では未実施。`flutter analyze` / `flutter test` /
+`flutter build linux --debug` で静的・ビルド確認のみ。実機目視は #11 描画統合後に行う。
+
 ## システムアーキテクチャ
 
 Universal Experienceは、Flutterベースのクロスプラットフォームアプリケーションとして設計されています。
