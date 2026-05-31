@@ -31,6 +31,10 @@ class LoupeWindowPolicy {
   /// - これ以上小さいとタイトルバー操作領域や枠描画が窮屈になり実用性を失う。
   /// 4:3 にしているのは「覗き窓」の直感的な比率で、特定アスペクト強制ではない
   /// (リサイズで自由に変えられる)。
+  ///
+  /// 単位の注意 (nit): この値は **論理ピクセル**。HiDPI (DPR 2x) のモニタでは
+  /// 実効の物理ピクセルは 640x480 相当の見え方になる。物理解像度に応じた見え方の
+  /// 調整 (DPR 換算) は #5 DPR スコープで扱う。
   static const Size minimumSize = Size(320, 240);
 
   /// 起動時の既定サイズ。最小より十分大きく、デスクトップの一角を覗ける程度。
@@ -118,6 +122,19 @@ class LoupeWindowController with WindowListener {
   /// リサイズなどで状態が変わったら呼ばれるコールバック (UI 再描画用)。
   VoidCallback? onChanged;
 
+  // TODO(#14/#16): アプリモード切替を導入する。
+  // 現状は起動直後から「透明・最前面」を常時適用しているが、フィルタ選択 UI (#16)
+  // を操作するときは「常に最前面・背景透明」だと操作しづらい (UI が透けて背後の
+  // アプリと重なる / 他ウィンドウへ移れない)。
+  // 将来は次の2モードを切り替える想定:
+  //   - 設定モード (settings): 通常ウィンドウ。透明 OFF・最前面 OFF。フィルタ選択など
+  //     UI 操作に集中する。起動既定はこちらが望ましい。
+  //   - ルーペモード (loupe): 透明 ON・最前面 ON。実際に画面へかざして見る。
+  // 実装時は LoupeWindowController に setSettingsMode(bool)/setLoupeMode(bool) の口を
+  // 用意し、main の起動既定を「設定モード=通常ウィンドウ」にする。
+  // 本 PR (#14) ではスコープ外のため起動既定 (透明・最前面 ON) は現状維持。
+  // 詳細は docs/ARCHITECTURE.md「フォロー事項: アプリモード切替」を参照。
+
   /// 起動時の初期化。最小サイズ・最前面・枠ポリシーを適用する。
   /// (透過は WindowOptions.backgroundColor 側で設定済み。)
   Future<void> initialize() async {
@@ -149,7 +166,13 @@ class LoupeWindowController with WindowListener {
   /// クリックスルーのトグル。
   ///
   /// `forward: true` で「自ウィンドウは無視しつつイベントを下へ転送」する。
-  /// プラットフォームによっては forward 非対応のため、try/catch で握る。
+  ///
+  /// プラットフォーム差 (重要): `forward` 引数は **macOS 専用**で、Linux/Windows
+  /// では window_manager 側で無視される。つまり Linux では「自ウィンドウはイベントを
+  /// 無視する」までは効くが、「下のアプリへ転送する」挙動は forward では保証されない
+  /// (コンポジタ/OS 依存)。クリックスルー時に下のアプリが実際に操作できるかは
+  /// **Linux 実機での確認が必要 (#11 描画統合後)**。未対応でも落ちないよう
+  /// try/catch で握る。
   Future<void> setClickThrough(bool value) async {
     _clickThrough = value;
     await _guard('setIgnoreMouseEvents', () async {
@@ -194,6 +217,12 @@ class LoupeWindowController with WindowListener {
   }
 
   /// 現在モードの枠ポリシーをウィンドウに反映する。
+  ///
+  /// 順序依存の注意 (nit/実機確認): ここでは `_setMode` が `setFullScreen` を
+  /// 呼んだ **後** に `setTitleBarStyle` を当てている。プラットフォームによっては
+  /// 全画面遷移とタイトルバースタイル変更の順序で「全画面なのにタイトルバーが
+  /// 残る/枠が二重に出る」等の差が出ることがある。この順序 (fullscreen → titleBar)
+  /// が Linux/Windows/macOS いずれでも破綻しないかは **実機目視で確認が必要 (#11後)**。
   Future<void> _applyFramePolicy() async {
     final showFrame = LoupeWindowPolicy.showFrame(_mode);
     await _guard('frame:$showFrame', () async {

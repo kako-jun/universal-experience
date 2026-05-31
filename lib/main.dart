@@ -28,6 +28,13 @@ void main() async {
     // backgroundColor は透過が既定 (LoupeWindowPolicy.defaultTransparent)。
     // window_manager の backgroundColor は非 null の Color のため、
     // 透過 ON のとき transparent、OFF のとき不透明黒を渡す。
+    //
+    // TODO(#14/#16): 起動既定を「設定モード (通常ウィンドウ・透明/最前面 OFF)」に
+    // するモード切替を将来導入する。今は起動から透明・最前面を常時適用しているため、
+    // フィルタ選択 UI (#16) 操作時に最前面・透明で操作しづらい。設定モードと
+    // ルーペモードの切替は #14 スコープ外なので、本 PR では起動既定 (透明・最前面 ON)
+    // を現状維持する。詳細は loupe_window_controller.dart の TODO と
+    // docs/ARCHITECTURE.md「フォロー事項: アプリモード切替」を参照。
     const windowOptions = WindowOptions(
       size: LoupeWindowPolicy.defaultSize,
       minimumSize: LoupeWindowPolicy.minimumSize,
