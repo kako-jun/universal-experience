@@ -22,13 +22,11 @@ uniform sampler2D uTexture;
 
 // 楕円カーネルの境界判定 (u²/a²+v²/b²≤1) を CPU(f32) と bit 一致させるため highp 必須。
 // mediump だと境界格子点の内外が flip し採用 tap が 1 点ずれる。
-precision highp int;
 
 // 1D directional blur — 眼振シミュレーション（motion blur による方向性ぼけ）
 // astigmatism.frag と同一カーネル（CPU ellipse_blur の filled-ellipse box ミラー, #126）。
 // uniform 名のみ違い: uAxisDeg → uDirectionDeg（揺れ方向をそのままぼかし方向に使う,
 // astigmatism と異なり +90° しない）。詳細は astigmatism.frag のコメント参照。
-
 
 out vec4 fragColor;
 

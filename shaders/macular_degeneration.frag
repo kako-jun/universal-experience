@@ -20,7 +20,6 @@ uniform sampler2D uTexture;
 // 黄斑変性（macular degeneration）シミュレーション — 中心暗化（foveal smoothstep マスク）
 // 中心部を暗化・脱色する。strength=1.0 で最強の中心視野欠損。
 
-
 out vec4 fragColor;
 
 float srgbToLinear(float c) {

@@ -34,7 +34,6 @@ uniform sampler2D uTexture;
 // 乖離上限: 32x32 で strength=0.5 → PSNR ≈ 40 dB、strength=1.0 → ≈ 42 dB
 // （いずれも許容下限 30 dB を満たす）。
 
-
 out vec4 fragColor;
 
 // blur が視認できない最小半径（CPU の MIN_BLUR_RADIUS_PX と一致）

@@ -22,7 +22,6 @@ uniform sampler2D uTexture;
 
 // 楕円カーネルの境界判定 (u²/a²+v²/b²≤1) を CPU(f32) と bit 一致させるため highp 必須。
 // mediump だと境界格子点の内外が flip し採用 tap が 1 点ずれる。
-precision highp int;
 
 // 1D directional blur — 乱視シミュレーション（純粋 cylinder lens）
 //
@@ -41,7 +40,6 @@ precision highp int;
 // よって 2D 窓 [-RMAX, RMAX]² を走査する。RMAX=15 は min(W,H) ≲ 1363 まで
 // ceil(uRadiusPx) ≤ RMAX を満たし、CPU と bit 等価。これを超える巨大半径では
 // 窓が飽和し近似となる（#97 disk-blur と同じ単一パス制約の扱い）。
-
 
 out vec4 fragColor;
 

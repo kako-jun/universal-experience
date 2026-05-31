@@ -28,7 +28,6 @@ uniform sampler2D uTexture;
 // Machado 2009 severity=1.0 行列（linear sRGB → simulated linear sRGB）
 // 出典: https://www.inf.ufrgs.br/~oliveira/pubs_files/CVD_Simulation/CVD_Simulation.html
 
-
 out vec4 fragColor;
 
 float srgbToLinear(float c) {

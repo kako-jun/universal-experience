@@ -31,7 +31,6 @@ uniform sampler2D uTexture;
 // 出典: Vos (1978) "Colorimetric and photometric properties of a 2° fundamental
 // observer" Color Research & Application 3(3): 125–128
 
-
 out vec4 fragColor;
 
 float srgbToLinear(float c) {

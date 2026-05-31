@@ -20,7 +20,6 @@ uniform sampler2D uTexture;
 // トンネル視野（tunnel vision）シミュレーション — 急峻なビネット
 // glaucoma より inner_r/outer_r の差が小さく、急激な境界が特徴。
 
-
 out vec4 fragColor;
 
 float srgbToLinear(float c) {

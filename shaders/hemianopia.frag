@@ -21,7 +21,6 @@ uniform sampler2D uTexture;
 // uSide=1.0: 右半分を暗化, uSide=-1.0: 左半分を暗化
 // 境界は画像中央 x=0.5 に固定。幅 2% の smoothstep で滑らかに。
 
-
 out vec4 fragColor;
 
 float srgbToLinear(float c) {

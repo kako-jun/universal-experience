@@ -23,7 +23,6 @@ uniform sampler2D uTexture;
 // メタメリックペア候補領域（|delta| < 0.05）の Cb/Cr 誇張は、
 // GPU では閾値判定が難しいため全領域に opponent channel 誇張を適用する簡略版。
 
-
 out vec4 fragColor;
 
 float srgbToLinear(float c) {

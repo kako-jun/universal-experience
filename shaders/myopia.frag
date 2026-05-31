@@ -22,7 +22,6 @@ uniform sampler2D uTexture;
 // 等方 disk blur（pillbox kernel）— 近視 / 遠視 / 老眼シミュレーション
 // Poisson disk サンプリング（16 サンプル）で円形ぼかしを近似する。
 
-
 out vec4 fragColor;
 
 float srgbToLinear(float c) {

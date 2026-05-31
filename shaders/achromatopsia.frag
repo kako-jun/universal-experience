@@ -22,7 +22,6 @@ uniform sampler2D uTexture;
 // BT.709 photopic luminance によるグレースケール化（全色盲シミュレーション）
 // 係数: R=0.2126, G=0.7152, B=0.0722
 
-
 out vec4 fragColor;
 
 float srgbToLinear(float c) {

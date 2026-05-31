@@ -27,7 +27,6 @@ uniform sampler2D uTexture;
 // GPU 版は 16-tap 水平 blur で motion blur を再現。
 // シフト量: strength * 0.05 (テクセル単位)
 
-
 out vec4 fragColor;
 
 float srgbToLinear(float c) {
