@@ -4,7 +4,24 @@ This JSON is the output of sensus-core's `examples/dump_shaders.rs` and is
 vendored here as the input for the shader sync codegen (#12). **Do not
 hand-edit.**
 
-Each array entry is `{ "name", "glsl", "layout" }`:
+## Top-level shape (freshness metadata)
+
+```json
+{
+  "schema": "sensus-shader-dump/v1",
+  "sensus_core_version": "0.5.0",
+  "shaders": [ { "name", "glsl", "layout" }, ... ]
+}
+```
+
+- `schema` — output format id. `generate_shaders.dart` rejects an unknown
+  schema (bump it on incompatible shape changes).
+- `sensus_core_version` — the `sensus-core` crate version this dump was produced
+  from. `generate_shaders.dart` asserts its **major** matches the `sensus-core`
+  dependency in `rust/Cargo.toml` (`sensus-core = "0.5"`), so a stale vendored
+  dump fails loudly instead of silently generating against the wrong version.
+
+Each `shaders[]` entry is `{ "name", "glsl", "layout" }`:
 
 - `name` — snake_case shader stem (matches `shaders/<name>.frag`).
 - `glsl` — the GLSL ES 3.00 source from sensus-core `*_glsl()`.
@@ -43,12 +60,27 @@ cargo run -p sensus-core --example dump_shaders \
     > /path/to/universal-experience/tools/sensus_shaders.g.json
 ```
 
+**Verify the version stamp matches the dependency** (else the next codegen run
+will fail the major-version assert):
+
+```sh
+# both should agree on the major (0.5.x):
+grep sensus_core_version tools/sensus_shaders.g.json
+grep '^sensus-core' rust/Cargo.toml
+```
+
+If sensus's major changed, bump `rust/Cargo.toml`'s `sensus-core` constraint and
+`_expectedSensusMajor` in `tools/generate_shaders.dart` together.
+
 Then regenerate the `.frag` files and `pubspec.yaml` shaders block:
 
 ```sh
 cd /path/to/universal-experience
 dart run tools/generate_shaders.dart
 ```
+
+The CLI also prints the included (20) vs intentionally-excluded filters (with
+the reason for each) to stderr, so the scope gap is never silent.
 
 `dart run tools/generate_shaders.dart --check` verifies the committed
 `shaders/*.frag` and `pubspec.yaml` are in sync with this JSON (used by

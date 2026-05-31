@@ -87,6 +87,19 @@ Rust で計算して FRB で渡すのが、二重実装を避ける唯一の方�
 > 変換規則: `#version`/`precision` 除去 + `#include <flutter/runtime_effect.glsl>`、
 > `in vec2 vTexCoord` 廃止して body の `vTexCoord` を `FlutterFragCoord()` / 合成
 > `uResolution` から算出、配列 `uMatrix[k]`→`uMatrixk`、`vec2 uXxx`→`uXxx_x`/`uXxx_y`。
+> トークン置換は厳密な識別子境界で行い、`uTexelSize` が `uTexelSizeScale` の
+> ような長い識別子を部分一致で壊さない。`uMatr[k]` 以外の未知配列 uniform
+> （`uniform float uKernel[5]` 等）は変換器が **throw** して握りつぶさない。
+>
+> **dump の鮮度検証（#24）**: `sensus_shaders.g.json` は配列ではなく
+> `{ "schema", "sensus_core_version", "shaders": [...] }` のオブジェクト。
+> dumper（`dump_shaders.rs`）が `CARGO_PKG_VERSION` を埋める。
+> `generate_shaders.dart` は (a) `schema` が既知値か、(b)
+> `sensus_core_version` のメジャーが `rust/Cargo.toml` の `sensus-core = "0.5"`
+> と一致するか、(c) 各エントリが `name`/`glsl`/`layout` を持つか、を検証して
+> 不一致なら停止する。sensus 更新時の再生成手順とバージョン確認は
+> `tools/sensus_shaders.README.md` を参照。生成 `.frag` のヘッダには sensus
+> version・入力 dump パス・正本（`sensus shaders/<name>.frag`）への参照を残す。
 
 GLSL ES 3.00 → Impeller サブセットの変換を**どちらで持つか**の選択肢:
 
