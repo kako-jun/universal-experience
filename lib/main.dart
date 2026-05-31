@@ -4,6 +4,7 @@ import 'package:window_manager/window_manager.dart';
 import 'dart:io' show Platform;
 
 import 'services/filter_service.dart';
+import 'services/vision_filter_state.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/theme/app_theme.dart';
 
@@ -40,6 +41,7 @@ class UniversalExperienceApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => FilterService()),
+        ChangeNotifierProvider(create: (_) => VisionFilterState()),
       ],
       child: MaterialApp(
         title: 'Universal Experience',
