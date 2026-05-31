@@ -53,5 +53,10 @@ flutter:
     - assets/images/
     - assets/fonts/
 
+  # FragmentProgram シェーダ (Impeller サブセットへ手変換した sensus フィルタ)。
+  # ビルド時に impellerc がコンパイルする。詳細は docs/sensus-integration.md。
+  shaders:
+    - shaders/protanopia.frag
+
   # Multi-platform support
   # Note: iOS intentionally excluded due to platform restrictions
