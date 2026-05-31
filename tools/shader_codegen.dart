@@ -10,7 +10,8 @@
 ///   2. Drop the original `uniform ...;` declarations and `in vec2 vTexCoord;`;
 ///      keep `out vec4 fragColor;`. Re-emit scalar uniforms in `layout` order as
 ///      `uniform float <name>;`, then `uniform sampler2D uTexture;`.
-///   3. Expand `uMatrix[k]` -> `uMatrixk` in the body.
+///   3. Expand array-uniform reads `name[k]` -> `namek` in the body, for every
+///      array uniform declared in the source (multi-digit indices supported).
 ///   4. Replace `vec2` uniforms referenced in the body (e.g. `uTexelSize`) with
 ///      `vec2(<name>_x, <name>_y)`.
 ///   5. Impeller has no `vTexCoord` varying, so replace body `vTexCoord` with UV
@@ -26,15 +27,16 @@ const String kGeneratedHeaderMarker = 'GENERATED FILE - DO NOT EDIT';
 /// `uResolution_x` / `uResolution_y` are the last two entries of every layout.
 const String kResolutionBase = 'uResolution';
 
-/// The only array uniform the converter knows how to expand (`uMatrix[k]` ->
-/// `uMatrixk`). Any other `uniform float NAME[n]` is unrecognised and makes the
-/// converter throw, rather than silently leaving an `impellerc`-incompatible
-/// array reference in the output. See [_assertNoUnknownArrayUniforms].
-const String kKnownArrayUniform = 'uMatrix';
-
 /// Path (relative to repo root) of the vendored sensus dump the generated
 /// `.frag` files are derived from. Recorded in each header for traceability.
 const String kDumpInputPath = 'tools/sensus_shaders.g.json';
+
+/// Matches a top-level GLSL precision declaration of any qualifier and type,
+/// e.g. `precision mediump float;` or `precision highp int;`. Impeller's
+/// runtime-effect subset accepts no precision qualifiers at all, so every such
+/// line is dropped during conversion (see Rule 1). The input is already
+/// `trim()`med, so no leading-whitespace allowance is needed here.
+final RegExp _precisionDeclRegex = RegExp(r'^precision\s+\w+\s+\w+\s*;$');
 
 /// Converts a sensus GLSL ES 3.00 source into an Impeller-compatible shader.
 ///
@@ -45,8 +47,8 @@ const String kDumpInputPath = 'tools/sensus_shaders.g.json';
 /// traceability (null/empty when a caller has none, e.g. a unit test).
 ///
 /// Throws [StateError] if the regenerated `uniform float` declaration order (up
-/// to `uTexture`) does not match [layout] exactly, or if the source declares an
-/// array uniform other than [kKnownArrayUniform].
+/// to `uTexture`) does not match [layout] exactly, or if the body references an
+/// array uniform (`name[k]`) that the source never declared.
 String convertShaderToImpeller(
   String glsl,
   List<String> layout,
@@ -66,11 +68,11 @@ String convertShaderToImpeller(
     );
   }
 
-  // Defence: the body rewrite only knows how to expand `uMatrix[k]`. Reject any
-  // other `uniform float NAME[n]` array up front so an unhandled array reference
-  // can never leak into the generated `.frag` (where `impellerc` would choke or,
-  // worse, silently mis-bind).
-  _assertNoUnknownArrayUniforms(glsl, filterName);
+  // Collect every array uniform declared in the source so the body rewrite can
+  // expand `name[k]` -> `name_k` for ALL of them (not just `uMatrix`). The layout
+  // side (deriveLayoutFromSource) already supports arbitrary `float NAME[n]`
+  // arrays, so this keeps the body rewrite and the layout in agreement.
+  final arrayUniformNames = _arrayUniformNames(glsl);
 
   // Collect the names of the original `vec2` uniforms so we can rewrite their
   // body references to `vec2(<name>_x, <name>_y)`.
@@ -82,7 +84,12 @@ String convertShaderToImpeller(
 
     // Rule 1: drop the GLSL ES header lines.
     if (trimmed == '#version 300 es') continue;
-    if (trimmed.startsWith('precision ') && trimmed.endsWith('float;')) {
+    // Drop ANY top-level precision declaration, not just `precision ... float;`.
+    // Impeller's runtime-effect subset rejects every precision qualifier
+    // (lowp/mediump/highp) for every type (float/int/...). Matching only
+    // `float;` previously let `precision highp int;` leak into the generated
+    // astigmatism/nystagmus shaders.
+    if (_precisionDeclRegex.hasMatch(trimmed)) {
       continue;
     }
 
@@ -106,18 +113,55 @@ String convertShaderToImpeller(
 
   var bodySrc = body.join('\n');
 
-  // Rule 3: array expansion uMatrix[k] -> uMatrixk (k = single digit).
-  bodySrc = bodySrc.replaceAllMapped(
-    RegExp(kKnownArrayUniform + r'\[(\d)\]'),
-    (m) => '$kKnownArrayUniform${m.group(1)}',
-  );
+  // Rule 3: array expansion `name[k]` -> `namek` for every declared array
+  // uniform. Multi-digit indices are supported (`[12]` -> `12`). Each name is
+  // regex-escaped so it cannot inject metacharacters.
+  for (final name in arrayUniformNames) {
+    bodySrc = bodySrc.replaceAllMapped(
+      RegExp('${RegExp.escape(name)}' r'\[(\d+)\]'),
+      (m) => '$name${m.group(1)}',
+    );
+  }
+
+  // Post-condition (should-1a): no array-style uniform access may survive the
+  // rewrite. A leftover `<identifier>[<digits>]` means the source used an array
+  // uniform it never declared, which would emit an `impellerc`-incompatible
+  // array reference (or silently mis-bind). Fail loudly instead. Dynamic
+  // indexing (`arr[i]`, non-constant) is out of scope and left untouched.
+  final leftoverArrayAccess = RegExp(r'\b(\w+)\[\d+\]').firstMatch(bodySrc);
+  if (leftoverArrayAccess != null) {
+    throw StateError(
+      'Shader "$filterName": unexpanded array uniform access '
+      '`${leftoverArrayAccess.group(0)}` survived codegen. Declare it as '
+      '`uniform float ${leftoverArrayAccess.group(1)}[N];` so its flat scalar '
+      'layout can be generated.',
+    );
+  }
 
   // Rule 4: vec2 uniform refs in the body -> vec2(name_x, name_y).
   //
   // Use a strict identifier boundary (a trailing negative lookahead in addition
   // to `\b`) so a payload uniform like `uTexelSize` cannot partially match (and
   // corrupt) a longer identifier such as `uTexelSizeScale`.
+  //
+  // PRECONDITION (should-2): each vec2 uniform name must be globally unique in
+  // the body — there must be no local `float NAME`/`vec2 NAME` declaration that
+  // shadows it. The boundary-anchored replacement is whole-identifier but not
+  // scope-aware, so a same-named local would be wrongly rewritten. We detect
+  // such a collision and throw rather than silently corrupt the shader. (sensus
+  // sources name uniforms with a `u` prefix and locals without one, so this is
+  // a guard against future drift, not a current occurrence.)
   for (final name in vec2Names) {
+    final localDecl = RegExp(
+      '(?:float|vec2)\\s+${RegExp.escape(name)}\\b(?![A-Za-z0-9_])\\s*[;=]',
+    );
+    if (localDecl.hasMatch(bodySrc)) {
+      throw StateError(
+        'Shader "$filterName": vec2 uniform `$name` collides with a local '
+        'variable of the same name; the non-scope-aware vec2 rewrite would '
+        'corrupt it. Rename the local before dumping this filter.',
+      );
+    }
     bodySrc = bodySrc.replaceAllMapped(
       RegExp('\\b${RegExp.escape(name)}\\b(?![A-Za-z0-9_])'),
       (_) => 'vec2(${name}_x, ${name}_y)',
@@ -133,6 +177,12 @@ String convertShaderToImpeller(
     (_) =>
         '(FlutterFragCoord().xy / vec2(${kResolutionBase}_x, ${kResolutionBase}_y))',
   );
+
+  // Cosmetic (nit-2): collapse runs of 2+ blank lines (left behind by dropped
+  // `precision`/`#version`/uniform lines, and by source formatting) down to a
+  // single blank line, so the generated body reads cleanly. This only touches
+  // whitespace, never comments or code.
+  bodySrc = bodySrc.replaceAll(RegExp(r'\n[ \t]*\n([ \t]*\n)+'), '\n\n');
 
   // Trim leading blank lines so the body starts cleanly after the uniform block.
   final bodyTrimmed = bodySrc.replaceFirst(RegExp(r'^\s*\n+'), '');
@@ -211,29 +261,17 @@ List<String> deriveLayoutFromSource(String glsl, String filterName) {
   return layout;
 }
 
-/// Throws [StateError] if [glsl] declares any array uniform other than the one
-/// the body rewrite knows how to expand ([kKnownArrayUniform], i.e. `uMatrix`).
-///
-/// The Rule 3 expansion is hard-coded to `uMatrix[k]`. A different array uniform
-/// (e.g. `uniform float uKernel[5];`) would otherwise pass through unexpanded
-/// and emit an `impellerc`-incompatible array reference, so we fail loudly here
-/// instead. Matches `uniform float NAME[n];` (optionally precision-qualified) in
-/// declaration position.
-void _assertNoUnknownArrayUniforms(String glsl, String filterName) {
+/// Returns the names of all array-style uniforms declared in [glsl], e.g.
+/// `{uMatrix}` for `uniform float uMatrix[9];`. Matches `uniform float NAME[n];`
+/// (optionally precision-qualified) in declaration position. Shared by the body
+/// rewrite (Rule 3) so it expands exactly the arrays that
+/// [deriveLayoutFromSource] flattens, keeping body and layout in agreement.
+Set<String> _arrayUniformNames(String glsl) {
   final re = RegExp(
     r'^\s*uniform\s+(?:lowp\s+|mediump\s+|highp\s+)?float\s+(\w+)\s*\[\s*\d+\s*\]\s*;',
     multiLine: true,
   );
-  for (final m in re.allMatches(glsl)) {
-    final base = m.group(1)!;
-    if (base != kKnownArrayUniform) {
-      throw StateError(
-        'Shader "$filterName": unknown array uniform `$base[]`. Only '
-        '`$kKnownArrayUniform[]` is supported by the converter; add explicit '
-        'handling (and tests) before dumping this filter.',
-      );
-    }
-  }
+  return re.allMatches(glsl).map((m) => m.group(1)!).toSet();
 }
 
 String _headerComment(
@@ -261,8 +299,10 @@ String _headerComment(
   return buf.toString().trimRight();
 }
 
-/// Extracts the `uniform float <name>;` names (in declaration order, up to but
-/// not including `uniform sampler2D uTexture;`) from generated GLSL.
+/// Extracts the `uniform float <name>;` names in declaration order from
+/// generated GLSL. Only `uniform float` declarations are matched, so the
+/// `uniform sampler2D uTexture;` line (and any other non-float uniform) is
+/// simply skipped rather than acting as a terminator.
 List<String> extractUniformFloatOrder(String glsl) {
   final names = <String>[];
   final re = RegExp(r'^\s*uniform\s+float\s+(\w+)\s*;', multiLine: true);
@@ -296,6 +336,16 @@ String buildPubspecShadersBlock(Iterable<String> shaderStems) {
 /// Replaces (or inserts) the `shaders:` block under the top-level `flutter:`
 /// key in [pubspecContent], leaving everything else (incl. the `assets:` block)
 /// untouched. Returns the new pubspec content.
+///
+/// Assumptions about the input pubspec (true for this repo's, kept simple on
+/// purpose):
+///   * The `shaders:` key is at exactly 2-space indentation (`  shaders:`),
+///     i.e. directly under the top-level `flutter:` key.
+///   * The existing shader list is the block of lines following that key that
+///     are indented MORE deeply than the key (>=3 leading spaces). Such lines
+///     are consumed and replaced — this now also tolerates indented comments
+///     (`    # ...`) interleaved with the `- shaders/*.frag` entries.
+///   * A blank line or any line indented <=2 spaces terminates the block.
 String updatePubspecShaders(
   String pubspecContent,
   Iterable<String> shaderStems,
@@ -305,7 +355,8 @@ String updatePubspecShaders(
 
   final shadersIdx = lines.indexWhere((l) => l == '  shaders:');
   if (shadersIdx >= 0) {
-    // End of the existing block: subsequent lines indented 3+ spaces.
+    // End of the existing block: subsequent lines indented 3+ spaces (covers
+    // `    - path` list items AND indented `    # comment` lines).
     var end = shadersIdx + 1;
     while (end < lines.length) {
       final l = lines[end];
