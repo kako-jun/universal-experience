@@ -103,5 +103,65 @@ void main() {
         expect(service.sensusFilter, expected, reason: '$type');
       });
     });
+
+    test('achromatopsia 適用で isActive=true / sensusFilter=achromatopsia', () {
+      final service = FilterService()..applyFilter(ColorVisionType.achromatopsia);
+      expect(service.isActive, isTrue);
+      expect(service.currentFilter, ColorVisionType.achromatopsia);
+      expect(service.sensusFilter, const VisionFilter.achromatopsia());
+    });
+
+    test('anomaly 型適用で intensity が渡した値のまま state に保持される', () {
+      final service = FilterService()
+        ..applyFilter(ColorVisionType.deuteranomaly, intensity: 0.6);
+      expect(service.currentFilter, ColorVisionType.deuteranomaly);
+      expect(service.intensity, 0.6);
+      // anomaly は対応する -opia と同一 VisionFilter にマップされる契約
+      expect(service.sensusFilter, const VisionFilter.deuteranopia());
+    });
+
+    test('anomalyDefaultSeverity は旧 simulator の severity 0.6 を保持する', () {
+      final service = FilterService();
+      expect(service.anomalyDefaultSeverity, 0.6);
+    });
+  });
+
+  group('recommendedStrength / kAnomalyDefaultSeverity', () {
+    test('kAnomalyDefaultSeverity は 0.6', () {
+      expect(kAnomalyDefaultSeverity, 0.6);
+    });
+
+    test('anomaly 系は kAnomalyDefaultSeverity を返す', () {
+      expect(
+        recommendedStrength(ColorVisionType.protanomaly),
+        kAnomalyDefaultSeverity,
+      );
+      expect(
+        recommendedStrength(ColorVisionType.deuteranomaly),
+        kAnomalyDefaultSeverity,
+      );
+      expect(
+        recommendedStrength(ColorVisionType.tritanomaly),
+        kAnomalyDefaultSeverity,
+      );
+    });
+
+    test('opia 系および achromatopsia は 1.0 を返す', () {
+      expect(recommendedStrength(ColorVisionType.protanopia), 1.0);
+      expect(recommendedStrength(ColorVisionType.deuteranopia), 1.0);
+      expect(recommendedStrength(ColorVisionType.tritanopia), 1.0);
+      expect(recommendedStrength(ColorVisionType.achromatopsia), 1.0);
+    });
+
+    test('none は 0.0 を返す', () {
+      expect(recommendedStrength(ColorVisionType.none), 0.0);
+    });
+
+    test('recommendedStrengthForCurrent は選択中タイプに連動する', () {
+      final service = FilterService()..applyFilter(ColorVisionType.protanomaly);
+      expect(service.recommendedStrengthForCurrent, kAnomalyDefaultSeverity);
+      service.applyFilter(ColorVisionType.protanopia);
+      expect(service.recommendedStrengthForCurrent, 1.0);
+    });
   });
 }

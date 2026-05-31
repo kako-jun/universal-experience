@@ -1,10 +1,19 @@
 # Color Vision Deficiency Simulation Algorithm
 
-色覚障害シミュレーションのための技術的詳細とアルゴリズム実装方針。
+> **注記（#13 以降）:** この文書は **#13 以前の ue 内実装の記録** です。
+> 現行アルゴリズムの正本は **sensus-core crate**（`shaders/*.frag` + `*_uniforms`）に
+> あり、ue は flutter_rust_bridge 経由でそれを消費します。本文に登場する
+> `ColorVisionSimulator`（`getTransformMatrix` / `toColorMatrix` 等）は ue から
+> **撤去済みで現存しません**。以下のコード例・行列値は歴史的記録であり、現行 API
+> では動きません。アルゴリズムの正本を確認したい場合は sensus-core を参照してください。
+
+色覚障害シミュレーションのための技術的詳細とアルゴリズム実装方針（#13 以前の記録）。
 
 ## 概要
 
-色覚障害（CVD: Color Vision Deficiency）のシミュレーションは、LMS色空間での変換に基づいています。
+（以下は ue 内に LMS 実装があった当時の記述。現行では sensus-core が同等の変換を担う。）
+
+色覚障害（CVD: Color Vision Deficiency）のシミュレーションは、LMS色空間での変換に基づいていました。
 
 ## LMS色空間とは
 

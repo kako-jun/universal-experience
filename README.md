@@ -16,9 +16,14 @@
 
 色覚変換アルゴリズムの正本は別 crate
 [`sensus-core`](https://crates.io/crates/sensus-core)（Rust）に一元化しており、
-ue はそれを flutter_rust_bridge 経由で消費する薄いブリッジです（ue は LMS 等の
-変換ロジックを再実装しません）。フィルタの見え方は sensus 由来の GPU シェーダ
-（`lib/rendering/shader_filter.dart`）で計算し、強度調整も可能です。
+ue はそれを flutter_rust_bridge 経由で消費する薄いブリッジです（ue 側で LMS 等の
+変換ロジックを再実装する方針は取りません）。フィルタの見え方は sensus 由来の
+GPU シェーダ（`lib/rendering/shader_filter.dart`）で計算し、強度調整も可能です。
+
+> ただし現状、一部の uniform（シェーダへ渡す変換行列）は
+> `lib/rendering/shader_filter.dart` に暫定的にハードコードされています
+> （`TODO(#11後続)`）。これらは #11 後続で flutter_rust_bridge 経由の
+> sensus-core 取得値へ置き換え、二重実装を解消する予定です。
 
 > 旧バージョンは OS 全体へ system-wide フィルタを適用する独自プラグイン
 > （`plugins/color_vision_filter`）と ue 内 LMS 実装を持っていましたが、
