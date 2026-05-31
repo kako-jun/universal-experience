@@ -1,5 +1,15 @@
 # Architecture Design
 
+> **現状（#13 反映）**: 本ドキュメントが「Platform Channel Layer」「Native
+> Implementation Layer」「OS-Specific Filter Application」として記述する
+> system-wide フィルタ機構（`color_vision_filter` プラグイン／`ColorVisionFilter.apply`
+> 等）は **撤去済み**。色覚アルゴリズムの正本は sensus-core crate（Rust）に一元化し、
+> ue は flutter_rust_bridge 経由で消費する（`lib/src/rust/`、詳細は
+> `docs/sensus-integration.md`）。フィルタ適用は sensus 由来の GPU シェーダ
+> （`lib/rendering/shader_filter.dart`）が担い、`FilterService` は選択状態のみを
+> 保持する。他アプリ含む全画面への適用は画面キャプチャ経路（#1/#3/#4）の実装後。
+> 以下の Platform Channel / Native 実装の節は当初設計の歴史的記述として残す。
+
 ## システムアーキテクチャ
 
 Universal Experienceは、Flutterベースのクロスプラットフォームアプリケーションとして設計されています。

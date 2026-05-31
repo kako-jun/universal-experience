@@ -48,12 +48,11 @@ cd universal-experience
 ```bash
 # メインアプリの依存関係
 flutter pub get
-
-# プラグインの依存関係
-cd plugins/color_vision_filter
-flutter pub get
-cd ../..
 ```
+
+> 旧バージョンには `plugins/color_vision_filter` という自作プラグインがあり、
+> ここで別途 `flutter pub get` が必要でしたが、#13 でプラグインを撤去し色変換
+> アルゴリズムを sensus crate に一元化したため、その手順はもう不要です。
 
 ### 3. プラットフォームの確認
 
@@ -104,11 +103,10 @@ universal-experience/
 ├── lib/                    # Dartソースコード
 │   ├── main.dart          # アプリエントリーポイント
 │   ├── models/            # データモデル
-│   ├── services/          # ビジネスロジック
-│   ├── ui/                # UIコンポーネント
-│   └── core/              # コアアルゴリズム
-├── plugins/               # ネイティブプラグイン
-│   └── color_vision_filter/
+│   ├── services/          # ビジネスロジック（FilterService = sensus への薄いブリッジ）
+│   ├── rendering/         # GPU シェーダ描画（sensus 由来の FragmentProgram）
+│   ├── src/rust/          # flutter_rust_bridge 生成コード（sensus-core 連携）
+│   └── ui/                # UIコンポーネント
 ├── android/               # Android固有コード
 ├── windows/               # Windows固有コード
 ├── macos/                 # macOS固有コード

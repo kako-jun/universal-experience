@@ -87,6 +87,16 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             const FilterSelector(),
+            const SizedBox(height: 16),
+            Text(
+              'フィルタの見え方は sensus（色覚アルゴリズムの正本）で計算します。'
+              'ライブ画面への適用は画面キャプチャ経路の実装後に対応予定です。',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
           ],
         ),
       ),

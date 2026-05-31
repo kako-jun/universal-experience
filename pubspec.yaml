@@ -25,10 +25,6 @@ dependencies:
   window_manager: ^0.3.7
   tray_manager: ^0.2.1
 
-  # Local Plugin
-  color_vision_filter:
-    path: plugins/color_vision_filter
-
   # Rust Bridge (sensus-core 連携: シェーダ取得 + uniform 計算)
   # selona と同じ 2.11.1 系を採用（selona は ^ だが、ここは exact pin）。
   # codegen ツール (2.11.1) と生成物のバージョンスタンプを一致させるため exact pin。
