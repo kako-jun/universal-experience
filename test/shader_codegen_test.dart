@@ -169,6 +169,26 @@ void main() { fragColor = vec4(uStrength); }
     });
   });
 
+  test('strips precision qualifiers of any type, not just float', () {
+    // Regression: `precision highp int;` previously leaked into the generated
+    // astigmatism/nystagmus shaders because only `precision ... float;` was
+    // stripped. Impeller rejects every precision qualifier.
+    const g = '''
+#version 300 es
+precision mediump float;
+precision highp int;
+uniform sampler2D uTexture;
+uniform float uStrength;
+in vec2 vTexCoord;
+out vec4 fragColor;
+void main() { fragColor = texture(uTexture, vTexCoord) * uStrength; }
+''';
+    const layout = <String>['uStrength', 'uResolution_x', 'uResolution_y'];
+    final out = convertShaderToImpeller(g, layout, 'precint');
+    expect(RegExp(r'^\s*precision\b', multiLine: true).hasMatch(out), isFalse,
+        reason: 'no precision line (float OR int) should survive conversion');
+  });
+
   test('convertShaderToImpeller throws when layout drifts from the source', () {
     expect(
       () => convertShaderToImpeller(
@@ -232,7 +252,8 @@ void main() {
       expect(RegExp(r'\buResolution\b(?![_xy])').hasMatch(out), isFalse);
     });
 
-    test('throws on an unknown array uniform (uKernel[5])', () {
+    test('expands any declared array uniform, not just uMatrix (uKernel[k])',
+        () {
       const g = '''
 #version 300 es
 precision mediump float;
@@ -241,17 +262,63 @@ uniform float uStrength;
 uniform float uKernel[5];
 in vec2 vTexCoord;
 out vec4 fragColor;
-void main() { fragColor = texture(uTexture, vTexCoord) * uStrength; }
+void main() {
+    float w = uKernel[0] + uKernel[4];
+    fragColor = texture(uTexture, vTexCoord) * uStrength * w;
+}
 ''';
-      // Layout matches what the source implies (so the layout guard passes and
-      // we actually reach the unknown-array guard).
       const layout = <String>[
         'uStrength',
         'uKernel0', 'uKernel1', 'uKernel2', 'uKernel3', 'uKernel4',
         'uResolution_x', 'uResolution_y',
       ];
+      final out = convertShaderToImpeller(g, layout, 'kernelish');
+      // The array access is flattened to scalar uniforms; no `name[k]` survives.
+      expect(out.contains('uKernel['), isFalse);
+      expect(out.contains('uKernel0'), isTrue);
+      expect(out.contains('uKernel4'), isTrue);
+    });
+
+    test('expands multi-digit array indices (uMatrix[10])', () {
+      const g = '''
+#version 300 es
+precision mediump float;
+uniform sampler2D uTexture;
+uniform float uMatrix[12];
+in vec2 vTexCoord;
+out vec4 fragColor;
+void main() {
+    fragColor = texture(uTexture, vTexCoord) * (uMatrix[0] + uMatrix[11]);
+}
+''';
+      final layout = <String>[
+        for (var i = 0; i < 12; i++) 'uMatrix$i',
+        'uResolution_x', 'uResolution_y',
+      ];
+      final out = convertShaderToImpeller(g, layout, 'big');
+      expect(out.contains('uMatrix['), isFalse);
+      expect(out.contains('uMatrix0'), isTrue);
+      expect(out.contains('uMatrix11'), isTrue);
+    });
+
+    test('throws when the body uses an array uniform it never declared', () {
+      const g = '''
+#version 300 es
+precision mediump float;
+uniform sampler2D uTexture;
+uniform float uStrength;
+in vec2 vTexCoord;
+out vec4 fragColor;
+void main() {
+    fragColor = texture(uTexture, vTexCoord) * uStrength * uMystery[0];
+}
+''';
+      const layout = <String>[
+        'uStrength',
+        'uResolution_x', 'uResolution_y',
+      ];
       expect(
-        () => convertShaderToImpeller(g, layout, 'kernelish'),
+        () => convertShaderToImpeller(g, layout, 'undeclared'),
         throwsA(isA<StateError>()),
       );
     });
@@ -354,10 +421,11 @@ flutter:
       test('$name follows Impeller conventions', () {
         final src = f.readAsStringSync();
         expect(src.contains('#version'), isFalse, reason: '$name has #version');
-        expect(src.contains('precision mediump float;'), isFalse,
-            reason: '$name has mediump precision line');
-        expect(src.contains('precision highp float;'), isFalse,
-            reason: '$name has highp precision line');
+        // No top-level precision declaration of ANY qualifier/type may survive
+        // (float OR int OR otherwise). Substring checks for `precision ...
+        // float;` previously missed `precision highp int;`.
+        expect(RegExp(r'^\s*precision\b', multiLine: true).hasMatch(src), isFalse,
+            reason: '$name still has a precision declaration');
         expect(src.contains('uMatrix['), isFalse,
             reason: '$name has unexpanded uMatrix[]');
         expect(src.contains(_varying), isFalse,
