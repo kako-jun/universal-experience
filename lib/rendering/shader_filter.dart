@@ -27,17 +27,19 @@ class ShaderFilter {
     -0.003882, -0.048116, 1.051998, //
   ];
 
-  static ui.FragmentProgram? _protanopiaProgram;
+  // 解決済み値ではなく Future をキャッシュする。並行呼び出し (スライダ連打で
+  // applyProtanopiaGpu が並列発火) でも fromAsset は 1 回だけになる。
+  static Future<ui.FragmentProgram>? _protanopiaProgram;
 
   /// protanopia の FragmentProgram をロード (キャッシュ)。
-  static Future<ui.FragmentProgram> _loadProtanopia() async {
-    return _protanopiaProgram ??=
-        await ui.FragmentProgram.fromAsset(_protanopiaAsset);
+  static Future<ui.FragmentProgram> _loadProtanopia() {
+    return _protanopiaProgram ??= ui.FragmentProgram.fromAsset(_protanopiaAsset);
   }
 
   /// protanopia フィルタを GPU で [src] に適用し、新しい [ui.Image] を返す。
   ///
-  /// [strength] は 0.0..=1.0 (0.0=原画, 1.0=完全適用)。範囲外は呼び元責任。
+  /// [strength] は 0.0..=1.0 (0.0=原画, 1.0=完全適用)。sensus の `normalize_strength`
+  /// と同じく、範囲外は clamp し NaN は 0.0 (原画) として扱う。
   static Future<ui.Image> applyProtanopiaGpu(
     ui.Image src,
     double strength,
@@ -45,12 +47,16 @@ class ShaderFilter {
     final ui.FragmentProgram program = await _loadProtanopia();
     final ui.FragmentShader shader = program.fragmentShader();
 
+    // sensus の normalize_strength 相当 (NaN→0, 0..=1 clamp)。非有限 uniform が
+    // GPU に流れて画面が壊れるのを防ぐ。
+    final double s = strength.isNaN ? 0.0 : strength.clamp(0.0, 1.0);
+
     final double w = src.width.toDouble();
     final double h = src.height.toDouble();
 
     // shaders/protanopia.frag の宣言順に setFloat する:
     //   0:uStrength, 1..9:uM0..uM8, 10:uSize.x, 11:uSize.y
-    shader.setFloat(0, strength);
+    shader.setFloat(0, s);
     for (int i = 0; i < 9; i++) {
       shader.setFloat(1 + i, _protanopiaMatrix[i]);
     }
