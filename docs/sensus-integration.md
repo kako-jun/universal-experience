@@ -66,6 +66,28 @@ Rust で計算して FRB で渡すのが、二重実装を避ける唯一の方�
 
 ### 2.1 シェーダ同期: 変換をどこでやるか（次フェーズの判断ポイント）
 
+> **#12 で実装済み（案A）**。変換器は ue 側に持つ。純粋変換関数は
+> `tools/shader_codegen.dart`、CLI は `tools/generate_shaders.dart`。入力は
+> sensus-core の dumper（`crates/core/examples/dump_shaders.rs`）出力を vendor した
+> `tools/sensus_shaders.g.json`。生成先は **repo 直下 `shaders/<name>.frag`**
+> （#11・host・pubspec が稼働中のパス。`assets/shaders/` ではない）。`pubspec.yaml`
+> の `shaders:` をアルファベット順に自動列挙する（`assets:` は触らない）。ドリフト
+> 検証は `dart run tools/generate_shaders.dart --check`、テストは
+> `test/shader_codegen_test.dart`。
+>
+> スコープは host（`lib/rendering/shader_filter.dart`）の uniform モデルに合う
+> フィルタ（単一 `uTexture` サンプラ + scalar `float`/`vec2` uniform）の 20 種。
+> 第2サンプラ（floaters/`uMask`, depth_aware_blur/`uDepth`）・`int`/`uint`
+> （glaucoma, cataract, flickering_stars, metamorphopsia）・`uTime`
+> （vertigo, bppv_rotation）を要するフィルタは host 側対応待ちで対象外。
+> さらに dry_eye / starbursts は GLSL の loop index が実行時値（radius,
+> iRayLen/numRays）と比較されており Impeller SkSL が拒否する（"loop index must be
+> compared with a constant expression"）ため、sensus 側で定数ループ境界に書き直す
+> までは対象外（codegen で握りつぶさない）。
+> 変換規則: `#version`/`precision` 除去 + `#include <flutter/runtime_effect.glsl>`、
+> `in vec2 vTexCoord` 廃止して body の `vTexCoord` を `FlutterFragCoord()` / 合成
+> `uResolution` から算出、配列 `uMatrix[k]`→`uMatrixk`、`vec2 uXxx`→`uXxx_x`/`uXxx_y`。
+
 GLSL ES 3.00 → Impeller サブセットの変換を**どちらで持つか**の選択肢:
 
 - **案A: ue 側ビルドで変換する**
@@ -129,8 +151,10 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
 
 ## 4. 次フェーズ（2/3）に残したこと
 
-1. **GLSL → Impeller サブセット変換**（§2.1 案A 推奨）。まず protanopia を手移植し
-   `assets/shaders/` へ置いて `pubspec` の `shaders:` に列挙、`impellerc` を通す。
+1. **GLSL → Impeller サブセット変換**（§2.1 案A）。**#12 で実装済み**:
+   `tools/generate_shaders.dart` が repo 直下 `shaders/<name>.frag`（`assets/shaders/`
+   ではない）へ 20 フィルタを生成し、`pubspec` の `shaders:` を列挙、`impellerc`
+   を通すところまで完了（`flutter build linux --debug` で全 .frag コンパイル実証）。
 2. **Flutter 側のレンダリング配線**: `FragmentProgram.fromAsset` でロード →
    `FragmentShader` に `visionUniforms()` の `Float32List` を `setFloat` で積む →
    `setImageSampler(0, snapshot)` → `CustomPainter` 等で適用。
