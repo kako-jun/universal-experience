@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/vision_filter_catalog.dart';
@@ -71,7 +73,11 @@ class VisionFilterState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// seed パラメータを乱数で再生成する（0..2^31-1。f32 精度の都合で控えめな範囲）。
+  /// seed パラメータを乱数で再生成する。
+  ///
+  /// seed は sensus の `u64`（Dart [BigInt]）。int/double を経由すると 2^53 超で
+  /// 精度が落ちるため、生成・保持とも [BigInt] で全 u64 範囲（0..[kSeedMax]）を
+  /// 扱う。
   void randomizeSeed(String name) {
     _params[name] = _nextSeed();
     notifyListeners();
@@ -232,16 +238,35 @@ class VisionFilterState extends ChangeNotifier {
     }
   }
 
-  /// hemianopia の side: 'left' → 0.0（左視野消失）, 'right' → 1.0（右視野消失）。
+  /// hemianopia の side: UI の文字列キー（'left'/'right'）を sensus の
+  /// `double side` に写像する。写像の定義は [kHemianopiaSideValues] が単一の正本
+  /// （'left'→0.0, 'right'→1.0）。ここはそれを参照するだけにして、catalog の
+  /// options 定義との不整合を防ぐ。未知キーは 'left'（=0.0）にフォールバック。
   double _hemianopiaSide(String name) {
-    return _raw(name) == 'right' ? 1.0 : 0.0;
+    final key = _raw(name);
+    return kHemianopiaSideValues[key] ?? kHemianopiaSideValues['left']!;
   }
 
-  int _seedCounter = 0;
-  int _nextSeed() {
-    // テストの決定性より UX を優先しつつ、衝突を避けるため時刻 + カウンタを混ぜる。
-    _seedCounter++;
-    final base = DateTime.now().microsecondsSinceEpoch ^ (_seedCounter * 2654435761);
-    return base & 0x7fffffff;
+  final Random _rng = Random();
+
+  /// 全 u64 範囲（0..[kSeedMax]）の [BigInt] を一様に近い形で生成する。
+  ///
+  /// int/double を経由せず BigInt 空間だけで組み立てるので、2^53 超でも精度欠落
+  /// しない。32bit ずつ乱数を引いて連結する。
+  BigInt _nextSeed() {
+    final bound = kSeedMax + BigInt.one; // 排他上限 = 2^64
+    final bitLength = bound.bitLength;
+    BigInt result;
+    do {
+      result = BigInt.zero;
+      var remaining = bitLength;
+      while (remaining > 0) {
+        final take = remaining < 32 ? remaining : 32;
+        final chunk = BigInt.from(_rng.nextInt(1 << take));
+        result = (result << take) | chunk;
+        remaining -= take;
+      }
+    } while (result >= bound);
+    return result;
   }
 }

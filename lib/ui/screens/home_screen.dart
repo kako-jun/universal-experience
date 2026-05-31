@@ -147,10 +147,13 @@ class HomeScreen extends StatelessWidget {
               children: [
                 Icon(Icons.science_outlined, color: Colors.indigo.shade600),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
+                  // TODO(#18): i18n - extract to key
+                  // `home.advancedSectionTitle`. English fallback for now;
+                  // actual translations are out of scope for #16.
                   child: Text(
                     'Advanced (all sensus filters)',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),

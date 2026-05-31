@@ -163,6 +163,20 @@ void main() {
       expect(mode.kind, VisionParamKind.enumValue);
       expect(mode.options.length, VisionGlaucomaMode.values.length);
     });
+
+    test('hemianopia の side options が kHemianopiaSideValues と一致（drift 検出）',
+        () {
+      // 単一の写像源（kHemianopiaSideValues）と catalog の option value 集合が
+      // ずれていないことを検証する。どちらか片方だけ変更すると失敗する。
+      final side = kVisionFilterCatalogById['hemianopia']!.parameters.single;
+      final optionKeys = side.options.map((o) => o.value).toSet();
+      expect(optionKeys, kHemianopiaSideValues.keys.toSet());
+      // 既定値も写像源のキーであること。
+      expect(kHemianopiaSideValues.containsKey(side.defaultValue), isTrue);
+      // 写像の実値（left=0.0 / right=1.0）が固定であること。
+      expect(kHemianopiaSideValues['left'], 0.0);
+      expect(kHemianopiaSideValues['right'], 1.0);
+    });
   });
 
   group('VisionFilterState.build()', () {
@@ -281,12 +295,35 @@ void main() {
       expect(notified, 3);
     });
 
-    test('randomizeSeed は seed param を 0..2^31-1 の int に更新', () {
+    test('randomizeSeed は seed param を 0..u64max の BigInt に更新', () {
       final state = VisionFilterState()..select('cataract');
       state.randomizeSeed('seed');
       final v = state.params['seed'];
-      expect(v, isA<int>());
-      expect(v as int, inInclusiveRange(0, 0x7fffffff));
+      expect(v, isA<BigInt>());
+      final big = v as BigInt;
+      expect(big, greaterThanOrEqualTo(BigInt.zero));
+      expect(big, lessThanOrEqualTo(kSeedMax));
+    });
+
+    test('randomizeSeed は 2^53 超の値にも到達できる（BigInt 経路の証跡）', () {
+      final state = VisionFilterState()..select('cataract');
+      final threshold = BigInt.one << 53;
+      var sawLarge = false;
+      // u64 範囲では 1 回の生成が 2^53 を超える確率が 99.9% 超。数十回で
+      // 偽陰性は天文学的に低い。
+      for (var i = 0; i < 50 && !sawLarge; i++) {
+        state.randomizeSeed('seed');
+        if ((state.params['seed'] as BigInt) >= threshold) sawLarge = true;
+      }
+      expect(sawLarge, isTrue);
+    });
+
+    test('seed の既定値は BigInt.zero（int/double を経由しない）', () {
+      final state = VisionFilterState()..select('cataract');
+      expect(state.params['seed'], isA<BigInt>());
+      expect(state.params['seed'], BigInt.zero);
+      expect(kSeedDefault, BigInt.zero);
+      expect(kSeedMax, (BigInt.one << 64) - BigInt.one);
     });
   });
 }
