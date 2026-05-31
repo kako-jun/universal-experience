@@ -1,8 +1,12 @@
 // GENERATED FILE - DO NOT EDIT.
 //
-// Source of truth: sensus-core vision filter "deuteranopia".
+// Source of truth: sensus-core vision filter "deuteranopia"
+// (canonical GLSL: sensus shaders/deuteranopia.frag, sensus-core v0.5.0).
+// Filter-specific provenance (e.g. the Machado 2009 matrix and
+// its citation) lives in the sensus source, not here.
+//
 // Regenerate with: dart run tools/generate_shaders.dart
-// (input: tools/sensus_shaders.g.json).
+// (input dump: tools/sensus_shaders.g.json, produced by sensus-core v0.5.0).
 //
 // scalar uniform order (setFloat index): uStrength, uMatrix0, uMatrix1, uMatrix2, uMatrix3, uMatrix4, uMatrix5, uMatrix6, uMatrix7, uMatrix8, uResolution_x, uResolution_y
 #include <flutter/runtime_effect.glsl>

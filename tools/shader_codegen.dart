@@ -26,19 +26,33 @@ const String kGeneratedHeaderMarker = 'GENERATED FILE - DO NOT EDIT';
 /// `uResolution_x` / `uResolution_y` are the last two entries of every layout.
 const String kResolutionBase = 'uResolution';
 
+/// The only array uniform the converter knows how to expand (`uMatrix[k]` ->
+/// `uMatrixk`). Any other `uniform float NAME[n]` is unrecognised and makes the
+/// converter throw, rather than silently leaving an `impellerc`-incompatible
+/// array reference in the output. See [_assertNoUnknownArrayUniforms].
+const String kKnownArrayUniform = 'uMatrix';
+
+/// Path (relative to repo root) of the vendored sensus dump the generated
+/// `.frag` files are derived from. Recorded in each header for traceability.
+const String kDumpInputPath = 'tools/sensus_shaders.g.json';
+
 /// Converts a sensus GLSL ES 3.00 source into an Impeller-compatible shader.
 ///
 /// [glsl] is the source from sensus `*_glsl()`. [layout] is the
 /// `setFloat`-ordered scalar uniform names (from the vendored dump). [filterName]
-/// is the snake_case stem used for the header comment.
+/// is the snake_case stem used for the header comment. [sensusVersion] is the
+/// `sensus_core_version` recorded in the dump; it is stamped into the header for
+/// traceability (null/empty when a caller has none, e.g. a unit test).
 ///
 /// Throws [StateError] if the regenerated `uniform float` declaration order (up
-/// to `uTexture`) does not match [layout] exactly.
+/// to `uTexture`) does not match [layout] exactly, or if the source declares an
+/// array uniform other than [kKnownArrayUniform].
 String convertShaderToImpeller(
   String glsl,
   List<String> layout,
-  String filterName,
-) {
+  String filterName, {
+  String? sensusVersion,
+}) {
   // Compute the scalar-float layout that the source *implies*, and assert it
   // matches the provided [layout]. This is the real guard: it fails loudly if
   // the vendored layout drifts from the actual shader source (wrong order,
@@ -51,6 +65,12 @@ String convertShaderToImpeller(
       '$layout',
     );
   }
+
+  // Defence: the body rewrite only knows how to expand `uMatrix[k]`. Reject any
+  // other `uniform float NAME[n]` array up front so an unhandled array reference
+  // can never leak into the generated `.frag` (where `impellerc` would choke or,
+  // worse, silently mis-bind).
+  _assertNoUnknownArrayUniforms(glsl, filterName);
 
   // Collect the names of the original `vec2` uniforms so we can rewrite their
   // body references to `vec2(<name>_x, <name>_y)`.
@@ -88,22 +108,28 @@ String convertShaderToImpeller(
 
   // Rule 3: array expansion uMatrix[k] -> uMatrixk (k = single digit).
   bodySrc = bodySrc.replaceAllMapped(
-    RegExp(r'uMatrix\[(\d)\]'),
-    (m) => 'uMatrix${m.group(1)}',
+    RegExp(kKnownArrayUniform + r'\[(\d)\]'),
+    (m) => '$kKnownArrayUniform${m.group(1)}',
   );
 
   // Rule 4: vec2 uniform refs in the body -> vec2(name_x, name_y).
+  //
+  // Use a strict identifier boundary (a trailing negative lookahead in addition
+  // to `\b`) so a payload uniform like `uTexelSize` cannot partially match (and
+  // corrupt) a longer identifier such as `uTexelSizeScale`.
   for (final name in vec2Names) {
     bodySrc = bodySrc.replaceAllMapped(
-      RegExp('\\b$name\\b'),
+      RegExp('\\b${RegExp.escape(name)}\\b(?![A-Za-z0-9_])'),
       (_) => 'vec2(${name}_x, ${name}_y)',
     );
   }
 
   // Rule 5: Impeller has no vTexCoord. Derive UV from FlutterFragCoord() and the
   // synthetic resolution pair. Wrap in parens so it is safe in any expression.
+  // The trailing negative lookahead keeps a longer identifier such as
+  // `vTexCoordScale` from being partially rewritten.
   bodySrc = bodySrc.replaceAllMapped(
-    RegExp(r'\bvTexCoord\b'),
+    RegExp(r'\bvTexCoord\b(?![A-Za-z0-9_])'),
     (_) =>
         '(FlutterFragCoord().xy / vec2(${kResolutionBase}_x, ${kResolutionBase}_y))',
   );
@@ -120,7 +146,7 @@ String convertShaderToImpeller(
   }
   uniformBlock.writeln('uniform sampler2D uTexture;');
 
-  final header = _headerComment(filterName, layout);
+  final header = _headerComment(filterName, layout, sensusVersion);
   final result = '$header\n${uniformBlock.toString()}\n$bodyTrimmed';
 
   return result.endsWith('\n') ? result : '$result\n';
@@ -185,13 +211,51 @@ List<String> deriveLayoutFromSource(String glsl, String filterName) {
   return layout;
 }
 
-String _headerComment(String filterName, List<String> layout) {
+/// Throws [StateError] if [glsl] declares any array uniform other than the one
+/// the body rewrite knows how to expand ([kKnownArrayUniform], i.e. `uMatrix`).
+///
+/// The Rule 3 expansion is hard-coded to `uMatrix[k]`. A different array uniform
+/// (e.g. `uniform float uKernel[5];`) would otherwise pass through unexpanded
+/// and emit an `impellerc`-incompatible array reference, so we fail loudly here
+/// instead. Matches `uniform float NAME[n];` (optionally precision-qualified) in
+/// declaration position.
+void _assertNoUnknownArrayUniforms(String glsl, String filterName) {
+  final re = RegExp(
+    r'^\s*uniform\s+(?:lowp\s+|mediump\s+|highp\s+)?float\s+(\w+)\s*\[\s*\d+\s*\]\s*;',
+    multiLine: true,
+  );
+  for (final m in re.allMatches(glsl)) {
+    final base = m.group(1)!;
+    if (base != kKnownArrayUniform) {
+      throw StateError(
+        'Shader "$filterName": unknown array uniform `$base[]`. Only '
+        '`$kKnownArrayUniform[]` is supported by the converter; add explicit '
+        'handling (and tests) before dumping this filter.',
+      );
+    }
+  }
+}
+
+String _headerComment(
+  String filterName,
+  List<String> layout,
+  String? sensusVersion,
+) {
+  final version = (sensusVersion == null || sensusVersion.isEmpty)
+      ? 'unknown'
+      : sensusVersion;
   final buf = StringBuffer();
   buf.writeln('// $kGeneratedHeaderMarker.');
   buf.writeln('//');
-  buf.writeln('// Source of truth: sensus-core vision filter "$filterName".');
+  buf.writeln('// Source of truth: sensus-core vision filter "$filterName"');
+  buf.writeln('// (canonical GLSL: sensus shaders/$filterName.frag, '
+      'sensus-core v$version).');
+  buf.writeln('// Filter-specific provenance (e.g. the Machado 2009 matrix and');
+  buf.writeln('// its citation) lives in the sensus source, not here.');
+  buf.writeln('//');
   buf.writeln('// Regenerate with: dart run tools/generate_shaders.dart');
-  buf.writeln('// (input: tools/sensus_shaders.g.json).');
+  buf.writeln('// (input dump: $kDumpInputPath, '
+      'produced by sensus-core v$version).');
   buf.writeln('//');
   buf.writeln('// scalar uniform order (setFloat index): ${layout.join(', ')}');
   return buf.toString().trimRight();

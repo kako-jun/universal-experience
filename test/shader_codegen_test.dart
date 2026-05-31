@@ -181,6 +181,109 @@ void main() { fragColor = vec4(uStrength); }
     );
   });
 
+  group('M1: token boundaries + unknown array uniforms', () {
+    // A vec2 payload uniform `uTexelSize` whose body ALSO references a longer
+    // identifier `uTexelSizeScale` (a plain float). The rewrite must split the
+    // bare `uTexelSize` but leave `uTexelSizeScale` byte-for-byte intact.
+    const tricky = '''
+#version 300 es
+precision highp float;
+
+uniform sampler2D uTexture;
+uniform float uTexelSizeScale;
+uniform vec2  uTexelSize;
+
+in vec2 vTexCoord;
+out vec4 fragColor;
+
+void main() {
+    vec2 uv = vTexCoord + uTexelSize * uTexelSizeScale;
+    fragColor = texture(uTexture, uv);
+}
+''';
+    const trickyLayout = <String>[
+      'uTexelSizeScale',
+      'uTexelSize_x',
+      'uTexelSize_y',
+      'uResolution_x',
+      'uResolution_y',
+    ];
+
+    test('splits uTexelSize but does not corrupt uTexelSizeScale', () {
+      final out = convertShaderToImpeller(tricky, trickyLayout, 'tricky');
+      // The longer identifier must still appear, undamaged, in the body.
+      expect(out.contains('uTexelSizeScale'), isTrue);
+      expect(
+        out.contains('vec2(uTexelSize_x, uTexelSize_y) * uTexelSizeScale'),
+        isTrue,
+        reason: 'bare uTexelSize should split; uTexelSizeScale untouched',
+      );
+      // No mangled `vec2(uTexelSize_x, uTexelSize_y)Scale` artefact.
+      expect(out.contains('uTexelSize_y)Scale'), isFalse);
+    });
+
+    test('uResolution-prefixed identifiers in the UV rule are not over-matched',
+        () {
+      // The emitted UV uses uResolution_x/_y; ensure no bare `uResolution`
+      // token (without suffix) leaks, and the synthetic split is exact.
+      final out =
+          convertShaderToImpeller(_matrixGlsl, _matrixLayout, 'protanopia');
+      expect(out.contains('vec2(uResolution_x, uResolution_y)'), isTrue);
+      expect(RegExp(r'\buResolution\b(?![_xy])').hasMatch(out), isFalse);
+    });
+
+    test('throws on an unknown array uniform (uKernel[5])', () {
+      const g = '''
+#version 300 es
+precision mediump float;
+uniform sampler2D uTexture;
+uniform float uStrength;
+uniform float uKernel[5];
+in vec2 vTexCoord;
+out vec4 fragColor;
+void main() { fragColor = texture(uTexture, vTexCoord) * uStrength; }
+''';
+      // Layout matches what the source implies (so the layout guard passes and
+      // we actually reach the unknown-array guard).
+      const layout = <String>[
+        'uStrength',
+        'uKernel0', 'uKernel1', 'uKernel2', 'uKernel3', 'uKernel4',
+        'uResolution_x', 'uResolution_y',
+      ];
+      expect(
+        () => convertShaderToImpeller(g, layout, 'kernelish'),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('still accepts the known uMatrix[9] array uniform', () {
+      expect(
+        () => convertShaderToImpeller(_matrixGlsl, _matrixLayout, 'protanopia'),
+        returnsNormally,
+      );
+    });
+  });
+
+  group('S3/N2: header traceability', () {
+    test('stamps sensus version and the input dump path into the header', () {
+      final out = convertShaderToImpeller(
+        _matrixGlsl,
+        _matrixLayout,
+        'protanopia',
+        sensusVersion: '0.5.0',
+      );
+      expect(out.contains('sensus-core v0.5.0'), isTrue);
+      expect(out.contains('tools/sensus_shaders.g.json'), isTrue);
+      expect(out.contains('sensus shaders/protanopia.frag'), isTrue);
+    });
+
+    test('falls back to "unknown" when no version is supplied', () {
+      final out =
+          convertShaderToImpeller(_matrixGlsl, _matrixLayout, 'protanopia');
+      expect(out.contains('sensus-core vunknown'), isTrue);
+    });
+  });
+
   group('buildPubspecShadersBlock / updatePubspecShaders', () {
     test('emits alphabetically sorted entries under shaders:', () {
       final block = buildPubspecShadersBlock(<String>['myopia', 'achromatopsia']);
@@ -209,6 +312,28 @@ flutter:
       // The assets block must survive untouched.
       expect(updated.contains('- assets/images/'), isTrue);
       expect(updated.contains('uses-material-design: true'), isTrue);
+    });
+
+    test('inserts a shaders block when none exists yet', () {
+      // No `shaders:` key at all under flutter: (initial state).
+      const pubspec = '''
+name: demo
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+''';
+      final updated = updatePubspecShaders(pubspec, <String>['b', 'a']);
+      expect(updated.contains('  shaders:'), isTrue);
+      expect(updated.contains('    - shaders/a.frag'), isTrue);
+      expect(updated.contains('    - shaders/b.frag'), isTrue);
+      // Pre-existing content survives.
+      expect(updated.contains('- assets/images/'), isTrue);
+      expect(updated.contains('uses-material-design: true'), isTrue);
+      // Re-running is idempotent (block now exists -> replaced in place).
+      final again = updatePubspecShaders(updated, <String>['a', 'b']);
+      expect('  shaders:'.allMatches(again).length, 1);
     });
   });
 
@@ -244,9 +369,10 @@ flutter:
   });
 
   group('layout consistency (.frag vs sensus dump)', () {
-    final dump = jsonDecode(
+    final dumpRoot = jsonDecode(
       File('tools/sensus_shaders.g.json').readAsStringSync(),
-    ) as List<dynamic>;
+    ) as Map<String, dynamic>;
+    final dump = dumpRoot['shaders'] as List<dynamic>;
 
     for (final entry in dump) {
       final e = entry as Map<String, dynamic>;
