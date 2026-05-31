@@ -56,7 +56,26 @@ flutter:
   # FragmentProgram シェーダ (Impeller サブセットへ手変換した sensus フィルタ)。
   # ビルド時に impellerc がコンパイルする。詳細は docs/sensus-integration.md。
   shaders:
+    - shaders/achromatopsia.frag
+    - shaders/astigmatism.frag
+    - shaders/contrast_sensitivity.frag
+    - shaders/deuteranopia.frag
+    - shaders/diplopia.frag
+    - shaders/eye_strain.frag
+    - shaders/hemianopia.frag
+    - shaders/hyperopia.frag
+    - shaders/macular_degeneration.frag
+    - shaders/myopia.frag
+    - shaders/nyctalopia.frag
+    - shaders/nystagmus.frag
+    - shaders/photophobia.frag
+    - shaders/presbyopia.frag
     - shaders/protanopia.frag
+    - shaders/teichopsia.frag
+    - shaders/tetrachromacy.frag
+    - shaders/tritanopia.frag
+    - shaders/tunnel_vision.frag
+    - shaders/vestibular_neuritis.frag
 
   # Multi-platform support
   # Note: iOS intentionally excluded due to platform restrictions

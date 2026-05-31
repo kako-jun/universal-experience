@@ -1,7 +1,7 @@
 // GENERATED FILE - DO NOT EDIT.
 //
-// Source of truth: sensus-core vision filter "protanopia"
-// (canonical GLSL: sensus shaders/protanopia.frag, sensus-core v0.5.0).
+// Source of truth: sensus-core vision filter "tritanopia"
+// (canonical GLSL: sensus shaders/tritanopia.frag, sensus-core v0.5.0).
 // Filter-specific provenance (e.g. the Machado 2009 matrix and
 // its citation) lives in the sensus source, not here.
 //

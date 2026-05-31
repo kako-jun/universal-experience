@@ -1,32 +1,26 @@
 // GENERATED FILE - DO NOT EDIT.
 //
-// Source of truth: sensus-core vision filter "protanopia"
-// (canonical GLSL: sensus shaders/protanopia.frag, sensus-core v0.5.0).
+// Source of truth: sensus-core vision filter "achromatopsia"
+// (canonical GLSL: sensus shaders/achromatopsia.frag, sensus-core v0.5.0).
 // Filter-specific provenance (e.g. the Machado 2009 matrix and
 // its citation) lives in the sensus source, not here.
 //
 // Regenerate with: dart run tools/generate_shaders.dart
 // (input dump: tools/sensus_shaders.g.json, produced by sensus-core v0.5.0).
 //
-// scalar uniform order (setFloat index): uStrength, uMatrix0, uMatrix1, uMatrix2, uMatrix3, uMatrix4, uMatrix5, uMatrix6, uMatrix7, uMatrix8, uResolution_x, uResolution_y
+// scalar uniform order (setFloat index): uStrength, uRWeight, uGWeight, uBWeight, uResolution_x, uResolution_y
 #include <flutter/runtime_effect.glsl>
 
 uniform float uStrength;
-uniform float uMatrix0;
-uniform float uMatrix1;
-uniform float uMatrix2;
-uniform float uMatrix3;
-uniform float uMatrix4;
-uniform float uMatrix5;
-uniform float uMatrix6;
-uniform float uMatrix7;
-uniform float uMatrix8;
+uniform float uRWeight;
+uniform float uGWeight;
+uniform float uBWeight;
 uniform float uResolution_x;
 uniform float uResolution_y;
 uniform sampler2D uTexture;
 
-// Machado 2009 severity=1.0 行列（linear sRGB → simulated linear sRGB）
-// 出典: https://www.inf.ufrgs.br/~oliveira/pubs_files/CVD_Simulation/CVD_Simulation.html
+// BT.709 photopic luminance によるグレースケール化（全色盲シミュレーション）
+// 係数: R=0.2126, G=0.7152, B=0.0722
 
 out vec4 fragColor;
 
@@ -44,13 +38,11 @@ void main() {
     float g = srgbToLinear(tex.g);
     float b = srgbToLinear(tex.b);
 
-    float sr = uMatrix0 * r + uMatrix1 * g + uMatrix2 * b;
-    float sg = uMatrix3 * r + uMatrix4 * g + uMatrix5 * b;
-    float sb = uMatrix6 * r + uMatrix7 * g + uMatrix8 * b;
+    float y = uRWeight * r + uGWeight * g + uBWeight * b;
 
-    float nr = r + (sr - r) * uStrength;
-    float ng = g + (sg - g) * uStrength;
-    float nb = b + (sb - b) * uStrength;
+    float nr = r + (y - r) * uStrength;
+    float ng = g + (y - g) * uStrength;
+    float nb = b + (y - b) * uStrength;
 
     fragColor = vec4(
         linearToSrgb(clamp(nr, 0.0, 1.0)),
