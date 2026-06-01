@@ -4,6 +4,7 @@ import 'package:window_manager/window_manager.dart';
 import 'dart:io' show Platform;
 
 import 'services/filter_service.dart';
+import 'services/vision_filter_state.dart';
 import 'services/loupe_window_controller.dart';
 import 'services/settings_service.dart';
 import 'ui/screens/home_screen.dart';
@@ -83,6 +84,8 @@ class UniversalExperienceApp extends StatelessWidget {
           create: (_) => FilterService()
             ..applyFilter(settings.filterType, intensity: settings.intensity),
         ),
+        // VisionFilterState (#16) drives the filter-selection / parameter UI.
+        ChangeNotifierProvider(create: (_) => VisionFilterState()),
       ],
       // Rebuild MaterialApp when the persisted theme mode changes.
       child: Consumer<SettingsService>(
