@@ -48,6 +48,9 @@ flutter:
   assets:
     - assets/images/
     - assets/fonts/
+    # タスクトレイアイコン (#15)。tray_manager の setIcon が
+    # rootBundle 経由でこのパスを解決する。
+    - assets/tray/
 
   # FragmentProgram シェーダ (Impeller サブセットへ手変換した sensus フィルタ)。
   # ビルド時に impellerc がコンパイルする。詳細は docs/sensus-integration.md。
