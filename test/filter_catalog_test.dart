@@ -295,6 +295,13 @@ void main() {
       expect(notified, 3);
     });
 
+    test('select で seed param の既定値が BigInt.zero（int/double を経由しない）',
+        () {
+      final state = VisionFilterState()..select('cataract');
+      expect(state.params['seed'], isA<BigInt>());
+      expect(state.params['seed'], BigInt.zero);
+    });
+
     test('randomizeSeed は seed param を 0..u64max の BigInt に更新', () {
       final state = VisionFilterState()..select('cataract');
       state.randomizeSeed('seed');
@@ -303,14 +310,15 @@ void main() {
       final big = v as BigInt;
       expect(big, greaterThanOrEqualTo(BigInt.zero));
       expect(big, lessThanOrEqualTo(kSeedMax));
+      expect(kSeedMax, (BigInt.one << 64) - BigInt.one);
     });
 
     test('randomizeSeed は 2^53 超の値にも到達できる（BigInt 経路の証跡）', () {
       final state = VisionFilterState()..select('cataract');
       final threshold = BigInt.one << 53;
       var sawLarge = false;
-      // u64 範囲では 1 回の生成が 2^53 を超える確率が 99.9% 超。数十回で
-      // 偽陰性は天文学的に低い。
+      // u64 範囲では 1 回の生成が 2^53 を超える確率が 99.9% 超。数十回試せば
+      // 偽陰性は天文学的に低い。int/double 経由ならこの範囲に到達できない。
       for (var i = 0; i < 50 && !sawLarge; i++) {
         state.randomizeSeed('seed');
         if ((state.params['seed'] as BigInt) >= threshold) sawLarge = true;
@@ -318,12 +326,21 @@ void main() {
       expect(sawLarge, isTrue);
     });
 
-    test('seed の既定値は BigInt.zero（int/double を経由しない）', () {
-      final state = VisionFilterState()..select('cataract');
-      expect(state.params['seed'], isA<BigInt>());
-      expect(state.params['seed'], BigInt.zero);
-      expect(kSeedDefault, BigInt.zero);
-      expect(kSeedMax, (BigInt.one << 64) - BigInt.one);
+    test('seed は 2^53 超の BigInt を精度欠落なく往復できる', () {
+      final state = VisionFilterState()..select('floaters');
+      // double 経由なら丸められてしまう値。
+      final big = (BigInt.one << 63) + BigInt.from(123456789);
+      state.setParam('seed', big);
+      expect(
+        state.build(),
+        VisionFilter.floaters(
+          seed: big,
+          density: 0.5,
+          size: 0.5,
+          gazeX: 0.5,
+          gazeY: 0.5,
+        ),
+      );
     });
   });
 }

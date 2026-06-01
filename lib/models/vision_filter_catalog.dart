@@ -17,6 +17,31 @@ library;
 
 import '../src/rust/api/sensus_bridge.dart';
 
+/// seed パラメータの上限（sensus `u64` の最大値、2^64-1）。
+///
+/// sensus は `seed` を Rust `u64`（Dart [BigInt]）で受ける。`u64` は
+/// [int]/[double] の正確表現範囲（2^53）を超えるため、seed は UI から sensus
+/// まで一貫して [BigInt] で運ぶ（int/double を経由すると巨大シードで精度が
+/// 落ちる。sensus_bridge.dart のモジュール doc 参照）。
+/// [VisionFilterState.randomizeSeed] はこの範囲内（0..[kSeedMax]）の
+/// [BigInt] を生成する。
+final BigInt kSeedMax = (BigInt.one << 64) - BigInt.one;
+
+/// hemianopia の `side`（UI 上は enum、sensus 上は `double`）の **単一の写像源**。
+///
+/// sensus は `hemianopia({required double side})` と連続値 `double` で受ける。
+/// UI は Left/Right の二択（[VisionParamOption] の文字列 value）で見せる。
+/// 「文字列キー → double 実値」の対応はこの 1 箇所だけで定義し、カタログの
+/// options 定義と `vision_filter_state` の build()（`_hemianopiaSide`）は
+/// 両方ともここを参照する。片方だけ変えても壊れないよう、
+/// test/filter_catalog_test.dart が両者の一致を検証する。
+///   - 'left'  -> 0.0
+///   - 'right' -> 1.0
+const Map<String, double> kHemianopiaSideValues = {
+  'left': 0.0,
+  'right': 1.0,
+};
+
 /// フィルタのカテゴリ分類。
 ///
 /// sensus_bridge.dart の `VisionFilter` コメント（種別 / Phase）に従って分類する。
@@ -55,6 +80,9 @@ enum VisionFilterCategory {
 ///
 /// 「この見え方をどれだけ早く周囲が把握すべきか」の目安。UI で選択時に小さく
 /// 表示する（#16 スコープ）。値そのものの調整・運用は将来 Issue。
+///
+/// NOTE: 各フィルタへの urgency 初期割り当て（[kVisionFilterCatalog] 内）は
+/// **初版・要医療監修**。現状は便宜的な目安であり、確定値ではない。
 enum VisionFilterUrgency {
   /// 緊急度の概念が薄い（色覚など）。
   none('None', 'urgency.none'),
@@ -327,15 +355,18 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         kind: VisionParamKind.enumValue,
         labelKey: 'param.hemianopia.side',
         displayName: 'Lost field',
+        // 文字列 option value は kHemianopiaSideValues のキー。double 実値への
+        // 写像（left=0.0 / right=1.0）はそのマップが単一の正本で、build() の
+        // _hemianopiaSide が同じマップを参照する。
         defaultValue: 'left',
         options: [
           VisionParamOption(
-            value: 'left',
+            value: 'left', // -> kHemianopiaSideValues['left'] == 0.0
             displayName: 'Left field lost',
             labelKey: 'param.hemianopia.side.left',
           ),
           VisionParamOption(
-            value: 'right',
+            value: 'right', // -> kHemianopiaSideValues['right'] == 1.0
             displayName: 'Right field lost',
             labelKey: 'param.hemianopia.side.right',
           ),
@@ -364,6 +395,8 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         kind: VisionParamKind.seed,
         labelKey: 'param.cataract.seed',
         displayName: 'Glare seed',
+        // seed は sensus u64。const カタログのため defaultValue は const-safe な
+        // int 0 とし、VisionFilterState が seed kind を実行時に BigInt 化する。
         defaultValue: 0,
       ),
     ],
@@ -380,6 +413,8 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         kind: VisionParamKind.seed,
         labelKey: 'param.floaters.seed',
         displayName: 'Seed',
+        // seed は sensus u64。const カタログのため defaultValue は const-safe な
+        // int 0 とし、VisionFilterState が seed kind を実行時に BigInt 化する。
         defaultValue: 0,
       ),
       VisionParam(
@@ -611,6 +646,8 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         kind: VisionParamKind.seed,
         labelKey: 'param.metamorphopsia.seed',
         displayName: 'Distortion seed',
+        // seed は sensus u64。const カタログのため defaultValue は const-safe な
+        // int 0 とし、VisionFilterState が seed kind を実行時に BigInt 化する。
         defaultValue: 0,
       ),
     ],
@@ -652,6 +689,8 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         kind: VisionParamKind.seed,
         labelKey: 'param.flickering_stars.seed',
         displayName: 'Seed',
+        // seed は sensus u64。const カタログのため defaultValue は const-safe な
+        // int 0 とし、VisionFilterState が seed kind を実行時に BigInt 化する。
         defaultValue: 0,
       ),
     ],

@@ -44,12 +44,17 @@ class VisionFilterState extends ChangeNotifier {
       throw ArgumentError('Unknown vision filter id: $id');
     }
     _selectedId = id;
-    _params
-      ..clear()
-      ..addAll({
-        for (final p in entry.parameters)
-          if (p.defaultValue != null) p.name: p.defaultValue!,
-      });
+    _params.clear();
+    for (final p in entry.parameters) {
+      if (p.defaultValue == null) continue;
+      // seed は sensus u64。カタログの const default は int だが、ここで
+      // BigInt 化して保持する（int/double を経由させず精度欠落を防ぐ）。
+      if (p.kind == VisionParamKind.seed) {
+        _params[p.name] = _toSeedBigInt(p.defaultValue!);
+      } else {
+        _params[p.name] = p.defaultValue!;
+      }
+    }
     notifyListeners();
   }
 
@@ -67,7 +72,7 @@ class VisionFilterState extends ChangeNotifier {
   }
 
   /// パラメータ値を更新する（型は呼び出し側責務: float→double / int→int /
-  /// enum→String value / seed→int）。
+  /// enum→String value / seed→[BigInt]）。
   void setParam(String name, Object value) {
     _params[name] = value;
     notifyListeners();
@@ -245,6 +250,14 @@ class VisionFilterState extends ChangeNotifier {
   double _hemianopiaSide(String name) {
     final key = _raw(name);
     return kHemianopiaSideValues[key] ?? kHemianopiaSideValues['left']!;
+  }
+
+  /// 任意の数値/BigInt を seed 用 [BigInt] に正規化する。
+  static BigInt _toSeedBigInt(Object value) {
+    if (value is BigInt) return value;
+    if (value is int) return BigInt.from(value);
+    if (value is num) return BigInt.from(value.toInt());
+    return BigInt.zero;
   }
 
   final Random _rng = Random();
