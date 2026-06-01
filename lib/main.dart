@@ -5,6 +5,7 @@ import 'dart:io' show Platform;
 
 import 'services/filter_service.dart';
 import 'services/loupe_window_controller.dart';
+import 'services/settings_service.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/theme/app_theme.dart';
 
@@ -15,6 +16,12 @@ final LoupeWindowController loupeWindow = LoupeWindowController();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Restore persisted settings (theme mode / last filter / intensity) before
+  // building the app so the first frame already reflects the user's choices
+  // (#17, settings_service.dart).
+  final settings = SettingsService();
+  await settings.load();
 
   // Initialize window manager for desktop platforms
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
@@ -54,25 +61,41 @@ void main() async {
     });
   }
 
-  runApp(const UniversalExperienceApp());
+  runApp(UniversalExperienceApp(settings: settings));
 }
 
 class UniversalExperienceApp extends StatelessWidget {
-  const UniversalExperienceApp({super.key});
+  const UniversalExperienceApp({super.key, required this.settings});
+
+  /// Pre-loaded settings service (theme mode / last filter / intensity).
+  final SettingsService settings;
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => FilterService()),
+        // SettingsService is created+loaded in main() so the first frame uses
+        // restored values; provide the existing instance (not a fresh one).
+        ChangeNotifierProvider<SettingsService>.value(value: settings),
+        // FilterService is seeded from the restored settings so the previously
+        // selected filter + intensity are reflected on startup.
+        ChangeNotifierProvider<FilterService>(
+          create: (_) => FilterService()
+            ..applyFilter(settings.filterType, intensity: settings.intensity),
+        ),
       ],
-      child: MaterialApp(
-        title: 'Universal Experience',
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.system,
-        home: const HomeScreen(),
-        debugShowCheckedModeBanner: false,
+      // Rebuild MaterialApp when the persisted theme mode changes.
+      child: Consumer<SettingsService>(
+        builder: (context, settings, _) {
+          return MaterialApp(
+            title: 'Universal Experience',
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: settings.themeMode,
+            home: const HomeScreen(),
+            debugShowCheckedModeBanner: false,
+          );
+        },
       ),
     );
   }
