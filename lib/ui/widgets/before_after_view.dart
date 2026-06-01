@@ -195,9 +195,19 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (_loading && _before == null) {
-      return const SizedBox(
+      // Non-animating placeholder while the first sample image is generated.
+      // (A CircularProgressIndicator would animate forever and block
+      // pumpAndSettle in widget tests.)
+      return SizedBox(
         height: 180,
-        child: Center(child: CircularProgressIndicator()),
+        child: Center(
+          child: Text(
+            'Preparing preview…',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
       );
     }
 

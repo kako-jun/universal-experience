@@ -105,6 +105,20 @@ void main() {
   });
 
   group('BeforeAfterView ウィジェット', () {
+    // 画像生成 / GPU 描画は実 microtask 上で走るため runAsync 内でポンプし、
+    // 目的テキストが現れるまで待つヘルパ。pumpAndSettle はロード/描画の
+    // 非同期完了を待てない（かつアニメーションで収束しない）ため使わない。
+    Future<void> pumpUntilText(WidgetTester tester, String text) async {
+      await tester.runAsync(() async {
+        for (var i = 0; i < 50; i++) {
+          await tester.pump(const Duration(milliseconds: 20));
+          if (find.text(text).evaluate().isNotEmpty) return;
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+      });
+      await tester.pump();
+    }
+
     testWidgets('protanopia で原画ラベルとフィルタ名ラベルの両ペインを出す',
         (tester) async {
       await tester.pumpWidget(
@@ -118,8 +132,7 @@ void main() {
           ),
         ),
       );
-      // 画像生成 + GPU 描画の Future を解決させる。
-      await tester.pumpAndSettle();
+      await pumpUntilText(tester, ColorVisionType.protanopia.displayName);
 
       expect(find.text('Original'), findsOneWidget);
       expect(find.text(ColorVisionType.protanopia.displayName), findsOneWidget);
@@ -138,7 +151,7 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await pumpUntilText(tester, 'Rendering coming soon');
 
       expect(find.text('Rendering coming soon'), findsOneWidget);
     });
