@@ -2,11 +2,49 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/disability_type.dart';
 import '../../services/filter_service.dart';
+import '../../services/settings_service.dart';
+import '../widgets/before_after_view.dart';
 import '../widgets/filter_selector.dart';
 import '../widgets/intensity_slider.dart';
+import '../widgets/filter_catalog_selector.dart';
+import '../widgets/filter_param_panel.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  FilterService? _filterService;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Bridge FilterService selection/intensity changes into SettingsService so
+    // the last filter + intensity are persisted (#17). Subscribe once.
+    final filterService = context.read<FilterService>();
+    if (!identical(filterService, _filterService)) {
+      _filterService?.removeListener(_persistFilterState);
+      _filterService = filterService;
+      _filterService!.addListener(_persistFilterState);
+    }
+  }
+
+  void _persistFilterState() {
+    final settings = context.read<SettingsService>();
+    final filterService = _filterService;
+    if (filterService == null) return;
+    settings.setFilterType(filterService.currentFilter);
+    settings.setIntensity(filterService.intensity);
+  }
+
+  @override
+  void dispose() {
+    _filterService?.removeListener(_persistFilterState);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,6 +52,7 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Universal Experience'),
         actions: [
+          const _ThemeModeButton(),
           IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: () => _showAboutDialog(context),
@@ -32,6 +71,10 @@ class HomeScreen extends StatelessWidget {
               _buildFilterSection(),
               const SizedBox(height: 24),
               _buildControlsSection(),
+              const SizedBox(height: 24),
+              _buildPreviewSection(),
+              const SizedBox(height: 32),
+              _buildAdvancedSection(),
               const SizedBox(height: 32),
               _buildInfoSection(),
             ],
@@ -131,6 +174,98 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildPreviewSection() {
+    return Consumer<FilterService>(
+      builder: (context, filterService, _) {
+        final theme = Theme.of(context);
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.compare, color: theme.colorScheme.primary),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Before / After',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                BeforeAfterView(
+                  filterType: filterService.currentFilter,
+                  intensity: filterService.intensity,
+                ),
+                if (!BeforeAfterView.canRender(filterService.currentFilter)) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Live rendering for this filter is not implemented yet — '
+                    'only protanopia/protanomaly are drawn today.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontStyle: FontStyle.italic,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Advanced（sensus 全 30 フィルタ）セクション。既存の色覚 7 種 UI とは別系統。
+  Widget _buildAdvancedSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.science_outlined, color: Colors.indigo.shade600),
+                const SizedBox(width: 12),
+                const Expanded(
+                  // TODO(#18): i18n - extract to key
+                  // `home.advancedSectionTitle`. English fallback for now;
+                  // actual translations are out of scope for #16.
+                  child: Text(
+                    'Advanced (all sensus filters)',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'sensus が公開する全 30 種の見え方を、カテゴリ別に選んでパラメータを'
+              '調整できます。実描画/ライブ適用は別 Issue（#11/#1/#3/#4）で対応します。',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const FilterCatalogSelector(),
+            const Divider(height: 32),
+            const FilterParamPanel(),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildInfoSection() {
     return Consumer<FilterService>(
       builder: (context, filterService, _) {
@@ -208,4 +343,35 @@ class HomeScreen extends StatelessWidget {
       ],
     );
   }
+}
+
+/// AppBar action that cycles the persisted theme mode (system → light → dark →
+/// system) and shows the current mode's icon. Writes through to
+/// [SettingsService] so the choice survives restarts (#17).
+class _ThemeModeButton extends StatelessWidget {
+  const _ThemeModeButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<SettingsService>(
+      builder: (context, settings, _) {
+        final (IconData icon, String tooltip) = switch (settings.themeMode) {
+          ThemeMode.system => (Icons.brightness_auto, 'Theme: System'),
+          ThemeMode.light => (Icons.light_mode, 'Theme: Light'),
+          ThemeMode.dark => (Icons.dark_mode, 'Theme: Dark'),
+        };
+        return IconButton(
+          icon: Icon(icon),
+          tooltip: '$tooltip (tap to change)',
+          onPressed: () => settings.setThemeMode(_next(settings.themeMode)),
+        );
+      },
+    );
+  }
+
+  ThemeMode _next(ThemeMode mode) => switch (mode) {
+        ThemeMode.system => ThemeMode.light,
+        ThemeMode.light => ThemeMode.dark,
+        ThemeMode.dark => ThemeMode.system,
+      };
 }
