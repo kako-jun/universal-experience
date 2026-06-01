@@ -71,7 +71,96 @@
 - フレームレス/クリックスルー forward 引数はプラットフォーム差・未対応があるため、
   全 window_manager I/O は try/catch + ログで握り、未対応でも落とさない。
 
-### フォロー事項: アプリモード切替 (#14/#16)
+### タスクトレイ (#15)
+
+デスクトップ版はタスクトレイ (通知領域 / メニューバー) に常駐する。実装は
+`lib/services/tray_service.dart` (tray_manager 0.2.4 ラッパ) と `lib/main.dart`
+の配線から成る。
+
+### 構成 (純粋ロジックと副作用の分離)
+
+`tray_service.dart` は 2 層に分かれている。
+
+- **純粋ロジック層** (`TrayMenuKind` / `TrayMenuEntry` /
+  `quickColorVisionFilters()` / `buildTrayMenuSpec()` / `trayToggleLabel()` /
+  `resolveCloseAction()`) — 「トレイメニューに何を出すか」をデータとして表現する。
+  tray_manager に一切依存しないため、ウィンドウシステム無しで単体テストできる
+  (`test/tray_service_test.dart`、15 件)。
+- **`TrayService`** — tray_manager を叩く副作用層。上記スペックを実際の
+  `Menu` / `MenuItem` に変換し、クリックを `FilterService` (#14) と、main.dart
+  から注入されるウィンドウ表示/非表示コールバックに橋渡しする。
+
+メインウィンドウ自体がルーペ窓 (#14)。`LoupeWindowController` は枠/モード/透過の
+責務を持つが show/hide は持たないため、トレイの「ルーペ窓を表示/隠す」は
+main.dart が `windowManager.show()` / `hide()` を `onShowLoupe` / `onHideLoupe`
+として `TrayService` に注入して実現する。
+
+### メニュー構成
+
+上から順に:
+
+1. **ルーペ窓を表示 / 隠す** — トグル (注入された `windowManager.show()` /
+   `hide()` を呼ぶ。ラベルは現在の表示状態で切替)
+2. (区切り線)
+3. **即切替フィルタ** (`quickColorVisionFilters()`) — よく使う色覚シミュレーションを
+   直接適用: Protanopia / Deuteranopia / Tritanopia / Achromatopsia。
+   `FilterService.applyFilter()` を呼び、アクティブなものにチェックが付く。全フィルタ
+   catalogue は設定 UI (#16) にあり、トレイは短く保つため代表のみ出す。
+4. **フィルタを解除** — `FilterService.deactivate()`
+5. (区切り線)
+6. **設定を開く…** — フィルタ選択 UI はメインウィンドウ内にあるため
+   `windowManager.show()` + `focus()` でウィンドウを表示する
+7. (区切り線)
+8. **終了** — トレイを破棄し `setPreventClose(false)` の上で
+   `windowManager.destroy()`
+
+### ウィンドウクローズ・ポリシー
+
+**ウィンドウを閉じても終了せず、トレイに最小化される (close = トレイ常駐)。**
+明示的な終了はトレイの "終了" のみ。`main.dart` で
+`windowManager.setPreventClose(true)` + `onWindowClose` → `windowManager.hide()`
+で実装している。
+
+ただしトレイから復帰できなければアプリが行方不明になるため、トレイ初期化が
+**失敗した環境では close = 終了** にフォールバックする (`resolveCloseAction()` が
+この判断を純粋関数として表現し、テスト済み)。よって `setPreventClose` の適用は
+トレイ初期化の成否で決める。
+
+### プラットフォーム差
+
+- **Windows / macOS**: トレイは常に利用可能。PNG アイコンが動作する
+  (Windows は内部で 16px へリサイズ)。
+- **Linux**: 単一のトレイ標準が無い。KDE/XFCE は StatusNotifierItem を標準提供
+  するが、**GNOME は AppIndicator/KStatusNotifierItem シェル拡張が必要**で、無いと
+  アイコンが黙って出ない。検出が困難なため tray_manager 呼び出しは全て try/catch
+  で包み、失敗してもアプリは落ちずウィンドウのみで使える。
+- **Android/iOS**: トレイ概念が無いためトレイ設定はスキップ
+  (`TrayService.isTraySupportedPlatform` が false)。Android の常駐は Foreground
+  Service (#4) でありスコープ外。
+
+### アイコン
+
+トレイアイコンは `assets/tray/tray_icon.png` (64x64 RGBA、青地に同心円の
+"eye/loupe" マーク。ImageMagick も Pillow も無い環境のため Python stdlib の
+`zlib` だけで生成したプレースホルダ) を `pubspec.yaml` の `flutter > assets` に
+登録した。ビルド時 `data/flutter_assets/assets/tray/tray_icon.png` にバンドル
+され、`trayManager.setIcon('assets/tray/tray_icon.png')` がこのバンドル相対パスを
+解決する。**より洗練したアイコン (特に Windows 用 `.ico`) は要追加。**
+
+### 実機目視について (正直な明記)
+
+この開発環境 (Wayland + grim 制約、GNOME はトレイ拡張要) では
+**トレイ常駐・メニュー操作の目視確認ができない**。検証は静的解析・単体テスト・
+Linux debug ビルド成功で代替している:
+
+- `flutter analyze`: No issues found! (0 issue)
+- `flutter test`: 全 117 件緑 (うちトレイ純粋ロジック 15 件)。
+- `flutter build linux --debug`: 成功。アイコンがバンドルに含まれることも確認。
+
+トレイアイコンが実際に表示されるか・メニュークリックの挙動は、トレイ対応環境
+(KDE 等、または GNOME + AppIndicator 拡張) での実機確認が別途必要。
+
+## フォロー事項: アプリモード切替 (#14/#16)
 
 現状は起動直後から「透明背景 ON・最前面 ON」を常時適用している。しかしフィルタ
 選択 UI (#16) を操作するときは、最前面・透明だと UI が背後のアプリと重なって
