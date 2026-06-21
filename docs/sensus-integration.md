@@ -209,3 +209,35 @@ ue が二重に持っていた色覚ロジックを撤去し、アルゴリズ�
   sensusFilter マッピング）。protanopia golden は維持。
 - **残課題（このフェーズ外）**: ライブ画面キャプチャ経路（#1/#3/#4）、
   `ColorVisionType` の全面 sensus `VisionFilter` 化や category/param パネル（#16）。
+
+---
+
+## 6. GPU golden テスト — 参照の再現可能な生成（#31）
+
+色覚（色変換系）フィルタの GPU 出力が sensus と数値一致することを守る golden テスト。
+当初は protanopia 1 種のみ（参照 PNG は sensus CLI 由来）だったが、CLI が同梱されず
+参照を再生成できなかった。そこで **正本そのもの（`sensus_core::apply()` / `vision_uniforms()`）**
+から参照を生成する経路を rust 側に置いた。
+
+- **生成元**: `rust/src/golden_gen.rs`（`#[cfg(test)]` のみ。本体 cdylib には何も載らない。
+  PNG 入出力は dev-dependency の `image`+`png` feature）。
+- **生成手順（参照 PNG と uniforms を再生成するとき）**:
+
+  ```sh
+  cd rust && cargo test -- --ignored gen_color_golden_refs
+  ```
+
+  → `test/golden/<filter>_ref.png`（参照 RGBA, CPU 正本経路）と
+  `test/golden/color_uniforms.json`（GPU 経路用の正本 uniform。色行列 / luma 重みを
+  Dart に再実装しないための生成物）を書き出す。
+- **方法論の保証**: `rust/src/golden_gen.rs` の `protanopia_ref_matches_sensus_core`
+  テスト（既定で実行）が、commit 済み `protanopia_ref.png`（CLI 由来）と
+  `sensus_core::apply(Protanopia)` がビット一致することを検証する。これにより
+  「rust apply を参照源に使う」生成経路が CLI 参照と等価であることを CI で守る（捏造防止）。
+- **Dart 側**: `test/vision_filter_golden_test.dart` が `color_uniforms.json` の正本 uniform を
+  `ShaderFilter.applyColorFilterGpu()` に流し、各 `.frag` を FragmentProgram で GPU 描画して
+  参照 PNG とトレランス内一致（PSNR≥30dB / maxDiff≤8）を assert する。現状 deuteranopia /
+  tritanopia / achromatopsia をカバー（protanopia は従来の `protanopia_golden_test.dart`）。
+- **対象外**: 空間・時間依存フィルタ（myopia/glaucoma/vertigo 等）は GPU/CPU のカーネル・
+  サンプリング差でピクセル等価にならないため、この PSNR golden 方式の対象にしない。
+  別途の検証方式（uniform レイアウト一致は既存の `shader_codegen_test.dart` が担保）。

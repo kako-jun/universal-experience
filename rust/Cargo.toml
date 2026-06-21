@@ -19,6 +19,14 @@ sensus-core = "0.5"
 # sensus-core が使う image 0.25 系に合わせる（DynamicImage の型整合のため）。
 image = { version = "0.25", default-features = false }
 
+# golden 参照 PNG の生成・検証テスト（src/golden_gen.rs の #[cfg(test)]）で
+# image の PNG codec を使うために png feature を足す。dev-dependencies なので
+# 本体 cdylib のビルドには影響しない（テストビルド時のみ有効化）。
+# なお PNG codec 自体は sensus-core が通常依存として既に有効化しているため、
+# これは feature の明示化であって新規の重量追加ではない。
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }
+
 [profile.release]
 lto = true
 codegen-units = 1

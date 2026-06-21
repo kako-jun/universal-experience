@@ -21,4 +21,9 @@ mod frb_generated; /* AUTO INJECTED BY flutter_rust_bridge. This line may not be
 
 mod api;
 
+// GPU golden テストの参照 PNG 生成・検証（#31）。中身は `#[cfg(test)]` のみで、
+// 本体ビルドには何も足さない。
+#[cfg(test)]
+mod golden_gen;
+
 pub use api::sensus_bridge::*;
