@@ -1,7 +1,7 @@
 # ADR: ビルド時 impellerc 変換（FragmentProgram）
 
-- **決定日**: 2026-05-31（変換を実装した #12 / PR #24 の commit 日 `ab24277`。
-  方針（案A）の確定は同時期の sensus 連携 1/3 #7/#8 の `docs/sensus-integration.md`）
+- **決定日**: 2026-05-31（二段階・同日内）。①方針（案A）の確定 = sensus 連携 1/3 #7/#8
+  の `docs/sensus-integration.md` §1/§2.1。②変換の実装 = #12 / PR #24 の commit `ab24277`。
 - **記録日**: 2026-06-21（ADR 化）
 - **ステータス**: Accepted
 
