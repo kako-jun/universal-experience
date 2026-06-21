@@ -101,6 +101,8 @@ Rust で計算して FRB で渡すのが、二重実装を避ける唯一の方�
 > `tools/sensus_shaders.README.md` を参照。生成 `.frag` のヘッダには sensus
 > version・入力 dump パス・正本（`sensus shaders/<name>.frag`）への参照を残す。
 
+> → ADR: 本節の案A/案B の判断は `docs/adr/2026-05-31-buildtime-impellerc-conversion.md` に昇格。
+
 GLSL ES 3.00 → Impeller サブセットの変換を**どちらで持つか**の選択肢:
 
 - **案A: ue 側ビルドで変換する**
@@ -184,6 +186,8 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
 ---
 
 ## 5. 重複ロジック撤去（3/3）— #13 で完了
+
+> → ADR: この一元化判断は `docs/adr/2026-05-31-sensus-core-consolidation.md` に昇格。
 
 ue が二重に持っていた色覚ロジックを撤去し、アルゴリズム正本を sensus に一本化した。
 

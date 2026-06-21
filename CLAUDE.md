@@ -16,7 +16,7 @@
 lib/
 ├── main.dart
 ├── core/
-│   └── color_vision_simulator.dart  # LMS変換アルゴリズム
+│   └── color_vision_simulator.dart  # LMS変換アルゴリズム ※#13で撤去済み・現存しない（詳細は docs/adr/）
 ├── models/
 │   └── disability_type.dart         # 障害タイプ定義
 ├── services/
@@ -28,7 +28,7 @@ lib/
     │   └── intensity_slider.dart
     └── theme/app_theme.dart
 
-plugins/color_vision_filter/
+plugins/color_vision_filter/  # ※#13で撤去済み・現存しない（詳細は docs/adr/）
 ├── lib/                    # Dart API
 ├── android/                # Kotlin実装
 ├── windows/                # C++実装
@@ -101,6 +101,8 @@ RGB → LMS → CVD Simulation → LMS → RGB
 - X11: XRandR fallback
 
 ## 設計判断
+
+> formal な ADR（判断・代替案・根拠・結果）は `docs/adr/` を正本とする。本節は概要。
 
 ### Flutter採用
 
