@@ -80,4 +80,58 @@ class ShaderFilter {
       shader.dispose();
     }
   }
+
+  // ロード済み FragmentProgram を asset パスでキャッシュ（並行ロードの重複を避ける）。
+  static final Map<String, Future<ui.FragmentProgram>> _programCache =
+      <String, Future<ui.FragmentProgram>>{};
+
+  static Future<ui.FragmentProgram> _loadProgram(String asset) {
+    return _programCache[asset] ??= ui.FragmentProgram.fromAsset(asset);
+  }
+
+  /// 色変換系フィルタ（色行列 / luma 重み）を GPU で [src] に適用する汎用経路。
+  ///
+  /// protanopia/deuteranopia/tritanopia/achromatopsia のように **解像度を最後の
+  /// 2 uniform に持つ** `.frag`（`[..scalars.., uResolution_x, uResolution_y]`）を対象に、
+  /// [scalarUniforms]（= 正本 `vision_uniforms()` が返す末尾の解像度を含まない flat 配列、
+  /// 例: `[uStrength, uMatrix0..8]` や `[uStrength, uRWeight, uGWeight, uBWeight]`）を
+  /// `setFloat(0..)` で積み、続けて `setFloat(n, w)` / `setFloat(n+1, h)` を積んで
+  /// `setImageSampler(0, src)` する。
+  ///
+  /// 色行列・luma 重みを Dart 側に**書かない**こと（正本は sensus_core）。本メソッドは
+  /// golden テストが正本由来の uniforms（`test/golden/color_uniforms.json`）を流し込む
+  /// ためのもので、ハードコードを増やさない。空間・時間依存フィルタ（blur/glaucoma/
+  /// vertigo 等）はこのレイアウト前提（末尾が解像度）と適用モデルが異なるため対象外。
+  static Future<ui.Image> applyColorFilterGpu(
+    ui.Image src,
+    String shaderAsset,
+    List<double> scalarUniforms,
+  ) async {
+    final ui.FragmentProgram program = await _loadProgram(shaderAsset);
+    final ui.FragmentShader shader = program.fragmentShader();
+
+    final double w = src.width.toDouble();
+    final double h = src.height.toDouble();
+
+    for (int i = 0; i < scalarUniforms.length; i++) {
+      final double v = scalarUniforms[i];
+      // 非有限 uniform が GPU に流れて描画が壊れるのを防ぐ（NaN/Inf→0.0）。
+      shader.setFloat(i, v.isFinite ? v : 0.0);
+    }
+    shader.setFloat(scalarUniforms.length, w);
+    shader.setFloat(scalarUniforms.length + 1, h);
+    shader.setImageSampler(0, src);
+
+    final ui.PictureRecorder recorder = ui.PictureRecorder();
+    final ui.Canvas canvas = ui.Canvas(recorder);
+    final ui.Paint paint = ui.Paint()..shader = shader;
+    canvas.drawRect(ui.Rect.fromLTWH(0, 0, w, h), paint);
+    final ui.Picture picture = recorder.endRecording();
+    try {
+      return await picture.toImage(src.width, src.height);
+    } finally {
+      picture.dispose();
+      shader.dispose();
+    }
+  }
 }
