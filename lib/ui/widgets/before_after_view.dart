@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -211,6 +212,9 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       final strengthPercent = (widget.intensity.clamp(0.0, 1.0) * 100).round();
       final date = isoDate(DateTime.now());
       // 色覚特性は urgency=none のため受診喚起は出さない（緊急性のある症状ではない）。
+      // 色覚 7 型（このウィジェットが扱う範囲）は urgency=none なので受診喚起は焼かない。
+      // sensus advanced フィルタ（緑内障等）の live export に拡張する際は、ここで
+      // `consultMessageForUrgency(...)` を解決して `urgencyMessage` に渡せる（拡張ポイント）。
       final caption = ExportCaption(
         symptomLabel: widget.filterType == ColorVisionType.none
             ? l10n.previewPaneOriginal
