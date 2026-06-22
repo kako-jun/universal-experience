@@ -1331,7 +1331,10 @@ mod tests {
             HearingFilter::from_sensus(H::HearingLoss),
             HearingFilter::HearingLoss
         );
-        assert_eq!(HearingFilter::from_sensus(H::Meniere), HearingFilter::Meniere);
+        assert_eq!(
+            HearingFilter::from_sensus(H::Meniere),
+            HearingFilter::Meniere
+        );
     }
 
     /// VisionFilter::from_sensus は to_sensus の逆写像（payload 付き含む代表ラウンドトリップ）。
