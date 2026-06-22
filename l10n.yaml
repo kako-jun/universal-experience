@@ -4,9 +4,9 @@
 # template-arb-file（app_en.arb）が「正本」で、キーと @meta（プレースホルダ型・
 # description）はここに書く。app_ja.arb は同じキーの ja 訳だけを持つ。
 #
-# 生成物は synthetic package（.dart_tool/flutter_gen/gen_l10n/）に出力され、
-# `package:flutter_gen/gen_l10n/app_localizations.dart` で import する。
-# .dart_tool は gitignore 済みなので生成物はコミットされない（ARB と本ファイルのみ）。
+# 生成物は arb-dir（lib/l10n/app_localizations.dart）に出力され、
+# `import 'l10n/app_localizations.dart'` で読む。
+# lib/l10n の生成 .dart は gitignore 済みなのでコミットされない（ARB と本ファイルのみ）。
 arb-dir: lib/l10n
 template-arb-file: app_en.arb
 output-localization-file: app_localizations.dart
