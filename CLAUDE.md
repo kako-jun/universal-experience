@@ -129,6 +129,13 @@ flutter test
 flutter run
 ```
 
+## CI
+
+`.github/workflows/ci.yml` が push/PR（main）で flutter analyze / flutter test と、
+`rust/` の cargo fmt --check / clippy --all-targets -D warnings / cargo test を回す
+（runs-on: macos-latest。Flutter golden を生成プラットフォームと揃えるため）。rust 依存は
+crates.io のみ（sensus-core）なので selona のような private 依存の deploy key は不要。
+
 ## ロードマップ
 
 - **Phase 1**: 色覚障害シミュレーション（80%完成）
