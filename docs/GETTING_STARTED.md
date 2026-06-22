@@ -102,11 +102,13 @@ flutter build linux --release
 universal-experience/
 ├── lib/                    # Dartソースコード
 │   ├── main.dart          # アプリエントリーポイント
+│   ├── l10n/              # 多言語化（ARB: app_en.arb / app_ja.arb と生成物。ja/en）
 │   ├── models/            # データモデル
-│   ├── services/          # ビジネスロジック（FilterService = sensus への薄いブリッジ）
+│   ├── services/          # ビジネスロジック（FilterService = sensus への薄いブリッジ、ExportService 等）
 │   ├── rendering/         # GPU シェーダ描画（sensus 由来の FragmentProgram）
-│   ├── src/rust/          # flutter_rust_bridge 生成コード（sensus-core 連携）
+│   ├── src/rust/          # flutter_rust_bridge 生成コード（sensus-core 連携、experiences() 等）
 │   └── ui/                # UIコンポーネント
+├── rust/                  # sensus-core を FRB で公開する Rust crate（生成元は src/rust/）
 ├── android/               # Android固有コード
 ├── windows/               # Windows固有コード
 ├── macos/                 # macOS固有コード
