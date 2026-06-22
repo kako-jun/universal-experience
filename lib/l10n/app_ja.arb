@@ -69,6 +69,15 @@
   "filterTritanomalyDesc": "S錐体の感度が弱まって起こる、軽めの青黄系の色覚特性です。",
   "filterNormalVisionDesc": "シミュレーションを適用していない、通常の色覚です。",
 
+  "prevalenceNormalVision": "男性の約92%、女性の約99.5%",
+  "prevalenceProtanopia": "男性の約1%、女性の約0.01%",
+  "prevalenceDeuteranopia": "男性の約1%、女性の約0.01%",
+  "prevalenceTritanopia": "約0.001%（ごくまれ）",
+  "prevalenceAchromatopsia": "約0.003%（きわめてまれ）",
+  "prevalenceProtanomaly": "男性の約1%、女性ではまれ",
+  "prevalenceDeuteranomaly": "男性の約5%、女性の約0.4%",
+  "prevalenceTritanomaly": "約0.01%（まれ）",
+
   "filterTetrachromacy": "4色覚",
   "filterMyopia": "近視",
   "filterHyperopia": "遠視",

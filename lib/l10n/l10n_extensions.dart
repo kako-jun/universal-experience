@@ -55,6 +55,30 @@ String colorVisionTypeDescription(AppLocalizations l10n, ColorVisionType type) {
   }
 }
 
+/// [ColorVisionType] の有病率（おおよその人口比）を解決する。
+///
+/// 統計値（数値・%）は i18n でも変えず、訳語のみローカライズする。
+String colorVisionTypePrevalence(AppLocalizations l10n, ColorVisionType type) {
+  switch (type) {
+    case ColorVisionType.none:
+      return l10n.prevalenceNormalVision;
+    case ColorVisionType.protanopia:
+      return l10n.prevalenceProtanopia;
+    case ColorVisionType.deuteranopia:
+      return l10n.prevalenceDeuteranopia;
+    case ColorVisionType.tritanopia:
+      return l10n.prevalenceTritanopia;
+    case ColorVisionType.achromatopsia:
+      return l10n.prevalenceAchromatopsia;
+    case ColorVisionType.protanomaly:
+      return l10n.prevalenceProtanomaly;
+    case ColorVisionType.deuteranomaly:
+      return l10n.prevalenceDeuteranomaly;
+    case ColorVisionType.tritanomaly:
+      return l10n.prevalenceTritanomaly;
+  }
+}
+
 /// Advanced カタログの [VisionFilterCategory] 表示名を解決する。
 String visionCategoryName(
     AppLocalizations l10n, VisionFilterCategory category) {

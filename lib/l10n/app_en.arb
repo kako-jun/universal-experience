@@ -204,6 +204,39 @@
   "filterTritanomalyDesc": "Partial blue-yellow deficiency with weakened S-cones.",
   "filterNormalVisionDesc": "Normal color vision with no simulation applied.",
 
+  "prevalenceNormalVision": "~92% of males, ~99.5% of females",
+  "@prevalenceNormalVision": {
+    "description": "Approximate population prevalence for the normal-vision (no deficiency) type. Statistics must not be altered when translating."
+  },
+  "prevalenceProtanopia": "~1% of males, ~0.01% of females",
+  "@prevalenceProtanopia": {
+    "description": "Approximate population prevalence for protanopia. Statistics must not be altered when translating."
+  },
+  "prevalenceDeuteranopia": "~1% of males, ~0.01% of females",
+  "@prevalenceDeuteranopia": {
+    "description": "Approximate population prevalence for deuteranopia. Statistics must not be altered when translating."
+  },
+  "prevalenceTritanopia": "~0.001% (very rare)",
+  "@prevalenceTritanopia": {
+    "description": "Approximate population prevalence for tritanopia. Statistics must not be altered when translating."
+  },
+  "prevalenceAchromatopsia": "~0.003% (extremely rare)",
+  "@prevalenceAchromatopsia": {
+    "description": "Approximate population prevalence for achromatopsia. Statistics must not be altered when translating."
+  },
+  "prevalenceProtanomaly": "~1% of males, rare in females",
+  "@prevalenceProtanomaly": {
+    "description": "Approximate population prevalence for protanomaly. Statistics must not be altered when translating."
+  },
+  "prevalenceDeuteranomaly": "~5% of males, ~0.4% of females",
+  "@prevalenceDeuteranomaly": {
+    "description": "Approximate population prevalence for deuteranomaly. Statistics must not be altered when translating."
+  },
+  "prevalenceTritanomaly": "~0.01% (rare)",
+  "@prevalenceTritanomaly": {
+    "description": "Approximate population prevalence for tritanomaly. Statistics must not be altered when translating."
+  },
+
   "filterTetrachromacy": "Tetrachromacy",
   "filterMyopia": "Myopia",
   "filterHyperopia": "Hyperopia",

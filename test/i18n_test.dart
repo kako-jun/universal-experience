@@ -16,6 +16,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
+import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/settings_service.dart';
@@ -72,6 +73,25 @@ void main() {
         expect(visionFilterName(en, entry.id), isNot(entry.id),
             reason: entry.id);
       }
+    });
+
+    test('全 ColorVisionType の有病率が i18n 解決でき、ja に英語が混入しない', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final ja = lookupAppLocalizations(const Locale('ja'));
+      for (final type in ColorVisionType.values) {
+        final enText = colorVisionTypePrevalence(en, type);
+        final jaText = colorVisionTypePrevalence(ja, type);
+        expect(enText.trim(), isNotEmpty, reason: '$type (en)');
+        expect(jaText.trim(), isNotEmpty, reason: '$type (ja)');
+        // ja の有病率行に英語の "of males/females" が混入していないこと（退行検出）。
+        expect(jaText.toLowerCase(), isNot(contains('of males')),
+            reason: '$type の ja に英語が混入');
+        expect(jaText.toLowerCase(), isNot(contains('of females')),
+            reason: '$type の ja に英語が混入');
+      }
+      // 代表ケース: deuteranomaly の ja 訳が日本語であること。
+      expect(colorVisionTypePrevalence(ja, ColorVisionType.deuteranomaly),
+          contains('男性'));
     });
 
     test('urgency 由来の受診喚起は medium/high のみ出る', () {

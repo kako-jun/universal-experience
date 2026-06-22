@@ -308,7 +308,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  l10n.prevalenceLabel(filter.prevalence),
+                  l10n.prevalenceLabel(colorVisionTypePrevalence(l10n, filter)),
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.blue.shade700,
