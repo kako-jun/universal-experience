@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # Flutter golden テストはゴールデン生成時のプラットフォーム (macOS) と揃える必要が
+    # あるため macos-latest。sibling の selona と統一。
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Flutter analyze
+        run: flutter analyze
+
+      - name: Flutter test
+        run: flutter test
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      # rust 依存は crates.io のみ (sensus-core)。private git 依存が無いので
+      # selona のような deploy key / ssh-agent 手順は不要。
+      - name: Rust fmt check
+        working-directory: rust
+        run: cargo fmt --check
+
+      - name: Rust clippy
+        working-directory: rust
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Rust test
+        working-directory: rust
+        run: cargo test
