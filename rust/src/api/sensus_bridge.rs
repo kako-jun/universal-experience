@@ -755,7 +755,7 @@ pub fn apply_vision_cpu_rgba8(
 // HearingFilter バリアントをキーに解決する。これにより、文言の正本は ue（多言語）、
 // 症状の組み合わせ（三徴候の正準化）の正本は sensus-core、と責務が分かれる。
 //
-// HearingFilter は **型として公開するだけ**で、音声再生は本層のスコープ外（#19 の
+// HearingFilter は **型として公開するだけ**で、音声再生は本層のスコープ外（#20 の
 // 聴覚モード設計に委ねる）。ここでは Experience の `hearing` データ（どの聴覚フィルタが
 // 組になるか）と 14 バリアントの識別子を Dart に渡すところまでを担う。
 
@@ -787,7 +787,7 @@ impl Urgency {
 /// 聴覚フィルタの種類。`sensus_core::HearingFilter` の FRB 公開ミラー（14 バリアント）。
 ///
 /// **型として公開するだけ**で、音声再生（`apply_hearing` 相当）は本層のスコープ外
-/// （聴覚モード設計 #19 に委ねる）。payload 付きバリアントは sensus と同じフィールド名・
+/// （聴覚モード設計 #20 に委ねる）。payload 付きバリアントは sensus と同じフィールド名・
 /// 型（`{ freq_hz: f32 }` 等）でミラーする。症状の説明文言は持たず、Dart 側 i18n が
 /// バリアントをキーに解決する。
 #[derive(Debug, Clone, Copy, PartialEq)]
