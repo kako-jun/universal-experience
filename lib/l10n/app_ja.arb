@@ -45,6 +45,18 @@
   "consultEarly": "もしこのような見え方をしているなら、一度眼科で診てもらうとよいかもしれません。",
   "consultEmergency": "見え方が急に変わったときは、早めに医療機関を受診してください。",
 
+  "experienceSectionTitle": "体験プリセット",
+  "experienceSectionNote": "sensus が用意した複合的な体験です。タップするとその視覚フィルタが適用されます。聴覚症状を含むものもあります（音声再生は未対応です）。",
+  "experienceMeniere": "メニエール病",
+  "experienceMeniereDesc": "回転性めまいを繰り返し、低音域の難聴・耳のつまり感・低い唸るような耳鳴りを伴います。",
+  "experienceBppv": "良性発作性頭位めまい症",
+  "experienceBppvDesc": "頭の位置を変えたときに起こる、短時間の回転性めまいです。聴覚症状はありません。",
+  "experienceVestibularNeuritis": "前庭神経炎",
+  "experienceVestibularNeuritisDesc": "前庭神経の炎症によって突然起こる、強く持続する回転性めまいです。聴力は保たれます。",
+  "experienceLabyrinthitis": "迷路炎",
+  "experienceLabyrinthitisDesc": "内耳の炎症により、回転性めまいに加えて高音域の難聴と高い耳鳴りを伴います。",
+  "experienceIncludesHearingNote": "この体験には聴覚症状も含まれます（音声再生は未対応です）。",
+
   "trayTooltip": "Universal Experience",
   "trayShowLoupe": "ルーペ窓を表示",
   "trayHideLoupe": "ルーペ窓を隠す",

@@ -708,3 +708,41 @@ List<VisionFilterEntry> visionFilterEntriesByCategory(
   VisionFilterCategory category,
 ) =>
     kVisionFilterCatalog.where((e) => e.category == category).toList();
+
+/// payload を持たない（const 構築できる）[VisionFilter] → カタログ id の写像。
+///
+/// 体験プリセット (#19) の `Experience.vision`（bridge の [VisionFilter] インスタンス）
+/// を、カタログの snake_case id（[VisionFilterState.select] が受ける値）へ変換する
+/// ための単一の正本。**id をハードコード散在させない**ため、ここ 1 箇所に集約する。
+///
+/// freezed の値等価（payload 無しバリアントは同値）を使って引く。payload を持つ
+/// フィルタ（astigmatism 等）は const 構築できず体験プリセットでも使われないため
+/// 対象外（[visionFilterCatalogId] が null を返す）。
+final Map<VisionFilter, String> _kCatalogIdByParamlessVision = {
+  const VisionFilter.protanopia(): 'protanopia',
+  const VisionFilter.deuteranopia(): 'deuteranopia',
+  const VisionFilter.tritanopia(): 'tritanopia',
+  const VisionFilter.achromatopsia(): 'achromatopsia',
+  const VisionFilter.tetrachromacy(): 'tetrachromacy',
+  const VisionFilter.myopia(): 'myopia',
+  const VisionFilter.hyperopia(): 'hyperopia',
+  const VisionFilter.presbyopia(): 'presbyopia',
+  const VisionFilter.macularDegeneration(): 'macular_degeneration',
+  const VisionFilter.tunnelVision(): 'tunnel_vision',
+  const VisionFilter.photophobia(): 'photophobia',
+  const VisionFilter.nightBlindness(): 'night_blindness',
+  const VisionFilter.vertigo(): 'vertigo',
+  const VisionFilter.bppvRotation(): 'bppv_rotation',
+  const VisionFilter.vestibularNeuritis(): 'vestibular_neuritis',
+  const VisionFilter.eyeStrain(): 'eye_strain',
+  const VisionFilter.dryEye(): 'dry_eye',
+  const VisionFilter.contrastSensitivity(): 'contrast_sensitivity',
+  const VisionFilter.teichopsia(): 'teichopsia',
+};
+
+/// [VisionFilter] インスタンス → カタログ id（snake_case）を引く。未知なら null。
+///
+/// 体験プリセット (#19) が `Experience.vision` を [VisionFilterState.select] へ橋渡し
+/// するのに使う。payload を持つフィルタ（体験プリセットでは未使用）は null を返す。
+String? visionFilterCatalogId(VisionFilter filter) =>
+    _kCatalogIdByParamlessVision[filter];

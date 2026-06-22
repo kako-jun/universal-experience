@@ -1,6 +1,7 @@
 import '../models/disability_type.dart';
 import '../models/vision_filter_catalog.dart';
 import '../services/tray_service.dart';
+import '../src/rust/api/sensus_bridge.dart';
 import 'app_localizations.dart';
 
 /// 定義（enum / catalog id）→ 表示文言（i18n）の解決をここに集約する (#18)。
@@ -267,6 +268,61 @@ String visionParamLabel(AppLocalizations l10n, String labelKey) {
       return l10n.paramFlickeringStarsSeed;
     default:
       return labelKey;
+  }
+}
+
+/// 体験プリセット (#19) の id（sensus `Experience.id`）→ 表示名を解決する。
+///
+/// id は sensus が返す安定識別子（`meniere` / `bppv` / `vestibular_neuritis` /
+/// `labyrinthitis`）。表示名・説明は文言を持たず、ここで i18n に写像する（規律2）。
+String experienceName(AppLocalizations l10n, String id) {
+  switch (id) {
+    case 'meniere':
+      return l10n.experienceMeniere;
+    case 'bppv':
+      return l10n.experienceBppv;
+    case 'vestibular_neuritis':
+      return l10n.experienceVestibularNeuritis;
+    case 'labyrinthitis':
+      return l10n.experienceLabyrinthitis;
+    default:
+      return id;
+  }
+}
+
+/// 体験プリセット (#19) の id → 三徴候の簡潔な説明を解決する。
+String experienceDescription(AppLocalizations l10n, String id) {
+  switch (id) {
+    case 'meniere':
+      return l10n.experienceMeniereDesc;
+    case 'bppv':
+      return l10n.experienceBppvDesc;
+    case 'vestibular_neuritis':
+      return l10n.experienceVestibularNeuritisDesc;
+    case 'labyrinthitis':
+      return l10n.experienceLabyrinthitisDesc;
+    default:
+      return id;
+  }
+}
+
+/// 体験プリセットの [Urgency]（sensus 由来）→ 受診喚起メッセージを解決する。
+///
+/// null = 喚起なし。`Urgency` の分類は bridge（sensus）が持ち、当事者への注記文言は
+/// ue 側が i18n で所有する（規律2）。`earlyConsultation` = 早期受診を促す穏やかな
+/// 注記、`emergency` = 速やかな受診を促す注記。`none` では出さない。
+///
+/// NOTE: catalog 側 [VisionFilterUrgency] 用の [consultMessageForUrgency] とは別系統
+/// （#19 体験プリセットは bridge の `Urgency` 3 値を使う）。文言キー
+/// `consultEarly` / `consultEmergency` は両者で共有する。
+String? urgencyConsultMessage(AppLocalizations l10n, Urgency urgency) {
+  switch (urgency) {
+    case Urgency.none:
+      return null;
+    case Urgency.earlyConsultation:
+      return l10n.consultEarly;
+    case Urgency.emergency:
+      return l10n.consultEmergency;
   }
 }
 

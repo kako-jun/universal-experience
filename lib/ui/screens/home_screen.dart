@@ -6,6 +6,7 @@ import '../../models/disability_type.dart';
 import '../../services/filter_service.dart';
 import '../../services/settings_service.dart';
 import '../widgets/before_after_view.dart';
+import '../widgets/experience_presets.dart';
 import '../widgets/filter_selector.dart';
 import '../widgets/intensity_slider.dart';
 import '../widgets/filter_catalog_selector.dart';
@@ -78,6 +79,8 @@ class _HomeScreenState extends State<HomeScreen> {
               _buildPreviewSection(),
               const SizedBox(height: 32),
               _buildAdvancedSection(l10n),
+              const SizedBox(height: 32),
+              _buildExperiencePresetsSection(l10n),
               const SizedBox(height: 32),
               _buildInfoSection(),
             ],
@@ -259,6 +262,48 @@ class _HomeScreenState extends State<HomeScreen> {
             const FilterCatalogSelector(),
             const Divider(height: 32),
             const FilterParamPanel(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 体験プリセット集 (#19) セクション。sensus の experiences() を消費し、
+  /// 複合体験（前庭性めまい系 4 種）をタップで視覚フィルタに適用する。聴覚再生は
+  /// 本 Issue 非スコープで、聴覚を含む体験は注記に留める。
+  Widget _buildExperiencePresetsSection(AppLocalizations l10n) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.auto_awesome, color: Colors.indigo.shade600),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    l10n.experienceSectionTitle,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l10n.experienceSectionNote,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const ExperiencePresets(),
           ],
         ),
       ),
