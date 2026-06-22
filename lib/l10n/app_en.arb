@@ -159,6 +159,22 @@
     "description": "Prompt to seek timely care for high-urgency conditions. Must be accurate and not alarmist."
   },
 
+  "exportButtonTooltip": "Export as PNG",
+  "@exportButtonTooltip": {
+    "description": "Tooltip for the icon button that exports the filtered 'after' image as a PNG with burned-in metadata (#43)."
+  },
+  "exportSuccess": "Exported to {path}",
+  "@exportSuccess": {
+    "description": "SnackBar shown after a successful PNG export. The file path is also copied to the clipboard.",
+    "placeholders": {
+      "path": { "type": "String" }
+    }
+  },
+  "exportFailure": "Export failed. Please try again.",
+  "@exportFailure": {
+    "description": "SnackBar shown when PNG export fails (no exception detail is leaked to the UI)."
+  },
+
   "experienceSectionTitle": "Experience Presets",
   "@experienceSectionTitle": {
     "description": "Title of the experience-presets section that lists composite vestibular experiences from the sensus bridge."

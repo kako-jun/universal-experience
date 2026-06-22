@@ -1,12 +1,13 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/disability_type.dart';
 import '../../rendering/shader_filter.dart';
+import '../../services/export_service.dart';
 
 /// Side-by-side "before / after" preview for a colour-vision filter.
 ///
@@ -149,6 +150,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   ui.Image? _before;
   ui.Image? _after;
   bool _loading = true;
+  bool _exporting = false;
 
   @override
   void initState() {
@@ -193,6 +195,63 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     super.dispose();
   }
 
+  /// Exports the current "after" image as a PNG with burned-in metadata (#43).
+  ///
+  /// i18n は **UI 側でここで解決** し、`ExportCaption`（解決済み文字列）として
+  /// pure な [composeExportImage] に渡す（規律2）。保存後はフルパスをテキストとして
+  /// クリップボードへコピーし、SnackBar で結果を知らせる。画像そのものの
+  /// クリップボード書き込みはプラグインを要し環境変更になるため非スコープ。
+  Future<void> _export(AppLocalizations l10n) async {
+    final base = _after;
+    if (base == null || _exporting) return;
+    setState(() => _exporting = true);
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final strengthPercent = (widget.intensity.clamp(0.0, 1.0) * 100).round();
+      final date = isoDate(DateTime.now());
+      // 色覚特性は urgency=none のため受診喚起は出さない（緊急性のある症状ではない）。
+      final caption = ExportCaption(
+        symptomLabel: widget.filterType == ColorVisionType.none
+            ? l10n.previewPaneOriginal
+            : colorVisionTypeName(l10n, widget.filterType),
+        strengthLabel: l10n.strengthLabel(strengthPercent),
+        isoDate: date,
+      );
+
+      final composed = await composeExportImage(base, caption);
+      Uint8List? bytes;
+      try {
+        bytes = await encodeImagePng(composed);
+      } finally {
+        composed.dispose();
+      }
+      if (bytes == null) {
+        throw StateError('PNG encoding returned no bytes');
+      }
+
+      final filename = exportFilename(
+        symptomId: widget.filterType.id,
+        strengthPercent: strengthPercent,
+        isoDate: date,
+      );
+      final path = await savePng(bytes, filename);
+      await Clipboard.setData(ClipboardData(text: path));
+
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.exportSuccess(path))),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.exportFailure)),
+      );
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -226,6 +285,17 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
           label: widget.filterType == ColorVisionType.none
               ? l10n.previewPaneOriginal
               : colorVisionTypeName(l10n, widget.filterType),
+          // Export is only meaningful when a real "after" image exists.
+          // Coming-soon filters (null _after) get no button.
+          trailing: _after != null
+              ? IconButton(
+                  icon: const Icon(Icons.download_outlined),
+                  iconSize: 20,
+                  visualDensity: VisualDensity.compact,
+                  tooltip: l10n.exportButtonTooltip,
+                  onPressed: _exporting ? null : () => _export(l10n),
+                )
+              : null,
           child: _after != null
               ? _ImageView(image: _after)
               : _ComingSoonPlaceholder(
@@ -255,10 +325,13 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
 }
 
 class _Pane extends StatelessWidget {
-  const _Pane({required this.label, required this.child});
+  const _Pane({required this.label, required this.child, this.trailing});
 
   final String label;
   final Widget child;
+
+  /// Optional action shown to the right of the label (e.g. the export button).
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -267,7 +340,21 @@ class _Pane extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label, style: theme.textTheme.labelLarge),
+        SizedBox(
+          height: 32,
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: theme.textTheme.labelLarge,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (trailing != null) trailing!,
+            ],
+          ),
+        ),
         const SizedBox(height: 6),
         AspectRatio(
           aspectRatio: 1,
