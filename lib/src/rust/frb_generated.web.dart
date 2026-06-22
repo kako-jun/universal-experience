@@ -24,16 +24,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  HearingFilter dco_decode_box_autoadd_hearing_filter(dynamic raw);
+
+  @protected
   VisionFilter dco_decode_box_autoadd_vision_filter(dynamic raw);
 
   @protected
+  Experience dco_decode_experience(dynamic raw);
+
+  @protected
   double dco_decode_f_32(dynamic raw);
+
+  @protected
+  HearingFilter dco_decode_hearing_filter(dynamic raw);
 
   @protected
   int dco_decode_i_32(dynamic raw);
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<Experience> dco_decode_list_experience(dynamic raw);
 
   @protected
   Float32List dco_decode_list_prim_f_32_strict(dynamic raw);
@@ -43,6 +55,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  HearingFilter? dco_decode_opt_box_autoadd_hearing_filter(dynamic raw);
+
+  @protected
+  VisionFilter? dco_decode_opt_box_autoadd_vision_filter(dynamic raw);
 
   @protected
   int dco_decode_u_32(dynamic raw);
@@ -57,6 +75,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void dco_decode_unit(dynamic raw);
 
   @protected
+  Urgency dco_decode_urgency(dynamic raw);
+
+  @protected
   VisionFilter dco_decode_vision_filter(dynamic raw);
 
   @protected
@@ -66,17 +87,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
+  HearingFilter sse_decode_box_autoadd_hearing_filter(
+      SseDeserializer deserializer);
+
+  @protected
   VisionFilter sse_decode_box_autoadd_vision_filter(
       SseDeserializer deserializer);
 
   @protected
+  Experience sse_decode_experience(SseDeserializer deserializer);
+
+  @protected
   double sse_decode_f_32(SseDeserializer deserializer);
+
+  @protected
+  HearingFilter sse_decode_hearing_filter(SseDeserializer deserializer);
 
   @protected
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<Experience> sse_decode_list_experience(SseDeserializer deserializer);
 
   @protected
   Float32List sse_decode_list_prim_f_32_strict(SseDeserializer deserializer);
@@ -86,6 +120,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  HearingFilter? sse_decode_opt_box_autoadd_hearing_filter(
+      SseDeserializer deserializer);
+
+  @protected
+  VisionFilter? sse_decode_opt_box_autoadd_vision_filter(
+      SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
@@ -98,6 +140,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_decode_unit(SseDeserializer deserializer);
+
+  @protected
+  Urgency sse_decode_urgency(SseDeserializer deserializer);
 
   @protected
   VisionFilter sse_decode_vision_filter(SseDeserializer deserializer);
@@ -116,15 +161,87 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   }
 
   @protected
+  JSAny cst_encode_box_autoadd_hearing_filter(HearingFilter raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return cst_encode_hearing_filter(raw);
+  }
+
+  @protected
   JSAny cst_encode_box_autoadd_vision_filter(VisionFilter raw) {
     // Codec=Cst (C-struct based), see doc to use other codecs
     return cst_encode_vision_filter(raw);
   }
 
   @protected
+  JSAny cst_encode_experience(Experience raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return [
+      cst_encode_String(raw.id),
+      cst_encode_opt_box_autoadd_vision_filter(raw.vision),
+      cst_encode_opt_box_autoadd_hearing_filter(raw.hearing),
+      cst_encode_urgency(raw.urgency)
+    ].jsify()!;
+  }
+
+  @protected
+  JSAny cst_encode_hearing_filter(HearingFilter raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    if (raw is HearingFilter_HearingLoss) {
+      return [0].jsify()!;
+    }
+    if (raw is HearingFilter_SuddenHearingLoss) {
+      return [1, cst_encode_f_32(raw.freqHz)].jsify()!;
+    }
+    if (raw is HearingFilter_NoiseInducedHearingLoss) {
+      return [2].jsify()!;
+    }
+    if (raw is HearingFilter_Tinnitus) {
+      return [3, cst_encode_f_32(raw.freqHz)].jsify()!;
+    }
+    if (raw is HearingFilter_Hyperacusis) {
+      return [4].jsify()!;
+    }
+    if (raw is HearingFilter_Misophonia) {
+      return [5, cst_encode_f_32(raw.freqHz)].jsify()!;
+    }
+    if (raw is HearingFilter_Paracusis) {
+      return [6].jsify()!;
+    }
+    if (raw is HearingFilter_Amusia) {
+      return [7].jsify()!;
+    }
+    if (raw is HearingFilter_Dysmelodia) {
+      return [8].jsify()!;
+    }
+    if (raw is HearingFilter_PitchShift) {
+      return [9, cst_encode_f_32(raw.semitones)].jsify()!;
+    }
+    if (raw is HearingFilter_Diplacusis) {
+      return [10].jsify()!;
+    }
+    if (raw is HearingFilter_AuditoryProcessingDisorder) {
+      return [11].jsify()!;
+    }
+    if (raw is HearingFilter_Meniere) {
+      return [12].jsify()!;
+    }
+    if (raw is HearingFilter_Labyrinthitis) {
+      return [13].jsify()!;
+    }
+
+    throw Exception('unreachable');
+  }
+
+  @protected
   JSAny cst_encode_list_String(List<String> raw) {
     // Codec=Cst (C-struct based), see doc to use other codecs
     return raw.map(cst_encode_String).toList().jsify()!;
+  }
+
+  @protected
+  JSAny cst_encode_list_experience(List<Experience> raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return raw.map(cst_encode_experience).toList().jsify()!;
   }
 
   @protected
@@ -143,6 +260,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   JSAny cst_encode_list_prim_u_8_strict(Uint8List raw) {
     // Codec=Cst (C-struct based), see doc to use other codecs
     return raw.jsify()!;
+  }
+
+  @protected
+  JSAny? cst_encode_opt_box_autoadd_hearing_filter(HearingFilter? raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return raw == null ? null : cst_encode_box_autoadd_hearing_filter(raw);
+  }
+
+  @protected
+  JSAny? cst_encode_opt_box_autoadd_vision_filter(VisionFilter? raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return raw == null ? null : cst_encode_box_autoadd_vision_filter(raw);
   }
 
   @protected
@@ -287,23 +416,40 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void cst_encode_unit(void raw);
 
   @protected
+  int cst_encode_urgency(Urgency raw);
+
+  @protected
   int cst_encode_vision_glaucoma_mode(VisionGlaucomaMode raw);
 
   @protected
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_hearing_filter(
+      HearingFilter self, SseSerializer serializer);
+
+  @protected
   void sse_encode_box_autoadd_vision_filter(
       VisionFilter self, SseSerializer serializer);
 
   @protected
+  void sse_encode_experience(Experience self, SseSerializer serializer);
+
+  @protected
   void sse_encode_f_32(double self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_hearing_filter(HearingFilter self, SseSerializer serializer);
 
   @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_experience(
+      List<Experience> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_prim_f_32_strict(
@@ -317,6 +463,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       Uint8List self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_hearing_filter(
+      HearingFilter? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_vision_filter(
+      VisionFilter? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_u_32(int self, SseSerializer serializer);
 
   @protected
@@ -327,6 +481,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_unit(void self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_urgency(Urgency self, SseSerializer serializer);
 
   @protected
   void sse_encode_vision_filter(VisionFilter self, SseSerializer serializer);
@@ -349,6 +506,10 @@ class RustLibWire implements BaseWire {
               JSAny rgba8, int width, int height, double strength) =>
           wasmModule.wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
               filter, rgba8, width, height, strength);
+
+  JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__experiences() =>
+          wasmModule.wire__crate__api__sensus_bridge__experiences();
 
   JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
       wire__crate__api__sensus_bridge__vision_shader_glsl(JSAny filter) =>
@@ -376,6 +537,9 @@ extension type RustLibWasmModule._(JSObject _) implements JSObject {
   external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
       wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
           JSAny filter, JSAny rgba8, int width, int height, double strength);
+
+  external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__experiences();
 
   external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
       wire__crate__api__sensus_bridge__vision_shader_glsl(JSAny filter);

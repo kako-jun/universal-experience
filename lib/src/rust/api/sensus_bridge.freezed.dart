@@ -15,6 +15,2934 @@ final _privateConstructorUsedError = UnsupportedError(
     'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
 
 /// @nodoc
+mixin _$HearingFilter {
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() hearingLoss,
+    required TResult Function(double freqHz) suddenHearingLoss,
+    required TResult Function() noiseInducedHearingLoss,
+    required TResult Function(double freqHz) tinnitus,
+    required TResult Function() hyperacusis,
+    required TResult Function(double freqHz) misophonia,
+    required TResult Function() paracusis,
+    required TResult Function() amusia,
+    required TResult Function() dysmelodia,
+    required TResult Function(double semitones) pitchShift,
+    required TResult Function() diplacusis,
+    required TResult Function() auditoryProcessingDisorder,
+    required TResult Function() meniere,
+    required TResult Function() labyrinthitis,
+  }) =>
+      throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? hearingLoss,
+    TResult? Function(double freqHz)? suddenHearingLoss,
+    TResult? Function()? noiseInducedHearingLoss,
+    TResult? Function(double freqHz)? tinnitus,
+    TResult? Function()? hyperacusis,
+    TResult? Function(double freqHz)? misophonia,
+    TResult? Function()? paracusis,
+    TResult? Function()? amusia,
+    TResult? Function()? dysmelodia,
+    TResult? Function(double semitones)? pitchShift,
+    TResult? Function()? diplacusis,
+    TResult? Function()? auditoryProcessingDisorder,
+    TResult? Function()? meniere,
+    TResult? Function()? labyrinthitis,
+  }) =>
+      throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? hearingLoss,
+    TResult Function(double freqHz)? suddenHearingLoss,
+    TResult Function()? noiseInducedHearingLoss,
+    TResult Function(double freqHz)? tinnitus,
+    TResult Function()? hyperacusis,
+    TResult Function(double freqHz)? misophonia,
+    TResult Function()? paracusis,
+    TResult Function()? amusia,
+    TResult Function()? dysmelodia,
+    TResult Function(double semitones)? pitchShift,
+    TResult Function()? diplacusis,
+    TResult Function()? auditoryProcessingDisorder,
+    TResult Function()? meniere,
+    TResult Function()? labyrinthitis,
+    required TResult orElse(),
+  }) =>
+      throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HearingFilter_HearingLoss value) hearingLoss,
+    required TResult Function(HearingFilter_SuddenHearingLoss value)
+        suddenHearingLoss,
+    required TResult Function(HearingFilter_NoiseInducedHearingLoss value)
+        noiseInducedHearingLoss,
+    required TResult Function(HearingFilter_Tinnitus value) tinnitus,
+    required TResult Function(HearingFilter_Hyperacusis value) hyperacusis,
+    required TResult Function(HearingFilter_Misophonia value) misophonia,
+    required TResult Function(HearingFilter_Paracusis value) paracusis,
+    required TResult Function(HearingFilter_Amusia value) amusia,
+    required TResult Function(HearingFilter_Dysmelodia value) dysmelodia,
+    required TResult Function(HearingFilter_PitchShift value) pitchShift,
+    required TResult Function(HearingFilter_Diplacusis value) diplacusis,
+    required TResult Function(HearingFilter_AuditoryProcessingDisorder value)
+        auditoryProcessingDisorder,
+    required TResult Function(HearingFilter_Meniere value) meniere,
+    required TResult Function(HearingFilter_Labyrinthitis value) labyrinthitis,
+  }) =>
+      throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult? Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult? Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult? Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult? Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult? Function(HearingFilter_Misophonia value)? misophonia,
+    TResult? Function(HearingFilter_Paracusis value)? paracusis,
+    TResult? Function(HearingFilter_Amusia value)? amusia,
+    TResult? Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult? Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult? Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult? Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult? Function(HearingFilter_Meniere value)? meniere,
+    TResult? Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+  }) =>
+      throw _privateConstructorUsedError;
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult Function(HearingFilter_Misophonia value)? misophonia,
+    TResult Function(HearingFilter_Paracusis value)? paracusis,
+    TResult Function(HearingFilter_Amusia value)? amusia,
+    TResult Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult Function(HearingFilter_Meniere value)? meniere,
+    TResult Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+    required TResult orElse(),
+  }) =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $HearingFilterCopyWith<$Res> {
+  factory $HearingFilterCopyWith(
+          HearingFilter value, $Res Function(HearingFilter) then) =
+      _$HearingFilterCopyWithImpl<$Res, HearingFilter>;
+}
+
+/// @nodoc
+class _$HearingFilterCopyWithImpl<$Res, $Val extends HearingFilter>
+    implements $HearingFilterCopyWith<$Res> {
+  _$HearingFilterCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+abstract class _$$HearingFilter_HearingLossImplCopyWith<$Res> {
+  factory _$$HearingFilter_HearingLossImplCopyWith(
+          _$HearingFilter_HearingLossImpl value,
+          $Res Function(_$HearingFilter_HearingLossImpl) then) =
+      __$$HearingFilter_HearingLossImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$HearingFilter_HearingLossImplCopyWithImpl<$Res>
+    extends _$HearingFilterCopyWithImpl<$Res, _$HearingFilter_HearingLossImpl>
+    implements _$$HearingFilter_HearingLossImplCopyWith<$Res> {
+  __$$HearingFilter_HearingLossImplCopyWithImpl(
+      _$HearingFilter_HearingLossImpl _value,
+      $Res Function(_$HearingFilter_HearingLossImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$HearingFilter_HearingLossImpl extends HearingFilter_HearingLoss {
+  const _$HearingFilter_HearingLossImpl() : super._();
+
+  @override
+  String toString() {
+    return 'HearingFilter.hearingLoss()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HearingFilter_HearingLossImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() hearingLoss,
+    required TResult Function(double freqHz) suddenHearingLoss,
+    required TResult Function() noiseInducedHearingLoss,
+    required TResult Function(double freqHz) tinnitus,
+    required TResult Function() hyperacusis,
+    required TResult Function(double freqHz) misophonia,
+    required TResult Function() paracusis,
+    required TResult Function() amusia,
+    required TResult Function() dysmelodia,
+    required TResult Function(double semitones) pitchShift,
+    required TResult Function() diplacusis,
+    required TResult Function() auditoryProcessingDisorder,
+    required TResult Function() meniere,
+    required TResult Function() labyrinthitis,
+  }) {
+    return hearingLoss();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? hearingLoss,
+    TResult? Function(double freqHz)? suddenHearingLoss,
+    TResult? Function()? noiseInducedHearingLoss,
+    TResult? Function(double freqHz)? tinnitus,
+    TResult? Function()? hyperacusis,
+    TResult? Function(double freqHz)? misophonia,
+    TResult? Function()? paracusis,
+    TResult? Function()? amusia,
+    TResult? Function()? dysmelodia,
+    TResult? Function(double semitones)? pitchShift,
+    TResult? Function()? diplacusis,
+    TResult? Function()? auditoryProcessingDisorder,
+    TResult? Function()? meniere,
+    TResult? Function()? labyrinthitis,
+  }) {
+    return hearingLoss?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? hearingLoss,
+    TResult Function(double freqHz)? suddenHearingLoss,
+    TResult Function()? noiseInducedHearingLoss,
+    TResult Function(double freqHz)? tinnitus,
+    TResult Function()? hyperacusis,
+    TResult Function(double freqHz)? misophonia,
+    TResult Function()? paracusis,
+    TResult Function()? amusia,
+    TResult Function()? dysmelodia,
+    TResult Function(double semitones)? pitchShift,
+    TResult Function()? diplacusis,
+    TResult Function()? auditoryProcessingDisorder,
+    TResult Function()? meniere,
+    TResult Function()? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (hearingLoss != null) {
+      return hearingLoss();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HearingFilter_HearingLoss value) hearingLoss,
+    required TResult Function(HearingFilter_SuddenHearingLoss value)
+        suddenHearingLoss,
+    required TResult Function(HearingFilter_NoiseInducedHearingLoss value)
+        noiseInducedHearingLoss,
+    required TResult Function(HearingFilter_Tinnitus value) tinnitus,
+    required TResult Function(HearingFilter_Hyperacusis value) hyperacusis,
+    required TResult Function(HearingFilter_Misophonia value) misophonia,
+    required TResult Function(HearingFilter_Paracusis value) paracusis,
+    required TResult Function(HearingFilter_Amusia value) amusia,
+    required TResult Function(HearingFilter_Dysmelodia value) dysmelodia,
+    required TResult Function(HearingFilter_PitchShift value) pitchShift,
+    required TResult Function(HearingFilter_Diplacusis value) diplacusis,
+    required TResult Function(HearingFilter_AuditoryProcessingDisorder value)
+        auditoryProcessingDisorder,
+    required TResult Function(HearingFilter_Meniere value) meniere,
+    required TResult Function(HearingFilter_Labyrinthitis value) labyrinthitis,
+  }) {
+    return hearingLoss(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult? Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult? Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult? Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult? Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult? Function(HearingFilter_Misophonia value)? misophonia,
+    TResult? Function(HearingFilter_Paracusis value)? paracusis,
+    TResult? Function(HearingFilter_Amusia value)? amusia,
+    TResult? Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult? Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult? Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult? Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult? Function(HearingFilter_Meniere value)? meniere,
+    TResult? Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+  }) {
+    return hearingLoss?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult Function(HearingFilter_Misophonia value)? misophonia,
+    TResult Function(HearingFilter_Paracusis value)? paracusis,
+    TResult Function(HearingFilter_Amusia value)? amusia,
+    TResult Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult Function(HearingFilter_Meniere value)? meniere,
+    TResult Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (hearingLoss != null) {
+      return hearingLoss(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HearingFilter_HearingLoss extends HearingFilter {
+  const factory HearingFilter_HearingLoss() = _$HearingFilter_HearingLossImpl;
+  const HearingFilter_HearingLoss._() : super._();
+}
+
+/// @nodoc
+abstract class _$$HearingFilter_SuddenHearingLossImplCopyWith<$Res> {
+  factory _$$HearingFilter_SuddenHearingLossImplCopyWith(
+          _$HearingFilter_SuddenHearingLossImpl value,
+          $Res Function(_$HearingFilter_SuddenHearingLossImpl) then) =
+      __$$HearingFilter_SuddenHearingLossImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({double freqHz});
+}
+
+/// @nodoc
+class __$$HearingFilter_SuddenHearingLossImplCopyWithImpl<$Res>
+    extends _$HearingFilterCopyWithImpl<$Res,
+        _$HearingFilter_SuddenHearingLossImpl>
+    implements _$$HearingFilter_SuddenHearingLossImplCopyWith<$Res> {
+  __$$HearingFilter_SuddenHearingLossImplCopyWithImpl(
+      _$HearingFilter_SuddenHearingLossImpl _value,
+      $Res Function(_$HearingFilter_SuddenHearingLossImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? freqHz = null,
+  }) {
+    return _then(_$HearingFilter_SuddenHearingLossImpl(
+      freqHz: null == freqHz
+          ? _value.freqHz
+          : freqHz // ignore: cast_nullable_to_non_nullable
+              as double,
+    ));
+  }
+}
+
+/// @nodoc
+
+class _$HearingFilter_SuddenHearingLossImpl
+    extends HearingFilter_SuddenHearingLoss {
+  const _$HearingFilter_SuddenHearingLossImpl({required this.freqHz})
+      : super._();
+
+  @override
+  final double freqHz;
+
+  @override
+  String toString() {
+    return 'HearingFilter.suddenHearingLoss(freqHz: $freqHz)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HearingFilter_SuddenHearingLossImpl &&
+            (identical(other.freqHz, freqHz) || other.freqHz == freqHz));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, freqHz);
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$HearingFilter_SuddenHearingLossImplCopyWith<
+          _$HearingFilter_SuddenHearingLossImpl>
+      get copyWith => __$$HearingFilter_SuddenHearingLossImplCopyWithImpl<
+          _$HearingFilter_SuddenHearingLossImpl>(this, _$identity);
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() hearingLoss,
+    required TResult Function(double freqHz) suddenHearingLoss,
+    required TResult Function() noiseInducedHearingLoss,
+    required TResult Function(double freqHz) tinnitus,
+    required TResult Function() hyperacusis,
+    required TResult Function(double freqHz) misophonia,
+    required TResult Function() paracusis,
+    required TResult Function() amusia,
+    required TResult Function() dysmelodia,
+    required TResult Function(double semitones) pitchShift,
+    required TResult Function() diplacusis,
+    required TResult Function() auditoryProcessingDisorder,
+    required TResult Function() meniere,
+    required TResult Function() labyrinthitis,
+  }) {
+    return suddenHearingLoss(freqHz);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? hearingLoss,
+    TResult? Function(double freqHz)? suddenHearingLoss,
+    TResult? Function()? noiseInducedHearingLoss,
+    TResult? Function(double freqHz)? tinnitus,
+    TResult? Function()? hyperacusis,
+    TResult? Function(double freqHz)? misophonia,
+    TResult? Function()? paracusis,
+    TResult? Function()? amusia,
+    TResult? Function()? dysmelodia,
+    TResult? Function(double semitones)? pitchShift,
+    TResult? Function()? diplacusis,
+    TResult? Function()? auditoryProcessingDisorder,
+    TResult? Function()? meniere,
+    TResult? Function()? labyrinthitis,
+  }) {
+    return suddenHearingLoss?.call(freqHz);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? hearingLoss,
+    TResult Function(double freqHz)? suddenHearingLoss,
+    TResult Function()? noiseInducedHearingLoss,
+    TResult Function(double freqHz)? tinnitus,
+    TResult Function()? hyperacusis,
+    TResult Function(double freqHz)? misophonia,
+    TResult Function()? paracusis,
+    TResult Function()? amusia,
+    TResult Function()? dysmelodia,
+    TResult Function(double semitones)? pitchShift,
+    TResult Function()? diplacusis,
+    TResult Function()? auditoryProcessingDisorder,
+    TResult Function()? meniere,
+    TResult Function()? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (suddenHearingLoss != null) {
+      return suddenHearingLoss(freqHz);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HearingFilter_HearingLoss value) hearingLoss,
+    required TResult Function(HearingFilter_SuddenHearingLoss value)
+        suddenHearingLoss,
+    required TResult Function(HearingFilter_NoiseInducedHearingLoss value)
+        noiseInducedHearingLoss,
+    required TResult Function(HearingFilter_Tinnitus value) tinnitus,
+    required TResult Function(HearingFilter_Hyperacusis value) hyperacusis,
+    required TResult Function(HearingFilter_Misophonia value) misophonia,
+    required TResult Function(HearingFilter_Paracusis value) paracusis,
+    required TResult Function(HearingFilter_Amusia value) amusia,
+    required TResult Function(HearingFilter_Dysmelodia value) dysmelodia,
+    required TResult Function(HearingFilter_PitchShift value) pitchShift,
+    required TResult Function(HearingFilter_Diplacusis value) diplacusis,
+    required TResult Function(HearingFilter_AuditoryProcessingDisorder value)
+        auditoryProcessingDisorder,
+    required TResult Function(HearingFilter_Meniere value) meniere,
+    required TResult Function(HearingFilter_Labyrinthitis value) labyrinthitis,
+  }) {
+    return suddenHearingLoss(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult? Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult? Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult? Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult? Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult? Function(HearingFilter_Misophonia value)? misophonia,
+    TResult? Function(HearingFilter_Paracusis value)? paracusis,
+    TResult? Function(HearingFilter_Amusia value)? amusia,
+    TResult? Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult? Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult? Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult? Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult? Function(HearingFilter_Meniere value)? meniere,
+    TResult? Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+  }) {
+    return suddenHearingLoss?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult Function(HearingFilter_Misophonia value)? misophonia,
+    TResult Function(HearingFilter_Paracusis value)? paracusis,
+    TResult Function(HearingFilter_Amusia value)? amusia,
+    TResult Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult Function(HearingFilter_Meniere value)? meniere,
+    TResult Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (suddenHearingLoss != null) {
+      return suddenHearingLoss(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HearingFilter_SuddenHearingLoss extends HearingFilter {
+  const factory HearingFilter_SuddenHearingLoss(
+      {required final double freqHz}) = _$HearingFilter_SuddenHearingLossImpl;
+  const HearingFilter_SuddenHearingLoss._() : super._();
+
+  double get freqHz;
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$HearingFilter_SuddenHearingLossImplCopyWith<
+          _$HearingFilter_SuddenHearingLossImpl>
+      get copyWith => throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$HearingFilter_NoiseInducedHearingLossImplCopyWith<$Res> {
+  factory _$$HearingFilter_NoiseInducedHearingLossImplCopyWith(
+          _$HearingFilter_NoiseInducedHearingLossImpl value,
+          $Res Function(_$HearingFilter_NoiseInducedHearingLossImpl) then) =
+      __$$HearingFilter_NoiseInducedHearingLossImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$HearingFilter_NoiseInducedHearingLossImplCopyWithImpl<$Res>
+    extends _$HearingFilterCopyWithImpl<$Res,
+        _$HearingFilter_NoiseInducedHearingLossImpl>
+    implements _$$HearingFilter_NoiseInducedHearingLossImplCopyWith<$Res> {
+  __$$HearingFilter_NoiseInducedHearingLossImplCopyWithImpl(
+      _$HearingFilter_NoiseInducedHearingLossImpl _value,
+      $Res Function(_$HearingFilter_NoiseInducedHearingLossImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$HearingFilter_NoiseInducedHearingLossImpl
+    extends HearingFilter_NoiseInducedHearingLoss {
+  const _$HearingFilter_NoiseInducedHearingLossImpl() : super._();
+
+  @override
+  String toString() {
+    return 'HearingFilter.noiseInducedHearingLoss()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HearingFilter_NoiseInducedHearingLossImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() hearingLoss,
+    required TResult Function(double freqHz) suddenHearingLoss,
+    required TResult Function() noiseInducedHearingLoss,
+    required TResult Function(double freqHz) tinnitus,
+    required TResult Function() hyperacusis,
+    required TResult Function(double freqHz) misophonia,
+    required TResult Function() paracusis,
+    required TResult Function() amusia,
+    required TResult Function() dysmelodia,
+    required TResult Function(double semitones) pitchShift,
+    required TResult Function() diplacusis,
+    required TResult Function() auditoryProcessingDisorder,
+    required TResult Function() meniere,
+    required TResult Function() labyrinthitis,
+  }) {
+    return noiseInducedHearingLoss();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? hearingLoss,
+    TResult? Function(double freqHz)? suddenHearingLoss,
+    TResult? Function()? noiseInducedHearingLoss,
+    TResult? Function(double freqHz)? tinnitus,
+    TResult? Function()? hyperacusis,
+    TResult? Function(double freqHz)? misophonia,
+    TResult? Function()? paracusis,
+    TResult? Function()? amusia,
+    TResult? Function()? dysmelodia,
+    TResult? Function(double semitones)? pitchShift,
+    TResult? Function()? diplacusis,
+    TResult? Function()? auditoryProcessingDisorder,
+    TResult? Function()? meniere,
+    TResult? Function()? labyrinthitis,
+  }) {
+    return noiseInducedHearingLoss?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? hearingLoss,
+    TResult Function(double freqHz)? suddenHearingLoss,
+    TResult Function()? noiseInducedHearingLoss,
+    TResult Function(double freqHz)? tinnitus,
+    TResult Function()? hyperacusis,
+    TResult Function(double freqHz)? misophonia,
+    TResult Function()? paracusis,
+    TResult Function()? amusia,
+    TResult Function()? dysmelodia,
+    TResult Function(double semitones)? pitchShift,
+    TResult Function()? diplacusis,
+    TResult Function()? auditoryProcessingDisorder,
+    TResult Function()? meniere,
+    TResult Function()? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (noiseInducedHearingLoss != null) {
+      return noiseInducedHearingLoss();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HearingFilter_HearingLoss value) hearingLoss,
+    required TResult Function(HearingFilter_SuddenHearingLoss value)
+        suddenHearingLoss,
+    required TResult Function(HearingFilter_NoiseInducedHearingLoss value)
+        noiseInducedHearingLoss,
+    required TResult Function(HearingFilter_Tinnitus value) tinnitus,
+    required TResult Function(HearingFilter_Hyperacusis value) hyperacusis,
+    required TResult Function(HearingFilter_Misophonia value) misophonia,
+    required TResult Function(HearingFilter_Paracusis value) paracusis,
+    required TResult Function(HearingFilter_Amusia value) amusia,
+    required TResult Function(HearingFilter_Dysmelodia value) dysmelodia,
+    required TResult Function(HearingFilter_PitchShift value) pitchShift,
+    required TResult Function(HearingFilter_Diplacusis value) diplacusis,
+    required TResult Function(HearingFilter_AuditoryProcessingDisorder value)
+        auditoryProcessingDisorder,
+    required TResult Function(HearingFilter_Meniere value) meniere,
+    required TResult Function(HearingFilter_Labyrinthitis value) labyrinthitis,
+  }) {
+    return noiseInducedHearingLoss(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult? Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult? Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult? Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult? Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult? Function(HearingFilter_Misophonia value)? misophonia,
+    TResult? Function(HearingFilter_Paracusis value)? paracusis,
+    TResult? Function(HearingFilter_Amusia value)? amusia,
+    TResult? Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult? Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult? Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult? Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult? Function(HearingFilter_Meniere value)? meniere,
+    TResult? Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+  }) {
+    return noiseInducedHearingLoss?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult Function(HearingFilter_Misophonia value)? misophonia,
+    TResult Function(HearingFilter_Paracusis value)? paracusis,
+    TResult Function(HearingFilter_Amusia value)? amusia,
+    TResult Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult Function(HearingFilter_Meniere value)? meniere,
+    TResult Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (noiseInducedHearingLoss != null) {
+      return noiseInducedHearingLoss(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HearingFilter_NoiseInducedHearingLoss extends HearingFilter {
+  const factory HearingFilter_NoiseInducedHearingLoss() =
+      _$HearingFilter_NoiseInducedHearingLossImpl;
+  const HearingFilter_NoiseInducedHearingLoss._() : super._();
+}
+
+/// @nodoc
+abstract class _$$HearingFilter_TinnitusImplCopyWith<$Res> {
+  factory _$$HearingFilter_TinnitusImplCopyWith(
+          _$HearingFilter_TinnitusImpl value,
+          $Res Function(_$HearingFilter_TinnitusImpl) then) =
+      __$$HearingFilter_TinnitusImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({double freqHz});
+}
+
+/// @nodoc
+class __$$HearingFilter_TinnitusImplCopyWithImpl<$Res>
+    extends _$HearingFilterCopyWithImpl<$Res, _$HearingFilter_TinnitusImpl>
+    implements _$$HearingFilter_TinnitusImplCopyWith<$Res> {
+  __$$HearingFilter_TinnitusImplCopyWithImpl(
+      _$HearingFilter_TinnitusImpl _value,
+      $Res Function(_$HearingFilter_TinnitusImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? freqHz = null,
+  }) {
+    return _then(_$HearingFilter_TinnitusImpl(
+      freqHz: null == freqHz
+          ? _value.freqHz
+          : freqHz // ignore: cast_nullable_to_non_nullable
+              as double,
+    ));
+  }
+}
+
+/// @nodoc
+
+class _$HearingFilter_TinnitusImpl extends HearingFilter_Tinnitus {
+  const _$HearingFilter_TinnitusImpl({required this.freqHz}) : super._();
+
+  @override
+  final double freqHz;
+
+  @override
+  String toString() {
+    return 'HearingFilter.tinnitus(freqHz: $freqHz)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HearingFilter_TinnitusImpl &&
+            (identical(other.freqHz, freqHz) || other.freqHz == freqHz));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, freqHz);
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$HearingFilter_TinnitusImplCopyWith<_$HearingFilter_TinnitusImpl>
+      get copyWith => __$$HearingFilter_TinnitusImplCopyWithImpl<
+          _$HearingFilter_TinnitusImpl>(this, _$identity);
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() hearingLoss,
+    required TResult Function(double freqHz) suddenHearingLoss,
+    required TResult Function() noiseInducedHearingLoss,
+    required TResult Function(double freqHz) tinnitus,
+    required TResult Function() hyperacusis,
+    required TResult Function(double freqHz) misophonia,
+    required TResult Function() paracusis,
+    required TResult Function() amusia,
+    required TResult Function() dysmelodia,
+    required TResult Function(double semitones) pitchShift,
+    required TResult Function() diplacusis,
+    required TResult Function() auditoryProcessingDisorder,
+    required TResult Function() meniere,
+    required TResult Function() labyrinthitis,
+  }) {
+    return tinnitus(freqHz);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? hearingLoss,
+    TResult? Function(double freqHz)? suddenHearingLoss,
+    TResult? Function()? noiseInducedHearingLoss,
+    TResult? Function(double freqHz)? tinnitus,
+    TResult? Function()? hyperacusis,
+    TResult? Function(double freqHz)? misophonia,
+    TResult? Function()? paracusis,
+    TResult? Function()? amusia,
+    TResult? Function()? dysmelodia,
+    TResult? Function(double semitones)? pitchShift,
+    TResult? Function()? diplacusis,
+    TResult? Function()? auditoryProcessingDisorder,
+    TResult? Function()? meniere,
+    TResult? Function()? labyrinthitis,
+  }) {
+    return tinnitus?.call(freqHz);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? hearingLoss,
+    TResult Function(double freqHz)? suddenHearingLoss,
+    TResult Function()? noiseInducedHearingLoss,
+    TResult Function(double freqHz)? tinnitus,
+    TResult Function()? hyperacusis,
+    TResult Function(double freqHz)? misophonia,
+    TResult Function()? paracusis,
+    TResult Function()? amusia,
+    TResult Function()? dysmelodia,
+    TResult Function(double semitones)? pitchShift,
+    TResult Function()? diplacusis,
+    TResult Function()? auditoryProcessingDisorder,
+    TResult Function()? meniere,
+    TResult Function()? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (tinnitus != null) {
+      return tinnitus(freqHz);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HearingFilter_HearingLoss value) hearingLoss,
+    required TResult Function(HearingFilter_SuddenHearingLoss value)
+        suddenHearingLoss,
+    required TResult Function(HearingFilter_NoiseInducedHearingLoss value)
+        noiseInducedHearingLoss,
+    required TResult Function(HearingFilter_Tinnitus value) tinnitus,
+    required TResult Function(HearingFilter_Hyperacusis value) hyperacusis,
+    required TResult Function(HearingFilter_Misophonia value) misophonia,
+    required TResult Function(HearingFilter_Paracusis value) paracusis,
+    required TResult Function(HearingFilter_Amusia value) amusia,
+    required TResult Function(HearingFilter_Dysmelodia value) dysmelodia,
+    required TResult Function(HearingFilter_PitchShift value) pitchShift,
+    required TResult Function(HearingFilter_Diplacusis value) diplacusis,
+    required TResult Function(HearingFilter_AuditoryProcessingDisorder value)
+        auditoryProcessingDisorder,
+    required TResult Function(HearingFilter_Meniere value) meniere,
+    required TResult Function(HearingFilter_Labyrinthitis value) labyrinthitis,
+  }) {
+    return tinnitus(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult? Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult? Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult? Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult? Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult? Function(HearingFilter_Misophonia value)? misophonia,
+    TResult? Function(HearingFilter_Paracusis value)? paracusis,
+    TResult? Function(HearingFilter_Amusia value)? amusia,
+    TResult? Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult? Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult? Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult? Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult? Function(HearingFilter_Meniere value)? meniere,
+    TResult? Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+  }) {
+    return tinnitus?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult Function(HearingFilter_Misophonia value)? misophonia,
+    TResult Function(HearingFilter_Paracusis value)? paracusis,
+    TResult Function(HearingFilter_Amusia value)? amusia,
+    TResult Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult Function(HearingFilter_Meniere value)? meniere,
+    TResult Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (tinnitus != null) {
+      return tinnitus(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HearingFilter_Tinnitus extends HearingFilter {
+  const factory HearingFilter_Tinnitus({required final double freqHz}) =
+      _$HearingFilter_TinnitusImpl;
+  const HearingFilter_Tinnitus._() : super._();
+
+  double get freqHz;
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$HearingFilter_TinnitusImplCopyWith<_$HearingFilter_TinnitusImpl>
+      get copyWith => throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$HearingFilter_HyperacusisImplCopyWith<$Res> {
+  factory _$$HearingFilter_HyperacusisImplCopyWith(
+          _$HearingFilter_HyperacusisImpl value,
+          $Res Function(_$HearingFilter_HyperacusisImpl) then) =
+      __$$HearingFilter_HyperacusisImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$HearingFilter_HyperacusisImplCopyWithImpl<$Res>
+    extends _$HearingFilterCopyWithImpl<$Res, _$HearingFilter_HyperacusisImpl>
+    implements _$$HearingFilter_HyperacusisImplCopyWith<$Res> {
+  __$$HearingFilter_HyperacusisImplCopyWithImpl(
+      _$HearingFilter_HyperacusisImpl _value,
+      $Res Function(_$HearingFilter_HyperacusisImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$HearingFilter_HyperacusisImpl extends HearingFilter_Hyperacusis {
+  const _$HearingFilter_HyperacusisImpl() : super._();
+
+  @override
+  String toString() {
+    return 'HearingFilter.hyperacusis()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HearingFilter_HyperacusisImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() hearingLoss,
+    required TResult Function(double freqHz) suddenHearingLoss,
+    required TResult Function() noiseInducedHearingLoss,
+    required TResult Function(double freqHz) tinnitus,
+    required TResult Function() hyperacusis,
+    required TResult Function(double freqHz) misophonia,
+    required TResult Function() paracusis,
+    required TResult Function() amusia,
+    required TResult Function() dysmelodia,
+    required TResult Function(double semitones) pitchShift,
+    required TResult Function() diplacusis,
+    required TResult Function() auditoryProcessingDisorder,
+    required TResult Function() meniere,
+    required TResult Function() labyrinthitis,
+  }) {
+    return hyperacusis();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? hearingLoss,
+    TResult? Function(double freqHz)? suddenHearingLoss,
+    TResult? Function()? noiseInducedHearingLoss,
+    TResult? Function(double freqHz)? tinnitus,
+    TResult? Function()? hyperacusis,
+    TResult? Function(double freqHz)? misophonia,
+    TResult? Function()? paracusis,
+    TResult? Function()? amusia,
+    TResult? Function()? dysmelodia,
+    TResult? Function(double semitones)? pitchShift,
+    TResult? Function()? diplacusis,
+    TResult? Function()? auditoryProcessingDisorder,
+    TResult? Function()? meniere,
+    TResult? Function()? labyrinthitis,
+  }) {
+    return hyperacusis?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? hearingLoss,
+    TResult Function(double freqHz)? suddenHearingLoss,
+    TResult Function()? noiseInducedHearingLoss,
+    TResult Function(double freqHz)? tinnitus,
+    TResult Function()? hyperacusis,
+    TResult Function(double freqHz)? misophonia,
+    TResult Function()? paracusis,
+    TResult Function()? amusia,
+    TResult Function()? dysmelodia,
+    TResult Function(double semitones)? pitchShift,
+    TResult Function()? diplacusis,
+    TResult Function()? auditoryProcessingDisorder,
+    TResult Function()? meniere,
+    TResult Function()? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (hyperacusis != null) {
+      return hyperacusis();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HearingFilter_HearingLoss value) hearingLoss,
+    required TResult Function(HearingFilter_SuddenHearingLoss value)
+        suddenHearingLoss,
+    required TResult Function(HearingFilter_NoiseInducedHearingLoss value)
+        noiseInducedHearingLoss,
+    required TResult Function(HearingFilter_Tinnitus value) tinnitus,
+    required TResult Function(HearingFilter_Hyperacusis value) hyperacusis,
+    required TResult Function(HearingFilter_Misophonia value) misophonia,
+    required TResult Function(HearingFilter_Paracusis value) paracusis,
+    required TResult Function(HearingFilter_Amusia value) amusia,
+    required TResult Function(HearingFilter_Dysmelodia value) dysmelodia,
+    required TResult Function(HearingFilter_PitchShift value) pitchShift,
+    required TResult Function(HearingFilter_Diplacusis value) diplacusis,
+    required TResult Function(HearingFilter_AuditoryProcessingDisorder value)
+        auditoryProcessingDisorder,
+    required TResult Function(HearingFilter_Meniere value) meniere,
+    required TResult Function(HearingFilter_Labyrinthitis value) labyrinthitis,
+  }) {
+    return hyperacusis(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult? Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult? Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult? Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult? Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult? Function(HearingFilter_Misophonia value)? misophonia,
+    TResult? Function(HearingFilter_Paracusis value)? paracusis,
+    TResult? Function(HearingFilter_Amusia value)? amusia,
+    TResult? Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult? Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult? Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult? Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult? Function(HearingFilter_Meniere value)? meniere,
+    TResult? Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+  }) {
+    return hyperacusis?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult Function(HearingFilter_Misophonia value)? misophonia,
+    TResult Function(HearingFilter_Paracusis value)? paracusis,
+    TResult Function(HearingFilter_Amusia value)? amusia,
+    TResult Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult Function(HearingFilter_Meniere value)? meniere,
+    TResult Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (hyperacusis != null) {
+      return hyperacusis(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HearingFilter_Hyperacusis extends HearingFilter {
+  const factory HearingFilter_Hyperacusis() = _$HearingFilter_HyperacusisImpl;
+  const HearingFilter_Hyperacusis._() : super._();
+}
+
+/// @nodoc
+abstract class _$$HearingFilter_MisophoniaImplCopyWith<$Res> {
+  factory _$$HearingFilter_MisophoniaImplCopyWith(
+          _$HearingFilter_MisophoniaImpl value,
+          $Res Function(_$HearingFilter_MisophoniaImpl) then) =
+      __$$HearingFilter_MisophoniaImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({double freqHz});
+}
+
+/// @nodoc
+class __$$HearingFilter_MisophoniaImplCopyWithImpl<$Res>
+    extends _$HearingFilterCopyWithImpl<$Res, _$HearingFilter_MisophoniaImpl>
+    implements _$$HearingFilter_MisophoniaImplCopyWith<$Res> {
+  __$$HearingFilter_MisophoniaImplCopyWithImpl(
+      _$HearingFilter_MisophoniaImpl _value,
+      $Res Function(_$HearingFilter_MisophoniaImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? freqHz = null,
+  }) {
+    return _then(_$HearingFilter_MisophoniaImpl(
+      freqHz: null == freqHz
+          ? _value.freqHz
+          : freqHz // ignore: cast_nullable_to_non_nullable
+              as double,
+    ));
+  }
+}
+
+/// @nodoc
+
+class _$HearingFilter_MisophoniaImpl extends HearingFilter_Misophonia {
+  const _$HearingFilter_MisophoniaImpl({required this.freqHz}) : super._();
+
+  @override
+  final double freqHz;
+
+  @override
+  String toString() {
+    return 'HearingFilter.misophonia(freqHz: $freqHz)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HearingFilter_MisophoniaImpl &&
+            (identical(other.freqHz, freqHz) || other.freqHz == freqHz));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, freqHz);
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$HearingFilter_MisophoniaImplCopyWith<_$HearingFilter_MisophoniaImpl>
+      get copyWith => __$$HearingFilter_MisophoniaImplCopyWithImpl<
+          _$HearingFilter_MisophoniaImpl>(this, _$identity);
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() hearingLoss,
+    required TResult Function(double freqHz) suddenHearingLoss,
+    required TResult Function() noiseInducedHearingLoss,
+    required TResult Function(double freqHz) tinnitus,
+    required TResult Function() hyperacusis,
+    required TResult Function(double freqHz) misophonia,
+    required TResult Function() paracusis,
+    required TResult Function() amusia,
+    required TResult Function() dysmelodia,
+    required TResult Function(double semitones) pitchShift,
+    required TResult Function() diplacusis,
+    required TResult Function() auditoryProcessingDisorder,
+    required TResult Function() meniere,
+    required TResult Function() labyrinthitis,
+  }) {
+    return misophonia(freqHz);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? hearingLoss,
+    TResult? Function(double freqHz)? suddenHearingLoss,
+    TResult? Function()? noiseInducedHearingLoss,
+    TResult? Function(double freqHz)? tinnitus,
+    TResult? Function()? hyperacusis,
+    TResult? Function(double freqHz)? misophonia,
+    TResult? Function()? paracusis,
+    TResult? Function()? amusia,
+    TResult? Function()? dysmelodia,
+    TResult? Function(double semitones)? pitchShift,
+    TResult? Function()? diplacusis,
+    TResult? Function()? auditoryProcessingDisorder,
+    TResult? Function()? meniere,
+    TResult? Function()? labyrinthitis,
+  }) {
+    return misophonia?.call(freqHz);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? hearingLoss,
+    TResult Function(double freqHz)? suddenHearingLoss,
+    TResult Function()? noiseInducedHearingLoss,
+    TResult Function(double freqHz)? tinnitus,
+    TResult Function()? hyperacusis,
+    TResult Function(double freqHz)? misophonia,
+    TResult Function()? paracusis,
+    TResult Function()? amusia,
+    TResult Function()? dysmelodia,
+    TResult Function(double semitones)? pitchShift,
+    TResult Function()? diplacusis,
+    TResult Function()? auditoryProcessingDisorder,
+    TResult Function()? meniere,
+    TResult Function()? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (misophonia != null) {
+      return misophonia(freqHz);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HearingFilter_HearingLoss value) hearingLoss,
+    required TResult Function(HearingFilter_SuddenHearingLoss value)
+        suddenHearingLoss,
+    required TResult Function(HearingFilter_NoiseInducedHearingLoss value)
+        noiseInducedHearingLoss,
+    required TResult Function(HearingFilter_Tinnitus value) tinnitus,
+    required TResult Function(HearingFilter_Hyperacusis value) hyperacusis,
+    required TResult Function(HearingFilter_Misophonia value) misophonia,
+    required TResult Function(HearingFilter_Paracusis value) paracusis,
+    required TResult Function(HearingFilter_Amusia value) amusia,
+    required TResult Function(HearingFilter_Dysmelodia value) dysmelodia,
+    required TResult Function(HearingFilter_PitchShift value) pitchShift,
+    required TResult Function(HearingFilter_Diplacusis value) diplacusis,
+    required TResult Function(HearingFilter_AuditoryProcessingDisorder value)
+        auditoryProcessingDisorder,
+    required TResult Function(HearingFilter_Meniere value) meniere,
+    required TResult Function(HearingFilter_Labyrinthitis value) labyrinthitis,
+  }) {
+    return misophonia(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult? Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult? Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult? Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult? Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult? Function(HearingFilter_Misophonia value)? misophonia,
+    TResult? Function(HearingFilter_Paracusis value)? paracusis,
+    TResult? Function(HearingFilter_Amusia value)? amusia,
+    TResult? Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult? Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult? Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult? Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult? Function(HearingFilter_Meniere value)? meniere,
+    TResult? Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+  }) {
+    return misophonia?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult Function(HearingFilter_Misophonia value)? misophonia,
+    TResult Function(HearingFilter_Paracusis value)? paracusis,
+    TResult Function(HearingFilter_Amusia value)? amusia,
+    TResult Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult Function(HearingFilter_Meniere value)? meniere,
+    TResult Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (misophonia != null) {
+      return misophonia(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HearingFilter_Misophonia extends HearingFilter {
+  const factory HearingFilter_Misophonia({required final double freqHz}) =
+      _$HearingFilter_MisophoniaImpl;
+  const HearingFilter_Misophonia._() : super._();
+
+  double get freqHz;
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$HearingFilter_MisophoniaImplCopyWith<_$HearingFilter_MisophoniaImpl>
+      get copyWith => throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$HearingFilter_ParacusisImplCopyWith<$Res> {
+  factory _$$HearingFilter_ParacusisImplCopyWith(
+          _$HearingFilter_ParacusisImpl value,
+          $Res Function(_$HearingFilter_ParacusisImpl) then) =
+      __$$HearingFilter_ParacusisImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$HearingFilter_ParacusisImplCopyWithImpl<$Res>
+    extends _$HearingFilterCopyWithImpl<$Res, _$HearingFilter_ParacusisImpl>
+    implements _$$HearingFilter_ParacusisImplCopyWith<$Res> {
+  __$$HearingFilter_ParacusisImplCopyWithImpl(
+      _$HearingFilter_ParacusisImpl _value,
+      $Res Function(_$HearingFilter_ParacusisImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$HearingFilter_ParacusisImpl extends HearingFilter_Paracusis {
+  const _$HearingFilter_ParacusisImpl() : super._();
+
+  @override
+  String toString() {
+    return 'HearingFilter.paracusis()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HearingFilter_ParacusisImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() hearingLoss,
+    required TResult Function(double freqHz) suddenHearingLoss,
+    required TResult Function() noiseInducedHearingLoss,
+    required TResult Function(double freqHz) tinnitus,
+    required TResult Function() hyperacusis,
+    required TResult Function(double freqHz) misophonia,
+    required TResult Function() paracusis,
+    required TResult Function() amusia,
+    required TResult Function() dysmelodia,
+    required TResult Function(double semitones) pitchShift,
+    required TResult Function() diplacusis,
+    required TResult Function() auditoryProcessingDisorder,
+    required TResult Function() meniere,
+    required TResult Function() labyrinthitis,
+  }) {
+    return paracusis();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? hearingLoss,
+    TResult? Function(double freqHz)? suddenHearingLoss,
+    TResult? Function()? noiseInducedHearingLoss,
+    TResult? Function(double freqHz)? tinnitus,
+    TResult? Function()? hyperacusis,
+    TResult? Function(double freqHz)? misophonia,
+    TResult? Function()? paracusis,
+    TResult? Function()? amusia,
+    TResult? Function()? dysmelodia,
+    TResult? Function(double semitones)? pitchShift,
+    TResult? Function()? diplacusis,
+    TResult? Function()? auditoryProcessingDisorder,
+    TResult? Function()? meniere,
+    TResult? Function()? labyrinthitis,
+  }) {
+    return paracusis?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? hearingLoss,
+    TResult Function(double freqHz)? suddenHearingLoss,
+    TResult Function()? noiseInducedHearingLoss,
+    TResult Function(double freqHz)? tinnitus,
+    TResult Function()? hyperacusis,
+    TResult Function(double freqHz)? misophonia,
+    TResult Function()? paracusis,
+    TResult Function()? amusia,
+    TResult Function()? dysmelodia,
+    TResult Function(double semitones)? pitchShift,
+    TResult Function()? diplacusis,
+    TResult Function()? auditoryProcessingDisorder,
+    TResult Function()? meniere,
+    TResult Function()? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (paracusis != null) {
+      return paracusis();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HearingFilter_HearingLoss value) hearingLoss,
+    required TResult Function(HearingFilter_SuddenHearingLoss value)
+        suddenHearingLoss,
+    required TResult Function(HearingFilter_NoiseInducedHearingLoss value)
+        noiseInducedHearingLoss,
+    required TResult Function(HearingFilter_Tinnitus value) tinnitus,
+    required TResult Function(HearingFilter_Hyperacusis value) hyperacusis,
+    required TResult Function(HearingFilter_Misophonia value) misophonia,
+    required TResult Function(HearingFilter_Paracusis value) paracusis,
+    required TResult Function(HearingFilter_Amusia value) amusia,
+    required TResult Function(HearingFilter_Dysmelodia value) dysmelodia,
+    required TResult Function(HearingFilter_PitchShift value) pitchShift,
+    required TResult Function(HearingFilter_Diplacusis value) diplacusis,
+    required TResult Function(HearingFilter_AuditoryProcessingDisorder value)
+        auditoryProcessingDisorder,
+    required TResult Function(HearingFilter_Meniere value) meniere,
+    required TResult Function(HearingFilter_Labyrinthitis value) labyrinthitis,
+  }) {
+    return paracusis(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult? Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult? Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult? Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult? Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult? Function(HearingFilter_Misophonia value)? misophonia,
+    TResult? Function(HearingFilter_Paracusis value)? paracusis,
+    TResult? Function(HearingFilter_Amusia value)? amusia,
+    TResult? Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult? Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult? Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult? Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult? Function(HearingFilter_Meniere value)? meniere,
+    TResult? Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+  }) {
+    return paracusis?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult Function(HearingFilter_Misophonia value)? misophonia,
+    TResult Function(HearingFilter_Paracusis value)? paracusis,
+    TResult Function(HearingFilter_Amusia value)? amusia,
+    TResult Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult Function(HearingFilter_Meniere value)? meniere,
+    TResult Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (paracusis != null) {
+      return paracusis(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HearingFilter_Paracusis extends HearingFilter {
+  const factory HearingFilter_Paracusis() = _$HearingFilter_ParacusisImpl;
+  const HearingFilter_Paracusis._() : super._();
+}
+
+/// @nodoc
+abstract class _$$HearingFilter_AmusiaImplCopyWith<$Res> {
+  factory _$$HearingFilter_AmusiaImplCopyWith(_$HearingFilter_AmusiaImpl value,
+          $Res Function(_$HearingFilter_AmusiaImpl) then) =
+      __$$HearingFilter_AmusiaImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$HearingFilter_AmusiaImplCopyWithImpl<$Res>
+    extends _$HearingFilterCopyWithImpl<$Res, _$HearingFilter_AmusiaImpl>
+    implements _$$HearingFilter_AmusiaImplCopyWith<$Res> {
+  __$$HearingFilter_AmusiaImplCopyWithImpl(_$HearingFilter_AmusiaImpl _value,
+      $Res Function(_$HearingFilter_AmusiaImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$HearingFilter_AmusiaImpl extends HearingFilter_Amusia {
+  const _$HearingFilter_AmusiaImpl() : super._();
+
+  @override
+  String toString() {
+    return 'HearingFilter.amusia()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HearingFilter_AmusiaImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() hearingLoss,
+    required TResult Function(double freqHz) suddenHearingLoss,
+    required TResult Function() noiseInducedHearingLoss,
+    required TResult Function(double freqHz) tinnitus,
+    required TResult Function() hyperacusis,
+    required TResult Function(double freqHz) misophonia,
+    required TResult Function() paracusis,
+    required TResult Function() amusia,
+    required TResult Function() dysmelodia,
+    required TResult Function(double semitones) pitchShift,
+    required TResult Function() diplacusis,
+    required TResult Function() auditoryProcessingDisorder,
+    required TResult Function() meniere,
+    required TResult Function() labyrinthitis,
+  }) {
+    return amusia();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? hearingLoss,
+    TResult? Function(double freqHz)? suddenHearingLoss,
+    TResult? Function()? noiseInducedHearingLoss,
+    TResult? Function(double freqHz)? tinnitus,
+    TResult? Function()? hyperacusis,
+    TResult? Function(double freqHz)? misophonia,
+    TResult? Function()? paracusis,
+    TResult? Function()? amusia,
+    TResult? Function()? dysmelodia,
+    TResult? Function(double semitones)? pitchShift,
+    TResult? Function()? diplacusis,
+    TResult? Function()? auditoryProcessingDisorder,
+    TResult? Function()? meniere,
+    TResult? Function()? labyrinthitis,
+  }) {
+    return amusia?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? hearingLoss,
+    TResult Function(double freqHz)? suddenHearingLoss,
+    TResult Function()? noiseInducedHearingLoss,
+    TResult Function(double freqHz)? tinnitus,
+    TResult Function()? hyperacusis,
+    TResult Function(double freqHz)? misophonia,
+    TResult Function()? paracusis,
+    TResult Function()? amusia,
+    TResult Function()? dysmelodia,
+    TResult Function(double semitones)? pitchShift,
+    TResult Function()? diplacusis,
+    TResult Function()? auditoryProcessingDisorder,
+    TResult Function()? meniere,
+    TResult Function()? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (amusia != null) {
+      return amusia();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HearingFilter_HearingLoss value) hearingLoss,
+    required TResult Function(HearingFilter_SuddenHearingLoss value)
+        suddenHearingLoss,
+    required TResult Function(HearingFilter_NoiseInducedHearingLoss value)
+        noiseInducedHearingLoss,
+    required TResult Function(HearingFilter_Tinnitus value) tinnitus,
+    required TResult Function(HearingFilter_Hyperacusis value) hyperacusis,
+    required TResult Function(HearingFilter_Misophonia value) misophonia,
+    required TResult Function(HearingFilter_Paracusis value) paracusis,
+    required TResult Function(HearingFilter_Amusia value) amusia,
+    required TResult Function(HearingFilter_Dysmelodia value) dysmelodia,
+    required TResult Function(HearingFilter_PitchShift value) pitchShift,
+    required TResult Function(HearingFilter_Diplacusis value) diplacusis,
+    required TResult Function(HearingFilter_AuditoryProcessingDisorder value)
+        auditoryProcessingDisorder,
+    required TResult Function(HearingFilter_Meniere value) meniere,
+    required TResult Function(HearingFilter_Labyrinthitis value) labyrinthitis,
+  }) {
+    return amusia(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult? Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult? Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult? Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult? Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult? Function(HearingFilter_Misophonia value)? misophonia,
+    TResult? Function(HearingFilter_Paracusis value)? paracusis,
+    TResult? Function(HearingFilter_Amusia value)? amusia,
+    TResult? Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult? Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult? Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult? Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult? Function(HearingFilter_Meniere value)? meniere,
+    TResult? Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+  }) {
+    return amusia?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult Function(HearingFilter_Misophonia value)? misophonia,
+    TResult Function(HearingFilter_Paracusis value)? paracusis,
+    TResult Function(HearingFilter_Amusia value)? amusia,
+    TResult Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult Function(HearingFilter_Meniere value)? meniere,
+    TResult Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (amusia != null) {
+      return amusia(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HearingFilter_Amusia extends HearingFilter {
+  const factory HearingFilter_Amusia() = _$HearingFilter_AmusiaImpl;
+  const HearingFilter_Amusia._() : super._();
+}
+
+/// @nodoc
+abstract class _$$HearingFilter_DysmelodiaImplCopyWith<$Res> {
+  factory _$$HearingFilter_DysmelodiaImplCopyWith(
+          _$HearingFilter_DysmelodiaImpl value,
+          $Res Function(_$HearingFilter_DysmelodiaImpl) then) =
+      __$$HearingFilter_DysmelodiaImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$HearingFilter_DysmelodiaImplCopyWithImpl<$Res>
+    extends _$HearingFilterCopyWithImpl<$Res, _$HearingFilter_DysmelodiaImpl>
+    implements _$$HearingFilter_DysmelodiaImplCopyWith<$Res> {
+  __$$HearingFilter_DysmelodiaImplCopyWithImpl(
+      _$HearingFilter_DysmelodiaImpl _value,
+      $Res Function(_$HearingFilter_DysmelodiaImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$HearingFilter_DysmelodiaImpl extends HearingFilter_Dysmelodia {
+  const _$HearingFilter_DysmelodiaImpl() : super._();
+
+  @override
+  String toString() {
+    return 'HearingFilter.dysmelodia()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HearingFilter_DysmelodiaImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() hearingLoss,
+    required TResult Function(double freqHz) suddenHearingLoss,
+    required TResult Function() noiseInducedHearingLoss,
+    required TResult Function(double freqHz) tinnitus,
+    required TResult Function() hyperacusis,
+    required TResult Function(double freqHz) misophonia,
+    required TResult Function() paracusis,
+    required TResult Function() amusia,
+    required TResult Function() dysmelodia,
+    required TResult Function(double semitones) pitchShift,
+    required TResult Function() diplacusis,
+    required TResult Function() auditoryProcessingDisorder,
+    required TResult Function() meniere,
+    required TResult Function() labyrinthitis,
+  }) {
+    return dysmelodia();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? hearingLoss,
+    TResult? Function(double freqHz)? suddenHearingLoss,
+    TResult? Function()? noiseInducedHearingLoss,
+    TResult? Function(double freqHz)? tinnitus,
+    TResult? Function()? hyperacusis,
+    TResult? Function(double freqHz)? misophonia,
+    TResult? Function()? paracusis,
+    TResult? Function()? amusia,
+    TResult? Function()? dysmelodia,
+    TResult? Function(double semitones)? pitchShift,
+    TResult? Function()? diplacusis,
+    TResult? Function()? auditoryProcessingDisorder,
+    TResult? Function()? meniere,
+    TResult? Function()? labyrinthitis,
+  }) {
+    return dysmelodia?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? hearingLoss,
+    TResult Function(double freqHz)? suddenHearingLoss,
+    TResult Function()? noiseInducedHearingLoss,
+    TResult Function(double freqHz)? tinnitus,
+    TResult Function()? hyperacusis,
+    TResult Function(double freqHz)? misophonia,
+    TResult Function()? paracusis,
+    TResult Function()? amusia,
+    TResult Function()? dysmelodia,
+    TResult Function(double semitones)? pitchShift,
+    TResult Function()? diplacusis,
+    TResult Function()? auditoryProcessingDisorder,
+    TResult Function()? meniere,
+    TResult Function()? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (dysmelodia != null) {
+      return dysmelodia();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HearingFilter_HearingLoss value) hearingLoss,
+    required TResult Function(HearingFilter_SuddenHearingLoss value)
+        suddenHearingLoss,
+    required TResult Function(HearingFilter_NoiseInducedHearingLoss value)
+        noiseInducedHearingLoss,
+    required TResult Function(HearingFilter_Tinnitus value) tinnitus,
+    required TResult Function(HearingFilter_Hyperacusis value) hyperacusis,
+    required TResult Function(HearingFilter_Misophonia value) misophonia,
+    required TResult Function(HearingFilter_Paracusis value) paracusis,
+    required TResult Function(HearingFilter_Amusia value) amusia,
+    required TResult Function(HearingFilter_Dysmelodia value) dysmelodia,
+    required TResult Function(HearingFilter_PitchShift value) pitchShift,
+    required TResult Function(HearingFilter_Diplacusis value) diplacusis,
+    required TResult Function(HearingFilter_AuditoryProcessingDisorder value)
+        auditoryProcessingDisorder,
+    required TResult Function(HearingFilter_Meniere value) meniere,
+    required TResult Function(HearingFilter_Labyrinthitis value) labyrinthitis,
+  }) {
+    return dysmelodia(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult? Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult? Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult? Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult? Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult? Function(HearingFilter_Misophonia value)? misophonia,
+    TResult? Function(HearingFilter_Paracusis value)? paracusis,
+    TResult? Function(HearingFilter_Amusia value)? amusia,
+    TResult? Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult? Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult? Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult? Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult? Function(HearingFilter_Meniere value)? meniere,
+    TResult? Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+  }) {
+    return dysmelodia?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult Function(HearingFilter_Misophonia value)? misophonia,
+    TResult Function(HearingFilter_Paracusis value)? paracusis,
+    TResult Function(HearingFilter_Amusia value)? amusia,
+    TResult Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult Function(HearingFilter_Meniere value)? meniere,
+    TResult Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (dysmelodia != null) {
+      return dysmelodia(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HearingFilter_Dysmelodia extends HearingFilter {
+  const factory HearingFilter_Dysmelodia() = _$HearingFilter_DysmelodiaImpl;
+  const HearingFilter_Dysmelodia._() : super._();
+}
+
+/// @nodoc
+abstract class _$$HearingFilter_PitchShiftImplCopyWith<$Res> {
+  factory _$$HearingFilter_PitchShiftImplCopyWith(
+          _$HearingFilter_PitchShiftImpl value,
+          $Res Function(_$HearingFilter_PitchShiftImpl) then) =
+      __$$HearingFilter_PitchShiftImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({double semitones});
+}
+
+/// @nodoc
+class __$$HearingFilter_PitchShiftImplCopyWithImpl<$Res>
+    extends _$HearingFilterCopyWithImpl<$Res, _$HearingFilter_PitchShiftImpl>
+    implements _$$HearingFilter_PitchShiftImplCopyWith<$Res> {
+  __$$HearingFilter_PitchShiftImplCopyWithImpl(
+      _$HearingFilter_PitchShiftImpl _value,
+      $Res Function(_$HearingFilter_PitchShiftImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? semitones = null,
+  }) {
+    return _then(_$HearingFilter_PitchShiftImpl(
+      semitones: null == semitones
+          ? _value.semitones
+          : semitones // ignore: cast_nullable_to_non_nullable
+              as double,
+    ));
+  }
+}
+
+/// @nodoc
+
+class _$HearingFilter_PitchShiftImpl extends HearingFilter_PitchShift {
+  const _$HearingFilter_PitchShiftImpl({required this.semitones}) : super._();
+
+  @override
+  final double semitones;
+
+  @override
+  String toString() {
+    return 'HearingFilter.pitchShift(semitones: $semitones)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HearingFilter_PitchShiftImpl &&
+            (identical(other.semitones, semitones) ||
+                other.semitones == semitones));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, semitones);
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$HearingFilter_PitchShiftImplCopyWith<_$HearingFilter_PitchShiftImpl>
+      get copyWith => __$$HearingFilter_PitchShiftImplCopyWithImpl<
+          _$HearingFilter_PitchShiftImpl>(this, _$identity);
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() hearingLoss,
+    required TResult Function(double freqHz) suddenHearingLoss,
+    required TResult Function() noiseInducedHearingLoss,
+    required TResult Function(double freqHz) tinnitus,
+    required TResult Function() hyperacusis,
+    required TResult Function(double freqHz) misophonia,
+    required TResult Function() paracusis,
+    required TResult Function() amusia,
+    required TResult Function() dysmelodia,
+    required TResult Function(double semitones) pitchShift,
+    required TResult Function() diplacusis,
+    required TResult Function() auditoryProcessingDisorder,
+    required TResult Function() meniere,
+    required TResult Function() labyrinthitis,
+  }) {
+    return pitchShift(semitones);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? hearingLoss,
+    TResult? Function(double freqHz)? suddenHearingLoss,
+    TResult? Function()? noiseInducedHearingLoss,
+    TResult? Function(double freqHz)? tinnitus,
+    TResult? Function()? hyperacusis,
+    TResult? Function(double freqHz)? misophonia,
+    TResult? Function()? paracusis,
+    TResult? Function()? amusia,
+    TResult? Function()? dysmelodia,
+    TResult? Function(double semitones)? pitchShift,
+    TResult? Function()? diplacusis,
+    TResult? Function()? auditoryProcessingDisorder,
+    TResult? Function()? meniere,
+    TResult? Function()? labyrinthitis,
+  }) {
+    return pitchShift?.call(semitones);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? hearingLoss,
+    TResult Function(double freqHz)? suddenHearingLoss,
+    TResult Function()? noiseInducedHearingLoss,
+    TResult Function(double freqHz)? tinnitus,
+    TResult Function()? hyperacusis,
+    TResult Function(double freqHz)? misophonia,
+    TResult Function()? paracusis,
+    TResult Function()? amusia,
+    TResult Function()? dysmelodia,
+    TResult Function(double semitones)? pitchShift,
+    TResult Function()? diplacusis,
+    TResult Function()? auditoryProcessingDisorder,
+    TResult Function()? meniere,
+    TResult Function()? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (pitchShift != null) {
+      return pitchShift(semitones);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HearingFilter_HearingLoss value) hearingLoss,
+    required TResult Function(HearingFilter_SuddenHearingLoss value)
+        suddenHearingLoss,
+    required TResult Function(HearingFilter_NoiseInducedHearingLoss value)
+        noiseInducedHearingLoss,
+    required TResult Function(HearingFilter_Tinnitus value) tinnitus,
+    required TResult Function(HearingFilter_Hyperacusis value) hyperacusis,
+    required TResult Function(HearingFilter_Misophonia value) misophonia,
+    required TResult Function(HearingFilter_Paracusis value) paracusis,
+    required TResult Function(HearingFilter_Amusia value) amusia,
+    required TResult Function(HearingFilter_Dysmelodia value) dysmelodia,
+    required TResult Function(HearingFilter_PitchShift value) pitchShift,
+    required TResult Function(HearingFilter_Diplacusis value) diplacusis,
+    required TResult Function(HearingFilter_AuditoryProcessingDisorder value)
+        auditoryProcessingDisorder,
+    required TResult Function(HearingFilter_Meniere value) meniere,
+    required TResult Function(HearingFilter_Labyrinthitis value) labyrinthitis,
+  }) {
+    return pitchShift(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult? Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult? Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult? Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult? Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult? Function(HearingFilter_Misophonia value)? misophonia,
+    TResult? Function(HearingFilter_Paracusis value)? paracusis,
+    TResult? Function(HearingFilter_Amusia value)? amusia,
+    TResult? Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult? Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult? Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult? Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult? Function(HearingFilter_Meniere value)? meniere,
+    TResult? Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+  }) {
+    return pitchShift?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult Function(HearingFilter_Misophonia value)? misophonia,
+    TResult Function(HearingFilter_Paracusis value)? paracusis,
+    TResult Function(HearingFilter_Amusia value)? amusia,
+    TResult Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult Function(HearingFilter_Meniere value)? meniere,
+    TResult Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (pitchShift != null) {
+      return pitchShift(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HearingFilter_PitchShift extends HearingFilter {
+  const factory HearingFilter_PitchShift({required final double semitones}) =
+      _$HearingFilter_PitchShiftImpl;
+  const HearingFilter_PitchShift._() : super._();
+
+  double get semitones;
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$HearingFilter_PitchShiftImplCopyWith<_$HearingFilter_PitchShiftImpl>
+      get copyWith => throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$HearingFilter_DiplacusisImplCopyWith<$Res> {
+  factory _$$HearingFilter_DiplacusisImplCopyWith(
+          _$HearingFilter_DiplacusisImpl value,
+          $Res Function(_$HearingFilter_DiplacusisImpl) then) =
+      __$$HearingFilter_DiplacusisImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$HearingFilter_DiplacusisImplCopyWithImpl<$Res>
+    extends _$HearingFilterCopyWithImpl<$Res, _$HearingFilter_DiplacusisImpl>
+    implements _$$HearingFilter_DiplacusisImplCopyWith<$Res> {
+  __$$HearingFilter_DiplacusisImplCopyWithImpl(
+      _$HearingFilter_DiplacusisImpl _value,
+      $Res Function(_$HearingFilter_DiplacusisImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$HearingFilter_DiplacusisImpl extends HearingFilter_Diplacusis {
+  const _$HearingFilter_DiplacusisImpl() : super._();
+
+  @override
+  String toString() {
+    return 'HearingFilter.diplacusis()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HearingFilter_DiplacusisImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() hearingLoss,
+    required TResult Function(double freqHz) suddenHearingLoss,
+    required TResult Function() noiseInducedHearingLoss,
+    required TResult Function(double freqHz) tinnitus,
+    required TResult Function() hyperacusis,
+    required TResult Function(double freqHz) misophonia,
+    required TResult Function() paracusis,
+    required TResult Function() amusia,
+    required TResult Function() dysmelodia,
+    required TResult Function(double semitones) pitchShift,
+    required TResult Function() diplacusis,
+    required TResult Function() auditoryProcessingDisorder,
+    required TResult Function() meniere,
+    required TResult Function() labyrinthitis,
+  }) {
+    return diplacusis();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? hearingLoss,
+    TResult? Function(double freqHz)? suddenHearingLoss,
+    TResult? Function()? noiseInducedHearingLoss,
+    TResult? Function(double freqHz)? tinnitus,
+    TResult? Function()? hyperacusis,
+    TResult? Function(double freqHz)? misophonia,
+    TResult? Function()? paracusis,
+    TResult? Function()? amusia,
+    TResult? Function()? dysmelodia,
+    TResult? Function(double semitones)? pitchShift,
+    TResult? Function()? diplacusis,
+    TResult? Function()? auditoryProcessingDisorder,
+    TResult? Function()? meniere,
+    TResult? Function()? labyrinthitis,
+  }) {
+    return diplacusis?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? hearingLoss,
+    TResult Function(double freqHz)? suddenHearingLoss,
+    TResult Function()? noiseInducedHearingLoss,
+    TResult Function(double freqHz)? tinnitus,
+    TResult Function()? hyperacusis,
+    TResult Function(double freqHz)? misophonia,
+    TResult Function()? paracusis,
+    TResult Function()? amusia,
+    TResult Function()? dysmelodia,
+    TResult Function(double semitones)? pitchShift,
+    TResult Function()? diplacusis,
+    TResult Function()? auditoryProcessingDisorder,
+    TResult Function()? meniere,
+    TResult Function()? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (diplacusis != null) {
+      return diplacusis();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HearingFilter_HearingLoss value) hearingLoss,
+    required TResult Function(HearingFilter_SuddenHearingLoss value)
+        suddenHearingLoss,
+    required TResult Function(HearingFilter_NoiseInducedHearingLoss value)
+        noiseInducedHearingLoss,
+    required TResult Function(HearingFilter_Tinnitus value) tinnitus,
+    required TResult Function(HearingFilter_Hyperacusis value) hyperacusis,
+    required TResult Function(HearingFilter_Misophonia value) misophonia,
+    required TResult Function(HearingFilter_Paracusis value) paracusis,
+    required TResult Function(HearingFilter_Amusia value) amusia,
+    required TResult Function(HearingFilter_Dysmelodia value) dysmelodia,
+    required TResult Function(HearingFilter_PitchShift value) pitchShift,
+    required TResult Function(HearingFilter_Diplacusis value) diplacusis,
+    required TResult Function(HearingFilter_AuditoryProcessingDisorder value)
+        auditoryProcessingDisorder,
+    required TResult Function(HearingFilter_Meniere value) meniere,
+    required TResult Function(HearingFilter_Labyrinthitis value) labyrinthitis,
+  }) {
+    return diplacusis(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult? Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult? Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult? Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult? Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult? Function(HearingFilter_Misophonia value)? misophonia,
+    TResult? Function(HearingFilter_Paracusis value)? paracusis,
+    TResult? Function(HearingFilter_Amusia value)? amusia,
+    TResult? Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult? Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult? Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult? Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult? Function(HearingFilter_Meniere value)? meniere,
+    TResult? Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+  }) {
+    return diplacusis?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult Function(HearingFilter_Misophonia value)? misophonia,
+    TResult Function(HearingFilter_Paracusis value)? paracusis,
+    TResult Function(HearingFilter_Amusia value)? amusia,
+    TResult Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult Function(HearingFilter_Meniere value)? meniere,
+    TResult Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (diplacusis != null) {
+      return diplacusis(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HearingFilter_Diplacusis extends HearingFilter {
+  const factory HearingFilter_Diplacusis() = _$HearingFilter_DiplacusisImpl;
+  const HearingFilter_Diplacusis._() : super._();
+}
+
+/// @nodoc
+abstract class _$$HearingFilter_AuditoryProcessingDisorderImplCopyWith<$Res> {
+  factory _$$HearingFilter_AuditoryProcessingDisorderImplCopyWith(
+          _$HearingFilter_AuditoryProcessingDisorderImpl value,
+          $Res Function(_$HearingFilter_AuditoryProcessingDisorderImpl) then) =
+      __$$HearingFilter_AuditoryProcessingDisorderImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$HearingFilter_AuditoryProcessingDisorderImplCopyWithImpl<$Res>
+    extends _$HearingFilterCopyWithImpl<$Res,
+        _$HearingFilter_AuditoryProcessingDisorderImpl>
+    implements _$$HearingFilter_AuditoryProcessingDisorderImplCopyWith<$Res> {
+  __$$HearingFilter_AuditoryProcessingDisorderImplCopyWithImpl(
+      _$HearingFilter_AuditoryProcessingDisorderImpl _value,
+      $Res Function(_$HearingFilter_AuditoryProcessingDisorderImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$HearingFilter_AuditoryProcessingDisorderImpl
+    extends HearingFilter_AuditoryProcessingDisorder {
+  const _$HearingFilter_AuditoryProcessingDisorderImpl() : super._();
+
+  @override
+  String toString() {
+    return 'HearingFilter.auditoryProcessingDisorder()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HearingFilter_AuditoryProcessingDisorderImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() hearingLoss,
+    required TResult Function(double freqHz) suddenHearingLoss,
+    required TResult Function() noiseInducedHearingLoss,
+    required TResult Function(double freqHz) tinnitus,
+    required TResult Function() hyperacusis,
+    required TResult Function(double freqHz) misophonia,
+    required TResult Function() paracusis,
+    required TResult Function() amusia,
+    required TResult Function() dysmelodia,
+    required TResult Function(double semitones) pitchShift,
+    required TResult Function() diplacusis,
+    required TResult Function() auditoryProcessingDisorder,
+    required TResult Function() meniere,
+    required TResult Function() labyrinthitis,
+  }) {
+    return auditoryProcessingDisorder();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? hearingLoss,
+    TResult? Function(double freqHz)? suddenHearingLoss,
+    TResult? Function()? noiseInducedHearingLoss,
+    TResult? Function(double freqHz)? tinnitus,
+    TResult? Function()? hyperacusis,
+    TResult? Function(double freqHz)? misophonia,
+    TResult? Function()? paracusis,
+    TResult? Function()? amusia,
+    TResult? Function()? dysmelodia,
+    TResult? Function(double semitones)? pitchShift,
+    TResult? Function()? diplacusis,
+    TResult? Function()? auditoryProcessingDisorder,
+    TResult? Function()? meniere,
+    TResult? Function()? labyrinthitis,
+  }) {
+    return auditoryProcessingDisorder?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? hearingLoss,
+    TResult Function(double freqHz)? suddenHearingLoss,
+    TResult Function()? noiseInducedHearingLoss,
+    TResult Function(double freqHz)? tinnitus,
+    TResult Function()? hyperacusis,
+    TResult Function(double freqHz)? misophonia,
+    TResult Function()? paracusis,
+    TResult Function()? amusia,
+    TResult Function()? dysmelodia,
+    TResult Function(double semitones)? pitchShift,
+    TResult Function()? diplacusis,
+    TResult Function()? auditoryProcessingDisorder,
+    TResult Function()? meniere,
+    TResult Function()? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (auditoryProcessingDisorder != null) {
+      return auditoryProcessingDisorder();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HearingFilter_HearingLoss value) hearingLoss,
+    required TResult Function(HearingFilter_SuddenHearingLoss value)
+        suddenHearingLoss,
+    required TResult Function(HearingFilter_NoiseInducedHearingLoss value)
+        noiseInducedHearingLoss,
+    required TResult Function(HearingFilter_Tinnitus value) tinnitus,
+    required TResult Function(HearingFilter_Hyperacusis value) hyperacusis,
+    required TResult Function(HearingFilter_Misophonia value) misophonia,
+    required TResult Function(HearingFilter_Paracusis value) paracusis,
+    required TResult Function(HearingFilter_Amusia value) amusia,
+    required TResult Function(HearingFilter_Dysmelodia value) dysmelodia,
+    required TResult Function(HearingFilter_PitchShift value) pitchShift,
+    required TResult Function(HearingFilter_Diplacusis value) diplacusis,
+    required TResult Function(HearingFilter_AuditoryProcessingDisorder value)
+        auditoryProcessingDisorder,
+    required TResult Function(HearingFilter_Meniere value) meniere,
+    required TResult Function(HearingFilter_Labyrinthitis value) labyrinthitis,
+  }) {
+    return auditoryProcessingDisorder(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult? Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult? Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult? Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult? Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult? Function(HearingFilter_Misophonia value)? misophonia,
+    TResult? Function(HearingFilter_Paracusis value)? paracusis,
+    TResult? Function(HearingFilter_Amusia value)? amusia,
+    TResult? Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult? Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult? Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult? Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult? Function(HearingFilter_Meniere value)? meniere,
+    TResult? Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+  }) {
+    return auditoryProcessingDisorder?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult Function(HearingFilter_Misophonia value)? misophonia,
+    TResult Function(HearingFilter_Paracusis value)? paracusis,
+    TResult Function(HearingFilter_Amusia value)? amusia,
+    TResult Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult Function(HearingFilter_Meniere value)? meniere,
+    TResult Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (auditoryProcessingDisorder != null) {
+      return auditoryProcessingDisorder(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HearingFilter_AuditoryProcessingDisorder extends HearingFilter {
+  const factory HearingFilter_AuditoryProcessingDisorder() =
+      _$HearingFilter_AuditoryProcessingDisorderImpl;
+  const HearingFilter_AuditoryProcessingDisorder._() : super._();
+}
+
+/// @nodoc
+abstract class _$$HearingFilter_MeniereImplCopyWith<$Res> {
+  factory _$$HearingFilter_MeniereImplCopyWith(
+          _$HearingFilter_MeniereImpl value,
+          $Res Function(_$HearingFilter_MeniereImpl) then) =
+      __$$HearingFilter_MeniereImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$HearingFilter_MeniereImplCopyWithImpl<$Res>
+    extends _$HearingFilterCopyWithImpl<$Res, _$HearingFilter_MeniereImpl>
+    implements _$$HearingFilter_MeniereImplCopyWith<$Res> {
+  __$$HearingFilter_MeniereImplCopyWithImpl(_$HearingFilter_MeniereImpl _value,
+      $Res Function(_$HearingFilter_MeniereImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$HearingFilter_MeniereImpl extends HearingFilter_Meniere {
+  const _$HearingFilter_MeniereImpl() : super._();
+
+  @override
+  String toString() {
+    return 'HearingFilter.meniere()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HearingFilter_MeniereImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() hearingLoss,
+    required TResult Function(double freqHz) suddenHearingLoss,
+    required TResult Function() noiseInducedHearingLoss,
+    required TResult Function(double freqHz) tinnitus,
+    required TResult Function() hyperacusis,
+    required TResult Function(double freqHz) misophonia,
+    required TResult Function() paracusis,
+    required TResult Function() amusia,
+    required TResult Function() dysmelodia,
+    required TResult Function(double semitones) pitchShift,
+    required TResult Function() diplacusis,
+    required TResult Function() auditoryProcessingDisorder,
+    required TResult Function() meniere,
+    required TResult Function() labyrinthitis,
+  }) {
+    return meniere();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? hearingLoss,
+    TResult? Function(double freqHz)? suddenHearingLoss,
+    TResult? Function()? noiseInducedHearingLoss,
+    TResult? Function(double freqHz)? tinnitus,
+    TResult? Function()? hyperacusis,
+    TResult? Function(double freqHz)? misophonia,
+    TResult? Function()? paracusis,
+    TResult? Function()? amusia,
+    TResult? Function()? dysmelodia,
+    TResult? Function(double semitones)? pitchShift,
+    TResult? Function()? diplacusis,
+    TResult? Function()? auditoryProcessingDisorder,
+    TResult? Function()? meniere,
+    TResult? Function()? labyrinthitis,
+  }) {
+    return meniere?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? hearingLoss,
+    TResult Function(double freqHz)? suddenHearingLoss,
+    TResult Function()? noiseInducedHearingLoss,
+    TResult Function(double freqHz)? tinnitus,
+    TResult Function()? hyperacusis,
+    TResult Function(double freqHz)? misophonia,
+    TResult Function()? paracusis,
+    TResult Function()? amusia,
+    TResult Function()? dysmelodia,
+    TResult Function(double semitones)? pitchShift,
+    TResult Function()? diplacusis,
+    TResult Function()? auditoryProcessingDisorder,
+    TResult Function()? meniere,
+    TResult Function()? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (meniere != null) {
+      return meniere();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HearingFilter_HearingLoss value) hearingLoss,
+    required TResult Function(HearingFilter_SuddenHearingLoss value)
+        suddenHearingLoss,
+    required TResult Function(HearingFilter_NoiseInducedHearingLoss value)
+        noiseInducedHearingLoss,
+    required TResult Function(HearingFilter_Tinnitus value) tinnitus,
+    required TResult Function(HearingFilter_Hyperacusis value) hyperacusis,
+    required TResult Function(HearingFilter_Misophonia value) misophonia,
+    required TResult Function(HearingFilter_Paracusis value) paracusis,
+    required TResult Function(HearingFilter_Amusia value) amusia,
+    required TResult Function(HearingFilter_Dysmelodia value) dysmelodia,
+    required TResult Function(HearingFilter_PitchShift value) pitchShift,
+    required TResult Function(HearingFilter_Diplacusis value) diplacusis,
+    required TResult Function(HearingFilter_AuditoryProcessingDisorder value)
+        auditoryProcessingDisorder,
+    required TResult Function(HearingFilter_Meniere value) meniere,
+    required TResult Function(HearingFilter_Labyrinthitis value) labyrinthitis,
+  }) {
+    return meniere(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult? Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult? Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult? Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult? Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult? Function(HearingFilter_Misophonia value)? misophonia,
+    TResult? Function(HearingFilter_Paracusis value)? paracusis,
+    TResult? Function(HearingFilter_Amusia value)? amusia,
+    TResult? Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult? Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult? Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult? Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult? Function(HearingFilter_Meniere value)? meniere,
+    TResult? Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+  }) {
+    return meniere?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult Function(HearingFilter_Misophonia value)? misophonia,
+    TResult Function(HearingFilter_Paracusis value)? paracusis,
+    TResult Function(HearingFilter_Amusia value)? amusia,
+    TResult Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult Function(HearingFilter_Meniere value)? meniere,
+    TResult Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (meniere != null) {
+      return meniere(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HearingFilter_Meniere extends HearingFilter {
+  const factory HearingFilter_Meniere() = _$HearingFilter_MeniereImpl;
+  const HearingFilter_Meniere._() : super._();
+}
+
+/// @nodoc
+abstract class _$$HearingFilter_LabyrinthitisImplCopyWith<$Res> {
+  factory _$$HearingFilter_LabyrinthitisImplCopyWith(
+          _$HearingFilter_LabyrinthitisImpl value,
+          $Res Function(_$HearingFilter_LabyrinthitisImpl) then) =
+      __$$HearingFilter_LabyrinthitisImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$HearingFilter_LabyrinthitisImplCopyWithImpl<$Res>
+    extends _$HearingFilterCopyWithImpl<$Res, _$HearingFilter_LabyrinthitisImpl>
+    implements _$$HearingFilter_LabyrinthitisImplCopyWith<$Res> {
+  __$$HearingFilter_LabyrinthitisImplCopyWithImpl(
+      _$HearingFilter_LabyrinthitisImpl _value,
+      $Res Function(_$HearingFilter_LabyrinthitisImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of HearingFilter
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$HearingFilter_LabyrinthitisImpl extends HearingFilter_Labyrinthitis {
+  const _$HearingFilter_LabyrinthitisImpl() : super._();
+
+  @override
+  String toString() {
+    return 'HearingFilter.labyrinthitis()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$HearingFilter_LabyrinthitisImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() hearingLoss,
+    required TResult Function(double freqHz) suddenHearingLoss,
+    required TResult Function() noiseInducedHearingLoss,
+    required TResult Function(double freqHz) tinnitus,
+    required TResult Function() hyperacusis,
+    required TResult Function(double freqHz) misophonia,
+    required TResult Function() paracusis,
+    required TResult Function() amusia,
+    required TResult Function() dysmelodia,
+    required TResult Function(double semitones) pitchShift,
+    required TResult Function() diplacusis,
+    required TResult Function() auditoryProcessingDisorder,
+    required TResult Function() meniere,
+    required TResult Function() labyrinthitis,
+  }) {
+    return labyrinthitis();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? hearingLoss,
+    TResult? Function(double freqHz)? suddenHearingLoss,
+    TResult? Function()? noiseInducedHearingLoss,
+    TResult? Function(double freqHz)? tinnitus,
+    TResult? Function()? hyperacusis,
+    TResult? Function(double freqHz)? misophonia,
+    TResult? Function()? paracusis,
+    TResult? Function()? amusia,
+    TResult? Function()? dysmelodia,
+    TResult? Function(double semitones)? pitchShift,
+    TResult? Function()? diplacusis,
+    TResult? Function()? auditoryProcessingDisorder,
+    TResult? Function()? meniere,
+    TResult? Function()? labyrinthitis,
+  }) {
+    return labyrinthitis?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? hearingLoss,
+    TResult Function(double freqHz)? suddenHearingLoss,
+    TResult Function()? noiseInducedHearingLoss,
+    TResult Function(double freqHz)? tinnitus,
+    TResult Function()? hyperacusis,
+    TResult Function(double freqHz)? misophonia,
+    TResult Function()? paracusis,
+    TResult Function()? amusia,
+    TResult Function()? dysmelodia,
+    TResult Function(double semitones)? pitchShift,
+    TResult Function()? diplacusis,
+    TResult Function()? auditoryProcessingDisorder,
+    TResult Function()? meniere,
+    TResult Function()? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (labyrinthitis != null) {
+      return labyrinthitis();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(HearingFilter_HearingLoss value) hearingLoss,
+    required TResult Function(HearingFilter_SuddenHearingLoss value)
+        suddenHearingLoss,
+    required TResult Function(HearingFilter_NoiseInducedHearingLoss value)
+        noiseInducedHearingLoss,
+    required TResult Function(HearingFilter_Tinnitus value) tinnitus,
+    required TResult Function(HearingFilter_Hyperacusis value) hyperacusis,
+    required TResult Function(HearingFilter_Misophonia value) misophonia,
+    required TResult Function(HearingFilter_Paracusis value) paracusis,
+    required TResult Function(HearingFilter_Amusia value) amusia,
+    required TResult Function(HearingFilter_Dysmelodia value) dysmelodia,
+    required TResult Function(HearingFilter_PitchShift value) pitchShift,
+    required TResult Function(HearingFilter_Diplacusis value) diplacusis,
+    required TResult Function(HearingFilter_AuditoryProcessingDisorder value)
+        auditoryProcessingDisorder,
+    required TResult Function(HearingFilter_Meniere value) meniere,
+    required TResult Function(HearingFilter_Labyrinthitis value) labyrinthitis,
+  }) {
+    return labyrinthitis(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult? Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult? Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult? Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult? Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult? Function(HearingFilter_Misophonia value)? misophonia,
+    TResult? Function(HearingFilter_Paracusis value)? paracusis,
+    TResult? Function(HearingFilter_Amusia value)? amusia,
+    TResult? Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult? Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult? Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult? Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult? Function(HearingFilter_Meniere value)? meniere,
+    TResult? Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+  }) {
+    return labyrinthitis?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(HearingFilter_HearingLoss value)? hearingLoss,
+    TResult Function(HearingFilter_SuddenHearingLoss value)? suddenHearingLoss,
+    TResult Function(HearingFilter_NoiseInducedHearingLoss value)?
+        noiseInducedHearingLoss,
+    TResult Function(HearingFilter_Tinnitus value)? tinnitus,
+    TResult Function(HearingFilter_Hyperacusis value)? hyperacusis,
+    TResult Function(HearingFilter_Misophonia value)? misophonia,
+    TResult Function(HearingFilter_Paracusis value)? paracusis,
+    TResult Function(HearingFilter_Amusia value)? amusia,
+    TResult Function(HearingFilter_Dysmelodia value)? dysmelodia,
+    TResult Function(HearingFilter_PitchShift value)? pitchShift,
+    TResult Function(HearingFilter_Diplacusis value)? diplacusis,
+    TResult Function(HearingFilter_AuditoryProcessingDisorder value)?
+        auditoryProcessingDisorder,
+    TResult Function(HearingFilter_Meniere value)? meniere,
+    TResult Function(HearingFilter_Labyrinthitis value)? labyrinthitis,
+    required TResult orElse(),
+  }) {
+    if (labyrinthitis != null) {
+      return labyrinthitis(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class HearingFilter_Labyrinthitis extends HearingFilter {
+  const factory HearingFilter_Labyrinthitis() =
+      _$HearingFilter_LabyrinthitisImpl;
+  const HearingFilter_Labyrinthitis._() : super._();
+}
+
+/// @nodoc
 mixin _$VisionFilter {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
