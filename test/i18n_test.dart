@@ -21,7 +21,9 @@ import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
+import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart';
+import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
 Map<String, dynamic> _readArb(String name) {
   final file = File('lib/l10n/$name');
@@ -129,6 +131,36 @@ void main() {
   });
 
   group('HomeScreen ロケール別描画', () {
+    // HomeScreen は体験プリセット集 (#19) が bridge の experiences() を呼ぶ。FFI 未
+    // ロードの flutter test では native を叩けないため、fixture で seam を差し替える。
+    setUp(() {
+      experiencesProvider = () => const [
+            Experience(
+              id: 'meniere',
+              vision: VisionFilter.vertigo(),
+              hearing: HearingFilter.meniere(),
+              urgency: Urgency.earlyConsultation,
+            ),
+            Experience(
+              id: 'bppv',
+              vision: VisionFilter.bppvRotation(),
+              urgency: Urgency.none,
+            ),
+            Experience(
+              id: 'vestibular_neuritis',
+              vision: VisionFilter.vestibularNeuritis(),
+              urgency: Urgency.emergency,
+            ),
+            Experience(
+              id: 'labyrinthitis',
+              vision: VisionFilter.vertigo(),
+              hearing: HearingFilter.labyrinthitis(),
+              urgency: Urgency.earlyConsultation,
+            ),
+          ];
+    });
+    tearDown(() => experiencesProvider = experiences);
+
     Future<void> pumpHome(WidgetTester tester, Locale locale) async {
       // HomeScreen は ListView で縦に長いため、全セクションが lazy build されるよう
       // 十分に高いビューポートにする（小さいと下のセクションが未生成で見つからない）。
@@ -195,7 +227,10 @@ void main() {
       state.select('glaucoma');
       await tester.pump();
 
-      expect(find.text(en.consultEmergency), findsOneWidget);
+      // glaucoma 選択で param panel に緊急受診メッセージが出る。加えて体験プリセット
+      // 集 (#19) の vestibular_neuritis（emergency）も常時同じメッセージを表示するため
+      // 計 2 件になる。少なくとも param panel 分が出ていることを保証する。
+      expect(find.text(en.consultEmergency), findsNWidgets(2));
     });
   });
 }
