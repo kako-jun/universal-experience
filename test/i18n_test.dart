@@ -227,9 +227,9 @@ void main() {
       state.select('glaucoma');
       await tester.pump();
 
-      // glaucoma 選択で param panel に緊急受診メッセージが出る。加えて体験プリセット
-      // 集 (#19) の vestibular_neuritis（emergency）も常時同じメッセージを表示するため
-      // 計 2 件になる。少なくとも param panel 分が出ていることを保証する。
+      // glaucoma 選択で param panel に緊急受診メッセージが 1 件。加えて体験プリセット
+      // 集 (#19) の vestibular_neuritis（emergency）が常時同じメッセージを表示するため
+      // 厳密に計 2 件。プリセットが落ちたら 1 件になり検出できる（exact count）。
       expect(find.text(en.consultEmergency), findsNWidgets(2));
     });
   });

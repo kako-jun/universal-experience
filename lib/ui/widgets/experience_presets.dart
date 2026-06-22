@@ -16,6 +16,10 @@ import '../../src/rust/api/sensus_bridge.dart';
 typedef ExperiencesProvider = List<Experience> Function();
 
 /// 体験プリセット供給源（テストで差し替え可能）。既定は bridge の [experiences]。
+///
+/// production からは既定値（実 bridge）をそのまま使う。差し替えは widget test の
+/// fixture 注入専用なので、外部からの書き換えを抑止するため `@visibleForTesting`。
+@visibleForTesting
 ExperiencesProvider experiencesProvider = experiences;
 
 /// 体験プリセット集 (#19)。
