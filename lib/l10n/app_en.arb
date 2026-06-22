@@ -1,0 +1,275 @@
+{
+  "@@locale": "en",
+
+  "appTitle": "Universal Experience",
+  "@appTitle": {
+    "description": "Application name, shown in the title bar, AppBar and About dialog."
+  },
+
+  "headerTagline": "Every sense, for everyone.",
+  "@headerTagline": {
+    "description": "Hero headline on the home screen."
+  },
+  "headerSubtitle": "Experience every perspective, understand every challenge.",
+  "@headerSubtitle": {
+    "description": "Hero sub-headline on the home screen."
+  },
+
+  "aboutTooltip": "About",
+  "@aboutTooltip": {
+    "description": "Tooltip for the About icon button in the AppBar."
+  },
+  "aboutBody": "Universal Experience is an accessibility simulation tool that helps people understand and empathize with a range of disabilities.",
+  "@aboutBody": {
+    "description": "First paragraph of the About dialog."
+  },
+  "aboutPhases": "Phase 1: Color vision deficiency simulation\nPhase 2: Hearing impairment simulation (coming soon)\nPhase 3: Further disability simulations (planned)",
+  "@aboutPhases": {
+    "description": "Roadmap paragraph of the About dialog. Newline-separated phase list."
+  },
+
+  "themeTooltipSystem": "Theme: System",
+  "@themeTooltipSystem": {
+    "description": "Theme toggle tooltip when following the system theme."
+  },
+  "themeTooltipLight": "Theme: Light",
+  "@themeTooltipLight": {
+    "description": "Theme toggle tooltip when the light theme is active."
+  },
+  "themeTooltipDark": "Theme: Dark",
+  "@themeTooltipDark": {
+    "description": "Theme toggle tooltip when the dark theme is active."
+  },
+  "themeTooltipHint": "{themeLabel} (tap to change)",
+  "@themeTooltipHint": {
+    "description": "Wraps the theme tooltip with a hint that tapping cycles the theme.",
+    "placeholders": {
+      "themeLabel": { "type": "String" }
+    }
+  },
+
+  "colorVisionSectionTitle": "Color Vision Simulation",
+  "@colorVisionSectionTitle": {
+    "description": "Title of the color-vision filter card."
+  },
+  "colorVisionSectionNote": "How the filter looks is computed by sensus (the source of truth for the color-vision algorithm). Live application to the screen will follow once the screen-capture path is implemented.",
+  "@colorVisionSectionNote": {
+    "description": "Explanatory note under the color-vision filter card."
+  },
+
+  "intensitySectionTitle": "Filter Intensity",
+  "@intensitySectionTitle": {
+    "description": "Title of the intensity-slider card."
+  },
+  "intensityValue": "Intensity: {percent}%",
+  "@intensityValue": {
+    "description": "Current filter intensity as a percentage.",
+    "placeholders": {
+      "percent": { "type": "int" }
+    }
+  },
+  "intensityActive": "Active",
+  "@intensityActive": {
+    "description": "Status label when a filter is currently active."
+  },
+  "intensityInactive": "Inactive",
+  "@intensityInactive": {
+    "description": "Status label when a filter is selected but not active."
+  },
+  "intensityHint": "Select a filter to adjust its intensity.",
+  "@intensityHint": {
+    "description": "Hint shown when no filter is selected so the slider is disabled."
+  },
+
+  "clearFilter": "Clear filter",
+  "@clearFilter": {
+    "description": "Button that clears the selected color-vision filter."
+  },
+  "clear": "Clear",
+  "@clear": {
+    "description": "Button that clears the selected advanced (catalog) filter."
+  },
+
+  "previewSectionTitle": "Before / After",
+  "@previewSectionTitle": {
+    "description": "Title of the before/after preview card."
+  },
+  "previewUnsupportedNote": "Live rendering for this filter is not implemented yet — only protanopia and protanomaly are drawn today.",
+  "@previewUnsupportedNote": {
+    "description": "Note shown when the selected filter has no live renderer yet."
+  },
+  "previewPaneOriginal": "Original",
+  "@previewPaneOriginal": {
+    "description": "Label of the 'before' (unfiltered) preview pane."
+  },
+  "previewPreparing": "Preparing preview…",
+  "@previewPreparing": {
+    "description": "Placeholder while the first sample preview image is generated."
+  },
+  "previewComingSoon": "Rendering coming soon",
+  "@previewComingSoon": {
+    "description": "Placeholder in the 'after' pane for filters without a live renderer."
+  },
+
+  "advancedSectionTitle": "Advanced (all sensus filters)",
+  "@advancedSectionTitle": {
+    "description": "Title of the advanced section listing all 30 sensus filters."
+  },
+  "advancedSectionNote": "Pick from all 30 ways of seeing that sensus exposes, grouped by category, and adjust their parameters. Real/live rendering is handled in separate issues.",
+  "@advancedSectionNote": {
+    "description": "Explanatory note under the advanced section."
+  },
+  "advancedParamPanelHint": "Select a filter to adjust its parameters.",
+  "@advancedParamPanelHint": {
+    "description": "Hint shown in the parameter panel when no advanced filter is selected."
+  },
+  "randomize": "Randomize",
+  "@randomize": {
+    "description": "Button that regenerates a random seed for a seed parameter."
+  },
+
+  "prevalenceLabel": "Prevalence: {value}",
+  "@prevalenceLabel": {
+    "description": "Prevalence line shown for the selected color-vision type.",
+    "placeholders": {
+      "value": { "type": "String" }
+    }
+  },
+  "strengthLabel": "Strength: {percent}%",
+  "@strengthLabel": {
+    "description": "Strength of the selected advanced filter as a percentage.",
+    "placeholders": {
+      "percent": { "type": "int" }
+    }
+  },
+  "urgencyLabel": "Urgency: {level}",
+  "@urgencyLabel": {
+    "description": "Urgency line shown for the selected advanced filter.",
+    "placeholders": {
+      "level": { "type": "String" }
+    }
+  },
+
+  "consultEarly": "If this is how you see, consider getting your eyes checked.",
+  "@consultEarly": {
+    "description": "Gentle prompt to seek an unhurried eye exam for medium-urgency conditions. Must not alarm or over-promise."
+  },
+  "consultEmergency": "Sudden changes in vision can need prompt medical attention.",
+  "@consultEmergency": {
+    "description": "Prompt to seek timely care for high-urgency conditions. Must be accurate and not alarmist."
+  },
+
+  "trayTooltip": "Universal Experience",
+  "@trayTooltip": {
+    "description": "Tray icon tooltip."
+  },
+  "trayShowLoupe": "Show loupe window",
+  "@trayShowLoupe": {
+    "description": "Tray menu item that shows the loupe (main) window."
+  },
+  "trayHideLoupe": "Hide loupe window",
+  "@trayHideLoupe": {
+    "description": "Tray menu item that hides the loupe (main) window."
+  },
+  "trayClearFilter": "Clear filter",
+  "@trayClearFilter": {
+    "description": "Tray menu item that clears the active color-vision filter."
+  },
+  "trayOpenSettings": "Open settings…",
+  "@trayOpenSettings": {
+    "description": "Tray menu item that shows the main window and opens settings."
+  },
+  "trayQuit": "Quit",
+  "@trayQuit": {
+    "description": "Tray menu item that quits the application."
+  },
+
+  "filterNormalVision": "Normal vision",
+  "@filterNormalVision": {
+    "description": "Color-vision type: no deficiency."
+  },
+  "filterProtanopia": "Protanopia",
+  "filterProtanopiaDesc": "Red-green color blindness caused by absent L-cones (red receptors).",
+  "filterDeuteranopia": "Deuteranopia",
+  "filterDeuteranopiaDesc": "Red-green color blindness caused by absent M-cones (green receptors).",
+  "filterTritanopia": "Tritanopia",
+  "filterTritanopiaDesc": "Blue-yellow color blindness caused by absent S-cones (blue receptors).",
+  "filterAchromatopsia": "Achromatopsia",
+  "filterAchromatopsiaDesc": "Complete color blindness with no functioning cone cells.",
+  "filterProtanomaly": "Protanomaly",
+  "filterProtanomalyDesc": "Partial red-green deficiency with weakened L-cones.",
+  "filterDeuteranomaly": "Deuteranomaly",
+  "filterDeuteranomalyDesc": "Partial red-green deficiency with weakened M-cones (the most common form).",
+  "filterTritanomaly": "Tritanomaly",
+  "filterTritanomalyDesc": "Partial blue-yellow deficiency with weakened S-cones.",
+  "filterNormalVisionDesc": "Normal color vision with no simulation applied.",
+
+  "filterTetrachromacy": "Tetrachromacy",
+  "filterMyopia": "Myopia",
+  "filterHyperopia": "Hyperopia",
+  "filterPresbyopia": "Presbyopia",
+  "filterAstigmatism": "Astigmatism",
+  "filterGlaucoma": "Glaucoma",
+  "filterMacularDegeneration": "Macular degeneration",
+  "filterHemianopia": "Hemianopia",
+  "filterTunnelVision": "Tunnel vision",
+  "filterCataract": "Cataract",
+  "filterFloaters": "Floaters",
+  "filterPhotophobia": "Photophobia",
+  "filterNightBlindness": "Night blindness",
+  "filterStarbursts": "Starbursts",
+  "filterVertigo": "Vertigo",
+  "filterBppvRotation": "BPPV rotation",
+  "filterVestibularNeuritis": "Vestibular neuritis",
+  "filterNystagmus": "Nystagmus",
+  "filterEyeStrain": "Eye strain",
+  "filterDryEye": "Dry eye",
+  "filterContrastSensitivity": "Contrast sensitivity loss",
+  "filterDiplopia": "Diplopia",
+  "filterMetamorphopsia": "Metamorphopsia",
+  "filterDetailLoss": "Detail loss",
+  "filterTeichopsia": "Teichopsia",
+  "filterFlickeringStars": "Flickering stars",
+
+  "categoryColorVision": "Color vision",
+  "categoryRefraction": "Refraction",
+  "categoryVisualField": "Visual field",
+  "categoryLightTransparency": "Light & transparency",
+  "categoryVestibular": "Vestibular & dizziness",
+  "categoryEyeStrain": "Eye strain",
+  "categoryOther": "Other",
+
+  "urgencyNone": "None",
+  "urgencyLow": "Low",
+  "urgencyMedium": "Medium",
+  "urgencyHigh": "High",
+
+  "paramAstigmatismAxisDeg": "Axis (deg)",
+  "paramGlaucomaMode": "Scotoma mode",
+  "paramGlaucomaModeVignette": "Vignette (peripheral)",
+  "paramGlaucomaModeArcuateSuperior": "Arcuate (superior)",
+  "paramGlaucomaModeArcuateInferior": "Arcuate (inferior)",
+  "paramGlaucomaModeBiarcuate": "Bi-arcuate (advanced)",
+  "paramHemianopiaSide": "Lost field",
+  "paramHemianopiaSideLeft": "Left field lost",
+  "paramHemianopiaSideRight": "Right field lost",
+  "paramCataractSeed": "Glare seed",
+  "paramFloatersSeed": "Seed",
+  "paramFloatersDensity": "Density",
+  "paramFloatersSize": "Size",
+  "paramFloatersGazeX": "Gaze X",
+  "paramFloatersGazeY": "Gaze Y",
+  "paramStarburstsNumRays": "Ray count",
+  "paramStarburstsRayLengthRatio": "Ray length",
+  "paramStarburstsThreshold": "Threshold",
+  "paramStarburstsDispersion": "Dispersion",
+  "paramNystagmusAmplitude": "Amplitude",
+  "paramNystagmusDirectionDeg": "Direction (deg)",
+  "paramDiplopiaOffsetX": "Ghost offset X",
+  "paramDiplopiaOffsetY": "Ghost offset Y",
+  "paramDiplopiaGhostStrength": "Ghost strength",
+  "paramMetamorphopsiaFreq": "Frequency",
+  "paramMetamorphopsiaSeed": "Distortion seed",
+  "paramDetailLossCellSize": "Cell size (px)",
+  "paramFlickeringStarsSeed": "Seed"
+}

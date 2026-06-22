@@ -12,6 +12,13 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # i18n (#18). flutter_localizations は GlobalMaterial/Widgets/Cupertino の
+  # ローカライズを供給し、intl は flutter gen-l10n が生成する AppLocalizations の
+  # ランタイム依存。バージョンは Flutter SDK 同梱版に固定する（pub get が解決）。
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.2
+
   # State Management
   provider: ^6.1.1
 
@@ -44,6 +51,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # i18n (#18). flutter gen-l10n が ARB（lib/l10n/*.arb）から AppLocalizations を
+  # 生成する。設定は l10n.yaml。生成物（.dart_tool 配下）はコミットしない。
+  generate: true
 
   assets:
     - assets/images/
