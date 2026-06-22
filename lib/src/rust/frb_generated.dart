@@ -68,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => -166308027;
+  int get rustContentHash => -326563465;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -85,6 +85,8 @@ abstract class RustLibApi extends BaseApi {
       required int width,
       required int height,
       required double strength});
+
+  List<Experience> crateApiSensusBridgeExperiences();
 
   String crateApiSensusBridgeVisionShaderGlsl({required VisionFilter filter});
 
@@ -138,6 +140,28 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(
         debugName: 'apply_vision_cpu_rgba8',
         argNames: ['filter', 'rgba8', 'width', 'height', 'strength'],
+      );
+
+  @override
+  List<Experience> crateApiSensusBridgeExperiences() {
+    return handler.executeSync(SyncTask(
+      callFfi: () {
+        return wire.wire__crate__api__sensus_bridge__experiences();
+      },
+      codec: DcoCodec(
+        decodeSuccessData: dco_decode_list_experience,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateApiSensusBridgeExperiencesConstMeta,
+      argValues: [],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiSensusBridgeExperiencesConstMeta =>
+      const TaskConstMeta(
+        debugName: 'experiences',
+        argNames: [],
       );
 
   @override
@@ -228,15 +252,80 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  HearingFilter dco_decode_box_autoadd_hearing_filter(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_hearing_filter(raw);
+  }
+
+  @protected
   VisionFilter dco_decode_box_autoadd_vision_filter(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_vision_filter(raw);
   }
 
   @protected
+  Experience dco_decode_experience(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return Experience(
+      id: dco_decode_String(arr[0]),
+      vision: dco_decode_opt_box_autoadd_vision_filter(arr[1]),
+      hearing: dco_decode_opt_box_autoadd_hearing_filter(arr[2]),
+      urgency: dco_decode_urgency(arr[3]),
+    );
+  }
+
+  @protected
   double dco_decode_f_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as double;
+  }
+
+  @protected
+  HearingFilter dco_decode_hearing_filter(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    switch (raw[0]) {
+      case 0:
+        return const HearingFilter_HearingLoss();
+      case 1:
+        return HearingFilter_SuddenHearingLoss(
+          freqHz: dco_decode_f_32(raw[1]),
+        );
+      case 2:
+        return const HearingFilter_NoiseInducedHearingLoss();
+      case 3:
+        return HearingFilter_Tinnitus(
+          freqHz: dco_decode_f_32(raw[1]),
+        );
+      case 4:
+        return const HearingFilter_Hyperacusis();
+      case 5:
+        return HearingFilter_Misophonia(
+          freqHz: dco_decode_f_32(raw[1]),
+        );
+      case 6:
+        return const HearingFilter_Paracusis();
+      case 7:
+        return const HearingFilter_Amusia();
+      case 8:
+        return const HearingFilter_Dysmelodia();
+      case 9:
+        return HearingFilter_PitchShift(
+          semitones: dco_decode_f_32(raw[1]),
+        );
+      case 10:
+        return const HearingFilter_Diplacusis();
+      case 11:
+        return const HearingFilter_AuditoryProcessingDisorder();
+      case 12:
+        return const HearingFilter_Meniere();
+      case 13:
+        return const HearingFilter_Labyrinthitis();
+      default:
+        throw Exception('unreachable');
+    }
   }
 
   @protected
@@ -249,6 +338,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   List<String> dco_decode_list_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_String).toList();
+  }
+
+  @protected
+  List<Experience> dco_decode_list_experience(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_experience).toList();
   }
 
   @protected
@@ -267,6 +362,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as Uint8List;
+  }
+
+  @protected
+  HearingFilter? dco_decode_opt_box_autoadd_hearing_filter(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_hearing_filter(raw);
+  }
+
+  @protected
+  VisionFilter? dco_decode_opt_box_autoadd_vision_filter(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_vision_filter(raw);
   }
 
   @protected
@@ -291,6 +398,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void dco_decode_unit(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return;
+  }
+
+  @protected
+  Urgency dco_decode_urgency(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return Urgency.values[raw as int];
   }
 
   @protected
@@ -409,6 +522,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  HearingFilter sse_decode_box_autoadd_hearing_filter(
+      SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_hearing_filter(deserializer));
+  }
+
+  @protected
   VisionFilter sse_decode_box_autoadd_vision_filter(
       SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -416,9 +536,66 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  Experience sse_decode_experience(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_vision = sse_decode_opt_box_autoadd_vision_filter(deserializer);
+    var var_hearing = sse_decode_opt_box_autoadd_hearing_filter(deserializer);
+    var var_urgency = sse_decode_urgency(deserializer);
+    return Experience(
+        id: var_id,
+        vision: var_vision,
+        hearing: var_hearing,
+        urgency: var_urgency);
+  }
+
+  @protected
   double sse_decode_f_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getFloat32();
+  }
+
+  @protected
+  HearingFilter sse_decode_hearing_filter(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var tag_ = sse_decode_i_32(deserializer);
+    switch (tag_) {
+      case 0:
+        return const HearingFilter_HearingLoss();
+      case 1:
+        var var_freqHz = sse_decode_f_32(deserializer);
+        return HearingFilter_SuddenHearingLoss(freqHz: var_freqHz);
+      case 2:
+        return const HearingFilter_NoiseInducedHearingLoss();
+      case 3:
+        var var_freqHz = sse_decode_f_32(deserializer);
+        return HearingFilter_Tinnitus(freqHz: var_freqHz);
+      case 4:
+        return const HearingFilter_Hyperacusis();
+      case 5:
+        var var_freqHz = sse_decode_f_32(deserializer);
+        return HearingFilter_Misophonia(freqHz: var_freqHz);
+      case 6:
+        return const HearingFilter_Paracusis();
+      case 7:
+        return const HearingFilter_Amusia();
+      case 8:
+        return const HearingFilter_Dysmelodia();
+      case 9:
+        var var_semitones = sse_decode_f_32(deserializer);
+        return HearingFilter_PitchShift(semitones: var_semitones);
+      case 10:
+        return const HearingFilter_Diplacusis();
+      case 11:
+        return const HearingFilter_AuditoryProcessingDisorder();
+      case 12:
+        return const HearingFilter_Meniere();
+      case 13:
+        return const HearingFilter_Labyrinthitis();
+      default:
+        throw UnimplementedError('');
+    }
   }
 
   @protected
@@ -435,6 +612,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <String>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_String(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<Experience> sse_decode_list_experience(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <Experience>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_experience(deserializer));
     }
     return ans_;
   }
@@ -461,6 +650,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  HearingFilter? sse_decode_opt_box_autoadd_hearing_filter(
+      SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_hearing_filter(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  VisionFilter? sse_decode_opt_box_autoadd_vision_filter(
+      SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_vision_filter(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   int sse_decode_u_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint32();
@@ -481,6 +694,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @protected
   void sse_decode_unit(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+  }
+
+  @protected
+  Urgency sse_decode_urgency(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return Urgency.values[inner];
   }
 
   @protected
@@ -634,6 +854,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int cst_encode_urgency(Urgency raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return cst_encode_i_32(raw.index);
+  }
+
+  @protected
   int cst_encode_vision_glaucoma_mode(VisionGlaucomaMode raw) {
     // Codec=Cst (C-struct based), see doc to use other codecs
     return cst_encode_i_32(raw.index);
@@ -646,6 +872,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_hearing_filter(
+      HearingFilter self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_hearing_filter(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_vision_filter(
       VisionFilter self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -653,9 +886,57 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_experience(Experience self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_opt_box_autoadd_vision_filter(self.vision, serializer);
+    sse_encode_opt_box_autoadd_hearing_filter(self.hearing, serializer);
+    sse_encode_urgency(self.urgency, serializer);
+  }
+
+  @protected
   void sse_encode_f_32(double self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putFloat32(self);
+  }
+
+  @protected
+  void sse_encode_hearing_filter(HearingFilter self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    switch (self) {
+      case HearingFilter_HearingLoss():
+        sse_encode_i_32(0, serializer);
+      case HearingFilter_SuddenHearingLoss(freqHz: final freqHz):
+        sse_encode_i_32(1, serializer);
+        sse_encode_f_32(freqHz, serializer);
+      case HearingFilter_NoiseInducedHearingLoss():
+        sse_encode_i_32(2, serializer);
+      case HearingFilter_Tinnitus(freqHz: final freqHz):
+        sse_encode_i_32(3, serializer);
+        sse_encode_f_32(freqHz, serializer);
+      case HearingFilter_Hyperacusis():
+        sse_encode_i_32(4, serializer);
+      case HearingFilter_Misophonia(freqHz: final freqHz):
+        sse_encode_i_32(5, serializer);
+        sse_encode_f_32(freqHz, serializer);
+      case HearingFilter_Paracusis():
+        sse_encode_i_32(6, serializer);
+      case HearingFilter_Amusia():
+        sse_encode_i_32(7, serializer);
+      case HearingFilter_Dysmelodia():
+        sse_encode_i_32(8, serializer);
+      case HearingFilter_PitchShift(semitones: final semitones):
+        sse_encode_i_32(9, serializer);
+        sse_encode_f_32(semitones, serializer);
+      case HearingFilter_Diplacusis():
+        sse_encode_i_32(10, serializer);
+      case HearingFilter_AuditoryProcessingDisorder():
+        sse_encode_i_32(11, serializer);
+      case HearingFilter_Meniere():
+        sse_encode_i_32(12, serializer);
+      case HearingFilter_Labyrinthitis():
+        sse_encode_i_32(13, serializer);
+    }
   }
 
   @protected
@@ -670,6 +951,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_String(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_experience(
+      List<Experience> self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_experience(item, serializer);
     }
   }
 
@@ -699,6 +990,28 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_hearing_filter(
+      HearingFilter? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_hearing_filter(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_vision_filter(
+      VisionFilter? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_vision_filter(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_u_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint32(self);
@@ -719,6 +1032,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @protected
   void sse_encode_unit(void self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+  }
+
+  @protected
+  void sse_encode_urgency(Urgency self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
   }
 
   @protected

@@ -37,7 +37,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueNom,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.11.1";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -166308027;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -326563465;
 
 // Section: executor
 
@@ -72,6 +72,22 @@ fn wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8_impl(
                     api_height,
                     api_strength,
                 )?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__sensus_bridge__experiences_impl(
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::DcoCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "experiences",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            transform_result_dco::<_, _, ()>((move || {
+                let output_ok = Result::<_, ()>::Ok(crate::api::sensus_bridge::experiences())?;
                 Ok(output_ok)
             })())
         },
@@ -181,6 +197,17 @@ impl CstDecode<u8> for u8 {
         self
     }
 }
+impl CstDecode<crate::api::sensus_bridge::Urgency> for i32 {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    fn cst_decode(self) -> crate::api::sensus_bridge::Urgency {
+        match self {
+            0 => crate::api::sensus_bridge::Urgency::None,
+            1 => crate::api::sensus_bridge::Urgency::EarlyConsultation,
+            2 => crate::api::sensus_bridge::Urgency::Emergency,
+            _ => unreachable!("Invalid variant for Urgency: {}", self),
+        }
+    }
+}
 impl CstDecode<crate::api::sensus_bridge::VisionGlaucomaMode> for i32 {
     // Codec=Cst (C-struct based), see doc to use other codecs
     fn cst_decode(self) -> crate::api::sensus_bridge::VisionGlaucomaMode {
@@ -201,10 +228,94 @@ impl SseDecode for String {
     }
 }
 
+impl SseDecode for crate::api::sensus_bridge::Experience {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_vision =
+            <Option<crate::api::sensus_bridge::VisionFilter>>::sse_decode(deserializer);
+        let mut var_hearing =
+            <Option<crate::api::sensus_bridge::HearingFilter>>::sse_decode(deserializer);
+        let mut var_urgency = <crate::api::sensus_bridge::Urgency>::sse_decode(deserializer);
+        return crate::api::sensus_bridge::Experience {
+            id: var_id,
+            vision: var_vision,
+            hearing: var_hearing,
+            urgency: var_urgency,
+        };
+    }
+}
+
 impl SseDecode for f32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         deserializer.cursor.read_f32::<NativeEndian>().unwrap()
+    }
+}
+
+impl SseDecode for crate::api::sensus_bridge::HearingFilter {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut tag_ = <i32>::sse_decode(deserializer);
+        match tag_ {
+            0 => {
+                return crate::api::sensus_bridge::HearingFilter::HearingLoss;
+            }
+            1 => {
+                let mut var_freqHz = <f32>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::HearingFilter::SuddenHearingLoss {
+                    freq_hz: var_freqHz,
+                };
+            }
+            2 => {
+                return crate::api::sensus_bridge::HearingFilter::NoiseInducedHearingLoss;
+            }
+            3 => {
+                let mut var_freqHz = <f32>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::HearingFilter::Tinnitus {
+                    freq_hz: var_freqHz,
+                };
+            }
+            4 => {
+                return crate::api::sensus_bridge::HearingFilter::Hyperacusis;
+            }
+            5 => {
+                let mut var_freqHz = <f32>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::HearingFilter::Misophonia {
+                    freq_hz: var_freqHz,
+                };
+            }
+            6 => {
+                return crate::api::sensus_bridge::HearingFilter::Paracusis;
+            }
+            7 => {
+                return crate::api::sensus_bridge::HearingFilter::Amusia;
+            }
+            8 => {
+                return crate::api::sensus_bridge::HearingFilter::Dysmelodia;
+            }
+            9 => {
+                let mut var_semitones = <f32>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::HearingFilter::PitchShift {
+                    semitones: var_semitones,
+                };
+            }
+            10 => {
+                return crate::api::sensus_bridge::HearingFilter::Diplacusis;
+            }
+            11 => {
+                return crate::api::sensus_bridge::HearingFilter::AuditoryProcessingDisorder;
+            }
+            12 => {
+                return crate::api::sensus_bridge::HearingFilter::Meniere;
+            }
+            13 => {
+                return crate::api::sensus_bridge::HearingFilter::Labyrinthitis;
+            }
+            _ => {
+                unimplemented!("");
+            }
+        }
     }
 }
 
@@ -222,6 +333,20 @@ impl SseDecode for Vec<String> {
         let mut ans_ = vec![];
         for idx_ in 0..len_ {
             ans_.push(<String>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::sensus_bridge::Experience> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = vec![];
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::sensus_bridge::Experience>::sse_decode(
+                deserializer,
+            ));
         }
         return ans_;
     }
@@ -251,6 +376,32 @@ impl SseDecode for Vec<u8> {
     }
 }
 
+impl SseDecode for Option<crate::api::sensus_bridge::HearingFilter> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::sensus_bridge::HearingFilter>::sse_decode(
+                deserializer,
+            ));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::api::sensus_bridge::VisionFilter> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::sensus_bridge::VisionFilter>::sse_decode(
+                deserializer,
+            ));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for u32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -275,6 +426,19 @@ impl SseDecode for u8 {
 impl SseDecode for () {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {}
+}
+
+impl SseDecode for crate::api::sensus_bridge::Urgency {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::sensus_bridge::Urgency::None,
+            1 => crate::api::sensus_bridge::Urgency::EarlyConsultation,
+            2 => crate::api::sensus_bridge::Urgency::Emergency,
+            _ => unreachable!("Invalid variant for Urgency: {}", inner),
+        };
+    }
 }
 
 impl SseDecode for crate::api::sensus_bridge::VisionFilter {
@@ -476,6 +640,98 @@ fn pde_ffi_dispatcher_sync_impl(
 // Section: rust2dart
 
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::sensus_bridge::Experience {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.vision.into_into_dart().into_dart(),
+            self.hearing.into_into_dart().into_dart(),
+            self.urgency.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::sensus_bridge::Experience
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::sensus_bridge::Experience>
+    for crate::api::sensus_bridge::Experience
+{
+    fn into_into_dart(self) -> crate::api::sensus_bridge::Experience {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::sensus_bridge::HearingFilter {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            crate::api::sensus_bridge::HearingFilter::HearingLoss => [0.into_dart()].into_dart(),
+            crate::api::sensus_bridge::HearingFilter::SuddenHearingLoss { freq_hz } => {
+                [1.into_dart(), freq_hz.into_into_dart().into_dart()].into_dart()
+            }
+            crate::api::sensus_bridge::HearingFilter::NoiseInducedHearingLoss => {
+                [2.into_dart()].into_dart()
+            }
+            crate::api::sensus_bridge::HearingFilter::Tinnitus { freq_hz } => {
+                [3.into_dart(), freq_hz.into_into_dart().into_dart()].into_dart()
+            }
+            crate::api::sensus_bridge::HearingFilter::Hyperacusis => [4.into_dart()].into_dart(),
+            crate::api::sensus_bridge::HearingFilter::Misophonia { freq_hz } => {
+                [5.into_dart(), freq_hz.into_into_dart().into_dart()].into_dart()
+            }
+            crate::api::sensus_bridge::HearingFilter::Paracusis => [6.into_dart()].into_dart(),
+            crate::api::sensus_bridge::HearingFilter::Amusia => [7.into_dart()].into_dart(),
+            crate::api::sensus_bridge::HearingFilter::Dysmelodia => [8.into_dart()].into_dart(),
+            crate::api::sensus_bridge::HearingFilter::PitchShift { semitones } => {
+                [9.into_dart(), semitones.into_into_dart().into_dart()].into_dart()
+            }
+            crate::api::sensus_bridge::HearingFilter::Diplacusis => [10.into_dart()].into_dart(),
+            crate::api::sensus_bridge::HearingFilter::AuditoryProcessingDisorder => {
+                [11.into_dart()].into_dart()
+            }
+            crate::api::sensus_bridge::HearingFilter::Meniere => [12.into_dart()].into_dart(),
+            crate::api::sensus_bridge::HearingFilter::Labyrinthitis => [13.into_dart()].into_dart(),
+            _ => {
+                unimplemented!("");
+            }
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::sensus_bridge::HearingFilter
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::sensus_bridge::HearingFilter>
+    for crate::api::sensus_bridge::HearingFilter
+{
+    fn into_into_dart(self) -> crate::api::sensus_bridge::HearingFilter {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::sensus_bridge::Urgency {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::None => 0.into_dart(),
+            Self::EarlyConsultation => 1.into_dart(),
+            Self::Emergency => 2.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::sensus_bridge::Urgency
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::sensus_bridge::Urgency>
+    for crate::api::sensus_bridge::Urgency
+{
+    fn into_into_dart(self) -> crate::api::sensus_bridge::Urgency {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::sensus_bridge::VisionFilter {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         match self {
@@ -624,10 +880,77 @@ impl SseEncode for String {
     }
 }
 
+impl SseEncode for crate::api::sensus_bridge::Experience {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <Option<crate::api::sensus_bridge::VisionFilter>>::sse_encode(self.vision, serializer);
+        <Option<crate::api::sensus_bridge::HearingFilter>>::sse_encode(self.hearing, serializer);
+        <crate::api::sensus_bridge::Urgency>::sse_encode(self.urgency, serializer);
+    }
+}
+
 impl SseEncode for f32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         serializer.cursor.write_f32::<NativeEndian>(self).unwrap();
+    }
+}
+
+impl SseEncode for crate::api::sensus_bridge::HearingFilter {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        match self {
+            crate::api::sensus_bridge::HearingFilter::HearingLoss => {
+                <i32>::sse_encode(0, serializer);
+            }
+            crate::api::sensus_bridge::HearingFilter::SuddenHearingLoss { freq_hz } => {
+                <i32>::sse_encode(1, serializer);
+                <f32>::sse_encode(freq_hz, serializer);
+            }
+            crate::api::sensus_bridge::HearingFilter::NoiseInducedHearingLoss => {
+                <i32>::sse_encode(2, serializer);
+            }
+            crate::api::sensus_bridge::HearingFilter::Tinnitus { freq_hz } => {
+                <i32>::sse_encode(3, serializer);
+                <f32>::sse_encode(freq_hz, serializer);
+            }
+            crate::api::sensus_bridge::HearingFilter::Hyperacusis => {
+                <i32>::sse_encode(4, serializer);
+            }
+            crate::api::sensus_bridge::HearingFilter::Misophonia { freq_hz } => {
+                <i32>::sse_encode(5, serializer);
+                <f32>::sse_encode(freq_hz, serializer);
+            }
+            crate::api::sensus_bridge::HearingFilter::Paracusis => {
+                <i32>::sse_encode(6, serializer);
+            }
+            crate::api::sensus_bridge::HearingFilter::Amusia => {
+                <i32>::sse_encode(7, serializer);
+            }
+            crate::api::sensus_bridge::HearingFilter::Dysmelodia => {
+                <i32>::sse_encode(8, serializer);
+            }
+            crate::api::sensus_bridge::HearingFilter::PitchShift { semitones } => {
+                <i32>::sse_encode(9, serializer);
+                <f32>::sse_encode(semitones, serializer);
+            }
+            crate::api::sensus_bridge::HearingFilter::Diplacusis => {
+                <i32>::sse_encode(10, serializer);
+            }
+            crate::api::sensus_bridge::HearingFilter::AuditoryProcessingDisorder => {
+                <i32>::sse_encode(11, serializer);
+            }
+            crate::api::sensus_bridge::HearingFilter::Meniere => {
+                <i32>::sse_encode(12, serializer);
+            }
+            crate::api::sensus_bridge::HearingFilter::Labyrinthitis => {
+                <i32>::sse_encode(13, serializer);
+            }
+            _ => {
+                unimplemented!("");
+            }
+        }
     }
 }
 
@@ -648,6 +971,16 @@ impl SseEncode for Vec<String> {
     }
 }
 
+impl SseEncode for Vec<crate::api::sensus_bridge::Experience> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::sensus_bridge::Experience>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<f32> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -664,6 +997,26 @@ impl SseEncode for Vec<u8> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <u8>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::sensus_bridge::HearingFilter> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::sensus_bridge::HearingFilter>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::sensus_bridge::VisionFilter> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::sensus_bridge::VisionFilter>::sse_encode(value, serializer);
         }
     }
 }
@@ -692,6 +1045,23 @@ impl SseEncode for u8 {
 impl SseEncode for () {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {}
+}
+
+impl SseEncode for crate::api::sensus_bridge::Urgency {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::sensus_bridge::Urgency::None => 0,
+                crate::api::sensus_bridge::Urgency::EarlyConsultation => 1,
+                crate::api::sensus_bridge::Urgency::Emergency => 2,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
 }
 
 impl SseEncode for crate::api::sensus_bridge::VisionFilter {
@@ -887,6 +1257,13 @@ mod io {
             String::from_utf8(vec).unwrap()
         }
     }
+    impl CstDecode<crate::api::sensus_bridge::HearingFilter> for *mut wire_cst_hearing_filter {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> crate::api::sensus_bridge::HearingFilter {
+            let wrap = unsafe { flutter_rust_bridge::for_generated::box_from_leak_ptr(self) };
+            CstDecode::<crate::api::sensus_bridge::HearingFilter>::cst_decode(*wrap).into()
+        }
+    }
     impl CstDecode<crate::api::sensus_bridge::VisionFilter> for *mut wire_cst_vision_filter {
         // Codec=Cst (C-struct based), see doc to use other codecs
         fn cst_decode(self) -> crate::api::sensus_bridge::VisionFilter {
@@ -894,9 +1271,72 @@ mod io {
             CstDecode::<crate::api::sensus_bridge::VisionFilter>::cst_decode(*wrap).into()
         }
     }
+    impl CstDecode<crate::api::sensus_bridge::Experience> for wire_cst_experience {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> crate::api::sensus_bridge::Experience {
+            crate::api::sensus_bridge::Experience {
+                id: self.id.cst_decode(),
+                vision: self.vision.cst_decode(),
+                hearing: self.hearing.cst_decode(),
+                urgency: self.urgency.cst_decode(),
+            }
+        }
+    }
+    impl CstDecode<crate::api::sensus_bridge::HearingFilter> for wire_cst_hearing_filter {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> crate::api::sensus_bridge::HearingFilter {
+            match self.tag {
+                0 => crate::api::sensus_bridge::HearingFilter::HearingLoss,
+                1 => {
+                    let ans = unsafe { self.kind.SuddenHearingLoss };
+                    crate::api::sensus_bridge::HearingFilter::SuddenHearingLoss {
+                        freq_hz: ans.freq_hz.cst_decode(),
+                    }
+                }
+                2 => crate::api::sensus_bridge::HearingFilter::NoiseInducedHearingLoss,
+                3 => {
+                    let ans = unsafe { self.kind.Tinnitus };
+                    crate::api::sensus_bridge::HearingFilter::Tinnitus {
+                        freq_hz: ans.freq_hz.cst_decode(),
+                    }
+                }
+                4 => crate::api::sensus_bridge::HearingFilter::Hyperacusis,
+                5 => {
+                    let ans = unsafe { self.kind.Misophonia };
+                    crate::api::sensus_bridge::HearingFilter::Misophonia {
+                        freq_hz: ans.freq_hz.cst_decode(),
+                    }
+                }
+                6 => crate::api::sensus_bridge::HearingFilter::Paracusis,
+                7 => crate::api::sensus_bridge::HearingFilter::Amusia,
+                8 => crate::api::sensus_bridge::HearingFilter::Dysmelodia,
+                9 => {
+                    let ans = unsafe { self.kind.PitchShift };
+                    crate::api::sensus_bridge::HearingFilter::PitchShift {
+                        semitones: ans.semitones.cst_decode(),
+                    }
+                }
+                10 => crate::api::sensus_bridge::HearingFilter::Diplacusis,
+                11 => crate::api::sensus_bridge::HearingFilter::AuditoryProcessingDisorder,
+                12 => crate::api::sensus_bridge::HearingFilter::Meniere,
+                13 => crate::api::sensus_bridge::HearingFilter::Labyrinthitis,
+                _ => unreachable!(),
+            }
+        }
+    }
     impl CstDecode<Vec<String>> for *mut wire_cst_list_String {
         // Codec=Cst (C-struct based), see doc to use other codecs
         fn cst_decode(self) -> Vec<String> {
+            let vec = unsafe {
+                let wrap = flutter_rust_bridge::for_generated::box_from_leak_ptr(self);
+                flutter_rust_bridge::for_generated::vec_from_leak_ptr(wrap.ptr, wrap.len)
+            };
+            vec.into_iter().map(CstDecode::cst_decode).collect()
+        }
+    }
+    impl CstDecode<Vec<crate::api::sensus_bridge::Experience>> for *mut wire_cst_list_experience {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> Vec<crate::api::sensus_bridge::Experience> {
             let vec = unsafe {
                 let wrap = flutter_rust_bridge::for_generated::box_from_leak_ptr(self);
                 flutter_rust_bridge::for_generated::vec_from_leak_ptr(wrap.ptr, wrap.len)
@@ -1035,6 +1475,34 @@ mod io {
             }
         }
     }
+    impl NewWithNullPtr for wire_cst_experience {
+        fn new_with_null_ptr() -> Self {
+            Self {
+                id: core::ptr::null_mut(),
+                vision: core::ptr::null_mut(),
+                hearing: core::ptr::null_mut(),
+                urgency: Default::default(),
+            }
+        }
+    }
+    impl Default for wire_cst_experience {
+        fn default() -> Self {
+            Self::new_with_null_ptr()
+        }
+    }
+    impl NewWithNullPtr for wire_cst_hearing_filter {
+        fn new_with_null_ptr() -> Self {
+            Self {
+                tag: -1,
+                kind: HearingFilterKind { nil__: () },
+            }
+        }
+    }
+    impl Default for wire_cst_hearing_filter {
+        fn default() -> Self {
+            Self::new_with_null_ptr()
+        }
+    }
     impl NewWithNullPtr for wire_cst_vision_filter {
         fn new_with_null_ptr() -> Self {
             Self {
@@ -1063,6 +1531,12 @@ mod io {
     }
 
     #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_universal_experience_wire__crate__api__sensus_bridge__experiences(
+    ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+        wire__crate__api__sensus_bridge__experiences_impl()
+    }
+
+    #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_universal_experience_wire__crate__api__sensus_bridge__vision_shader_glsl(
         filter: *mut wire_cst_vision_filter,
     ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
@@ -1088,6 +1562,14 @@ mod io {
     }
 
     #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_universal_experience_cst_new_box_autoadd_hearing_filter(
+    ) -> *mut wire_cst_hearing_filter {
+        flutter_rust_bridge::for_generated::new_leak_box_ptr(
+            wire_cst_hearing_filter::new_with_null_ptr(),
+        )
+    }
+
+    #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_universal_experience_cst_new_box_autoadd_vision_filter(
     ) -> *mut wire_cst_vision_filter {
         flutter_rust_bridge::for_generated::new_leak_box_ptr(
@@ -1102,6 +1584,20 @@ mod io {
         let wrap = wire_cst_list_String {
             ptr: flutter_rust_bridge::for_generated::new_leak_vec_ptr(
                 <*mut wire_cst_list_prim_u_8_strict>::new_with_null_ptr(),
+                len,
+            ),
+            len,
+        };
+        flutter_rust_bridge::for_generated::new_leak_box_ptr(wrap)
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_universal_experience_cst_new_list_experience(
+        len: i32,
+    ) -> *mut wire_cst_list_experience {
+        let wrap = wire_cst_list_experience {
+            ptr: flutter_rust_bridge::for_generated::new_leak_vec_ptr(
+                <wire_cst_experience>::new_with_null_ptr(),
                 len,
             ),
             len,
@@ -1144,8 +1640,57 @@ mod io {
 
     #[repr(C)]
     #[derive(Clone, Copy)]
+    pub struct wire_cst_experience {
+        id: *mut wire_cst_list_prim_u_8_strict,
+        vision: *mut wire_cst_vision_filter,
+        hearing: *mut wire_cst_hearing_filter,
+        urgency: i32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_hearing_filter {
+        tag: i32,
+        kind: HearingFilterKind,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub union HearingFilterKind {
+        SuddenHearingLoss: wire_cst_HearingFilter_SuddenHearingLoss,
+        Tinnitus: wire_cst_HearingFilter_Tinnitus,
+        Misophonia: wire_cst_HearingFilter_Misophonia,
+        PitchShift: wire_cst_HearingFilter_PitchShift,
+        nil__: (),
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_HearingFilter_SuddenHearingLoss {
+        freq_hz: f32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_HearingFilter_Tinnitus {
+        freq_hz: f32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_HearingFilter_Misophonia {
+        freq_hz: f32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_HearingFilter_PitchShift {
+        semitones: f32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
     pub struct wire_cst_list_String {
         ptr: *mut *mut wire_cst_list_prim_u_8_strict,
+        len: i32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_list_experience {
+        ptr: *mut wire_cst_experience,
         len: i32,
     }
     #[repr(C)]
@@ -1287,9 +1832,76 @@ mod web {
             self
         }
     }
+    impl CstDecode<crate::api::sensus_bridge::Experience>
+        for flutter_rust_bridge::for_generated::wasm_bindgen::JsValue
+    {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> crate::api::sensus_bridge::Experience {
+            let self_ = self
+                .dyn_into::<flutter_rust_bridge::for_generated::js_sys::Array>()
+                .unwrap();
+            assert_eq!(
+                self_.length(),
+                4,
+                "Expected 4 elements, got {}",
+                self_.length()
+            );
+            crate::api::sensus_bridge::Experience {
+                id: self_.get(0).cst_decode(),
+                vision: self_.get(1).cst_decode(),
+                hearing: self_.get(2).cst_decode(),
+                urgency: self_.get(3).cst_decode(),
+            }
+        }
+    }
+    impl CstDecode<crate::api::sensus_bridge::HearingFilter>
+        for flutter_rust_bridge::for_generated::wasm_bindgen::JsValue
+    {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> crate::api::sensus_bridge::HearingFilter {
+            let self_ = self.unchecked_into::<flutter_rust_bridge::for_generated::js_sys::Array>();
+            match self_.get(0).unchecked_into_f64() as _ {
+                0 => crate::api::sensus_bridge::HearingFilter::HearingLoss,
+                1 => crate::api::sensus_bridge::HearingFilter::SuddenHearingLoss {
+                    freq_hz: self_.get(1).cst_decode(),
+                },
+                2 => crate::api::sensus_bridge::HearingFilter::NoiseInducedHearingLoss,
+                3 => crate::api::sensus_bridge::HearingFilter::Tinnitus {
+                    freq_hz: self_.get(1).cst_decode(),
+                },
+                4 => crate::api::sensus_bridge::HearingFilter::Hyperacusis,
+                5 => crate::api::sensus_bridge::HearingFilter::Misophonia {
+                    freq_hz: self_.get(1).cst_decode(),
+                },
+                6 => crate::api::sensus_bridge::HearingFilter::Paracusis,
+                7 => crate::api::sensus_bridge::HearingFilter::Amusia,
+                8 => crate::api::sensus_bridge::HearingFilter::Dysmelodia,
+                9 => crate::api::sensus_bridge::HearingFilter::PitchShift {
+                    semitones: self_.get(1).cst_decode(),
+                },
+                10 => crate::api::sensus_bridge::HearingFilter::Diplacusis,
+                11 => crate::api::sensus_bridge::HearingFilter::AuditoryProcessingDisorder,
+                12 => crate::api::sensus_bridge::HearingFilter::Meniere,
+                13 => crate::api::sensus_bridge::HearingFilter::Labyrinthitis,
+                _ => unreachable!(),
+            }
+        }
+    }
     impl CstDecode<Vec<String>> for flutter_rust_bridge::for_generated::wasm_bindgen::JsValue {
         // Codec=Cst (C-struct based), see doc to use other codecs
         fn cst_decode(self) -> Vec<String> {
+            self.dyn_into::<flutter_rust_bridge::for_generated::js_sys::Array>()
+                .unwrap()
+                .iter()
+                .map(CstDecode::cst_decode)
+                .collect()
+        }
+    }
+    impl CstDecode<Vec<crate::api::sensus_bridge::Experience>>
+        for flutter_rust_bridge::for_generated::wasm_bindgen::JsValue
+    {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> Vec<crate::api::sensus_bridge::Experience> {
             self.dyn_into::<flutter_rust_bridge::for_generated::js_sys::Array>()
                 .unwrap()
                 .iter()
@@ -1435,6 +2047,14 @@ mod web {
             self.unchecked_into_f64() as _
         }
     }
+    impl CstDecode<crate::api::sensus_bridge::Urgency>
+        for flutter_rust_bridge::for_generated::wasm_bindgen::JsValue
+    {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> crate::api::sensus_bridge::Urgency {
+            (self.unchecked_into_f64() as i32).cst_decode()
+        }
+    }
     impl CstDecode<crate::api::sensus_bridge::VisionGlaucomaMode>
         for flutter_rust_bridge::for_generated::wasm_bindgen::JsValue
     {
@@ -1455,6 +2075,12 @@ mod web {
         wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8_impl(
             filter, rgba8, width, height, strength,
         )
+    }
+
+    #[wasm_bindgen]
+    pub fn wire__crate__api__sensus_bridge__experiences(
+    ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+        wire__crate__api__sensus_bridge__experiences_impl()
     }
 
     #[wasm_bindgen]

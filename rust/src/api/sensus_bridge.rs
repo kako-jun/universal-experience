@@ -53,6 +53,16 @@ impl VisionGlaucomaMode {
             VisionGlaucomaMode::Biarcuate => G::Biarcuate,
         }
     }
+
+    fn from_sensus(mode: sensus_core::vision::GlaucomaMode) -> Self {
+        use sensus_core::vision::GlaucomaMode as G;
+        match mode {
+            G::Vignette => VisionGlaucomaMode::Vignette,
+            G::ArcuateSuperior => VisionGlaucomaMode::ArcuateSuperior,
+            G::ArcuateInferior => VisionGlaucomaMode::ArcuateInferior,
+            G::Biarcuate => VisionGlaucomaMode::Biarcuate,
+        }
+    }
 }
 
 /// Dart 側で扱う vision フィルタ。`sensus_core::Filter` の vision バリアント全種を
@@ -233,6 +243,87 @@ impl VisionFilter {
             VisionFilter::Teichopsia => F::Teichopsia,
             VisionFilter::FlickeringStars { seed } => F::FlickeringStars { seed },
         }
+    }
+
+    /// `sensus_core::Filter` を Dart 公開ミラーへ逆変換する。`to_sensus` の対称写像。
+    ///
+    /// sensus の `Filter` は全 vision バリアントなので（聴覚は別 enum `HearingFilter`）、
+    /// 本関数は常に `Some` を返す。戻り値を `Option` にしてあるのは、将来 sensus が
+    /// non-vision な `Filter` バリアントを足したときに `None` で逃がせるようにするため。
+    /// [`Experience`] の `vision: Option<Filter>` をミラーへ写す際に使う。
+    fn from_sensus(filter: sensus_core::Filter) -> Option<VisionFilter> {
+        use sensus_core::Filter as F;
+        let mirror = match filter {
+            F::Protanopia => VisionFilter::Protanopia,
+            F::Deuteranopia => VisionFilter::Deuteranopia,
+            F::Tritanopia => VisionFilter::Tritanopia,
+            F::Achromatopsia => VisionFilter::Achromatopsia,
+            F::Tetrachromacy => VisionFilter::Tetrachromacy,
+            F::Myopia => VisionFilter::Myopia,
+            F::Hyperopia => VisionFilter::Hyperopia,
+            F::Presbyopia => VisionFilter::Presbyopia,
+            F::Astigmatism { axis_deg } => VisionFilter::Astigmatism { axis_deg },
+            F::Glaucoma { mode } => VisionFilter::Glaucoma {
+                mode: VisionGlaucomaMode::from_sensus(mode),
+            },
+            F::MacularDegeneration => VisionFilter::MacularDegeneration,
+            F::Hemianopia { side } => VisionFilter::Hemianopia { side },
+            F::TunnelVision => VisionFilter::TunnelVision,
+            F::Cataract { seed } => VisionFilter::Cataract { seed },
+            F::Floaters {
+                seed,
+                density,
+                size,
+                gaze_x,
+                gaze_y,
+            } => VisionFilter::Floaters {
+                seed,
+                density,
+                size,
+                gaze_x,
+                gaze_y,
+            },
+            F::Photophobia => VisionFilter::Photophobia,
+            F::NightBlindness => VisionFilter::NightBlindness,
+            F::Vertigo => VisionFilter::Vertigo,
+            F::BppvRotation => VisionFilter::BppvRotation,
+            F::VestibularNeuritis => VisionFilter::VestibularNeuritis,
+            F::Diplopia {
+                offset_x,
+                offset_y,
+                ghost_strength,
+            } => VisionFilter::Diplopia {
+                offset_x,
+                offset_y,
+                ghost_strength,
+            },
+            F::Nystagmus {
+                amplitude,
+                direction_deg,
+            } => VisionFilter::Nystagmus {
+                amplitude,
+                direction_deg,
+            },
+            F::Starbursts {
+                num_rays,
+                ray_length_ratio,
+                threshold,
+                dispersion,
+            } => VisionFilter::Starbursts {
+                num_rays,
+                ray_length_ratio,
+                threshold,
+                dispersion,
+            },
+            F::EyeStrain => VisionFilter::EyeStrain,
+            F::DryEye => VisionFilter::DryEye,
+            F::Metamorphopsia { freq, seed } => VisionFilter::Metamorphopsia { freq, seed },
+            F::ContrastSensitivity => VisionFilter::ContrastSensitivity,
+            F::DetailLoss { cell_size } => VisionFilter::DetailLoss { cell_size },
+            F::Teichopsia => VisionFilter::Teichopsia,
+            F::FlickeringStars { seed } => VisionFilter::FlickeringStars { seed },
+        };
+        Some(mirror)
     }
 }
 
@@ -654,6 +745,158 @@ pub fn apply_vision_cpu_rgba8(
     Ok(out.to_rgba8().into_raw())
 }
 
+// =============================================================================
+// 体験（Experience）— 視覚 + 聴覚 + 緊急度の正準記述子
+// =============================================================================
+//
+// sensus-core の `Experience` / `Urgency` / `HearingFilter` を Dart へ公開する。
+// 文言（体験名・緊急度メッセージ・聴覚症状の説明）は **一切持たせない**。`id` と
+// 分類（enum バリアント）だけを出し、文言は ue 側 i18n（#18）が `id`・urgency 種別・
+// HearingFilter バリアントをキーに解決する。これにより、文言の正本は ue（多言語）、
+// 症状の組み合わせ（三徴候の正準化）の正本は sensus-core、と責務が分かれる。
+//
+// HearingFilter は **型として公開するだけ**で、音声再生は本層のスコープ外（#19 の
+// 聴覚モード設計に委ねる）。ここでは Experience の `hearing` データ（どの聴覚フィルタが
+// 組になるか）と 14 バリアントの識別子を Dart に渡すところまでを担う。
+
+/// 受診喚起の緊急度分類。`sensus_core::Urgency` の FRB 公開ミラー。
+///
+/// 文言は持たない（分類のみ）。⚠️/🚨 等の表示文言は Dart 側 i18n が
+/// このバリアントをキーに出し分ける。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Urgency {
+    /// 緊急性の注記なし。
+    None,
+    /// 早期受診が望ましい。
+    EarlyConsultation,
+    /// 即救急（脳卒中等のサインの可能性）。
+    Emergency,
+}
+
+impl Urgency {
+    fn from_sensus(urgency: sensus_core::Urgency) -> Self {
+        use sensus_core::Urgency as U;
+        match urgency {
+            U::None => Urgency::None,
+            U::EarlyConsultation => Urgency::EarlyConsultation,
+            U::Emergency => Urgency::Emergency,
+        }
+    }
+}
+
+/// 聴覚フィルタの種類。`sensus_core::HearingFilter` の FRB 公開ミラー（14 バリアント）。
+///
+/// **型として公開するだけ**で、音声再生（`apply_hearing` 相当）は本層のスコープ外
+/// （聴覚モード設計 #19 に委ねる）。payload 付きバリアントは sensus と同じフィールド名・
+/// 型（`{ freq_hz: f32 }` 等）でミラーする。症状の説明文言は持たず、Dart 側 i18n が
+/// バリアントをキーに解決する。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum HearingFilter {
+    /// 難聴: 高音域カット。
+    HearingLoss,
+    /// 突発性難聴: 特定周波数帯の急激な損失。
+    SuddenHearingLoss { freq_hz: f32 },
+    /// 騒音性難聴: 4 kHz 付近の損失。
+    NoiseInducedHearingLoss,
+    /// 耳鳴り: 指定周波数の正弦波を常時ミックス。
+    Tinnitus { freq_hz: f32 },
+    /// 音響過敏: 音量を異常に増幅。
+    Hyperacusis,
+    /// ミソフォニア: `freq_hz` 中心のトリガー帯域を過剰増幅 + 歪み。
+    Misophonia { freq_hz: f32 },
+    /// 変音: 音を歪んだ・金属的な質感に加工。
+    Paracusis,
+    /// 音楽音痴: 音程の違いを識別しにくくする。
+    Amusia,
+    /// ジスメロディア: 音楽を不快・歪んだ音に変換。
+    Dysmelodia,
+    /// 音程シフト: 半音単位で全体音程をシフト。
+    PitchShift { semitones: f32 },
+    /// ダイプラクシス: 左右耳で異なる音程を知覚。
+    Diplacusis,
+    /// APD（聴覚情報処理障害）: 時間分解能低下 + 雑音付加。
+    AuditoryProcessingDisorder,
+    /// メニエール病の聴覚側: 低音域難聴 + 低い唸る耳鳴り。
+    Meniere,
+    /// 迷路炎の聴覚側: 高音域感音難聴 + 高音の耳鳴り。
+    Labyrinthitis,
+}
+
+impl HearingFilter {
+    fn from_sensus(filter: sensus_core::HearingFilter) -> Self {
+        use sensus_core::HearingFilter as H;
+        match filter {
+            H::HearingLoss => HearingFilter::HearingLoss,
+            H::SuddenHearingLoss { freq_hz } => HearingFilter::SuddenHearingLoss { freq_hz },
+            H::NoiseInducedHearingLoss => HearingFilter::NoiseInducedHearingLoss,
+            H::Tinnitus { freq_hz } => HearingFilter::Tinnitus { freq_hz },
+            H::Hyperacusis => HearingFilter::Hyperacusis,
+            H::Misophonia { freq_hz } => HearingFilter::Misophonia { freq_hz },
+            H::Paracusis => HearingFilter::Paracusis,
+            H::Amusia => HearingFilter::Amusia,
+            H::Dysmelodia => HearingFilter::Dysmelodia,
+            H::PitchShift { semitones } => HearingFilter::PitchShift { semitones },
+            H::Diplacusis => HearingFilter::Diplacusis,
+            H::AuditoryProcessingDisorder => HearingFilter::AuditoryProcessingDisorder,
+            H::Meniere => HearingFilter::Meniere,
+            H::Labyrinthitis => HearingFilter::Labyrinthitis,
+        }
+    }
+}
+
+/// 視覚 + 聴覚にまたがる「複合体験」の Dart 公開ミラー。`sensus_core::Experience` 由来。
+///
+/// sensus は pure・別バッファ（画像 / 音声）のため、メニエール病のような「回転性めまい
+/// （視覚）＋ 難聴・耳鳴り（聴覚）」の複合症状を 1 バッファで表せない。`Experience` は
+/// 「どの視覚フィルタとどの聴覚フィルタを組にすれば仕様どおりの複合体験になるか」の
+/// 正準化を sensus から受け取る。Dart 側は三徴候の組み合わせをハードコードせず、
+/// [`experiences`] から取得する。
+///
+/// `id` は安定した英語識別子（i18n キー）。文言（体験名・説明）は持たず、Dart 側 i18n が
+/// `id` をキーに解決する。
+#[derive(Debug, Clone, PartialEq)]
+pub struct Experience {
+    /// 安定した識別子（i18n キー等に使う英語 ID）。sensus は `&'static str` だが
+    /// FRB は `String` で出す。
+    pub id: String,
+    /// 視覚側フィルタ（視覚要素が無い体験では `None`）。
+    pub vision: Option<VisionFilter>,
+    /// 聴覚側フィルタ（聴覚要素が無い体験では `None`）。
+    pub hearing: Option<HearingFilter>,
+    /// 受診喚起の緊急度。
+    pub urgency: Urgency,
+}
+
+impl Experience {
+    fn from_sensus(exp: &sensus_core::Experience) -> Self {
+        Experience {
+            id: exp.id.to_string(),
+            vision: exp.vision.and_then(VisionFilter::from_sensus),
+            hearing: exp.hearing.clone().map(HearingFilter::from_sensus),
+            urgency: Urgency::from_sensus(exp.urgency),
+        }
+    }
+}
+
+/// sensus-core が正準化した複合体験のプリセット 4 種を Dart へ返す。
+///
+/// 順序固定: meniere / bppv / vestibular_neuritis / labyrinthitis。各体験の視覚・聴覚
+/// フィルタと緊急度は sensus の `Experience::MENIERE` 等の const をミラーへ変換したもの。
+/// 文言は含まない（`id`・分類のみ）。体験名・緊急度メッセージ・聴覚症状の説明は
+/// Dart 側 i18n（#18）が解決する。
+#[flutter_rust_bridge::frb(sync)]
+pub fn experiences() -> Vec<Experience> {
+    [
+        &sensus_core::Experience::MENIERE,
+        &sensus_core::Experience::BPPV,
+        &sensus_core::Experience::VESTIBULAR_NEURITIS,
+        &sensus_core::Experience::LABYRINTHITIS,
+    ]
+    .into_iter()
+    .map(Experience::from_sensus)
+    .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1004,5 +1247,102 @@ mod tests {
         assert_eq!(u[3], 8.0); // uNumRays
                                // ray_length_px = (0.1 * min(200,100)) as u32 = 10
         assert_eq!(u[4], 10.0);
+    }
+
+    // --- Experience / Urgency / HearingFilter ミラーのマッピング検証 ---
+
+    /// experiences() は sensus の 4 プリセットを順序固定で返す。
+    #[test]
+    fn experiences_returns_four_presets_in_order() {
+        let xs = experiences();
+        assert_eq!(xs.len(), 4);
+        let ids: Vec<&str> = xs.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec!["meniere", "bppv", "vestibular_neuritis", "labyrinthitis"]
+        );
+    }
+
+    /// meniere = 回転性めまい（視覚 Vertigo）+ 聴覚 Meniere + 早期受診。
+    #[test]
+    fn meniere_maps_vision_hearing_urgency() {
+        let xs = experiences();
+        let m = xs.iter().find(|e| e.id == "meniere").unwrap();
+        assert_eq!(m.vision, Some(VisionFilter::Vertigo));
+        assert_eq!(m.hearing, Some(HearingFilter::Meniere));
+        assert_eq!(m.urgency, Urgency::EarlyConsultation);
+    }
+
+    /// bppv = 純粋な前庭性めまい（聴覚症状なし）+ 緊急度なし。
+    #[test]
+    fn bppv_has_no_hearing_and_no_urgency() {
+        let xs = experiences();
+        let b = xs.iter().find(|e| e.id == "bppv").unwrap();
+        assert_eq!(b.vision, Some(VisionFilter::BppvRotation));
+        assert_eq!(b.hearing, None);
+        assert_eq!(b.urgency, Urgency::None);
+    }
+
+    /// vestibular_neuritis = 聴力温存（hearing None）+ 突然発症で救急。
+    #[test]
+    fn vestibular_neuritis_is_emergency_with_no_hearing() {
+        let xs = experiences();
+        let v = xs.iter().find(|e| e.id == "vestibular_neuritis").unwrap();
+        assert_eq!(v.vision, Some(VisionFilter::VestibularNeuritis));
+        assert_eq!(v.hearing, None);
+        assert_eq!(v.urgency, Urgency::Emergency);
+    }
+
+    /// labyrinthitis = 回転性めまい（視覚 Vertigo）+ 聴覚 Labyrinthitis + 早期受診。
+    #[test]
+    fn labyrinthitis_maps_vision_hearing_urgency() {
+        let xs = experiences();
+        let l = xs.iter().find(|e| e.id == "labyrinthitis").unwrap();
+        assert_eq!(l.vision, Some(VisionFilter::Vertigo));
+        assert_eq!(l.hearing, Some(HearingFilter::Labyrinthitis));
+        assert_eq!(l.urgency, Urgency::EarlyConsultation);
+    }
+
+    /// Urgency ミラーが sensus の 3 バリアントと 1 対 1 対応する。
+    #[test]
+    fn urgency_from_sensus_covers_all_variants() {
+        use sensus_core::Urgency as U;
+        assert_eq!(Urgency::from_sensus(U::None), Urgency::None);
+        assert_eq!(
+            Urgency::from_sensus(U::EarlyConsultation),
+            Urgency::EarlyConsultation
+        );
+        assert_eq!(Urgency::from_sensus(U::Emergency), Urgency::Emergency);
+    }
+
+    /// HearingFilter ミラーが payload を保持して写す（代表バリアント）。
+    #[test]
+    fn hearing_filter_from_sensus_preserves_payload() {
+        use sensus_core::HearingFilter as H;
+        assert_eq!(
+            HearingFilter::from_sensus(H::Tinnitus { freq_hz: 4000.0 }),
+            HearingFilter::Tinnitus { freq_hz: 4000.0 }
+        );
+        assert_eq!(
+            HearingFilter::from_sensus(H::PitchShift { semitones: -2.0 }),
+            HearingFilter::PitchShift { semitones: -2.0 }
+        );
+        assert_eq!(
+            HearingFilter::from_sensus(H::HearingLoss),
+            HearingFilter::HearingLoss
+        );
+        assert_eq!(
+            HearingFilter::from_sensus(H::Meniere),
+            HearingFilter::Meniere
+        );
+    }
+
+    /// VisionFilter::from_sensus は to_sensus の逆写像（payload 付き含む代表ラウンドトリップ）。
+    #[test]
+    fn vision_filter_from_sensus_roundtrips_to_sensus() {
+        for f in ALL_FILTERS {
+            let back = VisionFilter::from_sensus(f.to_sensus());
+            assert_eq!(back, Some(f), "{f:?}: from_sensus(to_sensus) mismatch");
+        }
     }
 }

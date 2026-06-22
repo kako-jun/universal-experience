@@ -22,16 +22,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  HearingFilter dco_decode_box_autoadd_hearing_filter(dynamic raw);
+
+  @protected
   VisionFilter dco_decode_box_autoadd_vision_filter(dynamic raw);
 
   @protected
+  Experience dco_decode_experience(dynamic raw);
+
+  @protected
   double dco_decode_f_32(dynamic raw);
+
+  @protected
+  HearingFilter dco_decode_hearing_filter(dynamic raw);
 
   @protected
   int dco_decode_i_32(dynamic raw);
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<Experience> dco_decode_list_experience(dynamic raw);
 
   @protected
   Float32List dco_decode_list_prim_f_32_strict(dynamic raw);
@@ -41,6 +53,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  HearingFilter? dco_decode_opt_box_autoadd_hearing_filter(dynamic raw);
+
+  @protected
+  VisionFilter? dco_decode_opt_box_autoadd_vision_filter(dynamic raw);
 
   @protected
   int dco_decode_u_32(dynamic raw);
@@ -55,6 +73,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void dco_decode_unit(dynamic raw);
 
   @protected
+  Urgency dco_decode_urgency(dynamic raw);
+
+  @protected
   VisionFilter dco_decode_vision_filter(dynamic raw);
 
   @protected
@@ -64,17 +85,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
+  HearingFilter sse_decode_box_autoadd_hearing_filter(
+      SseDeserializer deserializer);
+
+  @protected
   VisionFilter sse_decode_box_autoadd_vision_filter(
       SseDeserializer deserializer);
 
   @protected
+  Experience sse_decode_experience(SseDeserializer deserializer);
+
+  @protected
   double sse_decode_f_32(SseDeserializer deserializer);
+
+  @protected
+  HearingFilter sse_decode_hearing_filter(SseDeserializer deserializer);
 
   @protected
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<Experience> sse_decode_list_experience(SseDeserializer deserializer);
 
   @protected
   Float32List sse_decode_list_prim_f_32_strict(SseDeserializer deserializer);
@@ -84,6 +118,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  HearingFilter? sse_decode_opt_box_autoadd_hearing_filter(
+      SseDeserializer deserializer);
+
+  @protected
+  VisionFilter? sse_decode_opt_box_autoadd_vision_filter(
+      SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
@@ -96,6 +138,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_decode_unit(SseDeserializer deserializer);
+
+  @protected
+  Urgency sse_decode_urgency(SseDeserializer deserializer);
 
   @protected
   VisionFilter sse_decode_vision_filter(SseDeserializer deserializer);
@@ -114,6 +159,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   }
 
   @protected
+  ffi.Pointer<wire_cst_hearing_filter> cst_encode_box_autoadd_hearing_filter(
+      HearingFilter raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    final ptr = wire.cst_new_box_autoadd_hearing_filter();
+    cst_api_fill_to_wire_hearing_filter(raw, ptr.ref);
+    return ptr;
+  }
+
+  @protected
   ffi.Pointer<wire_cst_vision_filter> cst_encode_box_autoadd_vision_filter(
       VisionFilter raw) {
     // Codec=Cst (C-struct based), see doc to use other codecs
@@ -128,6 +182,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     final ans = wire.cst_new_list_String(raw.length);
     for (var i = 0; i < raw.length; ++i) {
       ans.ref.ptr[i] = cst_encode_String(raw[i]);
+    }
+    return ans;
+  }
+
+  @protected
+  ffi.Pointer<wire_cst_list_experience> cst_encode_list_experience(
+      List<Experience> raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    final ans = wire.cst_new_list_experience(raw.length);
+    for (var i = 0; i < raw.length; ++i) {
+      cst_api_fill_to_wire_experience(raw[i], ans.ref.ptr[i]);
     }
     return ans;
   }
@@ -160,15 +225,117 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   }
 
   @protected
+  ffi.Pointer<wire_cst_hearing_filter>
+      cst_encode_opt_box_autoadd_hearing_filter(HearingFilter? raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return raw == null
+        ? ffi.nullptr
+        : cst_encode_box_autoadd_hearing_filter(raw);
+  }
+
+  @protected
+  ffi.Pointer<wire_cst_vision_filter> cst_encode_opt_box_autoadd_vision_filter(
+      VisionFilter? raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return raw == null
+        ? ffi.nullptr
+        : cst_encode_box_autoadd_vision_filter(raw);
+  }
+
+  @protected
   int cst_encode_u_64(BigInt raw) {
     // Codec=Cst (C-struct based), see doc to use other codecs
     return raw.toSigned(64).toInt();
   }
 
   @protected
+  void cst_api_fill_to_wire_box_autoadd_hearing_filter(
+      HearingFilter apiObj, ffi.Pointer<wire_cst_hearing_filter> wireObj) {
+    cst_api_fill_to_wire_hearing_filter(apiObj, wireObj.ref);
+  }
+
+  @protected
   void cst_api_fill_to_wire_box_autoadd_vision_filter(
       VisionFilter apiObj, ffi.Pointer<wire_cst_vision_filter> wireObj) {
     cst_api_fill_to_wire_vision_filter(apiObj, wireObj.ref);
+  }
+
+  @protected
+  void cst_api_fill_to_wire_experience(
+      Experience apiObj, wire_cst_experience wireObj) {
+    wireObj.id = cst_encode_String(apiObj.id);
+    wireObj.vision = cst_encode_opt_box_autoadd_vision_filter(apiObj.vision);
+    wireObj.hearing = cst_encode_opt_box_autoadd_hearing_filter(apiObj.hearing);
+    wireObj.urgency = cst_encode_urgency(apiObj.urgency);
+  }
+
+  @protected
+  void cst_api_fill_to_wire_hearing_filter(
+      HearingFilter apiObj, wire_cst_hearing_filter wireObj) {
+    if (apiObj is HearingFilter_HearingLoss) {
+      wireObj.tag = 0;
+      return;
+    }
+    if (apiObj is HearingFilter_SuddenHearingLoss) {
+      var pre_freq_hz = cst_encode_f_32(apiObj.freqHz);
+      wireObj.tag = 1;
+      wireObj.kind.SuddenHearingLoss.freq_hz = pre_freq_hz;
+      return;
+    }
+    if (apiObj is HearingFilter_NoiseInducedHearingLoss) {
+      wireObj.tag = 2;
+      return;
+    }
+    if (apiObj is HearingFilter_Tinnitus) {
+      var pre_freq_hz = cst_encode_f_32(apiObj.freqHz);
+      wireObj.tag = 3;
+      wireObj.kind.Tinnitus.freq_hz = pre_freq_hz;
+      return;
+    }
+    if (apiObj is HearingFilter_Hyperacusis) {
+      wireObj.tag = 4;
+      return;
+    }
+    if (apiObj is HearingFilter_Misophonia) {
+      var pre_freq_hz = cst_encode_f_32(apiObj.freqHz);
+      wireObj.tag = 5;
+      wireObj.kind.Misophonia.freq_hz = pre_freq_hz;
+      return;
+    }
+    if (apiObj is HearingFilter_Paracusis) {
+      wireObj.tag = 6;
+      return;
+    }
+    if (apiObj is HearingFilter_Amusia) {
+      wireObj.tag = 7;
+      return;
+    }
+    if (apiObj is HearingFilter_Dysmelodia) {
+      wireObj.tag = 8;
+      return;
+    }
+    if (apiObj is HearingFilter_PitchShift) {
+      var pre_semitones = cst_encode_f_32(apiObj.semitones);
+      wireObj.tag = 9;
+      wireObj.kind.PitchShift.semitones = pre_semitones;
+      return;
+    }
+    if (apiObj is HearingFilter_Diplacusis) {
+      wireObj.tag = 10;
+      return;
+    }
+    if (apiObj is HearingFilter_AuditoryProcessingDisorder) {
+      wireObj.tag = 11;
+      return;
+    }
+    if (apiObj is HearingFilter_Meniere) {
+      wireObj.tag = 12;
+      return;
+    }
+    if (apiObj is HearingFilter_Labyrinthitis) {
+      wireObj.tag = 13;
+      return;
+    }
   }
 
   @protected
@@ -356,23 +523,40 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void cst_encode_unit(void raw);
 
   @protected
+  int cst_encode_urgency(Urgency raw);
+
+  @protected
   int cst_encode_vision_glaucoma_mode(VisionGlaucomaMode raw);
 
   @protected
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_hearing_filter(
+      HearingFilter self, SseSerializer serializer);
+
+  @protected
   void sse_encode_box_autoadd_vision_filter(
       VisionFilter self, SseSerializer serializer);
 
   @protected
+  void sse_encode_experience(Experience self, SseSerializer serializer);
+
+  @protected
   void sse_encode_f_32(double self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_hearing_filter(HearingFilter self, SseSerializer serializer);
 
   @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_experience(
+      List<Experience> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_prim_f_32_strict(
@@ -386,6 +570,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       Uint8List self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_hearing_filter(
+      HearingFilter? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_vision_filter(
+      VisionFilter? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_u_32(int self, SseSerializer serializer);
 
   @protected
@@ -396,6 +588,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_unit(void self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_urgency(Urgency self, SseSerializer serializer);
 
   @protected
   void sse_encode_vision_filter(VisionFilter self, SseSerializer serializer);
@@ -483,6 +678,18 @@ class RustLibWire implements BaseWire {
             double,
           )>();
 
+  WireSyncRust2DartDco wire__crate__api__sensus_bridge__experiences() {
+    return _wire__crate__api__sensus_bridge__experiences();
+  }
+
+  late final _wire__crate__api__sensus_bridge__experiencesPtr =
+      _lookup<ffi.NativeFunction<WireSyncRust2DartDco Function()>>(
+    'frbgen_universal_experience_wire__crate__api__sensus_bridge__experiences',
+  );
+  late final _wire__crate__api__sensus_bridge__experiences =
+      _wire__crate__api__sensus_bridge__experiencesPtr
+          .asFunction<WireSyncRust2DartDco Function()>();
+
   WireSyncRust2DartDco wire__crate__api__sensus_bridge__vision_shader_glsl(
     ffi.Pointer<wire_cst_vision_filter> filter,
   ) {
@@ -552,6 +759,17 @@ class RustLibWire implements BaseWire {
             int,
           )>();
 
+  ffi.Pointer<wire_cst_hearing_filter> cst_new_box_autoadd_hearing_filter() {
+    return _cst_new_box_autoadd_hearing_filter();
+  }
+
+  late final _cst_new_box_autoadd_hearing_filterPtr = _lookup<
+          ffi.NativeFunction<ffi.Pointer<wire_cst_hearing_filter> Function()>>(
+      'frbgen_universal_experience_cst_new_box_autoadd_hearing_filter');
+  late final _cst_new_box_autoadd_hearing_filter =
+      _cst_new_box_autoadd_hearing_filterPtr
+          .asFunction<ffi.Pointer<wire_cst_hearing_filter> Function()>();
+
   ffi.Pointer<wire_cst_vision_filter> cst_new_box_autoadd_vision_filter() {
     return _cst_new_box_autoadd_vision_filter();
   }
@@ -573,6 +791,17 @@ class RustLibWire implements BaseWire {
               ffi.Int32)>>('frbgen_universal_experience_cst_new_list_String');
   late final _cst_new_list_String = _cst_new_list_StringPtr
       .asFunction<ffi.Pointer<wire_cst_list_String> Function(int)>();
+
+  ffi.Pointer<wire_cst_list_experience> cst_new_list_experience(int len) {
+    return _cst_new_list_experience(len);
+  }
+
+  late final _cst_new_list_experiencePtr = _lookup<
+          ffi.NativeFunction<
+              ffi.Pointer<wire_cst_list_experience> Function(ffi.Int32)>>(
+      'frbgen_universal_experience_cst_new_list_experience');
+  late final _cst_new_list_experience = _cst_new_list_experiencePtr
+      .asFunction<ffi.Pointer<wire_cst_list_experience> Function(int)>();
 
   ffi.Pointer<wire_cst_list_prim_f_32_strict> cst_new_list_prim_f_32_strict(
     int len,
@@ -760,6 +989,43 @@ final class wire_cst_list_prim_u_8_loose extends ffi.Struct {
   external int len;
 }
 
+final class wire_cst_HearingFilter_SuddenHearingLoss extends ffi.Struct {
+  @ffi.Float()
+  external double freq_hz;
+}
+
+final class wire_cst_HearingFilter_Tinnitus extends ffi.Struct {
+  @ffi.Float()
+  external double freq_hz;
+}
+
+final class wire_cst_HearingFilter_Misophonia extends ffi.Struct {
+  @ffi.Float()
+  external double freq_hz;
+}
+
+final class wire_cst_HearingFilter_PitchShift extends ffi.Struct {
+  @ffi.Float()
+  external double semitones;
+}
+
+final class HearingFilterKind extends ffi.Union {
+  external wire_cst_HearingFilter_SuddenHearingLoss SuddenHearingLoss;
+
+  external wire_cst_HearingFilter_Tinnitus Tinnitus;
+
+  external wire_cst_HearingFilter_Misophonia Misophonia;
+
+  external wire_cst_HearingFilter_PitchShift PitchShift;
+}
+
+final class wire_cst_hearing_filter extends ffi.Struct {
+  @ffi.Int32()
+  external int tag;
+
+  external HearingFilterKind kind;
+}
+
 final class wire_cst_list_prim_u_8_strict extends ffi.Struct {
   external ffi.Pointer<ffi.Uint8> ptr;
 
@@ -769,6 +1035,24 @@ final class wire_cst_list_prim_u_8_strict extends ffi.Struct {
 
 final class wire_cst_list_String extends ffi.Struct {
   external ffi.Pointer<ffi.Pointer<wire_cst_list_prim_u_8_strict>> ptr;
+
+  @ffi.Int32()
+  external int len;
+}
+
+final class wire_cst_experience extends ffi.Struct {
+  external ffi.Pointer<wire_cst_list_prim_u_8_strict> id;
+
+  external ffi.Pointer<wire_cst_vision_filter> vision;
+
+  external ffi.Pointer<wire_cst_hearing_filter> hearing;
+
+  @ffi.Int32()
+  external int urgency;
+}
+
+final class wire_cst_list_experience extends ffi.Struct {
+  external ffi.Pointer<wire_cst_experience> ptr;
 
   @ffi.Int32()
   external int len;

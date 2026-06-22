@@ -8,8 +8,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:freezed_annotation/freezed_annotation.dart' hide protected;
 part 'sensus_bridge.freezed.dart';
 
-// These functions are ignored because they are not marked as `pub`: `color_matrix_flat`, `to_sensus`, `to_sensus`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`
+// These functions are ignored because they are not marked as `pub`: `color_matrix_flat`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `to_sensus`, `to_sensus`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// 指定フィルタの GLSL ES 3.00 ソースを返す。
 ///
@@ -82,6 +82,134 @@ Uint8List applyVisionCpuRgba8(
         width: width,
         height: height,
         strength: strength);
+
+/// sensus-core が正準化した複合体験のプリセット 4 種を Dart へ返す。
+///
+/// 順序固定: meniere / bppv / vestibular_neuritis / labyrinthitis。各体験の視覚・聴覚
+/// フィルタと緊急度は sensus の `Experience::MENIERE` 等の const をミラーへ変換したもの。
+/// 文言は含まない（`id`・分類のみ）。体験名・緊急度メッセージ・聴覚症状の説明は
+/// Dart 側 i18n（#18）が解決する。
+List<Experience> experiences() =>
+    RustLib.instance.api.crateApiSensusBridgeExperiences();
+
+/// 視覚 + 聴覚にまたがる「複合体験」の Dart 公開ミラー。`sensus_core::Experience` 由来。
+///
+/// sensus は pure・別バッファ（画像 / 音声）のため、メニエール病のような「回転性めまい
+/// （視覚）＋ 難聴・耳鳴り（聴覚）」の複合症状を 1 バッファで表せない。`Experience` は
+/// 「どの視覚フィルタとどの聴覚フィルタを組にすれば仕様どおりの複合体験になるか」の
+/// 正準化を sensus から受け取る。Dart 側は三徴候の組み合わせをハードコードせず、
+/// [`experiences`] から取得する。
+///
+/// `id` は安定した英語識別子（i18n キー）。文言（体験名・説明）は持たず、Dart 側 i18n が
+/// `id` をキーに解決する。
+class Experience {
+  /// 安定した識別子（i18n キー等に使う英語 ID）。sensus は `&'static str` だが
+  /// FRB は `String` で出す。
+  final String id;
+
+  /// 視覚側フィルタ（視覚要素が無い体験では `None`）。
+  final VisionFilter? vision;
+
+  /// 聴覚側フィルタ（聴覚要素が無い体験では `None`）。
+  final HearingFilter? hearing;
+
+  /// 受診喚起の緊急度。
+  final Urgency urgency;
+
+  const Experience({
+    required this.id,
+    this.vision,
+    this.hearing,
+    required this.urgency,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^ vision.hashCode ^ hearing.hashCode ^ urgency.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Experience &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          vision == other.vision &&
+          hearing == other.hearing &&
+          urgency == other.urgency;
+}
+
+@freezed
+sealed class HearingFilter with _$HearingFilter {
+  const HearingFilter._();
+
+  /// 難聴: 高音域カット。
+  const factory HearingFilter.hearingLoss() = HearingFilter_HearingLoss;
+
+  /// 突発性難聴: 特定周波数帯の急激な損失。
+  const factory HearingFilter.suddenHearingLoss({
+    required double freqHz,
+  }) = HearingFilter_SuddenHearingLoss;
+
+  /// 騒音性難聴: 4 kHz 付近の損失。
+  const factory HearingFilter.noiseInducedHearingLoss() =
+      HearingFilter_NoiseInducedHearingLoss;
+
+  /// 耳鳴り: 指定周波数の正弦波を常時ミックス。
+  const factory HearingFilter.tinnitus({
+    required double freqHz,
+  }) = HearingFilter_Tinnitus;
+
+  /// 音響過敏: 音量を異常に増幅。
+  const factory HearingFilter.hyperacusis() = HearingFilter_Hyperacusis;
+
+  /// ミソフォニア: `freq_hz` 中心のトリガー帯域を過剰増幅 + 歪み。
+  const factory HearingFilter.misophonia({
+    required double freqHz,
+  }) = HearingFilter_Misophonia;
+
+  /// 変音: 音を歪んだ・金属的な質感に加工。
+  const factory HearingFilter.paracusis() = HearingFilter_Paracusis;
+
+  /// 音楽音痴: 音程の違いを識別しにくくする。
+  const factory HearingFilter.amusia() = HearingFilter_Amusia;
+
+  /// ジスメロディア: 音楽を不快・歪んだ音に変換。
+  const factory HearingFilter.dysmelodia() = HearingFilter_Dysmelodia;
+
+  /// 音程シフト: 半音単位で全体音程をシフト。
+  const factory HearingFilter.pitchShift({
+    required double semitones,
+  }) = HearingFilter_PitchShift;
+
+  /// ダイプラクシス: 左右耳で異なる音程を知覚。
+  const factory HearingFilter.diplacusis() = HearingFilter_Diplacusis;
+
+  /// APD（聴覚情報処理障害）: 時間分解能低下 + 雑音付加。
+  const factory HearingFilter.auditoryProcessingDisorder() =
+      HearingFilter_AuditoryProcessingDisorder;
+
+  /// メニエール病の聴覚側: 低音域難聴 + 低い唸る耳鳴り。
+  const factory HearingFilter.meniere() = HearingFilter_Meniere;
+
+  /// 迷路炎の聴覚側: 高音域感音難聴 + 高音の耳鳴り。
+  const factory HearingFilter.labyrinthitis() = HearingFilter_Labyrinthitis;
+}
+
+/// 受診喚起の緊急度分類。`sensus_core::Urgency` の FRB 公開ミラー。
+///
+/// 文言は持たない（分類のみ）。⚠️/🚨 等の表示文言は Dart 側 i18n が
+/// このバリアントをキーに出し分ける。
+enum Urgency {
+  /// 緊急性の注記なし。
+  none,
+
+  /// 早期受診が望ましい。
+  earlyConsultation,
+
+  /// 即救急（脳卒中等のサインの可能性）。
+  emergency,
+  ;
+}
 
 @freezed
 sealed class VisionFilter with _$VisionFilter {
