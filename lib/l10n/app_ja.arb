@@ -45,6 +45,10 @@
   "consultEarly": "もしこのような見え方をしているなら、一度眼科で診てもらうとよいかもしれません。",
   "consultEmergency": "見え方が急に変わったときは、早めに医療機関を受診してください。",
 
+  "exportButtonTooltip": "PNG でエクスポート",
+  "exportSuccess": "エクスポートしました：{path}",
+  "exportFailure": "エクスポートに失敗しました。もう一度お試しください。",
+
   "experienceSectionTitle": "体験プリセット",
   "experienceSectionNote": "sensus が用意した複合的な体験です。タップするとその視覚フィルタが適用されます。聴覚症状を含むものもあります（音声再生は未対応です）。",
   "experienceMeniere": "メニエール病",
