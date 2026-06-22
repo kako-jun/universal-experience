@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../l10n/app_localizations.dart';
+import '../../l10n/l10n_extensions.dart';
 import '../../models/disability_type.dart';
 import '../../services/filter_service.dart';
 import '../../services/settings_service.dart';
@@ -48,15 +50,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Universal Experience'),
+        title: Text(l10n.appTitle),
         actions: [
           const _ThemeModeButton(),
           IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: () => _showAboutDialog(context),
-            tooltip: 'About',
+            tooltip: l10n.aboutTooltip,
           ),
         ],
       ),
@@ -66,15 +69,15 @@ class _HomeScreenState extends State<HomeScreen> {
           child: ListView(
             padding: const EdgeInsets.all(24),
             children: [
-              _buildHeaderSection(),
+              _buildHeaderSection(l10n),
               const SizedBox(height: 32),
-              _buildFilterSection(),
+              _buildFilterSection(l10n),
               const SizedBox(height: 24),
-              _buildControlsSection(),
+              _buildControlsSection(l10n),
               const SizedBox(height: 24),
               _buildPreviewSection(),
               const SizedBox(height: 32),
-              _buildAdvancedSection(),
+              _buildAdvancedSection(l10n),
               const SizedBox(height: 32),
               _buildInfoSection(),
             ],
@@ -84,12 +87,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHeaderSection() {
+  Widget _buildHeaderSection(AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'すべての感覚を、すべての人に。',
+          l10n.headerTagline,
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -98,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Experience every perspective, understand every challenge.',
+          l10n.headerSubtitle,
           style: TextStyle(
             fontSize: 16,
             color: Colors.grey.shade600,
@@ -108,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildFilterSection() {
+  Widget _buildFilterSection(AppLocalizations l10n) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -119,9 +122,9 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Icon(Icons.visibility, color: Colors.indigo.shade600),
                 const SizedBox(width: 12),
-                const Text(
-                  'Color Vision Simulation',
-                  style: TextStyle(
+                Text(
+                  l10n.colorVisionSectionTitle,
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
@@ -132,8 +135,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const FilterSelector(),
             const SizedBox(height: 16),
             Text(
-              'フィルタの見え方は sensus（色覚アルゴリズムの正本）で計算します。'
-              'ライブ画面への適用は画面キャプチャ経路の実装後に対応予定です。',
+              l10n.colorVisionSectionNote,
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey.shade600,
@@ -146,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildControlsSection() {
+  Widget _buildControlsSection(AppLocalizations l10n) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -157,9 +159,9 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Icon(Icons.tune, color: Colors.indigo.shade600),
                 const SizedBox(width: 12),
-                const Text(
-                  'Filter Intensity',
-                  style: TextStyle(
+                Text(
+                  l10n.intensitySectionTitle,
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
@@ -178,6 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Consumer<FilterService>(
       builder: (context, filterService, _) {
         final theme = Theme.of(context);
+        final l10n = AppLocalizations.of(context)!;
         return Card(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -189,7 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Icon(Icons.compare, color: theme.colorScheme.primary),
                     const SizedBox(width: 12),
                     Text(
-                      'Before / After',
+                      l10n.previewSectionTitle,
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -201,11 +204,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   filterType: filterService.currentFilter,
                   intensity: filterService.intensity,
                 ),
-                if (!BeforeAfterView.canRender(filterService.currentFilter)) ...[
+                if (!BeforeAfterView.canRender(
+                    filterService.currentFilter)) ...[
                   const SizedBox(height: 12),
                   Text(
-                    'Live rendering for this filter is not implemented yet — '
-                    'only protanopia/protanomaly are drawn today.',
+                    l10n.previewUnsupportedNote,
                     style: theme.textTheme.bodySmall?.copyWith(
                       fontStyle: FontStyle.italic,
                       color: theme.colorScheme.onSurfaceVariant,
@@ -221,7 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Advanced（sensus 全 30 フィルタ）セクション。既存の色覚 7 種 UI とは別系統。
-  Widget _buildAdvancedSection() {
+  Widget _buildAdvancedSection(AppLocalizations l10n) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -232,13 +235,10 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Icon(Icons.science_outlined, color: Colors.indigo.shade600),
                 const SizedBox(width: 12),
-                const Expanded(
-                  // TODO(#18): i18n - extract to key
-                  // `home.advancedSectionTitle`. English fallback for now;
-                  // actual translations are out of scope for #16.
+                Expanded(
                   child: Text(
-                    'Advanced (all sensus filters)',
-                    style: TextStyle(
+                    l10n.advancedSectionTitle,
+                    style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
@@ -248,8 +248,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'sensus が公開する全 30 種の見え方を、カテゴリ別に選んでパラメータを'
-              '調整できます。実描画/ライブ適用は別 Issue（#11/#1/#3/#4）で対応します。',
+              l10n.advancedSectionNote,
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey.shade600,
@@ -275,6 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
           return const SizedBox.shrink();
         }
 
+        final l10n = AppLocalizations.of(context)!;
         return Card(
           color: Colors.blue.shade50,
           child: Padding(
@@ -288,7 +288,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        filter.displayName,
+                        colorVisionTypeName(l10n, filter),
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -300,7 +300,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  filter.description,
+                  colorVisionTypeDescription(l10n, filter),
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.blue.shade800,
@@ -308,7 +308,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Prevalence: ${filter.prevalence}',
+                  l10n.prevalenceLabel(colorVisionTypePrevalence(l10n, filter)),
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.blue.shade700,
@@ -324,22 +324,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showAboutDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     showAboutDialog(
       context: context,
-      applicationName: 'Universal Experience',
+      applicationName: l10n.appTitle,
       applicationVersion: '0.1.0',
       applicationIcon: const Icon(Icons.accessibility_new, size: 48),
       children: [
-        const Text(
-          'Universal Experience is a comprehensive accessibility simulation tool '
-          'designed to help people understand and empathize with various disabilities.',
-        ),
+        Text(l10n.aboutBody),
         const SizedBox(height: 16),
-        const Text(
-          'Phase 1: Color Vision Deficiency Simulation\n'
-          'Phase 2: Hearing Impairment Simulation (Coming Soon)\n'
-          'Phase 3: Additional Disability Simulations (Planned)',
-        ),
+        Text(l10n.aboutPhases),
       ],
     );
   }
@@ -353,16 +347,17 @@ class _ThemeModeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Consumer<SettingsService>(
       builder: (context, settings, _) {
-        final (IconData icon, String tooltip) = switch (settings.themeMode) {
-          ThemeMode.system => (Icons.brightness_auto, 'Theme: System'),
-          ThemeMode.light => (Icons.light_mode, 'Theme: Light'),
-          ThemeMode.dark => (Icons.dark_mode, 'Theme: Dark'),
+        final (IconData icon, String label) = switch (settings.themeMode) {
+          ThemeMode.system => (Icons.brightness_auto, l10n.themeTooltipSystem),
+          ThemeMode.light => (Icons.light_mode, l10n.themeTooltipLight),
+          ThemeMode.dark => (Icons.dark_mode, l10n.themeTooltipDark),
         };
         return IconButton(
           icon: Icon(icon),
-          tooltip: '$tooltip (tap to change)',
+          tooltip: l10n.themeTooltipHint(label),
           onPressed: () => settings.setThemeMode(_next(settings.themeMode)),
         );
       },

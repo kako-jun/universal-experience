@@ -86,8 +86,7 @@ void main() {
       final Uint8List outPx = await _rgba(out);
       final Uint8List refPx = await _rgba(ref);
 
-      expect(outPx.length, refPx.length,
-          reason: 'GPU 出力と参照のバイト数が一致しない');
+      expect(outPx.length, refPx.length, reason: 'GPU 出力と参照のバイト数が一致しない');
 
       // RGB のみ比較（alpha は両者 255）。PSNR + 最大チャネル差で評価する。
       double sumSq = 0;
@@ -116,8 +115,7 @@ void main() {
       // srgb<->linear の pow と GPU/CPU 丸めの差を許容（protanopia golden と同基準）。
       expect(psnr, greaterThanOrEqualTo(30.0),
           reason: 'PSNR が 30dB 未満: GPU 出力が sensus 参照から乖離している');
-      expect(maxDiff, lessThanOrEqualTo(8),
-          reason: '最大チャネル差が 8/255 を超えている');
+      expect(maxDiff, lessThanOrEqualTo(8), reason: '最大チャネル差が 8/255 を超えている');
 
       src.dispose();
       ref.dispose();

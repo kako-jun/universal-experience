@@ -111,7 +111,8 @@ void main() {
       expectParamCount('hemianopia', 1); // side
       expectParamCount('cataract', 1); // seed
       expectParamCount('floaters', 5); // seed,density,size,gazeX,gazeY
-      expectParamCount('starbursts', 4); // numRays,rayLengthRatio,threshold,dispersion
+      expectParamCount(
+          'starbursts', 4); // numRays,rayLengthRatio,threshold,dispersion
       expectParamCount('nystagmus', 2); // amplitude,directionDeg
       expectParamCount('diplopia', 3); // offsetX,offsetY,ghostStrength
       expectParamCount('metamorphopsia', 2); // freq,seed
@@ -164,8 +165,7 @@ void main() {
       expect(mode.options.length, VisionGlaucomaMode.values.length);
     });
 
-    test('hemianopia の side options が kHemianopiaSideValues と一致（drift 検出）',
-        () {
+    test('hemianopia の side options が kHemianopiaSideValues と一致（drift 検出）', () {
       // 単一の写像源（kHemianopiaSideValues）と catalog の option value 集合が
       // ずれていないことを検証する。どちらか片方だけ変更すると失敗する。
       final side = kVisionFilterCatalogById['hemianopia']!.parameters.single;
@@ -295,8 +295,7 @@ void main() {
       expect(notified, 3);
     });
 
-    test('select で seed param の既定値が BigInt.zero（int/double を経由しない）',
-        () {
+    test('select で seed param の既定値が BigInt.zero（int/double を経由しない）', () {
       final state = VisionFilterState()..select('cataract');
       expect(state.params['seed'], isA<BigInt>());
       expect(state.params['seed'], BigInt.zero);

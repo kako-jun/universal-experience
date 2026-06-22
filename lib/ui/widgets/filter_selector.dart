@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../l10n/app_localizations.dart';
+import '../../l10n/l10n_extensions.dart';
 import '../../models/disability_type.dart';
 import '../../services/filter_service.dart';
 
@@ -8,6 +10,7 @@ class FilterSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Consumer<FilterService>(
       builder: (context, filterService, _) {
         return Column(
@@ -20,7 +23,7 @@ class FilterSelector extends StatelessWidget {
                 final isSelected = filterService.currentFilter == type;
 
                 return FilterChip(
-                  label: Text(type.displayName),
+                  label: Text(colorVisionTypeName(l10n, type)),
                   selected: isSelected,
                   onSelected: (selected) {
                     if (selected) {
@@ -33,7 +36,8 @@ class FilterSelector extends StatelessWidget {
                     color: isSelected
                         ? Colors.indigo.shade900
                         : Colors.grey.shade700,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
                 );
               }).toList(),
@@ -47,7 +51,7 @@ class FilterSelector extends StatelessWidget {
                       ? () => filterService.deactivate()
                       : null,
                   icon: const Icon(Icons.clear),
-                  label: const Text('Clear Filter'),
+                  label: Text(l10n.clearFilter),
                 ),
               ],
             ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/disability_type.dart';
 import '../../services/filter_service.dart';
 
@@ -8,6 +9,7 @@ class IntensitySlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Consumer<FilterService>(
       builder: (context, filterService, _) {
         final isEnabled = filterService.currentFilter != ColorVisionType.none;
@@ -19,7 +21,7 @@ class IntensitySlider extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Intensity: ${(filterService.intensity * 100).toInt()}%',
+                  l10n.intensityValue((filterService.intensity * 100).toInt()),
                   style: TextStyle(
                     fontSize: 16,
                     color: isEnabled ? Colors.black87 : Colors.grey,
@@ -27,7 +29,9 @@ class IntensitySlider extends StatelessWidget {
                 ),
                 if (isEnabled)
                   Text(
-                    filterService.isActive ? 'Active' : 'Inactive',
+                    filterService.isActive
+                        ? l10n.intensityActive
+                        : l10n.intensityInactive,
                     style: TextStyle(
                       fontSize: 14,
                       color: filterService.isActive
@@ -53,7 +57,7 @@ class IntensitySlider extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  'Select a filter type to adjust intensity',
+                  l10n.intensityHint,
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey.shade600,

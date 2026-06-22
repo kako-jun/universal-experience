@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:io' show Platform;
+import 'dart:ui' show PlatformDispatcher;
 
+import 'l10n/app_localizations.dart';
+import 'l10n/l10n_extensions.dart';
 import 'services/filter_service.dart';
 import 'services/vision_filter_state.dart';
 import 'services/loupe_window_controller.dart';
@@ -32,39 +36,74 @@ const String _trayIconPath = 'assets/tray/tray_icon.png';
 /// ルーペ窓 (= メインウィンドウ) の表示/非表示は windowManager 経由。
 /// `LoupeWindowController` (#14) は枠/モード/透過の責務で show/hide を持たないため、
 /// ここで windowManager.show()/hide() を注入する。
-final TrayService trayService = TrayService(
-  filterService: filterService,
-  iconPath: _trayIconPath,
-  onShowLoupe: () async {
-    await windowManager.show();
-    await windowManager.focus();
-  },
-  onHideLoupe: () async {
-    await windowManager.hide();
-  },
-  onOpenSettings: () async {
-    // 設定 (フィルタ選択 UI) はメインウィンドウ内にあるため、ウィンドウを表示する。
-    await windowManager.show();
-    await windowManager.focus();
-  },
-  onQuit: () async {
-    // トレイアイコンを破棄し、prevent-close を解除してから実際に終了する。
-    await trayService.dispose();
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      await windowManager.setPreventClose(false);
-      await windowManager.destroy();
-    }
-  },
-);
+///
+/// トレイ文言を起動時ロケールの [AppLocalizations] で解決して渡すため (#18)、
+/// 構築は settings 読込後の [main] 内で行う（top-level だと locale が未確定）。
+late final TrayService trayService;
+
+/// トレイメニュー文言を起動時ロケールで解決して [TrayService] を構築する (#18)。
+///
+/// トレイは BuildContext を持てないため、解決済みロケール（永続化設定 → 無ければ
+/// システム）の `AppLocalizations`（`lookupAppLocalizations`）から文言を取る。
+TrayService _buildTrayService(SettingsService settings) {
+  final locale = _resolveStartupLocale(settings.locale);
+  final l10n = lookupAppLocalizations(locale);
+  return TrayService(
+    filterService: filterService,
+    iconPath: _trayIconPath,
+    labels: trayMenuLabelsFrom(l10n),
+    tooltip: l10n.trayTooltip,
+    onShowLoupe: () async {
+      await windowManager.show();
+      await windowManager.focus();
+    },
+    onHideLoupe: () async {
+      await windowManager.hide();
+    },
+    onOpenSettings: () async {
+      // 設定 (フィルタ選択 UI) はメインウィンドウ内にあるため、ウィンドウを表示する。
+      await windowManager.show();
+      await windowManager.focus();
+    },
+    onQuit: () async {
+      // トレイアイコンを破棄し、prevent-close を解除してから実際に終了する。
+      await trayService.dispose();
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        await windowManager.setPreventClose(false);
+        await windowManager.destroy();
+      }
+    },
+  );
+}
+
+/// 設定の locale（null = システム追従）を、サポート対象 locale に解決する。
+///
+/// `lookupAppLocalizations` はサポート外 locale で投げるため、システム locale が
+/// 非対応のときは [AppLocalizations.supportedLocales] の先頭（en）へフォールバック。
+Locale _resolveStartupLocale(Locale? preferred) {
+  bool isSupported(Locale l) => AppLocalizations.supportedLocales
+      .any((s) => s.languageCode == l.languageCode);
+
+  if (preferred != null && isSupported(preferred)) return preferred;
+
+  final system = PlatformDispatcher.instance.locale;
+  if (isSupported(system)) return Locale(system.languageCode);
+
+  return AppLocalizations.supportedLocales.first;
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Restore persisted settings (theme mode / last filter / intensity) before
-  // building the app so the first frame already reflects the user's choices
-  // (#17, settings_service.dart).
+  // Restore persisted settings (theme mode / last filter / intensity / locale)
+  // before building the app so the first frame already reflects the user's
+  // choices (#17/#18, settings_service.dart).
   final settings = SettingsService();
   await settings.load();
+
+  // Build the tray with labels resolved for the startup locale (#18). Must run
+  // after settings.load() so the persisted language (if any) is honoured.
+  trayService = _buildTrayService(settings);
 
   // Seed the shared FilterService (#15) from the restored settings (#17) so the
   // previously selected filter + intensity are reflected on startup, on the
@@ -128,7 +167,8 @@ void main() async {
 Future<void> _setUpTray() async {
   await trayService.init();
 
-  final closeAction = resolveCloseAction(trayAvailable: trayService.isAvailable);
+  final closeAction =
+      resolveCloseAction(trayAvailable: trayService.isAvailable);
   if (closeAction == CloseAction.hideToTray) {
     await windowManager.setPreventClose(true);
     windowManager.addListener(
@@ -181,10 +221,21 @@ class UniversalExperienceApp extends StatelessWidget {
       child: Consumer<SettingsService>(
         builder: (context, settings, _) {
           return MaterialApp(
-            title: 'Universal Experience',
+            onGenerateTitle: (context) =>
+                AppLocalizations.of(context)!.appTitle,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: settings.themeMode,
+            // i18n (#18). locale = null はシステム追従。言語ピッカー UI は本 Issue
+            // 外（#16/#19）。SettingsService.setLocale が将来の足場。
+            locale: settings.locale,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
             home: const HomeScreen(),
             debugShowCheckedModeBanner: false,
           );

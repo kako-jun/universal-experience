@@ -1,3 +1,8 @@
+# i18n (#18). `flutter gen-l10n` の生成物。ARB（lib/l10n/*.arb）と l10n.yaml が
+# 正本で、生成された AppLocalizations はビルド時に再生成されるためコミットしない。
+/lib/l10n/app_localizations.dart
+/lib/l10n/app_localizations_*.dart
+
 # Miscellaneous
 *.class
 *.log

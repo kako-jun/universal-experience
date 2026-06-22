@@ -33,10 +33,17 @@ void main() {
 
 const List<String> _matrixLayout = <String>[
   'uStrength',
-  'uMatrix0', 'uMatrix1', 'uMatrix2',
-  'uMatrix3', 'uMatrix4', 'uMatrix5',
-  'uMatrix6', 'uMatrix7', 'uMatrix8',
-  'uResolution_x', 'uResolution_y',
+  'uMatrix0',
+  'uMatrix1',
+  'uMatrix2',
+  'uMatrix3',
+  'uMatrix4',
+  'uMatrix5',
+  'uMatrix6',
+  'uMatrix7',
+  'uMatrix8',
+  'uResolution_x',
+  'uResolution_y',
 ];
 
 /// A shader with a `vec2 uTexelSize` payload uniform (like myopia / starbursts),
@@ -269,8 +276,13 @@ void main() {
 ''';
       const layout = <String>[
         'uStrength',
-        'uKernel0', 'uKernel1', 'uKernel2', 'uKernel3', 'uKernel4',
-        'uResolution_x', 'uResolution_y',
+        'uKernel0',
+        'uKernel1',
+        'uKernel2',
+        'uKernel3',
+        'uKernel4',
+        'uResolution_x',
+        'uResolution_y',
       ];
       final out = convertShaderToImpeller(g, layout, 'kernelish');
       // The array access is flattened to scalar uniforms; no `name[k]` survives.
@@ -293,7 +305,8 @@ void main() {
 ''';
       final layout = <String>[
         for (var i = 0; i < 12; i++) 'uMatrix$i',
-        'uResolution_x', 'uResolution_y',
+        'uResolution_x',
+        'uResolution_y',
       ];
       final out = convertShaderToImpeller(g, layout, 'big');
       expect(out.contains('uMatrix['), isFalse);
@@ -315,7 +328,8 @@ void main() {
 ''';
       const layout = <String>[
         'uStrength',
-        'uResolution_x', 'uResolution_y',
+        'uResolution_x',
+        'uResolution_y',
       ];
       expect(
         () => convertShaderToImpeller(g, layout, 'undeclared'),
@@ -353,7 +367,8 @@ void main() {
 
   group('buildPubspecShadersBlock / updatePubspecShaders', () {
     test('emits alphabetically sorted entries under shaders:', () {
-      final block = buildPubspecShadersBlock(<String>['myopia', 'achromatopsia']);
+      final block =
+          buildPubspecShadersBlock(<String>['myopia', 'achromatopsia']);
       expect(block, '''
   shaders:
     - shaders/achromatopsia.frag
@@ -424,7 +439,8 @@ flutter:
         // No top-level precision declaration of ANY qualifier/type may survive
         // (float OR int OR otherwise). Substring checks for `precision ...
         // float;` previously missed `precision highp int;`.
-        expect(RegExp(r'^\s*precision\b', multiLine: true).hasMatch(src), isFalse,
+        expect(
+            RegExp(r'^\s*precision\b', multiLine: true).hasMatch(src), isFalse,
             reason: '$name still has a precision declaration');
         expect(src.contains('uMatrix['), isFalse,
             reason: '$name has unexpanded uMatrix[]');
@@ -453,7 +469,8 @@ flutter:
     }
   });
 
-  test('generate_shaders.dart --check reports no drift (committed in sync)', () {
+  test('generate_shaders.dart --check reports no drift (committed in sync)',
+      () {
     final result = Process.runSync(
       'dart',
       <String>['run', 'tools/generate_shaders.dart', '--check'],

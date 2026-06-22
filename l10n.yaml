@@ -1,0 +1,13 @@
+# Flutter i18n 生成設定 (#18)。`flutter gen-l10n`（pub get / build 時も自動）が
+# lib/l10n/*.arb から AppLocalizations を生成する。
+#
+# template-arb-file（app_en.arb）が「正本」で、キーと @meta（プレースホルダ型・
+# description）はここに書く。app_ja.arb は同じキーの ja 訳だけを持つ。
+#
+# 生成物は arb-dir（lib/l10n/app_localizations.dart）に出力され、
+# `import 'l10n/app_localizations.dart'` で読む。
+# lib/l10n の生成 .dart は gitignore 済みなのでコミットされない（ARB と本ファイルのみ）。
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations

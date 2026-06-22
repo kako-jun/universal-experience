@@ -33,7 +33,8 @@ class ShaderFilter {
 
   /// protanopia の FragmentProgram をロード (キャッシュ)。
   static Future<ui.FragmentProgram> _loadProtanopia() {
-    return _protanopiaProgram ??= ui.FragmentProgram.fromAsset(_protanopiaAsset);
+    return _protanopiaProgram ??=
+        ui.FragmentProgram.fromAsset(_protanopiaAsset);
   }
 
   /// protanopia フィルタを GPU で [src] に適用し、新しい [ui.Image] を返す。
