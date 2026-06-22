@@ -105,7 +105,8 @@ void main() {
     });
 
     test('achromatopsia 適用で isActive=true / sensusFilter=achromatopsia', () {
-      final service = FilterService()..applyFilter(ColorVisionType.achromatopsia);
+      final service = FilterService()
+        ..applyFilter(ColorVisionType.achromatopsia);
       expect(service.isActive, isTrue);
       expect(service.currentFilter, ColorVisionType.achromatopsia);
       expect(service.sensusFilter, const VisionFilter.achromatopsia());

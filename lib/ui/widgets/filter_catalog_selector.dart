@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/app_localizations.dart';
+import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_catalog.dart';
 import '../../services/vision_filter_state.dart';
 
@@ -13,13 +15,14 @@ class FilterCatalogSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Consumer<VisionFilterState>(
       builder: (context, state, _) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             for (final category in VisionFilterCategory.values)
-              _buildCategory(context, state, category),
+              _buildCategory(l10n, state, category),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -28,7 +31,7 @@ class FilterCatalogSelector extends StatelessWidget {
                   onPressed:
                       state.selectedId != null ? () => state.clear() : null,
                   icon: const Icon(Icons.clear),
-                  label: const Text('Clear'),
+                  label: Text(l10n.clear),
                 ),
               ],
             ),
@@ -39,7 +42,7 @@ class FilterCatalogSelector extends StatelessWidget {
   }
 
   Widget _buildCategory(
-    BuildContext context,
+    AppLocalizations l10n,
     VisionFilterState state,
     VisionFilterCategory category,
   ) {
@@ -52,7 +55,7 @@ class FilterCatalogSelector extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            category.displayName,
+            visionCategoryName(l10n, category),
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
@@ -65,7 +68,7 @@ class FilterCatalogSelector extends StatelessWidget {
             children: entries.map((entry) {
               final isSelected = state.selectedId == entry.id;
               return FilterChip(
-                label: Text(entry.displayName),
+                label: Text(visionFilterName(l10n, entry.id)),
                 selected: isSelected,
                 onSelected: (selected) {
                   if (selected) {

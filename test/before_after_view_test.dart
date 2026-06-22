@@ -1,7 +1,10 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:universal_experience/l10n/app_localizations.dart';
+import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 
@@ -119,41 +122,54 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('protanopia で原画ラベルとフィルタ名ラベルの両ペインを出す',
-        (tester) async {
+    // BeforeAfterView は AppLocalizations.of(context) を読むため、テストでも
+    // ローカライズ済みの MaterialApp（en 固定）に乗せる。期待文字列は en ARB を
+    // lookup して取り、ハードコードしない (#18)。
+    const enLocale = Locale('en');
+    final en = lookupAppLocalizations(enLocale);
+
+    Widget localized(Widget child) => MaterialApp(
+          locale: enLocale,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: child),
+        );
+
+    testWidgets('protanopia で原画ラベルとフィルタ名ラベルの両ペインを出す', (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: BeforeAfterView(
-              filterType: ColorVisionType.protanopia,
-              intensity: 1.0,
-              sampleSize: 32,
-            ),
+        localized(
+          const BeforeAfterView(
+            filterType: ColorVisionType.protanopia,
+            intensity: 1.0,
+            sampleSize: 32,
           ),
         ),
       );
-      await pumpUntilText(tester, ColorVisionType.protanopia.displayName);
+      final protoName = colorVisionTypeName(en, ColorVisionType.protanopia);
+      await pumpUntilText(tester, protoName);
 
-      expect(find.text('Original'), findsOneWidget);
-      expect(find.text(ColorVisionType.protanopia.displayName), findsOneWidget);
+      expect(find.text(en.previewPaneOriginal), findsOneWidget);
+      expect(find.text(protoName), findsOneWidget);
     });
 
-    testWidgets('未実装フィルタでは coming soon プレースホルダを出す',
-        (tester) async {
+    testWidgets('未実装フィルタでは coming soon プレースホルダを出す', (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: BeforeAfterView(
-              filterType: ColorVisionType.deuteranopia,
-              intensity: 1.0,
-              sampleSize: 32,
-            ),
+        localized(
+          const BeforeAfterView(
+            filterType: ColorVisionType.deuteranopia,
+            intensity: 1.0,
+            sampleSize: 32,
           ),
         ),
       );
-      await pumpUntilText(tester, 'Rendering coming soon');
+      await pumpUntilText(tester, en.previewComingSoon);
 
-      expect(find.text('Rendering coming soon'), findsOneWidget);
+      expect(find.text(en.previewComingSoon), findsOneWidget);
     });
   });
 }

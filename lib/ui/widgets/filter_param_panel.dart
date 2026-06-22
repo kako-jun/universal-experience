@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/app_localizations.dart';
+import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_catalog.dart';
 import '../../services/vision_filter_state.dart';
 
@@ -10,18 +12,20 @@ import '../../services/vision_filter_state.dart';
 /// - enum → [DropdownButton]
 /// - seed → 表示 + 乱数再生成ボタン
 ///
-/// 加えて strength スライダを常に表示する。値は [VisionFilterState] に反映する。
+/// 加えて urgency 注記・受診喚起メッセージ・strength スライダを表示する。
+/// 文言はすべて i18n で解決する（カタログは識別子/enum のみ持つ: #18）。
 class FilterParamPanel extends StatelessWidget {
   const FilterParamPanel({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Consumer<VisionFilterState>(
       builder: (context, state, _) {
         final entry = state.selectedEntry;
         if (entry == null) {
           return Text(
-            'Select a filter to adjust its parameters.',
+            l10n.advancedParamPanelHint,
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey.shade600,
@@ -30,15 +34,20 @@ class FilterParamPanel extends StatelessWidget {
           );
         }
 
+        final consult = consultMessageForUrgency(l10n, entry.urgency);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildUrgency(entry),
+            _buildUrgency(l10n, entry),
+            if (consult != null) ...[
+              const SizedBox(height: 8),
+              _buildConsultNote(consult),
+            ],
             const SizedBox(height: 16),
-            _buildStrength(state),
+            _buildStrength(l10n, state),
             for (final param in entry.parameters) ...[
               const SizedBox(height: 16),
-              _buildParam(state, param),
+              _buildParam(l10n, state, param),
             ],
           ],
         );
@@ -46,58 +55,86 @@ class FilterParamPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildUrgency(VisionFilterEntry entry) {
+  Widget _buildUrgency(AppLocalizations l10n, VisionFilterEntry entry) {
     return Row(
       children: [
         const Icon(Icons.priority_high, size: 16),
         const SizedBox(width: 6),
         Text(
-          'Urgency: ${entry.urgency.displayName}',
+          l10n.urgencyLabel(visionUrgencyName(l10n, entry.urgency)),
           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
         ),
       ],
     );
   }
 
-  Widget _buildStrength(VisionFilterState state) {
+  /// 受診喚起メッセージ（urgency 由来）。当事者に配慮した穏やかな注記として、
+  /// 控えめなアイコン + 注釈スタイルで出す。
+  Widget _buildConsultNote(String message) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(Icons.medical_information_outlined, size: 16),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            message,
+            style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStrength(AppLocalizations l10n, VisionFilterState state) {
+    final percent = (state.strength * 100).toInt();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Strength: ${(state.strength * 100).toInt()}%'),
+        Text(l10n.strengthLabel(percent)),
         Slider(
           value: state.strength,
           min: 0.0,
           max: 1.0,
           divisions: 20,
-          label: '${(state.strength * 100).toInt()}%',
+          label: '$percent%',
           onChanged: (v) => state.setStrength(v),
         ),
       ],
     );
   }
 
-  Widget _buildParam(VisionFilterState state, VisionParam param) {
+  Widget _buildParam(
+    AppLocalizations l10n,
+    VisionFilterState state,
+    VisionParam param,
+  ) {
     switch (param.kind) {
       case VisionParamKind.float:
-        return _buildFloatSlider(state, param);
+        return _buildFloatSlider(l10n, state, param);
       case VisionParamKind.intValue:
-        return _buildIntSlider(state, param);
+        return _buildIntSlider(l10n, state, param);
       case VisionParamKind.enumValue:
-        return _buildEnumDropdown(state, param);
+        return _buildEnumDropdown(l10n, state, param);
       case VisionParamKind.seed:
-        return _buildSeed(state, param);
+        return _buildSeed(l10n, state, param);
     }
   }
 
-  Widget _buildFloatSlider(VisionFilterState state, VisionParam param) {
+  Widget _buildFloatSlider(
+    AppLocalizations l10n,
+    VisionFilterState state,
+    VisionParam param,
+  ) {
     final value = (state.paramValue(param) as num?)?.toDouble() ?? 0.0;
     final min = param.min ?? 0.0;
     final max = param.max ?? 1.0;
     final clamped = value.clamp(min, max);
+    final label = visionParamLabel(l10n, param.labelKey);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('${param.displayName}: ${clamped.toStringAsFixed(2)}'),
+        Text('$label: ${clamped.toStringAsFixed(2)}'),
         Slider(
           value: clamped,
           min: min,
@@ -109,17 +146,22 @@ class FilterParamPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildIntSlider(VisionFilterState state, VisionParam param) {
+  Widget _buildIntSlider(
+    AppLocalizations l10n,
+    VisionFilterState state,
+    VisionParam param,
+  ) {
     final raw = state.paramValue(param);
     final value = raw is num ? raw.toInt() : 0;
     final min = (param.min ?? 0.0).toInt();
     final max = (param.max ?? 100.0).toInt();
     final clamped = value.clamp(min, max);
     final divisions = (max - min) > 0 ? (max - min) : 1;
+    final label = visionParamLabel(l10n, param.labelKey);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('${param.displayName}: $clamped'),
+        Text('$label: $clamped'),
         Slider(
           value: clamped.toDouble(),
           min: min.toDouble(),
@@ -132,12 +174,16 @@ class FilterParamPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildEnumDropdown(VisionFilterState state, VisionParam param) {
+  Widget _buildEnumDropdown(
+    AppLocalizations l10n,
+    VisionFilterState state,
+    VisionParam param,
+  ) {
     final current = state.paramValue(param) as String?;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(param.displayName),
+        Text(visionParamLabel(l10n, param.labelKey)),
         const SizedBox(height: 4),
         DropdownButton<String>(
           isExpanded: true,
@@ -146,7 +192,7 @@ class FilterParamPanel extends StatelessWidget {
               .map(
                 (o) => DropdownMenuItem<String>(
                   value: o.value,
-                  child: Text(o.displayName),
+                  child: Text(visionParamLabel(l10n, o.labelKey)),
                 ),
               )
               .toList(),
@@ -158,15 +204,20 @@ class FilterParamPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildSeed(VisionFilterState state, VisionParam param) {
+  Widget _buildSeed(
+    AppLocalizations l10n,
+    VisionFilterState state,
+    VisionParam param,
+  ) {
     final value = state.paramValue(param);
+    final label = visionParamLabel(l10n, param.labelKey);
     return Row(
       children: [
-        Expanded(child: Text('${param.displayName}: $value')),
+        Expanded(child: Text('$label: $value')),
         TextButton.icon(
           onPressed: () => state.randomizeSeed(param.name),
           icon: const Icon(Icons.casino),
-          label: const Text('Randomize'),
+          label: Text(l10n.randomize),
         ),
       ],
     );

@@ -3,6 +3,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_localizations.dart';
+import '../../l10n/l10n_extensions.dart';
 import '../../models/disability_type.dart';
 import '../../rendering/shader_filter.dart';
 
@@ -194,6 +196,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     if (_loading && _before == null) {
       // Non-animating placeholder while the first sample image is generated.
       // (A CircularProgressIndicator would animate forever and block
@@ -202,7 +205,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         height: 180,
         child: Center(
           child: Text(
-            'Preparing preview…',
+            l10n.previewPreparing,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -216,16 +219,17 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         // Stack the two panes vertically on narrow widths.
         final stackVertically = constraints.maxWidth < 420;
         final beforePane = _Pane(
-          label: 'Original',
+          label: l10n.previewPaneOriginal,
           child: _ImageView(image: _before),
         );
         final afterPane = _Pane(
           label: widget.filterType == ColorVisionType.none
-              ? 'Original'
-              : widget.filterType.displayName,
+              ? l10n.previewPaneOriginal
+              : colorVisionTypeName(l10n, widget.filterType),
           child: _after != null
               ? _ImageView(image: _after)
-              : _ComingSoonPlaceholder(theme: theme),
+              : _ComingSoonPlaceholder(
+                  theme: theme, label: l10n.previewComingSoon),
         );
 
         if (stackVertically) {
@@ -318,9 +322,10 @@ class _UiImagePainter extends CustomPainter {
 }
 
 class _ComingSoonPlaceholder extends StatelessWidget {
-  const _ComingSoonPlaceholder({required this.theme});
+  const _ComingSoonPlaceholder({required this.theme, required this.label});
 
   final ThemeData theme;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -338,7 +343,7 @@ class _ComingSoonPlaceholder extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Rendering coming soon',
+                label,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
