@@ -80,6 +80,11 @@ Rust で計算して FRB で渡すのが、二重実装を避ける唯一の方�
 > 第2サンプラ（floaters/`uMask`, depth_aware_blur/`uDepth`）・`int`/`uint`
 > （glaucoma, cataract, flickering_stars, metamorphopsia）・`uTime`
 > （vertigo, bppv_rotation）を要するフィルタは host 側対応待ちで対象外。
+> ここで「対象外」とは **shader codegen による live GPU 描画が未対応**という
+> 意味に限られる。これらの視覚フィルタ自体はカタログ（#16）や体験プリセット
+> （#19、vertigo / bppv_rotation 等を含む）から**選択・配線できる**（適用＝
+> 選択状態の確定）。live 描画の有無とプリセットからの選択可否は別の話であり、
+> 両者は矛盾しない。
 > さらに dry_eye / starbursts は GLSL の loop index が実行時値（radius,
 > iRayLen/numRays）と比較されており Impeller SkSL が拒否する（"loop index must be
 > compared with a constant expression"）ため、sensus 側で定数ループ境界に書き直す
@@ -135,6 +140,32 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
 - `visionUniformLayout(filter)` → `List<String>`（各インデックスの uniform 名。
   `.frag` の宣言順と突き合わせる検証用。`visionUniforms` と同じ長さ・順序）
 - `applyVisionCpuRgba8(...)` → `Uint8List`（将来用の CPU フォールバック。MVP 未使用）
+
+#### 複合体験（Experience）API（#10）
+
+視覚 + 聴覚 + 緊急度にまたがる「複合体験」の正準記述子を FRB で公開する
+（生成 Dart は `lib/src/rust/api/sensus_bridge.dart`）。メニエール病のような
+「回転性めまい（視覚）＋ 難聴・耳鳴り（聴覚）」は sensus の pure・別バッファ
+設計（画像／音声）では 1 バッファに収まらないため、「どの視覚フィルタとどの
+聴覚フィルタを組にすれば仕様どおりの複合体験になるか」の正準化を sensus から
+受け取る。
+
+- `experiences()` → `List<Experience>`（`frb(sync)`）。順序固定で 4 複合体験
+  `meniere` / `bppv` / `vestibular_neuritis` / `labyrinthitis` を返す。
+- `Experience`（ミラー型）— `id`（安定した英語識別子＝i18n キー）、
+  `vision: VisionFilter?`、`hearing: HearingFilter?`、`urgency: Urgency`。
+- `Urgency`（ミラー enum）— `None` / `EarlyConsultation` / `Emergency`。
+- `HearingFilter`（ミラー型・14 バリアント）— `HearingLoss` /
+  `SuddenHearingLoss { freq_hz }` / `Tinnitus { freq_hz }` / `Meniere` /
+  `Labyrinthitis` 等。payload 付きバリアントは sensus と同じフィールド名・型。
+
+文言は **一切持たない**（`id` と分類＝enum バリアントのみ）。体験名・受診喚起
+メッセージ・聴覚症状の説明といった表示文言の正本は ue 側 i18n（#18）にあり、
+`id` / `Urgency` 種別 / `HearingFilter` バリアントをキーに解決する。症状の
+組み合わせの正本は sensus-core。`HearingFilter` は **型として公開するだけ**で、
+音声再生（`apply_hearing` 相当）は本層のスコープ外であり**未実装**（聴覚モード
+設計に委ねる）。`experiences()` をワンタップ適用 UI として消費するのが体験
+プリセット集（#19、`lib/ui/widgets/experience_presets.dart`）。
 
 #### uniform レイアウト（MVP の 6 フィルタ）
 

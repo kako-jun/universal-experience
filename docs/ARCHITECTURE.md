@@ -9,6 +9,14 @@
 > （`lib/rendering/shader_filter.dart`）が担い、`FilterService` は選択状態のみを
 > 保持する。他アプリ含む全画面への適用は画面キャプチャ経路（#1/#3/#4）の実装後。
 > 以下の Platform Channel / Native 実装の節は当初設計の歴史的記述として残す。
+>
+> **追補（現状）**: 以下も実装済み。多言語化（#18・`flutter_localizations` +
+> ARB、ja/en、`lib/l10n/`）、sensus の複合体験 API の FRB 公開（#10・
+> `experiences()` / `Experience` / `Urgency` / `HearingFilter`、ただし音声再生は
+> 未実装）、体験プリセット集 UI（#19・`lib/ui/widgets/experience_presets.dart`）、
+> フィルタ済み画像のメタ焼き込み PNG エクスポート（#43・
+> `lib/services/export_service.dart`）。before / after の live 描画は
+> protanopia / protanomaly のみで、他フィルタは coming soon プレースホルダ。
 
 ## ルーペ窓挙動 (#14)
 
