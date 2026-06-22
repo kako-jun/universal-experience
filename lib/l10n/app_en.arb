@@ -159,6 +159,51 @@
     "description": "Prompt to seek timely care for high-urgency conditions. Must be accurate and not alarmist."
   },
 
+  "experienceSectionTitle": "Experience Presets",
+  "@experienceSectionTitle": {
+    "description": "Title of the experience-presets section that lists composite vestibular experiences from the sensus bridge."
+  },
+  "experienceSectionNote": "Curated composite experiences from sensus. Tap one to apply its vision filter. Some include hearing symptoms (audio playback is not yet supported).",
+  "@experienceSectionNote": {
+    "description": "Explanatory note under the experience-presets section. Must not over-promise; audio is out of scope here."
+  },
+  "experienceMeniere": "Ménière's disease",
+  "@experienceMeniere": {
+    "description": "Name of the Ménière's disease experience preset."
+  },
+  "experienceMeniereDesc": "Recurrent vertigo with low-tone hearing loss, ear fullness, and a low roaring tinnitus.",
+  "@experienceMeniereDesc": {
+    "description": "Short triad description of Ménière's disease. Accurate, non-alarmist."
+  },
+  "experienceBppv": "Benign paroxysmal positional vertigo",
+  "@experienceBppv": {
+    "description": "Name of the BPPV experience preset."
+  },
+  "experienceBppvDesc": "Brief spinning vertigo triggered by head-position changes, with no hearing symptoms.",
+  "@experienceBppvDesc": {
+    "description": "Short description of BPPV. Accurate, non-alarmist."
+  },
+  "experienceVestibularNeuritis": "Vestibular neuritis",
+  "@experienceVestibularNeuritis": {
+    "description": "Name of the vestibular neuritis experience preset."
+  },
+  "experienceVestibularNeuritisDesc": "Sudden, intense, continuous vertigo from vestibular nerve inflammation, with hearing preserved.",
+  "@experienceVestibularNeuritisDesc": {
+    "description": "Short description of vestibular neuritis. Accurate, non-alarmist."
+  },
+  "experienceLabyrinthitis": "Labyrinthitis",
+  "@experienceLabyrinthitis": {
+    "description": "Name of the labyrinthitis experience preset."
+  },
+  "experienceLabyrinthitisDesc": "Vertigo combined with high-tone hearing loss and a high-pitched tinnitus from inner-ear inflammation.",
+  "@experienceLabyrinthitisDesc": {
+    "description": "Short triad description of labyrinthitis. Accurate, non-alarmist."
+  },
+  "experienceIncludesHearingNote": "This experience also includes hearing symptoms (audio playback is not yet supported).",
+  "@experienceIncludesHearingNote": {
+    "description": "Note shown for experiences whose composite includes a hearing filter. Audio is out of scope for #19; only the vision filter is applied."
+  },
+
   "trayTooltip": "Universal Experience",
   "@trayTooltip": {
     "description": "Tray icon tooltip."
