@@ -115,8 +115,7 @@ class TrayMenuEntry {
       other.checked == checked;
 
   @override
-  int get hashCode =>
-      Object.hash(kind, key, label, colorVisionType, checked);
+  int get hashCode => Object.hash(kind, key, label, colorVisionType, checked);
 
   @override
   String toString() => 'TrayMenuEntry(kind: $kind, key: $key, label: $label, '
@@ -135,13 +134,48 @@ List<ColorVisionType> quickColorVisionFilters() => const <ColorVisionType>[
       ColorVisionType.achromatopsia,
     ];
 
-/// トレイに表示する [ColorVisionType] のラベル。
-/// モデルの `displayName` をそのまま使う。
-String colorVisionLabel(ColorVisionType type) => type.displayName;
+/// トレイメニューの表示文言を 1 つにまとめた値オブジェクト (#18)。
+///
+/// 純粋データ層 ([buildTrayMenuSpec]) は **文言を自前で持たない**。i18n の解決は
+/// UI/副作用層 ([TrayService]) の責務で、起動時ロケールの `AppLocalizations` から
+/// 文字列を取り出してここに詰めて渡す（context を持てないトレイ層の作法）。
+/// color-vision フィルタのラベルは id ごとに [filterLabels] で引く。
+@immutable
+class TrayMenuLabels {
+  const TrayMenuLabels({
+    required this.showLoupe,
+    required this.hideLoupe,
+    required this.clearFilter,
+    required this.openSettings,
+    required this.quit,
+    required this.filterLabels,
+  });
 
-/// ルーペ窓トグル項目のラベル (現在の表示状態で切り替わる)。
-String trayToggleLabel({required bool loupeVisible}) =>
-    loupeVisible ? 'ルーペ窓を隠す' : 'ルーペ窓を表示';
+  /// ルーペ窓を表示する項目のラベル（非表示状態のトグルに使う）。
+  final String showLoupe;
+
+  /// ルーペ窓を隠す項目のラベル（表示状態のトグルに使う）。
+  final String hideLoupe;
+
+  /// フィルタ解除項目のラベル。
+  final String clearFilter;
+
+  /// 設定を開く項目のラベル。
+  final String openSettings;
+
+  /// 終了項目のラベル。
+  final String quit;
+
+  /// color-vision id → 表示ラベル。[quickColorVisionFilters] の各型をカバーする。
+  final Map<ColorVisionType, String> filterLabels;
+
+  /// ルーペ窓トグルのラベルを表示状態に応じて返す。
+  String toggleLabel({required bool loupeVisible}) =>
+      loupeVisible ? hideLoupe : showLoupe;
+
+  /// 指定 color-vision 型のラベル（未登録なら id をフォールバック表示）。
+  String filterLabel(ColorVisionType type) => filterLabels[type] ?? type.id;
+}
 
 /// 色覚フィルタ項目の安定キー (フィルタ id から導出)。
 String colorVisionEntryKey(ColorVisionType type) => 'filter_${type.id}';
@@ -155,16 +189,18 @@ const String kQuitKey = 'quit';
 /// トレイメニュー全体を純粋データとして組み立てる。
 ///
 /// [loupeVisible] がトグルのラベルを、[activeFilter] がアクティブな
-/// クイックフィルタへのチェック表示を制御する。
+/// クイックフィルタへのチェック表示を制御する。表示文言は呼び出し側が i18n
+/// 解決して [labels] で渡す（純粋層は文言を持たない: #18）。
 List<TrayMenuEntry> buildTrayMenuSpec({
   required bool loupeVisible,
+  required TrayMenuLabels labels,
   ColorVisionType activeFilter = ColorVisionType.none,
 }) {
   return <TrayMenuEntry>[
     TrayMenuEntry(
       kind: TrayMenuKind.toggleLoupe,
       key: kToggleLoupeKey,
-      label: trayToggleLabel(loupeVisible: loupeVisible),
+      label: labels.toggleLabel(loupeVisible: loupeVisible),
       checked: loupeVisible,
     ),
     const TrayMenuEntry.separator(),
@@ -172,27 +208,27 @@ List<TrayMenuEntry> buildTrayMenuSpec({
       TrayMenuEntry(
         kind: TrayMenuKind.applyColorVisionFilter,
         key: colorVisionEntryKey(f),
-        label: colorVisionLabel(f),
+        label: labels.filterLabel(f),
         colorVisionType: f,
         checked: f == activeFilter,
       ),
     TrayMenuEntry(
       kind: TrayMenuKind.clearFilter,
       key: kClearFilterKey,
-      label: 'フィルタを解除',
+      label: labels.clearFilter,
       checked: activeFilter == ColorVisionType.none,
     ),
     const TrayMenuEntry.separator(),
-    const TrayMenuEntry(
+    TrayMenuEntry(
       kind: TrayMenuKind.openSettings,
       key: kOpenSettingsKey,
-      label: '設定を開く…',
+      label: labels.openSettings,
     ),
     const TrayMenuEntry.separator(),
-    const TrayMenuEntry(
+    TrayMenuEntry(
       kind: TrayMenuKind.quit,
       key: kQuitKey,
-      label: '終了',
+      label: labels.quit,
     ),
   ];
 }
@@ -218,6 +254,8 @@ class TrayService with TrayListener {
   TrayService({
     required this.filterService,
     required this.iconPath,
+    required this.labels,
+    required this.tooltip,
     required this.onShowLoupe,
     required this.onHideLoupe,
     required this.onOpenSettings,
@@ -230,6 +268,12 @@ class TrayService with TrayListener {
 
   /// トレイアイコンのアセットパス (PNG)。`assets/tray/` 参照。
   final String iconPath;
+
+  /// トレイメニューの i18n 解決済み文言 (#18)。起動時ロケールで解決して渡す。
+  final TrayMenuLabels labels;
+
+  /// トレイアイコンのツールチップ（= アプリ名、i18n 解決済み）。
+  final String tooltip;
 
   /// ルーペ窓を表示する (main.dart が windowManager.show を呼ぶ)。
   final Future<void> Function() onShowLoupe;
@@ -271,7 +315,7 @@ class TrayService with TrayListener {
     try {
       trayManager.addListener(this);
       await trayManager.setIcon(iconPath);
-      await trayManager.setToolTip('Universal Experience');
+      await trayManager.setToolTip(tooltip);
       await _rebuildMenu();
       _initialised = true;
     } catch (error, stack) {
@@ -290,6 +334,7 @@ class TrayService with TrayListener {
   Future<void> _rebuildMenu() async {
     final spec = buildTrayMenuSpec(
       loupeVisible: _loupeVisible,
+      labels: labels,
       activeFilter: filterService.currentFilter,
     );
     final menu = Menu(items: spec.map(_toMenuItem).toList());
