@@ -135,8 +135,10 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
 
 - `visionShaderGlsl(filter)` → `String`（GLSL ソース。**ビルド時同期スクリプト用**。
   実行時にこの文字列を `FragmentProgram` へ流すわけではない）
-- `visionUniforms(filter, strength, width, height, seed)` → `Float32List`
-  （`setFloat(0..)` する順序の flat 配列。sensus の `*_uniforms()` を呼ぶだけ）
+- `visionUniforms(filter, strength, time, width, height)` → `Float32List`
+  （`setFloat(0..)` する順序の flat 配列。sensus の `*_uniforms()` を呼ぶだけ。
+  `time` は秒単位で、時間依存フィルタ（Vertigo / BppvRotation）の `uTime` に渡す。
+  それ以外のフィルタでは無視される）
 - `visionUniformLayout(filter)` → `List<String>`（各インデックスの uniform 名。
   `.frag` の宣言順と突き合わせる検証用。`visionUniforms` と同じ長さ・順序）
 - `applyVisionCpuRgba8(...)` → `Uint8List`（将来用の CPU フォールバック。MVP 未使用）
@@ -167,10 +169,19 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
 設計に委ねる）。`experiences()` をワンタップ適用 UI として消費するのが体験
 プリセット集（#19、`lib/ui/widgets/experience_presets.dart`）。
 
-#### uniform レイアウト（MVP の 6 フィルタ）
+#### uniform レイアウト（ドキュメント化済みの一部フィルタ）
 
 `setFloat(i, value)` の順序。`sampler2D uTexture` は `setImageSampler(0, ..)` で
 別途渡すため、この float 配列には含まない。
+
+> 以下の表は代表例のドキュメントであり網羅ではない。シェーダ codegen（§2.1）は
+> 20 フィルタを `.frag` に変換済みだが、UI（`before_after_view.dart`）から実際に
+> ライブ GPU 描画で呼ばれているのは **protanopia（と、それを弱い強度で流用する
+> protanomaly）のみ**。deuteranopia / tritanopia / achromatopsia は
+> `ShaderFilter.applyColorFilterGpu` の GPU golden テストで正しさを検証済みだが、
+> ホーム画面の before/after プレビューにはまだ配線されていない（#59）。各フィルタの
+> 正確なレイアウトは実装時に必ず `visionUniformLayout()` で確認すること（ここに
+> 書き写した値を信用しない）。
 
 | フィルタ | flat 配列 | 要素数 |
 |---|---|---|
@@ -188,31 +199,36 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
 
 ## 3. このフェーズ（1/3）で完了したこと
 
-- `rust/` crate を追加（selona と同構成、`flutter_rust_bridge = "=2.11.1"`、
-  `sensus-core = "0.5"` 依存）。`cargo build` / `cargo fmt` / `cargo clippy` 通過。
+- `rust/` crate を追加（別の flutter_rust_bridge プロジェクトと同構成、
+  `flutter_rust_bridge = "=2.11.1"`、`sensus-core = "0.5"` 依存）。
+  `cargo build` / `cargo fmt` / `cargo clippy` 通過。
 - ブリッジ API（上記 4 関数 + `VisionFilter` enum 6 種）を実装。`cargo test` 16 件通過。
 - FRB codegen 実行、`lib/src/rust/` に Dart バインディング生成。`flutter analyze`
   エラー 0（生成 web 版が inline-class を使うため Dart SDK 下限を 3.3 に引き上げ）。
 - 本ドキュメントで方言の結論と統合方針を確定。
 
-## 4. 次フェーズ（2/3）に残したこと
+## 4. 次フェーズ（2/3）に残したこと — 完了状況
 
-1. **GLSL → Impeller サブセット変換**（§2.1 案A）。**#12 で実装済み**:
+1. ✅ **完了（#12）**: **GLSL → Impeller サブセット変換**（§2.1 案A）。
    `tools/generate_shaders.dart` が repo 直下 `shaders/<name>.frag`（`assets/shaders/`
    ではない）へ 20 フィルタを生成し、`pubspec` の `shaders:` を列挙、`impellerc`
    を通すところまで完了（`flutter build linux --debug` で全 .frag コンパイル実証）。
-2. **Flutter 側のレンダリング配線**: `FragmentProgram.fromAsset` でロード →
-   `FragmentShader` に `visionUniforms()` の `Float32List` を `setFloat` で積む →
-   `setImageSampler(0, snapshot)` → `CustomPainter` 等で適用。
-3. **実機検証**: Linux/Android/Windows いずれかで実際に 1 フィルタを画面適用し、
+2. ✅ **完了（#11、protanopia のみ）**: **Flutter 側のレンダリング配線**。
+   `FragmentProgram.fromAsset` でロード → `FragmentShader` に `visionUniforms()` の
+   `Float32List` を `setFloat` で積む → `setImageSampler(0, snapshot)` →
+   `CustomPainter`（`before_after_view.dart`）で適用、を protanopia について実装。
+   汎用 `applyColorFilterGpu` も追加済みだが、home 画面への配線は protanopia 系のみ。
+3. ⬜ **未完了**: **実機検証**。macOS/Linux で実際に画面へ 1 フィルタを適用し、
    sensus の CPU 出力（または既知の見え方）と目視一致を確認する（CLAUDE.md の
-   完了判定: 実機 golden path）。本フェーズは環境（ネイティブツールチェーン未導入）
-   のため `flutter run` 未実施。
-4. **フィルタ網羅の拡張**: `VisionFilter` を `sensus_core::Filter` の全バリアントへ
-   広げる（cataract/floaters の seed、glaucoma の mode、astigmatism の axis_deg、
-   時間依存の vertigo/bppv など、payload を FRB へ反映）。
-5. 既存 `lib/core/color_vision_simulator.dart`（ue 内の LMS 実装）の撤去は
-   **別 Issue（3/3）**。→ **#13 で撤去済み**（下記 §5）。
+   完了判定: 実機 golden path）。現状は `flutter test`（ヘッドレス）の GPU golden
+   テスト（PSNR/maxDiff 一致）で代替しており、実機での目視確認は未実施。
+4. 🟡 **部分実装**: **フィルタ網羅の拡張**。`VisionFilter`/カタログは
+   `sensus_core::Filter` の全 30 種を選択・パラメータ調整できる状態まで広がった
+   （#16）が、ライブ GPU 描画が配線されているのは上記のとおり一部のみ。
+   payload 付きフィルタ（cataract/floaters の seed、glaucoma の mode、astigmatism
+   の axis_deg、時間依存の vertigo/bppv 等）の描画配線は個別 Issue（#59 等）で継続中。
+5. ✅ **完了（#13）**: 既存 `lib/core/color_vision_simulator.dart`（ue 内の LMS 実装）の
+   撤去。詳細は下記 §5。
 
 ---
 

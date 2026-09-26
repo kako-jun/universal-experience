@@ -203,7 +203,8 @@ func applyColorFilter(type: ColorVisionType) {
 - ただし、これらの直接操作は非推奨
 
 #### システム要件
-- macOS 10.14 (Mojave)以降
+- macOS 10.14 (Mojave)以降（この API 自体の要件。ue アプリ本体の現行最低対応バージョンは
+  macOS 12+）
 - アクセシビリティ権限が必要な場合がある
 
 #### 利点

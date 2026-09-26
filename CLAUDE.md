@@ -15,32 +15,52 @@
 ```
 lib/
 ├── main.dart
-├── core/
-│   └── color_vision_simulator.dart  # LMS変換アルゴリズム ※#13で撤去済み・現存しない（詳細は docs/adr/）
+├── l10n/                   # 多言語化（ARB: app_en.arb / app_ja.arb、ja/en。生成物は非コミット）
 ├── models/
-│   └── disability_type.dart         # 障害タイプ定義
+│   ├── disability_type.dart
+│   └── vision_filter_catalog.dart   # sensus カタログ（30種）の Dart 側定義
+├── rendering/
+│   └── shader_filter.dart           # sensus 由来 GLSL → Impeller FragmentProgram 適用
 ├── services/
-│   └── filter_service.dart          # フィルタ適用サービス
+│   ├── export_service.dart          # PNG エクスポート（メタ焼き込み）
+│   ├── filter_service.dart          # 選択状態モデル（sensus VisionFilter へのマッピング）
+│   ├── loupe_window_controller.dart # ルーペ窓のモード/透過/最前面
+│   ├── settings_service.dart
+│   ├── tray_service.dart            # タスクトレイ
+│   └── vision_filter_state.dart
+├── src/rust/                        # flutter_rust_bridge 生成コード（sensus-core 連携）
 └── ui/
     ├── screens/home_screen.dart
-    ├── widgets/
-    │   ├── filter_selector.dart
-    │   └── intensity_slider.dart
+    ├── widgets/                     # filter_selector, intensity_slider, before_after_view,
+    │                                 # experience_presets, filter_catalog_selector, filter_param_panel
     └── theme/app_theme.dart
 
-plugins/color_vision_filter/  # ※#13で撤去済み・現存しない（詳細は docs/adr/）
-├── lib/                    # Dart API
-├── android/                # Kotlin実装
-├── windows/                # C++実装
-├── macos/                  # Swift実装（計画中）
-└── linux/                  # C++実装（計画中）
+rust/                        # sensus-core を FRB で公開する Rust crate
+├── Cargo.toml
+└── src/
+    ├── api/sensus_bridge.rs
+    ├── frb_generated.rs
+    └── golden_gen.rs        # GPU golden 参照生成（#[cfg(test)] のみ）
+
+tools/                       # シェーダ codegen（sensus の .frag → Impeller サブセットへ機械変換）
+shaders/                     # 変換済み .frag（ビルド時 impellerc がコンパイル）
+
+macos/                       # macOS ランナー（現行対応）
+linux/                       # Linux ランナー（現行対応）
+# Android / Windows ランナーは計画中（未作成）
 
 docs/
+├── adr/                     # 設計判断の正本（Architecture Decision Records）
 ├── ARCHITECTURE.md
 ├── COLOR_ALGORITHM.md
 ├── GETTING_STARTED.md
-└── PLATFORM_APIS.md
+├── PLATFORM_APIS.md
+├── sensus-integration.md
+└── competitive-analysis.md
 ```
+
+`core/`（旧 LMS 実装）と `plugins/color_vision_filter/`（旧 system-wide ネイティブプラグイン）は
+#13 で撤去済みで現存しない。経緯は `docs/adr/2026-05-31-sensus-core-consolidation.md` を参照。
 
 ## アーキテクチャ
 
@@ -49,11 +69,9 @@ Flutter UI (Presentation)
     ↓
 Services / State (Provider)
     ↓
-Platform Channel
+flutter_rust_bridge (FRB)
     ↓
-Native Plugin (Android/Windows/macOS/Linux)
-    ↓
-OS System APIs
+sensus-core (Rust, アルゴリズム正本) + FragmentProgram シェーダ (GPU 描画)
 ```
 
 ## 色覚アルゴリズム
@@ -72,33 +90,23 @@ RGB → LMS → CVD Simulation → LMS → RGB
 
 | タイプ | 有病率（男性） |
 |--------|--------------|
-| Deuteranopia | 5% |
-| Protanopia | 1% |
-| Deuteranomaly | 5% |
-| Protanomaly | 1% |
+| Deuteranopia | 約1% |
+| Protanopia | 約1% |
+| Deuteranomaly | 約5% |
+| Protanomaly | 約1% |
 | Tritanopia | 0.001% |
 
 ## プラットフォーム実装
 
-### Android
+かつては OS 全体（他アプリ含む全画面）へ色覚フィルタを適用する独自ネイティブ機構
+（Android: AccessibilityService + Overlay、Windows: Magnification API、macOS:
+CGSetDisplayTransferByTable、Linux: Wayland/X11 compositor 連携）を目指していたが、
+sensus-core への一元化に伴い撤去した。判断の経緯・代替案・根拠は
+`docs/adr/2026-05-31-sensus-core-consolidation.md` を参照。各 API の調査自体は
+歴史的記録として `docs/PLATFORM_APIS.md` に残す。
 
-- AccessibilityService + Overlay
-- ColorMatrix + ColorMatrixColorFilter
-
-### Windows
-
-- Magnification API
-- MAGCOLOREFFECT (5x5 matrix)
-
-### macOS (計画中)
-
-- CGSetDisplayTransferByTable (Public API)
-- Private API回避でApp Store対応
-
-### Linux (計画中)
-
-- Wayland: GNOME Shell Extension / KWin Effects
-- X11: XRandR fallback
+現在は sensus 由来の GPU シェーダでルーペ窓内の画像にフィルタを適用する方式を採る
+（`docs/adr/2026-09-26-loupe-as-single-render-unit.md`）。
 
 ## 設計判断
 
@@ -134,10 +142,14 @@ flutter run
 `.github/workflows/ci.yml` が push/PR（main）で flutter analyze / flutter test と、
 `rust/` の cargo fmt --check / clippy --all-targets -D warnings / cargo test を回す
 （runs-on: macos-latest。Flutter golden を生成プラットフォームと揃えるため）。rust 依存は
-crates.io のみ（sensus-core）なので selona のような private 依存の deploy key は不要。
+crates.io のみ（sensus-core）なので、private 依存を git 経由で引く場合に要る
+deploy key / ssh-agent 設定は不要。
 
 ## ロードマップ
 
-- **Phase 1**: 色覚障害シミュレーション（80%完成）
-- **Phase 2**: 聴覚障害シミュレーション
-- **Phase 3**: 視野欠損、視覚ぼやけ、運動障害
+- **Phase 1**: 色覚障害シミュレーション — 進行中。ライブ GPU 描画は protanopia /
+  protanomaly のみ配線済みで、他の色覚型・advanced フィルタは選択・パラメータ調整は
+  できるが描画は「準備中」表示（詳細は GitHub Issues、特に #34 / #2 / #59）
+- **Phase 2**: 聴覚障害シミュレーション — 複合体験の型定義（FRB, `HearingFilter`）は
+  公開済みだが、音声の加工・再生は未実装
+- **Phase 3**: 視野欠損、視覚ぼやけ、運動障害 — 未着手

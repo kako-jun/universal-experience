@@ -66,9 +66,11 @@ universal-experience はこの路線を取らない（OS 設定変更ではな�
    - crates.io 公開で OSS 視覚シミュレーション基盤として再利用可能
    - 競合は単体アプリ実装でロジック再利用できず
 
-3. **4 OS ネイティブ対応（Win / Mac / Linux / Android）**
+3. **クロスプラットフォーム設計（現行対応: macOS / Linux。Windows / Android は計画中）**
    - Sim Daltonism は macOS/iOS、DaltonLens は Win/Mac/Linux のみ
-   - **Android 対応のデスクトップ型ルーペは皆無**（CVS はカメラ入力のみ）
+   - Android への対応が実現すれば、**Android 対応のデスクトップ型ルーペは皆無**
+     （CVS はカメラ入力のみ）という空白地帯を埋められるが、現状 Android ランナーは
+     未作成で対応済みではない
 
 4. **医学的注記の併載**
    - 各フィルタに「こうなったらすぐ病院へ」を併記
@@ -109,12 +111,15 @@ VIP-Sim 論文 (UIST 2025) が最大の事前研究。kako-jun の打ち出し�
 実装が進んだ段階で VIP-Sim を参照ベンチに再対照した（#6）。要点:
 
 - **ライセンス**: VIP-Sim は **CC BY 4.0**（arXiv:2507.10479, UIST 2025, Unity, Win/Mac）。派生・比較利用時は出典表示で扱える。
-- **ue が広い**: 対応症状は **30 種**（VIP-Sim は 21 種）、軸付き乱視・物理光学屈折、Android、OSS Rust crate（sensus）、受診喚起の併載、聴覚ロードマップ。
+- **ue が広い**: **選択・パラメータ調整できる症状は 30 種**（VIP-Sim は 21 種。ただし
+  実際にライブ GPU 描画できるのは一部のみ、後述）、軸付き乱視・物理光学屈折、
+  OSS Rust crate（sensus）、受診喚起の併載、聴覚ロードマップ。対応 OS は現行
+  macOS / Linux で、Android / Windows は計画中（ランナー未作成）。
 - **ue が決定的に遅れている点（正直に）**: VIP-Sim を「今日使える物」にしている **リアルタイム画面キャプチャが ue では未稼働**。ue は現状、合成したデモ画像に対してのみフィルタを適用し、**ライブ描画は protanopia / protanomaly のみ**。この差は既存の #1（親）/#3/#4/#5 で追跡中。
 - **VIP-Sim の新規性の柱**: ① **視線追従（gaze-contingent）** webcam + マウス、② **複数症状の同時適用（compositing）**（"one or multiple symptoms"）。ue は前者を #42、後者を #41 として起票済み（いずれも現状は未実装）。
 - **ue の差別化（VIP-Sim に無い）**: フィルタ済み画像のメタ焼き込み **PNG エクスポート**（#43 実装済み）。
 
-打ち出しの注意: live キャプチャと compositing が稼働するまでは「常駐ルーペとして VIP-Sim を代替できる」とは言わない。**精度（linear sRGB / disk blur / 軸付き乱視）・症状網羅・Rust crate・Android・受診喚起**という、現に手元にある強みに限定して訴求する。
+打ち出しの注意: live キャプチャと compositing が稼働するまでは「常駐ルーペとして VIP-Sim を代替できる」とは言わない。Android 対応も計画段階でありまだ実現していない。**精度（linear sRGB / disk blur / 軸付き乱視）・症状網羅（カタログとしての 30 種）・Rust crate・受診喚起**という、現に手元にある強みに限定して訴求する。
 
 ## 出典
 

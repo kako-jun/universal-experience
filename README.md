@@ -12,7 +12,7 @@
 - Deuteranopia（2型色覚・緑色盲）
 - Tritanopia（3型色覚・青黄色盲）
 - Achromatopsia（全色盲）
-- Protanomaly / Deuteranomaly / Tritanomaly（各2色覚）
+- Protanomaly / Deuteranomaly / Tritanomaly（各異常3色覚。錐体機能の部分低下）
 
 色覚変換アルゴリズムの正本は別 crate
 [`sensus-core`](https://crates.io/crates/sensus-core)（Rust）に一元化しており、
@@ -21,9 +21,9 @@ ue はそれを flutter_rust_bridge 経由で消費する薄いブリッジで�
 GPU シェーダ（`lib/rendering/shader_filter.dart`）で計算し、強度調整も可能です。
 
 > ただし現状、一部の uniform（シェーダへ渡す変換行列）は
-> `lib/rendering/shader_filter.dart` に暫定的にハードコードされています
-> （`TODO(#11後続)`）。これらは #11 後続で flutter_rust_bridge 経由の
-> sensus-core 取得値へ置き換え、二重実装を解消する予定です。
+> `lib/rendering/shader_filter.dart` に暫定的にハードコードされています。
+> これらは #34 で flutter_rust_bridge 経由の sensus-core 取得値へ置き換え、
+> 二重実装を解消する予定です。
 
 > 旧バージョンは OS 全体へ system-wide フィルタを適用する独自プラグイン
 > （`plugins/color_vision_filter`）と ue 内 LMS 実装を持っていましたが、
@@ -34,7 +34,7 @@ GPU シェーダ（`lib/rendering/shader_filter.dart`）で計算し、強度調
 > protanopia / protanomaly のみです（protanomaly は protanopia の変換を
 > 弱い強度で再利用）。それ以外の色覚 7 型・後述の advanced フィルタは、
 > カタログから選択・パラメータ調整はできますが、ライブ描画は「coming soon」
-> プレースホルダ表示で、GPU 描画配線は #11 後続で順次対応します。
+> プレースホルダ表示で、GPU 描画配線は #2 の後続として順次対応します。
 
 ### 視覚 advanced フィルタ（sensus カタログ）
 
@@ -92,12 +92,17 @@ UI は **日本語 / 英語** に対応しています（`flutter_localizations`
 
 ## 対応プラットフォーム
 
-- Android 6.0+
-- Windows 10/11
-- macOS 10.14+
-- Linux (Ubuntu 20.04+)
+現行で対応（ランナーが存在し、ビルド・実行できる）:
 
-※ iOS は技術的制約により非対応
+- macOS 12+
+- Linux (Ubuntu 20.04+ 目安、GTK 3 ベース)
+
+計画中（ランナー未作成）:
+
+- Android
+- Windows
+
+※ iOS は技術的制約により非対応（`docs/adr/2025-11-17-no-ios-support.md`）
 
 ## セットアップ
 
@@ -108,9 +113,13 @@ flutter pub get
 flutter run
 ```
 
+Rust ツールチェーン（`cargo` / `rustc`、stable channel）が必要です。`rust/` crate を
+flutter_rust_bridge が生成物として要求します（詳細は `docs/GETTING_STARTED.md`）。
+
 ## 技術スタック
 
-- Flutter 3.2+
+- Flutter 3.19+（`pubspec.yaml` の `sdk: '>=3.3.0 <4.0.0'` が要求する Dart 3.3 の
+  同梱バージョン）
 - Provider (状態管理)
 - Material Design 3
 - 多言語化は `flutter_localizations` + ARB（`lib/l10n/app_en.arb` / `app_ja.arb`、ja/en）

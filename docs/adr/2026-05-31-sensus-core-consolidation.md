@@ -82,9 +82,9 @@ ue は色覚シミュレーションのアルゴリズムを**二重に**持っ�
 - `docs/COLOR_ALGORITHM.md` / `docs/PLATFORM_APIS.md` / `docs/ARCHITECTURE.md` の
   Platform Channel / Native 実装・LMS 行列の記述は **#13 以前の歴史的記録**で、
   各冒頭にその旨の注記がある。
-- `CLAUDE.md` の「プロジェクト構造」には `plugins/color_vision_filter/` や
-  `lib/core/color_vision_simulator.dart` が残っているが、これらは **#13 で撤去済み**で
-  現存しない。本 ADR が現状（sensus-core 一元化）の正本である。
+- `CLAUDE.md` の「プロジェクト構造」も #53 でこの現状に合わせて更新済み
+  （`plugins/color_vision_filter/` / `lib/core/color_vision_simulator.dart` の記述は
+  削除済み）。本 ADR が現状（sensus-core 一元化）の判断根拠の正本である。
 
 ## 関連 Issue・PR・docs
 

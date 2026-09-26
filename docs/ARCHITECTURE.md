@@ -198,287 +198,69 @@ TODO コメントを残してある。
 #11 描画統合前のため本実装段階では未実施。`flutter analyze` / `flutter test` /
 `flutter build linux --debug` で静的・ビルド確認のみ。実機目視は #11 描画統合後に行う。
 
-## システムアーキテクチャ
+## システムアーキテクチャ（現行）
 
-Universal Experienceは、Flutterベースのクロスプラットフォームアプリケーションとして設計されています。
-
-## レイヤー構造
-
-```
-┌─────────────────────────────────────────┐
-│     Flutter UI Layer (Dart)             │
-│  - Screens, Widgets, Theme              │
-│  - User Interaction                     │
-└─────────────────────────────────────────┘
-                 ↓
-┌─────────────────────────────────────────┐
-│  Business Logic Layer (Dart)            │
-│  - FilterService (State Management)     │
-│  - Models (DisabilityType, etc.)        │
-└─────────────────────────────────────────┘
-                 ↓
-┌─────────────────────────────────────────┐
-│  Platform Channel Layer                 │
-│  - Method Channel Interface             │
-│  - Platform-specific Plugin API         │
-└─────────────────────────────────────────┘
-                 ↓
-┌─────────────────────────────────────────┐
-│  Native Implementation Layer            │
-│  - Android: Kotlin/Java                 │
-│  - Windows: C++/C#                      │
-│  - macOS: Swift/Objective-C             │
-│  - Linux: C++                           │
-└─────────────────────────────────────────┘
-                 ↓
-┌─────────────────────────────────────────┐
-│  OS System APIs                         │
-│  - Graphics/Compositing APIs            │
-│  - Accessibility Services               │
-└─────────────────────────────────────────┘
-```
-
-## コンポーネント詳細
-
-### 1. Flutter UI Layer
-
-**責務**: ユーザーインターフェースの提供
-
-**主要コンポーネント**:
-- `HomeScreen`: メイン画面
-- `FilterSelector`: フィルタタイプ選択UI
-- `IntensitySlider`: 強度調整UI
-- `AppTheme`: アプリ全体のテーマ定義
-
-### 2. Business Logic Layer
-
-**責務**: アプリケーションロジックと状態管理
-
-**主要コンポーネント**:
-- `FilterService`: フィルタの状態管理とプラットフォームへの指示
-- `DisabilityType`: 障害タイプの定義
-- `ColorVisionType`: 色覚障害タイプの詳細定義
-
-### 3. Platform Channel Layer
-
-**責務**: Dart ↔ ネイティブコード間の通信
-
-**メソッド**:
-```dart
-// フィルタの適用
-await ColorVisionFilter.apply(String type, double intensity)
-
-// フィルタの強度変更
-await ColorVisionFilter.setIntensity(double intensity)
-
-// フィルタの解除
-await ColorVisionFilter.remove()
-
-// フィルタの状態取得
-Map<String, dynamic> state = await ColorVisionFilter.getState()
-```
-
-### 4. Native Implementation Layer
-
-各プラットフォーム固有の実装を提供します。
-
-## プラットフォーム別実装戦略
-
-### Android
-
-**アプローチ**: Accessibility Service + Overlay
+Universal Experience は Flutter（UI）+ Rust（sensus-core、アルゴリズム正本）の
+二言語構成。全体の層構造は本ファイル冒頭の要約と `docs/adr/2026-05-31-flutter-rust-split.md`
+を参照。
 
 ```
-1. AccessibilityService登録
-2. SurfaceViewでオーバーレイ作成
-3. Canvas/Shaderで色変換処理
-4. リアルタイム画面キャプチャ & フィルタ適用
-```
-
-**主要API**:
-- `AccessibilityService`
-- `WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY`
-- `Canvas`, `Paint`, `ColorMatrix`
-
-**課題**:
-- パフォーマンス最適化
-- バッテリー消費の管理
-
-### Windows
-
-**アプローチ**: Magnification API / DirectComposition
-
-```
-1. Magnification APIでシステム全体の色変換
-2. ColorEffectで変換行列を設定
-3. または DirectComposition で画面合成時にフィルタ
-```
-
-**主要API**:
-- `MagSetFullscreenColorEffect`
-- `MagInitialize`, `MagUninitialize`
-- DirectComposition (Windows 8+)
-
-**利点**:
-- システムレベルの統合
-- 高パフォーマンス
-
-### macOS
-
-**アプローチ**: Core Graphics Filters
-
-```
-1. CGDisplaySetDisplayFilters
-2. Quartz FilterでLMS変換実装
-3. システム全体に適用
-```
-
-**主要API**:
-- `CGDisplaySetDisplayFilters`
-- Core Image Filters
-- Accessibility Inspector (開発用)
-
-**注意**:
-- macOS 10.14以降でAPI変更
-- サンドボックス制限への対応
-
-### Linux
-
-**アプローチ**: Compositor連携
-
-```
-1. Wayland: wl_output filters
-2. X11: XRandR gamma correction
-3. または compton/picom compositorプラグイン
-```
-
-**主要API**:
-- Wayland Protocol Extensions
-- XRandR (X11)
-- Compositor-specific plugin APIs
-
-**課題**:
-- ディスプレイサーバーの多様性
-- 各環境での互換性確保
-
-## データフロー
-
-### フィルタ適用フロー
-
-```
-User Action (UI)
+Flutter UI (Screens/Widgets, Provider)
       ↓
-FilterService.applyFilter()
+FilterService / VisionFilterState (選択状態モデル)
       ↓
-State Update (Provider)
+flutter_rust_bridge (lib/src/rust/)
       ↓
-Platform Channel Call
+sensus-core (Rust, GLSL + uniform 計算の正本)
       ↓
-Native Plugin Handler
-      ↓
-OS-Specific Filter Application
-      ↓
-Visual Feedback to User
+ShaderFilter (lib/rendering/) — Impeller FragmentProgram で ui.Image に適用
 ```
 
-### 状態管理フロー
+### 主要コンポーネント
 
-```
-FilterService (ChangeNotifier)
-      ↓
-Consumer<FilterService> (UI)
-      ↓
-UI Rebuild on notifyListeners()
-```
+- `HomeScreen`: メイン画面。色覚クイック選択・強度スライダ・before/after プレビュー・
+  advanced カタログ・体験プリセット・PNG エクスポートをまとめる
+- `FilterService`: 色覚フィルタ（`ColorVisionType`）の選択状態管理。
+  sensus `VisionFilter` へのマッピングを持つ純粋な状態モデル
+- `VisionFilterState`: advanced カタログ（sensus 全 30 種）の選択・パラメータ状態
+- `ShaderFilter`（`lib/rendering/shader_filter.dart`）: sensus 由来 GLSL を変換した
+  Impeller `FragmentProgram` で `ui.Image` にフィルタを適用する。現状ライブ描画済みは
+  色変換系（protanopia/deuteranopia/tritanopia/achromatopsia）＋ myopia/photophobia
+  クラスの一部で、他は #59 等で順次拡張
+- `ExportService`: フィルタ適用後（after）画像のメタ焼き込み PNG エクスポート
+- `ExperiencePresets`（`lib/ui/widgets/experience_presets.dart`）: sensus の
+  `experiences()` をワンタップ適用 UI として消費する（複合体験、#19）
 
-## セキュリティ考慮事項
+### 過去の設計: system-wide プラグイン（#13 で撤去）
 
-1. **権限管理**:
-   - Android: SYSTEM_ALERT_WINDOW, BIND_ACCESSIBILITY_SERVICE
-   - macOS: Accessibility permissions
-   - Linux: Compositor access
+当初は Android（AccessibilityService + Overlay）/ Windows（Magnification API）/
+macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR）それぞれの
+ネイティブ機構で OS 全体に色覚フィルタを適用する Platform Channel + Native Plugin 構成を
+計画・調査していた。この構成は撤去済みで、判断の経緯・代替案・根拠は
+`docs/adr/2026-05-31-sensus-core-consolidation.md` に、各 API 調査そのものは歴史的記録として
+`docs/PLATFORM_APIS.md` にまとめてある。
 
-2. **サンドボックス**:
-   - macOS App Sandboxでの制限事項
-   - Windows UWP vs. Win32
+## テスト戦略（現行）
 
-3. **プライバシー**:
-   - 画面キャプチャ時のデータ保護
-   - 一時ファイルの暗号化
+- **ユニット/ウィジェットテスト**（`test/*.dart`, `flutter test`）: ARB 整合性・
+  トレイ純粋ロジック・ルーペ窓ポリシー・PNG エクスポート・シェーダ codegen ドリフト
+  検証・体験プリセット等を含む
+- **GPU golden テスト**（`test/vision_filter_golden_test.dart` /
+  `test/protanopia_golden_test.dart`）: sensus-core 正本由来の参照 PNG と GPU 描画結果を
+  PSNR/maxDiff で比較（詳細は `docs/sensus-integration.md` §6）
+- **Rust 側**: `cargo test`（`rust/`、`golden_gen.rs` の正本一致テストを含む）
+- **CI**（#38、完了）: `.github/workflows/ci.yml` が push/PR で上記を回す
+- **タスクトレイ常駐**（#15、完了）: 実機でのトレイ表示・メニュー操作は環境制約
+  （Wayland + grim、GNOME のトレイ拡張要件）のため未検証。純粋ロジックの単体テストと
+  ビルド成功で代替している（上記「実機目視について」）
 
-## パフォーマンス最適化
+## 今後の拡張
 
-1. **リアルタイム処理**:
-   - GPU アクセラレーション活用
-   - シェーダーでの色変換
-   - フレームレート維持 (60fps目標)
-
-2. **リソース管理**:
-   - メモリ使用量の監視
-   - バッテリー消費の最適化
-   - CPU使用率の制限
-
-3. **起動時間**:
-   - 遅延初期化
-   - バックグラウンド起動
-
-## 拡張性設計
-
-### Phase 2: 聴覚障害対応
-
-```
-新規サービス: AudioFilterService
-新規プラグイン: audio_filter
-Platform APIs:
-- Android: AudioEffect
-- Windows: WASAPI
-- macOS: Core Audio
-- Linux: PulseAudio/ALSA
-```
-
-### Phase 3: その他の障害
-
-```
-モジュール化されたプラグインシステム
-- vision_field_filter (視野欠損)
-- blur_filter (視覚ぼやけ)
-- tremor_simulator (振戦シミュレーション)
-```
-
-## テスト戦略
-
-1. **ユニットテスト**:
-   - モデル、サービスのロジックテスト
-   - 色変換アルゴリズムの精度検証
-
-2. **ウィジェットテスト**:
-   - UI コンポーネントの動作確認
-   - 状態変化の検証
-
-3. **統合テスト**:
-   - プラットフォームチャネルの通信テスト
-   - エンドツーエンドフロー
-
-4. **プラットフォームテスト**:
-   - 各OS固有機能の動作確認
-   - パフォーマンステスト
-
-## デプロイメント
-
-```
-Development → Staging → Production
-
-Channels:
-- main: 安定版
-- beta: ベータ版
-- dev: 開発版
-```
-
-## 今後の技術的課題
-
-1. ✅ 色覚フィルタアルゴリズムの実装
-2. ⬜ プラットフォーム別ネイティブプラグイン開発
-3. ⬜ システム常駐機能の実装
-4. ⬜ パフォーマンス最適化
-5. ⬜ CI/CDパイプライン構築
-6. ⬜ 自動テストの拡充
+- **聴覚障害対応**: 複合体験の型定義（`HearingFilter` 14 種、`Experience`、`Urgency`。
+  FRB 公開済み、#10 部分実装）はあるが、実際の音声加工・再生は未実装。スコープに
+  入れるか／サンプル音源デモか／system audio リアルタイム加工かは #20 で検討中
+  （旧計画にあった `AudioFilterService` + `audio_filter` プラグインという構成は
+  この検討を経ていないため前提としない）
+- **視野欠損・視覚ぼやけ・運動障害等**: sensus-core のカタログには既に含まれ、
+  advanced フィルタとして選択・パラメータ調整はできる。live GPU 描画・専用 UI の
+  拡張は個別 Issue（#59 等）で順次対応する
