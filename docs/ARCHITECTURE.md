@@ -303,7 +303,10 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   PSNR/maxDiff で比較（詳細は `docs/sensus-integration.md` §6）
 - **Rust 側**: `cargo test`（`rust/`、`golden_gen.rs` の正本一致テストを含む）
 - **実ブリッジ integration test**（`integration_test/`、
-  `flutter test integration_test -d macos`、#55）:
+  `flutter test integration_test/experience_presets_smoke_test.dart -d macos` と
+  `flutter test integration_test/app_bootstrap_test.dart -d macos` の2コマンド
+  （CI では linux -d linux も）、#55。2ファイルを1回の `flutter test integration_test`
+  呼び出しにまとめるとデスクトップでは2番目のアプリ起動が失敗するため個別に実行する）:
   - `experience_presets_smoke_test.dart`: widget test は `experiencesProvider`
     を fixture に差し替えているため検知できない領域を、`initNativeBridge()`
     経由で実ネイティブライブラリをロードして確認する。`experiences()` の
@@ -318,7 +321,7 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   - `app_bootstrap_test.dart`（#55 レビュー M1）: 上記が自前の `setUpAll` で
     先に `initNativeBridge()` を呼んでしまうのに対し、こちらは新しい別プロセス
     （`RustLib` 未初期化）から `main()` が実際に呼ぶ `buildRootApp()` を直接
-    呼んで実起動経路そのものを検証する。`main()` 内の `initNativeBridge()`
+    呼んで実起動経路そのものを検証する。`buildRootApp()` 内の `initNativeBridge()`
     呼び出しが削除/誤配置される退行（#52 と同種）を、他のテストを変更せずに
     検知するための専用ファイル
 - **CI**（#38、完了）: `.github/workflows/ci.yml` は2ジョブ構成。`check`
@@ -327,8 +330,9 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   兼ねるため、Rust toolchain セットアップを build より前に置く。`linux-build`
   （ubuntu-latest、#55）は Linux 側の cargokit 同梱経路（`.so` がバンドルに
   含まれることの確認）と、xvfb 上での実ブリッジ integration test を検証する。
-  両ジョブとも `Swatinem/rust-cache` で crates.io 依存 + cargokit のビルド
-  出力をキャッシュする
+  `Swatinem/rust-cache` によるキャッシュ対象は両ジョブで異なり、`linux-build`
+  は cargokit のビルド出力も含めるが、`check`（macOS）は `rust/`（cargo target）
+  + crates.io 依存のみキャッシュする
 - **タスクトレイ常駐**（#15、完了）: 実機でのトレイ表示・メニュー操作は環境制約
   （Wayland + grim、GNOME のトレイ拡張要件）のため未検証。純粋ロジックの単体テストと
   ビルド成功で代替している（上記「実機目視について」）

@@ -7,7 +7,10 @@
 // （services/native_bridge_service.dart の initNativeBridge()）で本物の
 // experiences() / visionShaderGlsl() / visionUniformLayout() を呼ぶ。
 //
-// 実行: `flutter test integration_test -d macos`
+// 実行: `flutter test integration_test/experience_presets_smoke_test.dart -d macos`
+// app_bootstrap_test.dart と一緒に 1 回の `flutter test integration_test` へ
+// まとめて渡すと、デスクトップでは 2 番目に起動する側のアプリ起動待ちが失敗する
+// 既知の制約があるため、別コマンドとして実行する。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';

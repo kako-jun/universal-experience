@@ -12,7 +12,11 @@
 // smoke test と合流させると「本当に未初期化から通しで検証できているか」が
 // テスト順序に依存してしまうため、あえて別ファイルに分離している。
 //
-// 実行: `flutter test integration_test -d macos`（CI では linux -d linux も）
+// 実行: `flutter test integration_test/app_bootstrap_test.dart -d macos`
+// （CI では linux -d linux も）。experience_presets_smoke_test.dart と一緒に
+// 1 回の `flutter test integration_test` へまとめて渡すと、デスクトップでは
+// 2 番目に起動する側のアプリ起動待ちが失敗する既知の制約があるため、
+// 別コマンドとして実行する（詳細は .github/workflows/ci.yml のコメント参照）。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
