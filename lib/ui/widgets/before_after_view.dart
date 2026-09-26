@@ -206,16 +206,30 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// stale data or leaking GPU images (#58).
   int _generation = 0;
 
+  /// Latest pane logical square side / devicePixelRatio recorded by
+  /// [build]'s `LayoutBuilder` (#58 レビュー Q1: layout フェーズ自体は記録するだけ
+  /// で、判定・タイマー起動などの副作用は起こさない). Consumed by
+  /// [_evaluateAutoResize], which runs from a post-frame callback.
+  double? _pendingPaneLogicalSize;
+  double? _pendingDevicePixelRatio;
+  bool _autoResizeCallbackScheduled = false;
+
   static const int _minAutoSampleSize = 32;
-  static const int _maxAutoSampleSize = 1024;
+  static const int _maxAutoSampleSize = 2048; // #58 レビュー N5
   static const Duration _resizeDebounceDuration = Duration(milliseconds: 300);
+
+  /// Logical pane side used when the incoming layout constraints are
+  /// unbounded (e.g. inside a horizontally-scrolling list) and no real size
+  /// can be derived (#58 レビュー Q2).
+  static const double _fallbackPaneLogicalSize = 256;
 
   @override
   void initState() {
     super.initState();
     // Auto mode (widget.sampleSize == null) can't size itself yet — it has
     // no layout constraints until the first LayoutBuilder pass in build(),
-    // which triggers the first _rebuild via _handleLayout instead (#58).
+    // which triggers the first generation via _evaluateAutoResize instead
+    // (#58).
     final explicitSize = widget.sampleSize;
     if (explicitSize != null) {
       _rebuild(explicitSize);
@@ -225,17 +239,34 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   @override
   void didUpdateWidget(BeforeAfterView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.sampleSize != null) {
+      // #58 レビュー N2: 明示サイズに切り替わったら auto 用のリサイズタイマーは
+      // 不要（残っていると意味のない再生成が後から起きる）。
+      _cancelResizeTimer();
+    }
     if (oldWidget.filterType != widget.filterType ||
         oldWidget.intensity != widget.intensity ||
         oldWidget.sampleSize != widget.sampleSize) {
-      final size = widget.sampleSize ?? _currentSampleSize;
-      // If no generation has completed yet (auto mode, first layout still
-      // pending), skip: the upcoming/in-flight _rebuild already reads the
-      // current widget.filterType/intensity when it runs.
+      // #58 レビュー M1: auto モードで初回生成がまだ完了していない間に
+      // filterType/intensity が変わると、_currentSampleSize はまだ null。
+      // その場合は _pendingResizeSampleSize（初回/リサイズで既に決まっている
+      // 生成先サイズ）を使う。どちらも null なら auto の初回レイアウトが
+      // まだ来ていないということなので、そのレイアウトに任せてここでは何もしない
+      // （実行される _rebuild は呼び出し時点の widget.filterType/intensity を
+      // 読むので、更新は取りこぼされない）。
+      final size =
+          widget.sampleSize ?? _pendingResizeSampleSize ?? _currentSampleSize;
       if (size != null) {
+        // 直接 _rebuild するので、保留中のデバウンスタイマー（あれば）は不要。
+        _cancelResizeTimer();
         _rebuild(size);
       }
     }
+  }
+
+  void _cancelResizeTimer() {
+    _resizeDebounceTimer?.cancel();
+    _resizeDebounceTimer = null;
   }
 
   /// Desired sample resolution for a pane whose logical square side is
@@ -252,31 +283,70 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// Called from [build]'s `LayoutBuilder` with the pane's current logical
   /// square side and device pixel ratio (#58).
   ///
-  /// No-ops when [BeforeAfterView.sampleSize] is set explicitly (tests that
-  /// want a fixed, deterministic size). Otherwise: the very first generation
-  /// runs as soon as possible (deferred to after this frame, since `build()`
-  /// itself can't call `setState`); later changes (the pane being resized)
-  /// are debounced so a drag doesn't regenerate on every frame.
-  void _handleLayout(double paneLogicalSize, double devicePixelRatio) {
-    if (widget.sampleSize != null) return;
+  /// #58 レビュー Q1: レイアウトフェーズでは値を記録し、まだ1回も予約していなけ
+  /// れば post-frame コールバックを1つ予約するだけに留める。実際の判定（サイズ
+  /// が変わったか）・タイマーの起動・`_rebuild` の呼び出しはすべて
+  /// [_evaluateAutoResize]（post-frame コールバックからのみ呼ばれる）で行う。
+  void _recordPaneLayout(double paneLogicalSize, double devicePixelRatio) {
+    _pendingPaneLogicalSize = paneLogicalSize;
+    _pendingDevicePixelRatio = devicePixelRatio;
+    if (widget.sampleSize != null || _autoResizeCallbackScheduled) return;
+    _autoResizeCallbackScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _autoResizeCallbackScheduled = false;
+      _evaluateAutoResize();
+    });
+  }
+
+  /// Runs (only from a post-frame callback, never during layout/build — Q1)
+  /// the actual auto-size decision: no-ops when [BeforeAfterView.sampleSize]
+  /// is set explicitly (re-checked here too — N2 — in case it changed while
+  /// this callback was in flight) or the widget was disposed. Otherwise: the
+  /// very first generation runs immediately; later changes (the pane being
+  /// resized) are debounced so a drag doesn't regenerate on every frame.
+  void _evaluateAutoResize() {
+    if (!mounted || widget.sampleSize != null) return;
+    final paneLogicalSize = _pendingPaneLogicalSize;
+    final devicePixelRatio = _pendingDevicePixelRatio;
+    if (paneLogicalSize == null || devicePixelRatio == null) return;
     final target = _autoSampleSize(paneLogicalSize, devicePixelRatio);
-    if (target == _currentSampleSize || target == _pendingResizeSampleSize) {
+
+    if (target == _currentSampleSize) {
+      // #58 レビュー N1: A→B→A のようにサイズが元に戻った場合、B 用に予約され
+      // ていたデバウンスタイマーが残っていると、後で誤って B へ作り直してしまう
+      // ので、ここで破棄しておく。
+      if (_pendingResizeSampleSize != null &&
+          _pendingResizeSampleSize != target) {
+        _cancelResizeTimer();
+        _pendingResizeSampleSize = null;
+      }
       return;
     }
+    if (target == _pendingResizeSampleSize) return;
+
     _pendingResizeSampleSize = target;
-    _resizeDebounceTimer?.cancel();
-    _resizeDebounceTimer = null;
+    _cancelResizeTimer();
     if (_currentSampleSize == null) {
-      // First generation: don't debounce, but defer past this build frame
-      // (setState can't be called synchronously while building).
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _rebuild(target);
-      });
+      // First generation: no debounce. We're already inside a post-frame
+      // callback here, so calling _rebuild (and its setState) is safe.
+      _rebuild(target);
     } else {
       _resizeDebounceTimer = Timer(_resizeDebounceDuration, () {
-        if (mounted) _rebuild(target);
+        // #58 レビュー N2: 発火時点で改めて確認する。
+        if (mounted && widget.sampleSize == null) _rebuild(target);
       });
     }
+  }
+
+  /// Cleans up after a failed [_rebuild] (#58 レビュー S1): if this call is
+  /// still the latest request, resets `_loading`/`_pendingResizeSampleSize`
+  /// so the UI doesn't stay stuck on the "preparing" placeholder and a later
+  /// layout/update can retry. If a newer request has already superseded this
+  /// one, does nothing (that newer request owns the state now).
+  void _onRebuildFailed(int generation) {
+    if (generation != _generation || !mounted) return;
+    setState(() => _loading = false);
+    _pendingResizeSampleSize = null;
   }
 
   Future<void> _rebuild(int sampleSize) async {
@@ -285,25 +355,62 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     final reuseBefore = _before != null && _currentSampleSize == sampleSize;
     setState(() => _loading = true);
 
-    final before =
-        reuseBefore ? _before! : await sampleImageGenerator(sampleSize);
-    final after = await afterImageRenderer(
-      before,
-      widget.filterType,
-      widget.intensity,
-    );
+    final ui.Image before;
+    if (reuseBefore) {
+      before = _before!;
+    } else {
+      try {
+        before = await sampleImageGenerator(sampleSize);
+      } catch (_) {
+        // #58 レビュー S1: 生成に失敗しても loading に固着させず、次の
+        // レイアウト/更新で再試行できるようにする。
+        _onRebuildFailed(generation);
+        return;
+      }
+    }
 
     if (generation != _generation || !mounted) {
-      // Superseded by a newer request, or the widget was disposed while we
-      // were awaiting — discard this result instead of leaking a GPU image
-      // or calling setState after dispose (#58). `before` may still be
-      // identical to the current `_before` (e.g. a still-current image that
-      // a later request also happened to reuse); never dispose that one.
-      if (!reuseBefore && !identical(before, _before)) {
+      // #58 レビュー N3: generator の後・renderer の前でも世代を確認し、既に
+      // 追い越されていれば（GPU コストのかかる）renderer を呼ばずに捨てる。
+      if (!reuseBefore && !identical(before, _before)) before.dispose();
+      return;
+    }
+
+    // #58 レビュー S2: `before` が再利用中の `_before` そのものだと、await
+    // している間に別の（より新しい）`_rebuild` がそれを dispose する可能性が
+    // ある。renderer には複製を渡し、`_before`/`_after` の実体には触れさせない。
+    // 新規生成した `before` はまだどこにも共有されていないため複製不要。
+    final bool clonedInput = reuseBefore;
+    final ui.Image rendererInput = clonedInput ? before.clone() : before;
+
+    ui.Image? after;
+    try {
+      after = await afterImageRenderer(
+        rendererInput,
+        widget.filterType,
+        widget.intensity,
+      );
+    } catch (_) {
+      if (clonedInput) {
+        rendererInput.dispose();
+      } else if (!identical(before, _before)) {
         before.dispose();
       }
+      _onRebuildFailed(generation);
+      return;
+    }
+
+    final bool isLatest = generation == _generation && mounted;
+    if (!isLatest) {
+      // Superseded while we awaited the renderer, or disposed meanwhile —
+      // discard everything we produced instead of leaking or touching state
+      // a newer request already owns.
+      if (!reuseBefore && !identical(before, _before)) before.dispose();
+      if (clonedInput && !identical(rendererInput, after)) {
+        rendererInput.dispose();
+      }
       if (after != null &&
-          !identical(after, before) &&
+          !identical(after, rendererInput) &&
           !identical(after, _after)) {
         after.dispose();
       }
@@ -320,6 +427,12 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     });
     _pendingResizeSampleSize = null;
 
+    if (clonedInput && !identical(rendererInput, after)) {
+      // The clone only exists to protect the renderer call; it never becomes
+      // the new `_after` unless the renderer returned it unchanged
+      // (filterType == none), so dispose it now.
+      rendererInput.dispose();
+    }
     if (!identical(oldBefore, before)) {
       oldBefore?.dispose();
     }
@@ -334,7 +447,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
 
   @override
   void dispose() {
-    _resizeDebounceTimer?.cancel();
+    _cancelResizeTimer();
     _before?.dispose();
     // _after may alias _before (when filterType == none); avoid double dispose.
     if (!identical(_after, _before)) {
@@ -403,7 +516,9 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
+    // #58 レビュー N4: DPR だけを購読する（MediaQuery 全体の変更で余計に
+    // rebuild しない）。
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
 
     // Wraps the whole widget (including the loading placeholder) so the
     // pane's logical size is known from the very first build — auto sizing
@@ -413,13 +528,20 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         // Stack the two panes vertically on narrow widths.
         final stackVertically = constraints.maxWidth < 420;
         // Mirrors how each pane is actually sized below: full width when
-        // stacked, half (minus the 12px gutter) side-by-side.
-        final paneLogicalSize = stackVertically
+        // stacked, half (minus the 12px gutter) side-by-side. Falls back to
+        // a fixed logical size when the incoming constraints are unbounded
+        // (e.g. inside a horizontally-scrolling list) — #58 レビュー Q2.
+        final rawPaneLogicalSize = stackVertically
             ? constraints.maxWidth
             : (constraints.maxWidth - 12) / 2;
-        if (paneLogicalSize.isFinite && paneLogicalSize > 0) {
-          _handleLayout(paneLogicalSize, devicePixelRatio);
-        }
+        final paneLogicalSize =
+            rawPaneLogicalSize.isFinite && rawPaneLogicalSize > 0
+                ? rawPaneLogicalSize
+                : _fallbackPaneLogicalSize;
+        // #58 レビュー Q1: レイアウト（build）フェーズでは値を記録するだけ。
+        // 判定・タイマー起動などの副作用は _evaluateAutoResize（post-frame）で
+        // 行う。
+        _recordPaneLayout(paneLogicalSize, devicePixelRatio);
 
         if (_loading && _before == null) {
           // Non-animating placeholder while the first sample image is
