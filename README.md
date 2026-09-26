@@ -32,9 +32,11 @@ GPU シェーダ（`lib/rendering/shader_filter.dart`）で計算し、強度調
 
 > 現状、before / after の比較プレビューで実際に描画できるのは
 > protanopia / protanomaly のみです（protanomaly は protanopia の変換を
-> 弱い強度で再利用）。それ以外の色覚 7 型・後述の advanced フィルタは、
-> カタログから選択・パラメータ調整はできますが、ライブ描画は「coming soon」
-> プレースホルダ表示で、GPU 描画配線は #2 の後続として順次対応します。
+> 弱い強度で再利用）。それ以外の色覚 7 型は、クイック選択はできますが
+> ライブ描画は「描画は近日対応」（en: "Rendering coming soon"）のプレースホルダ
+> 表示で、GPU 描画配線は #59 等で順次対応します。後述の advanced カタログ・
+> 体験プリセットの選択も `VisionFilterState` に入るだけで、プレビューへの
+> 描画には反映されません（#60）。
 
 ### 視覚 advanced フィルタ（sensus カタログ）
 
@@ -43,7 +45,8 @@ sensus が提供する**計 30 種**（上記の色覚型を含む。屈折／�
 カテゴリ別に選択し、パラメータ・強度を調整できます。フィルタ定義の正本は
 sensus-core であり、ue はカタログ（`lib/models/vision_filter_catalog.dart`）
 から引きます。
-※ ライブ描画は上記の制約どおり一部のみ。
+※ 選択・パラメータ調整は `VisionFilterState` に反映されますが、プレビューへの
+ライブ描画は未配線です（#60）。
 
 ### 体験プリセット（複合症状）
 
@@ -57,9 +60,10 @@ sensus-core であり、ue はカタログ（`lib/models/vision_filter_catalog.d
 
 各プリセットは視覚フィルタを選択状態にし、緊急度に応じた受診喚起の注記を
 表示します。聴覚症状を含む体験（メニエール病・迷路炎）には「聴覚症状も含む」
-注記を出しますが、**音声再生は未実装**で、現状は視覚フィルタの適用と注記の
-表示にとどまります。プリセットの組み合わせ（どの視覚・聴覚フィルタが組に
-なるか）の正本は sensus-core の `experiences()` です。
+注記を出しますが、**音声再生は未実装**です。また、プリセットのタップでは
+`FilterService` が deactivate され、before/after 両ペインとも原画のままです
+（#60）。プリセットの組み合わせ（どの視覚・聴覚フィルタが組になるか）の正本は
+sensus-core の `experiences()` です。
 
 ### 画像エクスポート（PNG）
 
@@ -92,9 +96,10 @@ UI は **日本語 / 英語** に対応しています（`flutter_localizations`
 
 ## 対応プラットフォーム
 
-現行で対応（ランナーが存在し、ビルド・実行できる）:
+現行で対応（ランナーが存在し、ビルド・実行できる。macOS はビルド修正中、#54）:
 
-- macOS 12+
+- macOS 12+（deployment target を 12.0 へ引き上げ中、#54。現行設定の 10.15 は
+  Xcode 27 ではビルドできない）
 - Linux (Ubuntu 20.04+ 目安、GTK 3 ベース)
 
 計画中（ランナー未作成）:
@@ -113,13 +118,13 @@ flutter pub get
 flutter run
 ```
 
-Rust ツールチェーン（`cargo` / `rustc`、stable channel）が必要です。`rust/` crate を
-flutter_rust_bridge が生成物として要求します（詳細は `docs/GETTING_STARTED.md`）。
+Rust は `rust/` の `cargo test` / clippy と flutter_rust_bridge の codegen に必要です。
+アプリ本体への同梱は #55 で対応中です（詳細は `docs/GETTING_STARTED.md`）。
 
 ## 技術スタック
 
-- Flutter 3.19+（`pubspec.yaml` の `sdk: '>=3.3.0 <4.0.0'` が要求する Dart 3.3 の
-  同梱バージョン）
+- Flutter 3.38.4+（`pubspec.lock` の `sdks` 準拠。`pubspec.yaml` の
+  `sdk: '>=3.3.0 <4.0.0'` は flutter_rust_bridge の生成物が要求する下限にすぎない）
 - Provider (状態管理)
 - Material Design 3
 - 多言語化は `flutter_localizations` + ARB（`lib/l10n/app_en.arb` / `app_ja.arb`、ja/en）

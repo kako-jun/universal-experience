@@ -1,22 +1,26 @@
 # Architecture Design
 
-> **現状（#13 反映）**: 本ドキュメントが「Platform Channel Layer」「Native
-> Implementation Layer」「OS-Specific Filter Application」として記述する
-> system-wide フィルタ機構（`color_vision_filter` プラグイン／`ColorVisionFilter.apply`
-> 等）は **撤去済み**。色覚アルゴリズムの正本は sensus-core crate（Rust）に一元化し、
-> ue は flutter_rust_bridge 経由で消費する（`lib/src/rust/`、詳細は
-> `docs/sensus-integration.md`）。フィルタ適用は sensus 由来の GPU シェーダ
-> （`lib/rendering/shader_filter.dart`）が担い、`FilterService` は選択状態のみを
-> 保持する。他アプリ含む全画面への適用は画面キャプチャ経路（#1/#3/#4）の実装後。
-> 以下の Platform Channel / Native 実装の節は当初設計の歴史的記述として残す。
+> **現状**: 当初設計にあった system-wide フィルタ機構（`color_vision_filter`
+> プラグイン／`ColorVisionFilter.apply` 等、「Platform Channel Layer」「Native
+> Implementation Layer」「OS-Specific Filter Application」と呼んでいたもの）の
+> 撤去経緯・判断根拠は、当該節を ADR に畳んだ
+> `docs/adr/2026-05-31-sensus-core-consolidation.md` を参照。色覚アルゴリズムの
+> 正本は sensus-core crate（Rust）に一元化し、ue は flutter_rust_bridge 経由で
+> 消費する（`lib/src/rust/`、詳細は `docs/sensus-integration.md`）。フィルタ適用は
+> sensus 由来の GPU シェーダ（`lib/rendering/shader_filter.dart`）が担い、
+> `FilterService` は選択状態のみを保持する。他アプリ含む全画面への適用は
+> 画面キャプチャ経路（#1/#3/#4）の実装後。
 >
 > **追補（現状）**: 以下も実装済み。多言語化（#18・`flutter_localizations` +
 > ARB、ja/en、`lib/l10n/`）、sensus の複合体験 API の FRB 公開（#10・
 > `experiences()` / `Experience` / `Urgency` / `HearingFilter`、ただし音声再生は
 > 未実装）、体験プリセット集 UI（#19・`lib/ui/widgets/experience_presets.dart`）、
 > フィルタ済み画像のメタ焼き込み PNG エクスポート（#43・
-> `lib/services/export_service.dart`）。before / after の live 描画は
-> protanopia / protanomaly のみで、他フィルタは coming soon プレースホルダ。
+> `lib/services/export_service.dart`）。色覚のクイック選択で描画できない型は
+> 「描画は近日対応」のプレースホルダを出す。advanced カタログ・体験プリセットの
+> 選択は `VisionFilterState` に入るだけでプレビューには反映されない（#60）。
+> プリセットのタップでは `FilterService` が deactivate され、before/after
+> 両ペインとも原画のままになる（#60）。
 
 ## ルーペ窓挙動 (#14)
 
@@ -216,6 +220,10 @@ sensus-core (Rust, GLSL + uniform 計算の正本)
 ShaderFilter (lib/rendering/) — Impeller FragmentProgram で ui.Image に適用
 ```
 
+状態管理は Provider の `ChangeNotifier` ベース: `FilterService` /
+`VisionFilterState` が状態変更時に `notifyListeners()` を呼び、それを購読する
+`Consumer` を持つウィジェットだけが rebuild される。
+
 ### 主要コンポーネント
 
 - `HomeScreen`: メイン画面。色覚クイック選択・強度スライダ・before/after プレビュー・
@@ -224,9 +232,10 @@ ShaderFilter (lib/rendering/) — Impeller FragmentProgram で ui.Image に適�
   sensus `VisionFilter` へのマッピングを持つ純粋な状態モデル
 - `VisionFilterState`: advanced カタログ（sensus 全 30 種）の選択・パラメータ状態
 - `ShaderFilter`（`lib/rendering/shader_filter.dart`）: sensus 由来 GLSL を変換した
-  Impeller `FragmentProgram` で `ui.Image` にフィルタを適用する。現状ライブ描画済みは
-  色変換系（protanopia/deuteranopia/tritanopia/achromatopsia）＋ myopia/photophobia
-  クラスの一部で、他は #59 等で順次拡張
+  Impeller `FragmentProgram` で `ui.Image` にフィルタを適用する。ライブ描画は
+  protanopia（と、その強度を下げて流用する protanomaly）のみ。deuteranopia /
+  tritanopia / achromatopsia は GPU golden テストで検証済みだが UI には未配線
+  （#59）
 - `ExportService`: フィルタ適用後（after）画像のメタ焼き込み PNG エクスポート
 - `ExperiencePresets`（`lib/ui/widgets/experience_presets.dart`）: sensus の
   `experiences()` をワンタップ適用 UI として消費する（複合体験、#19）

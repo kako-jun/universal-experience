@@ -54,7 +54,7 @@ flutter:
   uses-material-design: true
 
   # i18n (#18). flutter gen-l10n が ARB（lib/l10n/*.arb）から AppLocalizations を
-  # 生成する。設定は l10n.yaml。生成物（.dart_tool 配下）はコミットしない。
+  # 生成する。設定は l10n.yaml。生成物（lib/l10n/ 配下、.gitignore 済み）はコミットしない。
   generate: true
 
   assets:

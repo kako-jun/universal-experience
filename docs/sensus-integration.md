@@ -209,25 +209,27 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
 
 ## 4. 次フェーズ（2/3）に残したこと — 完了状況
 
-1. ✅ **完了（#12）**: **GLSL → Impeller サブセット変換**（§2.1 案A）。
+1. 完了（#12）: **GLSL → Impeller サブセット変換**（§2.1 案A）。
    `tools/generate_shaders.dart` が repo 直下 `shaders/<name>.frag`（`assets/shaders/`
    ではない）へ 20 フィルタを生成し、`pubspec` の `shaders:` を列挙、`impellerc`
    を通すところまで完了（`flutter build linux --debug` で全 .frag コンパイル実証）。
-2. ✅ **完了（#11、protanopia のみ）**: **Flutter 側のレンダリング配線**。
-   `FragmentProgram.fromAsset` でロード → `FragmentShader` に `visionUniforms()` の
-   `Float32List` を `setFloat` で積む → `setImageSampler(0, snapshot)` →
-   `CustomPainter`（`before_after_view.dart`）で適用、を protanopia について実装。
-   汎用 `applyColorFilterGpu` も追加済みだが、home 画面への配線は protanopia 系のみ。
-3. ⬜ **未完了**: **実機検証**。macOS/Linux で実際に画面へ 1 フィルタを適用し、
+2. 完了（#11、protanopia のみ）: **Flutter 側のレンダリング配線**。
+   `FragmentProgram.fromAsset` でロード → `FragmentShader` に protanopia の
+   暫定ハードコード行列（`shader_filter.dart` の `_protanopiaMatrix`）を
+   `setFloat` で積む → `setImageSampler(0, snapshot)` → `toImage` →
+   `_UiImagePainter`（`before_after_view.dart`）で描画、を実装。`visionUniforms()`
+   から取得する形への置き換えは #34。汎用 `applyColorFilterGpu` も追加済みだが、
+   home 画面への配線は protanopia 系のみ。
+3. 未完了: **実機検証**。macOS/Linux で実際に画面へ 1 フィルタを適用し、
    sensus の CPU 出力（または既知の見え方）と目視一致を確認する（CLAUDE.md の
    完了判定: 実機 golden path）。現状は `flutter test`（ヘッドレス）の GPU golden
    テスト（PSNR/maxDiff 一致）で代替しており、実機での目視確認は未実施。
-4. 🟡 **部分実装**: **フィルタ網羅の拡張**。`VisionFilter`/カタログは
+4. 部分: **フィルタ網羅の拡張**。`VisionFilter`/カタログは
    `sensus_core::Filter` の全 30 種を選択・パラメータ調整できる状態まで広がった
    （#16）が、ライブ GPU 描画が配線されているのは上記のとおり一部のみ。
    payload 付きフィルタ（cataract/floaters の seed、glaucoma の mode、astigmatism
    の axis_deg、時間依存の vertigo/bppv 等）の描画配線は個別 Issue（#59 等）で継続中。
-5. ✅ **完了（#13）**: 既存 `lib/core/color_vision_simulator.dart`（ue 内の LMS 実装）の
+5. 完了（#13）: 既存 `lib/core/color_vision_simulator.dart`（ue 内の LMS 実装）の
    撤去。詳細は下記 §5。
 
 ---

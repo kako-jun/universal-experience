@@ -6,8 +6,8 @@
 
 ### 必須ツール
 
-- **Flutter SDK**: 3.19.0以上（`pubspec.yaml` の `sdk: '>=3.3.0 <4.0.0'` が要求する
-  Dart 3.3 を同梱する最小の Flutter バージョン）
+- **Flutter SDK**: 3.38.4以上（`pubspec.lock` の `sdks` 準拠。`pubspec.yaml` の
+  `sdk: '>=3.3.0 <4.0.0'` は flutter_rust_bridge の生成物が要求する下限にすぎない）
   ```bash
   flutter --version
   ```
@@ -27,7 +27,7 @@
 Android / Windows は計画中で、ランナーディレクトリ自体がまだありません。
 
 #### macOS開発（現行対応）
-- Xcode 14以上
+- 最新の安定版 Xcode（macOS 12 以上をターゲットにできるもの）
 - CocoaPods
 
 #### Linux開発（現行対応）
@@ -113,7 +113,7 @@ universal-experience/
 │   ├── rendering/         # GPU シェーダ描画（sensus 由来の FragmentProgram）
 │   ├── src/rust/          # flutter_rust_bridge 生成コード（sensus-core 連携、experiences() 等）
 │   └── ui/                # UIコンポーネント
-├── rust/                  # sensus-core を FRB で公開する Rust crate（生成元は src/rust/）
+├── rust/                  # sensus-core を FRB で公開する Rust crate（Dart バインディング lib/src/rust/ の生成元）
 ├── tools/                 # シェーダ codegen（sensus の .frag → Impeller サブセット変換）
 ├── shaders/               # 変換済み .frag（ビルド時 impellerc がコンパイル）
 ├── macos/                 # macOS固有コード（現行対応）

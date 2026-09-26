@@ -148,8 +148,10 @@ deploy key / ssh-agent 設定は不要。
 ## ロードマップ
 
 - **Phase 1**: 色覚障害シミュレーション — 進行中。ライブ GPU 描画は protanopia /
-  protanomaly のみ配線済みで、他の色覚型・advanced フィルタは選択・パラメータ調整は
-  できるが描画は「準備中」表示（詳細は GitHub Issues、特に #34 / #2 / #59）
+  protanomaly のみ配線済みで、他の色覚型はクイック選択できるが描画は
+  「描画は近日対応」（en: "Rendering coming soon"）表示。advanced カタログ・
+  体験プリセットの選択は `VisionFilterState` に入るだけでプレビューには反映されない
+  （詳細は GitHub Issues、特に #34 / #59 / #60）
 - **Phase 2**: 聴覚障害シミュレーション — 複合体験の型定義（FRB, `HearingFilter`）は
   公開済みだが、音声の加工・再生は未実装
 - **Phase 3**: 視野欠損、視覚ぼやけ、運動障害 — 未着手
