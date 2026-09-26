@@ -5,13 +5,17 @@
 Pod::Spec.new do |s|
   s.name             = 'universal_experience_rust'
   s.version          = '0.0.1'
-  s.summary          = 'A new Flutter FFI plugin project.'
+  s.summary          = 'cargokit glue to build the Universal Experience Rust bridge (sensus-core).'
   s.description      = <<-DESC
-A new Flutter FFI plugin project.
+Builds the rust/ crate (flutter_rust_bridge bridge to sensus-core) via
+cargokit and bundles it into the Universal Experience macOS app (#55).
+Not a standalone plugin; not published.
                        DESC
-  s.homepage         = 'http://example.com'
-  s.license          = { :file => '../LICENSE' }
-  s.author           = { 'Your Company' => 'email@example.com' }
+  s.homepage         = 'https://github.com/kako-jun/universal-experience'
+  # README.md の「ライセンス」節と同じ MIT（リポジトリ直下に LICENSE ファイルは
+  # 無いため、:file 参照ではなく :type で明示する）。
+  s.license          = { :type => 'MIT' }
+  s.author           = 'kako-jun'
 
   # This will ensure the source files in Classes/ are included in the native
   # builds of apps using this FFI plugin. Podspec does not support relative
