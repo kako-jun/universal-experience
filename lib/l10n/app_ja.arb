@@ -34,7 +34,7 @@
   "previewComingSoon": "描画は近日対応",
 
   "advancedSectionTitle": "アドバンスト（sensus の全フィルタ）",
-  "advancedSectionNote": "sensus が公開する全 30 種の見え方を、カテゴリ別に選んでパラメータを調整できます。画面への実際の描画（ライブ適用）は一部のフィルタのみで、順次拡充していきます。",
+  "advancedSectionNote": "sensus が公開する全 30 種の見え方を、カテゴリ別に選んでパラメータを調整できます。選んだフィルタの画面への描画は順次対応していきます。",
   "advancedParamPanelHint": "フィルタを選ぶとパラメータを調整できます。",
   "randomize": "ランダム生成",
 
