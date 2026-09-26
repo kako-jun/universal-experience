@@ -107,7 +107,7 @@ void main() async {
   // （experiences() 等）はもう行われない。
   final nativeBridgeReady = await initNativeBridge();
   if (!nativeBridgeReady) {
-    runApp(const _NativeBridgeErrorApp());
+    runApp(const NativeBridgeErrorApp());
     return;
   }
 
@@ -266,14 +266,19 @@ class UniversalExperienceApp extends StatelessWidget {
 ///
 /// `VisionFilterState` / `FilterService` 等の状態も `SettingsService` も
 /// 一切構築しない（Rust ブリッジに依存する機能を使わせないための最小構成）。
-/// ロケールはシステム追従（設定の読込前なので永続化ロケールは見られない）。
-class _NativeBridgeErrorApp extends StatelessWidget {
-  const _NativeBridgeErrorApp();
+/// ロケールはシステム追従（設定の読込前なので永続化ロケールは見られない）が、
+/// [locale] を渡せばテスト等から明示的に固定できる（未指定時は
+/// [_resolveStartupLocale] のフォールバックに従う）。
+class NativeBridgeErrorApp extends StatelessWidget {
+  const NativeBridgeErrorApp({super.key, this.locale});
+
+  /// 表示に使うロケール。null ならシステム追従（[_resolveStartupLocale]）。
+  final Locale? locale;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      locale: _resolveStartupLocale(null),
+      locale: locale ?? _resolveStartupLocale(null),
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,

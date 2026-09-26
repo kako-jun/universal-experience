@@ -233,9 +233,11 @@ native lib をロードする（呼ばないと `RustLib.instance` が未初期�
 共有する唯一の初期化経路で、二重初期化（`RustLib.instance.initialized` が
 true）は素通りにし、`RustLib.init()` 自体の失敗は例外を外に投げず `false` を
 返す。`main()` はこれが `false` のとき `UniversalExperienceApp` の代わりに
-`_NativeBridgeErrorApp`（`AppLocalizations.nativeBridgeInitFailed`、ja/en）を
+`NativeBridgeErrorApp`（`AppLocalizations.nativeBridgeInitFailed`、ja/en）を
 `runApp` する。native lib が同梱されていない/壊れている状態でもクラッシュせず
-文言表示に落ちる、という契約。
+文言表示に落ちる、という契約。`NativeBridgeErrorApp` は任意の `locale` を
+注入できる（未指定ならシステム追従のフォールバック）ため、widget test から
+ja/en それぞれの文言を固定して検証できる（`test/native_bridge_error_app_test.dart`）。
 
 > **注意（Linux の dev ロードパス優先）**: `RustLib.init()`（flutter_rust_bridge の
 > `loadExternalLibrary`）は、まずカレントディレクトリ相対の `rust/target/release/`
