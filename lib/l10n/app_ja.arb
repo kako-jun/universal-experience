@@ -30,10 +30,8 @@
   "clear": "クリア",
 
   "previewSectionTitle": "ビフォー / アフター",
-  "previewUnsupportedNote": "このフィルタのライブ描画はまだ実装されていません。現在描画できるのは「1型2色覚（赤）」と「1型3色覚（赤）」だけです。",
   "previewPaneOriginal": "元の画像",
   "previewPreparing": "プレビューを準備中…",
-  "previewComingSoon": "描画は近日対応",
   "previewFailed": "プレビューの描画に失敗しました",
 
   "advancedSectionTitle": "アドバンスト（sensus の全フィルタ）",

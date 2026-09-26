@@ -12,9 +12,10 @@ import 'package:universal_experience/ui/widgets/before_after_view.dart';
 
 /// BeforeAfterView の before/after 生成ロジックと描画カバレッジのテスト（#17）。
 ///
-/// 静的ヘルパ（generateSampleImage / renderAfter / canRender）を直接検証する。
-/// protanopia は ShaderFilter 経由で実描画でき、他フィルタは未描画
-/// （null = プレースホルダ表示）であることを確認する。
+/// 静的ヘルパ（generateSampleImage / renderAfter）を直接検証する。全
+/// ColorVisionType が ShaderFilter 経由で実描画される（#59。`canRender` と
+/// 「描画は近日対応」プレースホルダは、到達しなくなったため #86 レビューで
+/// 撤去した）。
 
 /// `_rebuild` は例外を `FlutterError.reportError` で報告するようになった
 /// （#58 レビュー nit-1）。意図的に失敗を起こすテストがそれで落ちないよう、
@@ -34,14 +35,6 @@ List<FlutterErrorDetails> suppressFlutterErrorReporting() {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-
-  group('canRender 描画カバレッジ', () {
-    test('全 ColorVisionType が描画可能になった（#59）', () {
-      for (final type in ColorVisionType.values) {
-        expect(BeforeAfterView.canRender(type), isTrue, reason: '$type');
-      }
-    });
-  });
 
   group('generateSampleImage', () {
     test('指定サイズの正方形画像を生成し PNG 化できる', () async {
@@ -235,8 +228,8 @@ void main() {
     });
 
     testWidgets(
-        'deuteranopia でも coming soon プレースホルダは出ず、フィルタ名ラベルの'
-        'ペインを出す（#59: canRender/renderAfter の対象拡大）', (tester) async {
+        'deuteranopia でも原画ラベルとフィルタ名ラベルの両ペインを出す'
+        '（#59: renderAfter の対象拡大）', (tester) async {
       await tester.pumpWidget(
         localized(
           const BeforeAfterView(
@@ -252,7 +245,6 @@ void main() {
 
       expect(find.text(en.previewPaneOriginal), findsOneWidget);
       expect(find.text(deuteranopiaName), findsOneWidget);
-      expect(find.text(en.previewComingSoon), findsNothing);
     });
 
     // #58: プレビューが GPU 画像をリークする／古い結果で上書きされる／Retina で

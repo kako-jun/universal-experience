@@ -99,10 +99,6 @@
   "@previewSectionTitle": {
     "description": "Title of the before/after preview card."
   },
-  "previewUnsupportedNote": "Live rendering for this filter is not implemented yet — only Protanopia and Protanomaly are drawn today.",
-  "@previewUnsupportedNote": {
-    "description": "Note shown when the selected filter has no live renderer yet."
-  },
   "previewPaneOriginal": "Original",
   "@previewPaneOriginal": {
     "description": "Label of the 'before' (unfiltered) preview pane."
@@ -110,10 +106,6 @@
   "previewPreparing": "Preparing preview…",
   "@previewPreparing": {
     "description": "Placeholder while the first sample preview image is generated."
-  },
-  "previewComingSoon": "Rendering coming soon",
-  "@previewComingSoon": {
-    "description": "Placeholder in the 'after' pane for filters without a live renderer."
   },
   "previewFailed": "Preview failed to render",
   "@previewFailed": {

@@ -50,11 +50,8 @@ AfterImageRenderer afterImageRenderer = BeforeAfterView.renderAfter;
 /// per-severity matrix, resolved with the same piecewise-linear interpolation
 /// sensus_core uses), the -omaly types reuse their base -opia transform at a
 /// reduced strength ([recommendedStrength]), and achromatopsia uses a
-/// constant BT.709 luma blend. The "rendering coming soon" placeholder
-/// (`_ComingSoonPlaceholder`) machinery is kept for defensiveness (a future
-/// `ColorVisionType` addition without a renderer yet would fall back to it)
-/// but nothing in the current enum reaches it. Live *screen* capture (as
-/// opposed to this synthetic sample image) is still tracked by #1/#3/#4.
+/// constant BT.709 luma blend. Live *screen* capture (as opposed to this
+/// synthetic sample image) is still tracked by #1/#3/#4.
 class BeforeAfterView extends StatefulWidget {
   const BeforeAfterView({
     super.key,
@@ -78,15 +75,6 @@ class BeforeAfterView extends StatefulWidget {
   /// generating arbitrarily large textures). Tests that want a small,
   /// deterministic image regardless of layout pass an explicit value.
   final int? sampleSize;
-
-  /// Whether [type] can currently be rendered to a real "after" image.
-  ///
-  /// Exposed as a static so tests and callers can reason about render coverage
-  /// without instantiating the widget. All eight values render for real as of
-  /// #59 (see the class doc); kept as a function rather than inlining `true`
-  /// at call sites so a future non-colour-vision extension of this widget has
-  /// a single place to gate on.
-  static bool canRender(ColorVisionType type) => true;
 
   /// Builds the deterministic sample image used in the *before* pane.
   ///
@@ -148,8 +136,8 @@ class BeforeAfterView extends StatefulWidget {
   /// Produces the *after* image for [type] from [source]. Returns null only
   /// if [type] has no real renderer yet — none of today's eight values does
   /// (#59), but the nullable return stays so a future `ColorVisionType`
-  /// addition without a renderer degrades to the coming-soon placeholder
-  /// instead of a hard error.
+  /// addition without a renderer degrades to [_ImageView]'s own null-safe
+  /// placeholder instead of a hard error.
   ///
   /// [ColorVisionType.none] returns [source] unchanged (clone via the shader
   /// is unnecessary). Each -opia/achromatopsia type routes through its
@@ -642,25 +630,20 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         );
         // #58 レビュー SHOULD-1: 最新世代が失敗した場合は _failed が立ち、
         // _after は null にされている。stale/不整合な画像を出し続けるより
-        // 失敗を明示する。
-        final Widget afterChild;
-        if (_failed) {
-          afterChild =
-              _ErrorPlaceholder(theme: theme, label: l10n.previewFailed);
-        } else if (_after != null) {
-          afterChild = _ImageView(image: _after);
-        } else {
-          afterChild = _ComingSoonPlaceholder(
-            theme: theme,
-            label: l10n.previewComingSoon,
-          );
-        }
+        // 失敗を明示する。全 ColorVisionType が実描画対応済み（#59）なので、
+        // 失敗以外で `_after` が null のまま安定することはない（一度も成功して
+        // いなければこの分岐に来る前に上の `_loading` ガードで preparing 表示に
+        // なる）。それでも [_ImageView] 自身が null を安全に扱うため、二分岐で
+        // 十分（「描画は近日対応」プレースホルダは #86 レビューで YAGNI 判定・撤去）。
+        final Widget afterChild = _failed
+            ? _ErrorPlaceholder(theme: theme, label: l10n.previewFailed)
+            : _ImageView(image: _after);
         final afterPane = _Pane(
           label: widget.filterType == ColorVisionType.none
               ? l10n.previewPaneOriginal
               : colorVisionTypeName(l10n, widget.filterType),
           // Export is only meaningful when a real "after" image exists.
-          // Coming-soon/failed states (null _after) get no button.
+          // The failed state (null _after) gets no button.
           trailing: _after != null
               ? IconButton(
                   icon: const Icon(Icons.download_outlined),
@@ -779,42 +762,6 @@ class _UiImagePainter extends CustomPainter {
   @override
   bool shouldRepaint(_UiImagePainter oldDelegate) =>
       !identical(oldDelegate.image, image);
-}
-
-class _ComingSoonPlaceholder extends StatelessWidget {
-  const _ComingSoonPlaceholder({required this.theme, required this.label});
-
-  final ThemeData theme;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: theme.colorScheme.surfaceContainerHigh,
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.brush_outlined,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 /// Shown in the "after" pane when the latest generation/render attempt
