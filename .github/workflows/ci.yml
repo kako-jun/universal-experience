@@ -110,9 +110,13 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      # rust/ 本体に加え、cargokit が `flutter build linux` 時に実際にビルドで
-      # 使う一時ディレクトリ（CMAKE_CURRENT_BINARY_DIR/cargokit_build、
-      # rust_builder/cargokit/cmake/cargokit.cmake 参照）もキャッシュする。
+      # このジョブは cargo fmt/clippy/test を一切実行しない（それらは `check`
+      # job 側の macOS 環境でのみ回す）ので、素の `rust` workspace エントリは
+      # 中身の無い rust/target/ をキャッシュするだけで無意味。ここでキャッシュ
+      # したいのは cargokit が `flutter build linux` 時に実際にビルドで使う
+      # 一時ディレクトリ（CMAKE_CURRENT_BINARY_DIR/cargokit_build、
+      # rust_builder/cargokit/cmake/cargokit.cmake 参照）だけで、目的は
+      # `flutter build linux` の高速化（cargo の成果物キャッシュではない）。
       # Flutter Linux の標準ビルドパス（build/linux/x64/<config>/plugins/<plugin>）
       # を前提にしており、Flutter のバージョンでこの構造が変わった場合は
       # キャッシュがヒットしないだけで（保存対象が存在しない）ビルド自体は失敗しない。
@@ -120,7 +124,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
-            rust
             rust -> ../build/linux/x64/debug/plugins/universal_experience_rust/cargokit_build
 
       - name: Flutter pub get
