@@ -204,7 +204,7 @@ func applyColorFilter(type: ColorVisionType) {
 
 #### システム要件
 - macOS 10.14 (Mojave)以降（この API 自体の要件。ue アプリ本体の現行最低対応バージョンは
-  macOS 12+、deployment target 12.0）
+  macOS 13+、deployment target 13.0。Flutter の native assets が macOS 13 を要求する）
 - アクセシビリティ権限が必要な場合がある
 
 #### 利点

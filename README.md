@@ -98,7 +98,7 @@ UI は **日本語 / 英語** に対応しています（`flutter_localizations`
 
 現行で対応（ランナーが存在し、ビルド・実行できる）:
 
-- macOS 12+（deployment target 12.0）
+- macOS 13+（deployment target 13.0。Flutter の native assets が macOS 13 を要求する）
 - Linux (Ubuntu 20.04+ 目安、GTK 3 ベース)
 
 計画中（ランナー未作成）:
