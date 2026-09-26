@@ -8,8 +8,8 @@ license = "MIT"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-# flutter_rust_bridge は selona と同一バージョンに固定する（codegen の
-# forceSameCodegenVersion 前提）。
+# flutter_rust_bridge は別の flutter_rust_bridge プロジェクトと同一バージョンに
+# 固定する（codegen の forceSameCodegenVersion 前提）。
 flutter_rust_bridge = "=2.11.1"
 # 感覚障害シミュレーションのアルゴリズム正本。シェーダ文字列と uniform 計算を
 # 提供する（sensus_core::shaders）。GLSL/uniform を ue 内で再実装しないための

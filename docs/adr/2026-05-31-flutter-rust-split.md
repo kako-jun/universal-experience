@@ -24,8 +24,8 @@ sensus-core を ue から消費するには、Rust のロジックを Dart か�
   ue は `rust/` crate を持ち、`rust/src/api/sensus_bridge.rs` が
   [flutter_rust_bridge (FRB)](https://crates.io/crates/flutter_rust_bridge) 経由で
   sensus-core の機能を Dart へ公開する。
-- 生成された Dart バインディングは `lib/src/rust/`。FRB は selona と同一バージョン
-  `=2.11.1` に固定し、`sensus-core = "0.5"` に依存する。
+- 生成された Dart バインディングは `lib/src/rust/`。FRB は別の flutter_rust_bridge
+  プロジェクトと同一バージョン `=2.11.1` に固定し、`sensus-core = "0.5"` に依存する。
 
 ブリッジが公開する主な API（`sensus_bridge.rs`）:
 
@@ -46,15 +46,16 @@ uniform 値（半径式・aspect 補正・texel size 等）は sensus の `*_uni
    UI・既存の Flutter エコシステム（window_manager / tray_manager / provider 等の
    デスクトップ周辺）を捨てることになる。ue は元々 Flutter アプリとして始まっている。
 3. **Rust を別プロセス/FFI 手書き** — FRB を使わず手書き FFI や別プロセス IPC で繋ぐ。
-   却下: FRB は型安全なバインディングを codegen でき、selona で同構成の実績がある。
-   手書き FFI は境界の保守が重い。
+   却下: FRB は型安全なバインディングを codegen でき、別の flutter_rust_bridge
+   プロジェクトで同構成の実績がある。手書き FFI は境界の保守が重い。
 
 ## 根拠
 
 - **正本（Rust の sensus-core）をそのまま消費できる**。Dart へ再実装せず、UI と
   アルゴリズムをそれぞれ得意な言語に置ける。
-- **FRB の実績**: selona と同構成（`flutter_rust_bridge = "=2.11.1"`）で、codegen に
-  よる型安全なブリッジが既に動いている。バージョンを固定して codegen のドリフトを防ぐ。
+- **FRB の実績**: 別の flutter_rust_bridge プロジェクトと同構成
+  （`flutter_rust_bridge = "=2.11.1"`）で、codegen による型安全なブリッジが既に
+  動いている。バージョンを固定して codegen のドリフトを防ぐ。
 - **二重実装を避ける唯一の形**: uniform の計算（半径式・aspect・texel size 等）を
   sensus 正本のまま Rust で行い FRB で渡すことで、ue 側に計算ロジックを複製しない。
 

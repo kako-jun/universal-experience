@@ -51,11 +51,11 @@ This yields **20** generated shaders.
 
 ## Regenerating (when sensus shaders change)
 
-The sensus repo lives at `/home/ariori/repos/2026/sensus` (published crate
+The sensus repo lives at `<path-to-sensus>` (published crate
 `sensus-core = "0.5"`):
 
 ```sh
-cd /home/ariori/repos/2026/sensus
+cd <path-to-sensus>
 cargo run -p sensus-core --example dump_shaders \
     > /path/to/universal-experience/tools/sensus_shaders.g.json
 ```

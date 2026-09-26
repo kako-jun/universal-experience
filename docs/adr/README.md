@@ -36,6 +36,7 @@ Universal Experience（ue）の主要な設計判断を記録する正本ディ�
 
 | ファイル | タイトル | 決定日 | ステータス |
 |---|---|---|---|
+| [2026-09-26-loupe-as-single-render-unit.md](2026-09-26-loupe-as-single-render-unit.md) | ルーペ窓を唯一の描画単位にする（対象アプリ指定は自動配置モード） | 2026-09-26 | Accepted |
 | [2026-05-31-sensus-core-consolidation.md](2026-05-31-sensus-core-consolidation.md) | sensus-core への色変換一元化（plugin/simulator 撤去） | 2026-05-31 | Accepted |
 | [2026-05-31-flutter-rust-split.md](2026-05-31-flutter-rust-split.md) | Flutter + Rust の分割 | 2026-05-31 | Accepted |
 | [2026-05-31-buildtime-impellerc-conversion.md](2026-05-31-buildtime-impellerc-conversion.md) | ビルド時 impellerc 変換（FragmentProgram） | 2026-05-31 | Accepted |

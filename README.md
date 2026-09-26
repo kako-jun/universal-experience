@@ -12,7 +12,7 @@
 - Deuteranopia（2型色覚・緑色盲）
 - Tritanopia（3型色覚・青黄色盲）
 - Achromatopsia（全色盲）
-- Protanomaly / Deuteranomaly / Tritanomaly（各2色覚）
+- Protanomaly / Deuteranomaly / Tritanomaly（各異常3色覚。錐体機能の部分低下）
 
 色覚変換アルゴリズムの正本は別 crate
 [`sensus-core`](https://crates.io/crates/sensus-core)（Rust）に一元化しており、
@@ -21,9 +21,9 @@ ue はそれを flutter_rust_bridge 経由で消費する薄いブリッジで�
 GPU シェーダ（`lib/rendering/shader_filter.dart`）で計算し、強度調整も可能です。
 
 > ただし現状、一部の uniform（シェーダへ渡す変換行列）は
-> `lib/rendering/shader_filter.dart` に暫定的にハードコードされています
-> （`TODO(#11後続)`）。これらは #11 後続で flutter_rust_bridge 経由の
-> sensus-core 取得値へ置き換え、二重実装を解消する予定です。
+> `lib/rendering/shader_filter.dart` に暫定的にハードコードされています。
+> これらは #34 で flutter_rust_bridge 経由の sensus-core 取得値へ置き換え、
+> 二重実装を解消する予定です。
 
 > 旧バージョンは OS 全体へ system-wide フィルタを適用する独自プラグイン
 > （`plugins/color_vision_filter`）と ue 内 LMS 実装を持っていましたが、
@@ -32,9 +32,11 @@ GPU シェーダ（`lib/rendering/shader_filter.dart`）で計算し、強度調
 
 > 現状、before / after の比較プレビューで実際に描画できるのは
 > protanopia / protanomaly のみです（protanomaly は protanopia の変換を
-> 弱い強度で再利用）。それ以外の色覚 7 型・後述の advanced フィルタは、
-> カタログから選択・パラメータ調整はできますが、ライブ描画は「coming soon」
-> プレースホルダ表示で、GPU 描画配線は #11 後続で順次対応します。
+> 弱い強度で再利用）。それ以外の色覚 7 型は、クイック選択はできますが
+> ライブ描画は「描画は近日対応」（en: "Rendering coming soon"）のプレースホルダ
+> 表示で、GPU 描画配線は #59 等で順次対応します。後述の advanced カタログ・
+> 体験プリセットの選択も `VisionFilterState` に入るだけで、プレビューへの
+> 描画には反映されません（#60）。
 
 ### 視覚 advanced フィルタ（sensus カタログ）
 
@@ -43,7 +45,8 @@ sensus が提供する**計 30 種**（上記の色覚型を含む。屈折／�
 カテゴリ別に選択し、パラメータ・強度を調整できます。フィルタ定義の正本は
 sensus-core であり、ue はカタログ（`lib/models/vision_filter_catalog.dart`）
 から引きます。
-※ ライブ描画は上記の制約どおり一部のみ。
+※ 選択・パラメータ調整は `VisionFilterState` に反映されますが、プレビューへの
+ライブ描画は未配線です（#60）。
 
 ### 体験プリセット（複合症状）
 
@@ -57,9 +60,10 @@ sensus-core であり、ue はカタログ（`lib/models/vision_filter_catalog.d
 
 各プリセットは視覚フィルタを選択状態にし、緊急度に応じた受診喚起の注記を
 表示します。聴覚症状を含む体験（メニエール病・迷路炎）には「聴覚症状も含む」
-注記を出しますが、**音声再生は未実装**で、現状は視覚フィルタの適用と注記の
-表示にとどまります。プリセットの組み合わせ（どの視覚・聴覚フィルタが組に
-なるか）の正本は sensus-core の `experiences()` です。
+注記を出しますが、**音声再生は未実装**です。また、プリセットのタップでは
+`FilterService` が deactivate され、before/after 両ペインとも原画のままです
+（#60）。プリセットの組み合わせ（どの視覚・聴覚フィルタが組になるか）の正本は
+sensus-core の `experiences()` です。
 
 ### 画像エクスポート（PNG）
 
@@ -92,12 +96,18 @@ UI は **日本語 / 英語** に対応しています（`flutter_localizations`
 
 ## 対応プラットフォーム
 
-- Android 6.0+
-- Windows 10/11
-- macOS 10.14+
-- Linux (Ubuntu 20.04+)
+現行で対応（ランナーが存在し、ビルド・実行できる）:
 
-※ iOS は技術的制約により非対応
+- macOS 12+（現在ビルド修正中、#54。deployment target を 12.0 へ引き上げ中で、
+  現行設定の 10.15 は Xcode 27 ではビルドできない）
+- Linux (Ubuntu 20.04+ 目安、GTK 3 ベース)
+
+計画中（ランナー未作成）:
+
+- Android
+- Windows
+
+※ iOS は技術的制約により非対応（`docs/adr/2025-11-17-no-ios-support.md`）
 
 ## セットアップ
 
@@ -108,9 +118,13 @@ flutter pub get
 flutter run
 ```
 
+Rust は `rust/` の `cargo test` / clippy と flutter_rust_bridge の codegen に必要です。
+アプリ本体への同梱は #55 で対応中です（詳細は `docs/GETTING_STARTED.md`）。
+
 ## 技術スタック
 
-- Flutter 3.2+
+- Flutter 3.38.4+（`pubspec.lock` の `sdks` 準拠。`pubspec.yaml` の
+  `sdk: '>=3.3.0 <4.0.0'` は flutter_rust_bridge の生成物が要求する下限にすぎない）
 - Provider (状態管理)
 - Material Design 3
 - 多言語化は `flutter_localizations` + ARB（`lib/l10n/app_en.arb` / `app_ja.arb`、ja/en）

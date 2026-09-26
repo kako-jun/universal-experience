@@ -6,33 +6,44 @@
 
 ### 必須ツール
 
-- **Flutter SDK**: 3.2.0以上
+- **Flutter SDK**: 3.38.4以上（`pubspec.lock` の `sdks` 準拠。`pubspec.yaml` の
+  `sdk: '>=3.3.0 <4.0.0'` は flutter_rust_bridge の生成物が要求する下限にすぎない）
   ```bash
   flutter --version
   ```
 
 - **Git**: バージョン管理用
 
+- **Rust toolchain**（`rustc` / `cargo`, stable channel）: `rust/` crate
+  （flutter_rust_bridge 経由で sensus-core を公開する）のビルドに必要
+  ```bash
+  rustc --version
+  cargo --version
+  ```
+
 ### プラットフォーム別要件
 
-#### Android開発
-- Android Studio
-- Android SDK (API 23以上)
-- Java Development Kit (JDK) 11以上
+現行でランナーがあり実際にビルド・実行できるのは macOS / Linux のみです。
+Android / Windows は計画中で、ランナーディレクトリ自体がまだありません。
 
-#### Windows開発
-- Visual Studio 2022 (C++ desktop development)
-- Windows 10/11 SDK
-
-#### macOS開発
-- Xcode 14以上
+#### macOS開発（現行対応）
+- 最新の安定版 Xcode（macOS 12 以上をターゲットにできるもの）
 - CocoaPods
 
-#### Linux開発
+#### Linux開発（現行対応）
 - Clang
 - CMake 3.10以上
 - GTK 3.0 development headers
 - pkg-config
+
+#### Android開発（計画中）
+- Android Studio
+- Android SDK (API 23以上)
+- Java Development Kit (JDK) 11以上
+
+#### Windows開発（計画中）
+- Visual Studio 2022 (C++ desktop development)
+- Windows 10/11 SDK
 
 ## セットアップ手順
 
@@ -72,29 +83,23 @@ flutter run
 
 # 特定のデバイスで実行
 flutter run -d <device-id>
-
-# Windowsで実行
-flutter run -d windows
-
-# Androidで実行
-flutter run -d <android-device-id>
 ```
+
+Windows / Android 向けの `-d windows` / `-d <android-device-id>` は、対応する
+ランナーディレクトリ自体がまだ無いため現状使えません（計画中）。
 
 ### リリースビルド
 
 ```bash
-# Windowsリリースビルド
-flutter build windows --release
-
-# Androidリリースビルド
-flutter build apk --release
-
 # macOSリリースビルド
 flutter build macos --release
 
 # Linuxリリースビルド
 flutter build linux --release
 ```
+
+Windows / Android のビルド（`flutter build windows` / `flutter build apk`）は
+ランナー未作成のため現状動きません（計画中）。
 
 ## プロジェクト構造
 
@@ -108,24 +113,25 @@ universal-experience/
 │   ├── rendering/         # GPU シェーダ描画（sensus 由来の FragmentProgram）
 │   ├── src/rust/          # flutter_rust_bridge 生成コード（sensus-core 連携、experiences() 等）
 │   └── ui/                # UIコンポーネント
-├── rust/                  # sensus-core を FRB で公開する Rust crate（生成元は src/rust/）
-├── android/               # Android固有コード
-├── windows/               # Windows固有コード
-├── macos/                 # macOS固有コード
-├── linux/                 # Linux固有コード
+├── rust/                  # sensus-core を FRB で公開する Rust crate（Dart バインディング lib/src/rust/ の生成元）
+├── tools/                 # シェーダ codegen（sensus の .frag → Impeller サブセット変換）
+├── shaders/               # 変換済み .frag（ビルド時 impellerc がコンパイル）
+├── macos/                 # macOS固有コード（現行対応）
+├── linux/                 # Linux固有コード（現行対応）
 ├── docs/                  # ドキュメント
 └── test/                  # テスト
 ```
+
+Android / Windows 固有ディレクトリ（`android/` / `windows/`）はランナー自体が
+まだ無いため存在しません（計画中）。
 
 ## 開発ワークフロー
 
 ### コードの変更を監視
 
-```bash
-flutter run --hot-reload
-```
-
-ホットリロードで、コード変更を即座に反映できます。
+`flutter run` で起動したセッションに `r`（hot reload）/ `R`（hot restart）を
+入力すると、コード変更を即座に反映できます（`flutter run --hot-reload` という
+コマンドラインオプションはありません）。
 
 ### 静的解析
 
@@ -140,14 +146,16 @@ flutter analyze
 flutter test
 
 # 特定のテスト実行
-flutter test test/models/disability_type_test.dart
+flutter test test/filter_service_test.dart
 ```
 
 ### コードフォーマット
 
 ```bash
-flutter format lib/ test/
+dart format lib/ test/
 ```
+
+（`flutter format` は廃止されたコマンドです。）
 
 ## トラブルシューティング
 
@@ -163,22 +171,7 @@ which flutter
 export PATH="$PATH:/path/to/flutter/bin"
 ```
 
-#### 2. Android依存関係エラー
-
-```bash
-cd android
-./gradlew clean
-cd ..
-flutter clean
-flutter pub get
-```
-
-#### 3. Windows Magnification APIエラー
-
-- Windows SDKがインストールされているか確認
-- Visual Studio 2022でC++デスクトップ開発をインストール
-
-#### 4. macOSビルドエラー
+#### 2. macOSビルドエラー
 
 ```bash
 cd macos

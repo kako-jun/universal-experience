@@ -8,7 +8,7 @@
 
   "aboutTooltip": "このアプリについて",
   "aboutBody": "Universal Experience は、さまざまな障害への理解と共感を助けるアクセシビリティ・シミュレーションツールです。",
-  "aboutPhases": "Phase 1：色覚特性のシミュレーション\nPhase 2：聴覚障害のシミュレーション（準備中）\nPhase 3：その他の障害のシミュレーション（予定）",
+  "aboutPhases": "Phase 1：色覚特性のシミュレーション\nPhase 2：聴覚障害のシミュレーション（準備中）\nPhase 3：視野の欠け・ぼやけなど色覚以外の見え方（アドバンストから選択・調整できます。実際の画面描画は順次拡充中）",
 
   "themeTooltipSystem": "テーマ：システムに従う",
   "themeTooltipLight": "テーマ：ライト",
@@ -28,13 +28,13 @@
   "clear": "クリア",
 
   "previewSectionTitle": "ビフォー / アフター",
-  "previewUnsupportedNote": "このフィルタのライブ描画はまだ実装されていません。現在は protanopia と protanomaly のみ描画できます。",
+  "previewUnsupportedNote": "このフィルタのライブ描画はまだ実装されていません。現在描画できるのは「1型2色覚（赤）」と「1型3色覚（赤）」だけです。",
   "previewPaneOriginal": "元の画像",
   "previewPreparing": "プレビューを準備中…",
   "previewComingSoon": "描画は近日対応",
 
   "advancedSectionTitle": "アドバンスト（sensus の全フィルタ）",
-  "advancedSectionNote": "sensus が公開する全 30 種の見え方を、カテゴリ別に選んでパラメータを調整できます。実描画・ライブ適用は別 Issue で対応します。",
+  "advancedSectionNote": "sensus が公開する全 30 種の見え方を、カテゴリ別に選んでパラメータを調整できます。選んだフィルタの画面への描画は順次対応していきます。",
   "advancedParamPanelHint": "フィルタを選ぶとパラメータを調整できます。",
   "randomize": "ランダム生成",
 

@@ -20,7 +20,7 @@ class ShaderFilter {
   /// 値は sensus_core `PROTANOPIA_MATRIX` / 元 .frag コメントと同値。
   /// MVP ではここにハードコードするが、将来は rust bridge の
   /// `visionUniforms(VisionFilter.protanopia, ...)` から取得して二重実装を避ける。
-  // TODO(#11 後続): bridge の visionUniforms から取得し、本ハードコードを撤去する。
+  // TODO(#34): bridge の visionUniforms から取得し、本ハードコードを撤去する。
   static const List<double> _protanopiaMatrix = <double>[
     0.152286, 1.052583, -0.204868, //
     0.114503, 0.786281, 0.099216, //
