@@ -17,8 +17,8 @@
 //! ドリフト検出（CI 常時実行）: [`tests::generated_json_matches_committed_file`]
 
 // lib.rs の `#[cfg(test)] mod shader_dump_gen;` が既にこのファイル全体を
-// test 限定にしているため、ここでの `#[cfg(test)]` は付けない（N5: 二重ゲート
-// の解消）。
+// test 限定にしているため、ここで重ねて `#[cfg(test)]` は付けない（無意味な
+// 二重ゲートになる）。
 mod tests {
     use crate::{vision_shader_glsl, vision_uniform_layout, VisionFieldLossMode, VisionFilter};
     use std::collections::HashSet;
@@ -209,7 +209,7 @@ mod tests {
         eprintln!("wrote {} ({} filters)", out.display(), dump_targets().len());
     }
 
-    /// ドリフト検出（レビュー S2）: [`build_dump_json`] が今 commit されている
+    /// ドリフト検出: [`build_dump_json`] が今 commit されている
     /// `tools/sensus_shaders.g.json` と byte 一致することを常時（非 ignore）検証する。
     /// sensus-core を更新したのにダンプを再生成し忘れると、このテストが CI で落ちる。
     #[test]
@@ -226,9 +226,77 @@ mod tests {
         );
     }
 
+    /// `tools/generate_shaders.dart` のソースをそのまま埋め込む。`_excludedFilters`
+    /// のキーを Rust 側でハードコードしてミラーするのではなく、ここから実際に
+    /// 抽出して使うことで、Dart 側だけ更新して Rust 側を更新し忘れるドリフトを
+    /// [`dump_targets_and_excluded_stems_cover_all_variants`] が検出できるようにする。
+    const GENERATE_SHADERS_DART_SRC: &str = include_str!("../../tools/generate_shaders.dart");
+
+    /// [`GENERATE_SHADERS_DART_SRC`] の `_excludedFilters` map からキー（除外
+    /// フィルタ名）の集合を抽出する。
+    ///
+    /// 素朴な字句解析: シングル/ダブルクォートの文字列トークンだけを認識する。
+    /// 値側の説明文がアポストロフィ回避でダブルクォートに切り替わることがある
+    /// （例: `"can't reproduce ..."`）が、クォート種別ごとに閉じクォートを
+    /// 探すので中のアポストロフィで誤って区切ってしまうことはない。直後に `:`
+    /// が続く「シングルクォート + snake_case」トークンだけをキーとして拾う
+    /// （値の説明文はスペース・大文字・記号を含むためこの条件に一致しない）。
+    fn excluded_filter_names_from_generate_shaders_dart() -> HashSet<String> {
+        let src = GENERATE_SHADERS_DART_SRC;
+        let marker = "_excludedFilters = <String, String>{";
+        let map_start = src
+            .find(marker)
+            .expect("_excludedFilters map not found in tools/generate_shaders.dart");
+        let body_start = map_start + marker.len();
+        let body_end = body_start
+            + src[body_start..]
+                .find("\n};")
+                .expect("no closing `};` for _excludedFilters in tools/generate_shaders.dart");
+        let body = &src[body_start..body_end];
+
+        let mut names = HashSet::new();
+        let mut chars = body.char_indices().peekable();
+        while let Some((start, quote)) = chars.next() {
+            if quote != '\'' && quote != '"' {
+                continue;
+            }
+            let content_start = start + quote.len_utf8();
+            let mut content_end = None;
+            while let Some(&(idx, c)) = chars.peek() {
+                if c == '\\' {
+                    chars.next();
+                    chars.next();
+                    continue;
+                }
+                if c == quote {
+                    content_end = Some(idx);
+                    chars.next();
+                    break;
+                }
+                chars.next();
+            }
+            let Some(content_end) = content_end else {
+                break; // unterminated string at end of body; nothing more to parse
+            };
+            let token = &body[content_start..content_end];
+            let is_snake_case_ident = !token.is_empty()
+                && token
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b == b'_' || b.is_ascii_digit());
+            if quote == '\'' && is_snake_case_ident {
+                let after = &body[content_end + quote.len_utf8()..];
+                if after.trim_start().starts_with(':') {
+                    names.insert(token.to_string());
+                }
+            }
+        }
+        names
+    }
+
     /// [`dump_targets`] の 20 種と、`tools/generate_shaders.dart` の
-    /// `_excludedFilters`（ここに手でミラーする）が、重複なく sensus-core の
-    /// 全 30 `VisionFilter` を覆っていることを検証する（レビュー S2）。
+    /// `_excludedFilters`（[`excluded_filter_names_from_generate_shaders_dart`]
+    /// で実際に読み取る）が、重複なく sensus-core の全 30 `VisionFilter` を
+    /// 覆っていることを検証する。
     ///
     /// `depth_aware_blur` だけは対応する `VisionFilter` variant が存在しない
     /// sensus 内部シェーダ（第2サンプラ `uDepth`）なので、variant の網羅対象
@@ -237,22 +305,7 @@ mod tests {
     fn dump_targets_and_excluded_stems_cover_all_variants() {
         use crate::api::sensus_bridge::tests::ALL_FILTERS;
 
-        // tools/generate_shaders.dart の `_excludedFilters` のキーのうち、
-        // 実在する VisionFilter variant に対応する 10 種（depth_aware_blur を除く）。
-        const EXCLUDED_VARIANTS: [&str; 10] = [
-            "dry_eye",
-            "starbursts",
-            "glaucoma",
-            "cataract",
-            "flickering_stars",
-            "metamorphopsia",
-            "vertigo",
-            "bppv_rotation",
-            "floaters",
-            "detail_loss",
-        ];
-        // 対応する VisionFilter variant が無い、sensus 内部シェーダ。
-        const EXCLUDED_NON_VARIANT: [&str; 1] = ["depth_aware_blur"];
+        const NON_VARIANT_EXCLUSIONS: [&str; 1] = ["depth_aware_blur"];
 
         let dumped_names: HashSet<&str> = dump_targets().iter().map(|(name, _)| *name).collect();
         assert_eq!(
@@ -261,15 +314,28 @@ mod tests {
             "dump_targets() の対象数が20から変わった"
         );
 
+        let excluded_names = excluded_filter_names_from_generate_shaders_dart();
+        assert!(
+            excluded_names.len() >= NON_VARIANT_EXCLUSIONS.len(),
+            "tools/generate_shaders.dart の _excludedFilters から1件も読めなかった \
+             （抽出ロジックがフォーマット変更で壊れていないか確認すること）"
+        );
+
         for name in &dumped_names {
             assert!(
-                !EXCLUDED_VARIANTS.contains(name),
+                !excluded_names.contains(*name),
                 "{name} is listed as both dumped and excluded"
             );
         }
 
+        let excluded_variant_names: HashSet<&str> = excluded_names
+            .iter()
+            .map(String::as_str)
+            .filter(|n| !NON_VARIANT_EXCLUSIONS.contains(n))
+            .collect();
+
         let mut covered: HashSet<&str> = dumped_names.clone();
-        covered.extend(EXCLUDED_VARIANTS);
+        covered.extend(excluded_variant_names);
 
         let all_variant_stems: HashSet<&str> = ALL_FILTERS.iter().map(canonical_stem).collect();
         assert_eq!(
@@ -280,13 +346,17 @@ mod tests {
 
         assert_eq!(
             covered, all_variant_stems,
-            "dump_targets() + _excludedFilters(ミラー) が VisionFilter 全30種と \
-             一致しない。新しい variant を追加したら dump_targets() / \
-             tools/generate_shaders.dart の _excludedFilters / このテストの \
-             いずれかを更新すること"
+            "dump_targets() + tools/generate_shaders.dart の _excludedFilters が \
+             VisionFilter 全30種と一致しない。新しい variant を追加したら \
+             dump_targets() か _excludedFilters のいずれかを更新すること"
         );
 
-        for name in EXCLUDED_NON_VARIANT {
+        for name in NON_VARIANT_EXCLUSIONS {
+            assert!(
+                excluded_names.contains(name),
+                "{name} が tools/generate_shaders.dart の _excludedFilters から \
+                 消えている（VisionFilter に対応しないドキュメント目的のエントリ）"
+            );
             assert!(
                 !all_variant_stems.contains(name),
                 "{name} に対応する VisionFilter variant が追加された場合は \

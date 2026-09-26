@@ -985,8 +985,8 @@ pub(crate) mod tests {
     /// ここに追加するだけで全網羅テストが拾う。payload 付きは代表値を入れる。
     ///
     /// `pub(crate)`: `shader_dump_gen.rs` の
-    /// `dump_targets_and_excluded_stems_cover_all_variants`（レビュー S2）が
-    /// crate 内の別テストモジュールから参照する。
+    /// `dump_targets_and_excluded_stems_cover_all_variants`（#56、ダンプ対象
+    /// フィルタ一覧の網羅性検証）が crate 内の別テストモジュールから参照する。
     // 新しい VisionFilter variant を追加したらこの配列にも足すこと（網羅テスト用）。
     // 本体の `vision_uniforms`/`vision_shader_glsl`/`to_sensus` は網羅 match なので、
     // variant 追加自体はコンパイルエラーで気付ける。
@@ -1371,8 +1371,8 @@ pub(crate) mod tests {
         ]
     }
 
-    /// (a) CPU 経路（apply_vision_cpu_rgba8）では Darken と Blur の出力が異なる
-    /// （field_loss_mode が実際に効いていることの確認。レビュー S6a）。
+    /// CPU 経路（apply_vision_cpu_rgba8）では Darken と Blur の出力が異なる
+    /// （field_loss_mode が実際に効いていることの確認）。
     #[test]
     fn field_loss_mode_blur_vs_darken_differs_on_cpu_path() {
         let w = 8u32;
@@ -1407,8 +1407,8 @@ pub(crate) mod tests {
         }
     }
 
-    /// (b) GPU 経路（vision_uniforms）は Darken/Blur で出力が同一（field_loss_mode を
-    /// 無視して常に Darken 相当になることの確認。レビュー S6b）。
+    /// GPU 経路（vision_uniforms）は Darken/Blur で出力が同一（field_loss_mode を
+    /// 無視して常に Darken 相当になることの確認）。
     #[test]
     fn field_loss_mode_blur_vs_darken_identical_on_gpu_uniforms() {
         for (name, build) in field_loss_mode_filters() {
