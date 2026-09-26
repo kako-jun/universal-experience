@@ -15,6 +15,23 @@ import 'package:universal_experience/ui/widgets/before_after_view.dart';
 /// 静的ヘルパ（generateSampleImage / renderAfter / canRender）を直接検証する。
 /// protanopia は ShaderFilter 経由で実描画でき、他フィルタは未描画
 /// （null = プレースホルダ表示）であることを確認する。
+
+/// `_rebuild` は例外を `FlutterError.reportError` で報告するようになった
+/// （#58 レビュー nit-1）。意図的に失敗を起こすテストがそれで落ちないよう、
+/// `FlutterError.onError` を収集用に差し替えて元に戻すためのヘルパ。
+///
+/// `group`/`setUp` ではなく各テスト本体の中で呼ぶこと:
+/// `TestWidgetsFlutterBinding` が独自の `onError`（失敗を検知してテストを落とす）
+/// を仕込むタイミングが `setUp` より後（テスト本体に入ってから）なので、
+/// `setUp` で差し替えても `testWidgets` 開始時に上書きされてしまい効かない。
+List<FlutterErrorDetails> suppressFlutterErrorReporting() {
+  final reported = <FlutterErrorDetails>[];
+  final originalOnError = FlutterError.onError;
+  FlutterError.onError = reported.add;
+  addTearDown(() => FlutterError.onError = originalOnError);
+  return reported;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -853,6 +870,58 @@ void main() {
         expect(requestedSizes, [494, 999],
             reason: '明示サイズへ切り替えたら auto 用タイマーは無効化されるべき');
       });
+
+      testWidgets(
+          '失敗直後のユーザー操作は、古い成功サイズではなく直近の失敗サイズで'
+          '再試行する（ちらつき防止） (#58 レビュー nit-3)', (tester) async {
+        suppressFlutterErrorReporting();
+
+        late ui.Image goodA;
+        await tester.runAsync(() async {
+          goodA = await BeforeAfterView.generateSampleImage(4);
+        });
+        final requestedSizes = <int>[];
+        sampleImageGenerator = (size) {
+          requestedSizes.add(size);
+          if (size == 494) return Future.value(goodA); // 初回サイズは成功。
+          // リサイズ後のサイズ（694）はアセット欠落等で恒久的に失敗する。
+          return Future<ui.Image>.error(StateError('boom'));
+        };
+
+        tester.view.physicalSize = const Size(1000, 800); // target 494
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filterType: ColorVisionType.none,
+          intensity: 1.0,
+        )));
+        await tester.pump();
+        await tester.pump();
+        expect(requestedSizes, [494]);
+
+        // リサイズすると新サイズ(694)での生成が失敗する
+        // （_currentSampleSize=494 のまま、_failedSampleSize=694 になる）。
+        tester.view.physicalSize = const Size(1400, 800); // target 694
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 301)); // デバウンス発火
+        expect(requestedSizes, [494, 694]);
+
+        // ここでユーザー操作（intensity 変更）が入る。_currentSampleSize
+        // (494、もう画面のサイズに合っていない) ではなく、直近の失敗サイズ
+        // (694、現在のレイアウトに合っているサイズ) で再試行するべき。494 で
+        // 再試行すると、694 用の失敗表示から一瞬 494 の古い画像に戻ってまた
+        // 694 に切り替わる、というちらつきが起きる。
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filterType: ColorVisionType.none,
+          intensity: 0.5,
+        )));
+        await tester.pump();
+
+        expect(requestedSizes, [494, 694, 694],
+            reason: '494（古い成功サイズ）ではなく694（直近の失敗サイズ）で'
+                '再試行するべき');
+      });
     });
 
     group('例外処理と復帰 (#58 レビュー S1)', () {
@@ -861,8 +930,52 @@ void main() {
         afterImageRenderer = BeforeAfterView.renderAfter;
       });
 
+      testWidgets(
+          'generator/renderer の例外は FlutterError.reportError で報告される '
+          '(#58 レビュー nit-1)', (tester) async {
+        final reportedErrors = suppressFlutterErrorReporting();
+        sampleImageGenerator = (size) => Future<ui.Image>.error(
+              StateError('boom: generator'),
+              StackTrace.current,
+            );
+
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filterType: ColorVisionType.protanopia,
+          intensity: 1.0,
+          sampleSize: 16,
+        )));
+        await tester.pump();
+        await tester.pump();
+
+        expect(reportedErrors, hasLength(1));
+        expect(reportedErrors.single.exception, isA<StateError>());
+        expect(reportedErrors.single.library, 'before_after_view');
+
+        // renderer 側の例外も同様に報告される。
+        late ui.Image goodBefore;
+        await tester.runAsync(() async {
+          goodBefore = await BeforeAfterView.generateSampleImage(4);
+        });
+        sampleImageGenerator = (size) => Future.value(goodBefore);
+        afterImageRenderer = (source, type, strength) =>
+            Future<ui.Image?>.error(StateError('boom: renderer'));
+
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filterType: ColorVisionType.protanopia,
+          intensity: 0.5,
+          sampleSize: 16,
+        )));
+        await tester.pump();
+        await tester.pump();
+
+        expect(reportedErrors, hasLength(2));
+        expect(reportedErrors.last.exception, isA<StateError>());
+        expect(reportedErrors.last.library, 'before_after_view');
+      });
+
       testWidgets('generator が例外を投げても loading が固着せず、次の更新で再試行できる',
           (tester) async {
+        suppressFlutterErrorReporting();
         late ui.Image goodBefore, goodAfter;
         await tester.runAsync(() async {
           goodBefore = await BeforeAfterView.generateSampleImage(4);
@@ -907,6 +1020,7 @@ void main() {
 
       testWidgets('renderer が例外を投げても新規生成した before はリークせず、次の更新で再試行できる',
           (tester) async {
+        suppressFlutterErrorReporting();
         late ui.Image before1, before2, goodAfter;
         await tester.runAsync(() async {
           before1 = await BeforeAfterView.generateSampleImage(4);
@@ -958,6 +1072,7 @@ void main() {
           'auto モードで恒久的な失敗が続いても busy loop にならず、'
           'ユーザー操作（intensity 変更）で再試行して成功する '
           '(#58 レビュー MUST-1)', (tester) async {
+        suppressFlutterErrorReporting();
         late ui.Image goodBefore, goodAfter;
         await tester.runAsync(() async {
           goodBefore = await BeforeAfterView.generateSampleImage(4);
@@ -1010,6 +1125,7 @@ void main() {
       testWidgets(
           'リサイズ後の恒久的な失敗も 300ms 周期の busy loop にならない '
           '(#58 レビュー MUST-1)', (tester) async {
+        suppressFlutterErrorReporting();
         late ui.Image goodBefore;
         await tester.runAsync(() async {
           goodBefore = await BeforeAfterView.generateSampleImage(4);
@@ -1063,6 +1179,7 @@ void main() {
       testWidgets(
           '最新世代が失敗すると _after が null になり previewFailed 表示になる。'
           '旧 _after は dispose され、次に成功すると元に戻る', (tester) async {
+        suppressFlutterErrorReporting();
         late ui.Image goodBefore, goodAfter1, goodAfter2;
         await tester.runAsync(() async {
           goodBefore = await BeforeAfterView.generateSampleImage(4);

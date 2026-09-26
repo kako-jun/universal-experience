@@ -189,9 +189,11 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
 
   /// Set when the most recently *applied* generation failed (#58 レビュー
   /// SHOULD-1). Gates the "after" pane to a [_ErrorPlaceholder] instead of a
-  /// stale/possibly-inconsistent image. Cleared back to `null` on the next
-  /// successful generation.
-  Object? _error;
+  /// stale/possibly-inconsistent image. Cleared back to `false` on the next
+  /// successful generation. The actual exception/stack trace isn't retained
+  /// here — it's reported once via [FlutterError.reportError] at the catch
+  /// site instead (#58 レビュー nit-1).
+  bool _failed = false;
 
   /// Resolution (square side, pixels) the currently-held [_before]/[_after]
   /// were generated at. `null` until the first generation completes (#58).
@@ -265,18 +267,21 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       // filterType/intensity が変わると、_currentSampleSize はまだ null。
       // その場合は _pendingResizeSampleSize（初回/リサイズで既に決まっている
       // 生成先サイズ）を使う。
-      // #58 レビュー MUST-1: 恒久的な失敗で _currentSampleSize/
+      // #58 レビュー MUST-1/nit-3: 恒久的な失敗で _currentSampleSize/
       // _pendingResizeSampleSize がどちらも null のままのことがある
       // （auto-resize 側は busy loop を避けるため自動では再試行しない）。
       // その場合は _failedSampleSize を使い、ユーザー操作（フィルタ/強度の変更）
-      // での再試行を可能にする。すべて null なら auto の初回レイアウトが
+      // での再試行を可能にする。_failedSampleSize は _currentSampleSize より
+      // 優先する: 一度成功したサイズが残っていても、レイアウトが変わった後に
+      // 失敗したのであれば、古い（もう画面のサイズに合っていない）成功時の
+      // サイズへ後戻りさせるとちらつく。すべて null なら auto の初回レイアウトが
       // まだ来ていないということなので、そのレイアウトに任せてここでは何もしない
       // （実行される _rebuild は呼び出し時点の widget.filterType/intensity を
       // 読むので、更新は取りこぼされない）。
       final size = widget.sampleSize ??
           _pendingResizeSampleSize ??
-          _currentSampleSize ??
-          _failedSampleSize;
+          _failedSampleSize ??
+          _currentSampleSize;
       if (size != null) {
         // 直接 _rebuild するので、保留中のデバウンスタイマー（あれば）は不要。
         _cancelResizeTimer();
@@ -356,9 +361,15 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
 
     _pendingResizeSampleSize = target;
     _cancelResizeTimer();
-    if (_currentSampleSize == null) {
-      // First generation: no debounce. We're already inside a post-frame
-      // callback here, so calling _rebuild (and its setState) is safe.
+    if (_currentSampleSize == null && _failedSampleSize == null) {
+      // Very first generation ever attempted for this widget: no debounce.
+      // We're already inside a post-frame callback here, so calling
+      // _rebuild (and its setState) is safe.
+      // #58 レビュー nit-2: a *previous* failure (even though it also left
+      // _currentSampleSize null) must NOT be treated as "first generation"
+      // here — otherwise resizing right after a permanent failure would
+      // retry immediately (and again on every subsequent resize frame while
+      // it keeps failing) instead of going through the debounce path below.
       _rebuild(target);
     } else {
       _resizeDebounceTimer = Timer(_resizeDebounceDuration, () {
@@ -377,14 +388,14 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// a failure state instead of the (possibly now-stale) `_after` (SHOULD-1).
   /// If a newer request has already superseded this one, does nothing (that
   /// newer request owns the state now).
-  void _onRebuildFailed(int generation, int sampleSize, Object error) {
+  void _onRebuildFailed(int generation, int sampleSize) {
     if (generation != _generation || !mounted) return;
     _failedSampleSize = sampleSize;
     _pendingResizeSampleSize = null;
     final oldAfter = _after;
     setState(() {
       _loading = false;
-      _error = error;
+      _failed = true;
       _after = null;
     });
     // _after may have aliased _before (filterType == none) — don't dispose
@@ -406,10 +417,17 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     } else {
       try {
         before = await sampleImageGenerator(sampleSize);
-      } catch (e) {
+      } catch (e, st) {
+        // #58 レビュー nit-1: 静かに握りつぶさず Flutter のエラー報告経路に
+        // 乗せる（crash reporting 等が拾えるように）。
+        FlutterError.reportError(FlutterErrorDetails(
+          exception: e,
+          stack: st,
+          library: 'before_after_view',
+        ));
         // #58 レビュー S1: 生成に失敗しても loading に固着させず、次の
         // レイアウト/更新で再試行できるようにする。
-        _onRebuildFailed(generation, sampleSize, e);
+        _onRebuildFailed(generation, sampleSize);
         return;
       }
     }
@@ -435,13 +453,19 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         widget.filterType,
         widget.intensity,
       );
-    } catch (e) {
+    } catch (e, st) {
+      // #58 レビュー nit-1: こちらも同様に報告する。
+      FlutterError.reportError(FlutterErrorDetails(
+        exception: e,
+        stack: st,
+        library: 'before_after_view',
+      ));
       if (clonedInput) {
         rendererInput.dispose();
       } else if (!identical(before, _before)) {
         before.dispose();
       }
-      _onRebuildFailed(generation, sampleSize, e);
+      _onRebuildFailed(generation, sampleSize);
       return;
     }
 
@@ -473,7 +497,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       _after = after;
       _currentSampleSize = sampleSize;
       _loading = false;
-      _error = null; // #58 レビュー SHOULD-1: 成功したら失敗表示を解除する。
+      _failed = false; // #58 レビュー SHOULD-1: 成功したら失敗表示を解除する。
     });
     _pendingResizeSampleSize = null;
     _failedSampleSize = null; // #58 レビュー MUST-1: 成功したので再試行を許可する。
@@ -615,11 +639,11 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
           label: l10n.previewPaneOriginal,
           child: _ImageView(image: _before),
         );
-        // #58 レビュー SHOULD-1: 最新世代が失敗した場合は _error が立ち、
+        // #58 レビュー SHOULD-1: 最新世代が失敗した場合は _failed が立ち、
         // _after は null にされている。stale/不整合な画像を出し続けるより
         // 失敗を明示する。
         final Widget afterChild;
-        if (_error != null) {
+        if (_failed) {
           afterChild =
               _ErrorPlaceholder(theme: theme, label: l10n.previewFailed);
         } else if (_after != null) {
