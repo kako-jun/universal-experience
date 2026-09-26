@@ -14,12 +14,16 @@
 
 - **Git**: バージョン管理用
 
-- **Rust toolchain**（`rustc` / `cargo`, stable channel）: `rust/` crate
-  （flutter_rust_bridge 経由で sensus-core を公開する）に必要。`cargo test` /
-  clippy だけでなく、`rust_builder/`（cargokit 統合、#55）が `flutter run` /
-  `flutter build macos` / `flutter build linux` のたびに `cargo build` を
-  呼んで native lib をビルド・同梱するため、通常のアプリ実行にも要ります
+- **Rust toolchain**（`rustc` / `cargo`, stable channel、**rustup 経由でのインストールが必須**）:
+  `rust/` crate（flutter_rust_bridge 経由で sensus-core を公開する）に必要。
+  `cargo test` / clippy だけでなく、`rust_builder/`（cargokit 統合、#55）が
+  `flutter run` / `flutter build macos` / `flutter build linux` のたびに
+  `cargo build` を呼んで native lib をビルド・同梱するため、通常のアプリ実行にも
+  要ります。cargokit は toolchain の解決に `rustup` コマンドを直接呼ぶため
+  （`rustup toolchain list` 等）、Homebrew 等で `cargo`/`rustc` だけ単独導入した
+  環境では動きません。[rustup.rs](https://rustup.rs/) 経由で入れてください
   ```bash
+  rustup --version
   rustc --version
   cargo --version
   ```
@@ -187,10 +191,14 @@ cd ..
 #### 3. Rust ビルドエラー（`cargokit`, `cargo build failed` 等）
 
 `rust_builder/`（cargokit 統合、#55）が `flutter build` / `flutter run` の
-たびに裏で `cargo build` を実行します。Rust toolchain が入っていない、または
-`rust/` の `cargo build` 自体が失敗する環境ではここで落ちます。
+たびに裏で `cargo build` を実行します。Rust toolchain が入っていない、
+rustup 経由で入れていない、または `rust/` の `cargo build` 自体が失敗する
+環境ではここで落ちます。
 
 ```bash
+# rustup 経由で入っているか確認する（cargokit は rustup を直接呼ぶ）
+rustup --version
+
 # rust/ 単体でビルドが通るか確認する
 cd rust
 cargo build

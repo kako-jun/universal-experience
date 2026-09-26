@@ -237,6 +237,18 @@ true）は素通りにし、`RustLib.init()` 自体の失敗は例外を外に�
 `runApp` する。native lib が同梱されていない/壊れている状態でもクラッシュせず
 文言表示に落ちる、という契約。
 
+> **注意（Linux の dev ロードパス優先）**: `RustLib.init()`（flutter_rust_bridge の
+> `loadExternalLibrary`）は、まずカレントディレクトリ相対の `rust/target/release/`
+> （生成済み `frb_generated.dart` の `ioDirectory` 設定）に `.so`/`.dylib` が
+> 無いか探し、あればそれを優先してロードする。cargokit が同梱した native lib
+> （フォールバック経路）を見るのはそれが無い場合だけ。`flutter run -d linux` は
+> プロジェクトルートを CWD にして実行されるため、`cargo build`（`cd rust && cargo
+> build` 等）を一度でも直接叩いたことがある開発環境では `rust/target/release/` に
+> 古い `.so` が残り、それが cargokit の再ビルド分より優先されてロードされうる。
+> 挙動が cargokit 側の変更と食い違って見えたら、まず `rust/target/release/` に
+> 古い `.so`/`.dylib` が残っていないか確認する（`rm -rf rust/target` で消せる。
+> `cargo test`/`clippy` 用の再ビルドは自動で走る）。
+
 ### 主要コンポーネント
 
 - `HomeScreen`: メイン画面。色覚クイック選択・強度スライダ・before/after プレビュー・
