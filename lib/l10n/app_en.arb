@@ -23,7 +23,7 @@
   "@aboutBody": {
     "description": "First paragraph of the About dialog."
   },
-  "aboutPhases": "Phase 1: Color vision deficiency simulation\nPhase 2: Hearing impairment simulation (coming soon)\nPhase 3: Further disability simulations (planned)",
+  "aboutPhases": "Phase 1: Color vision deficiency simulation\nPhase 2: Hearing impairment simulation (coming soon)\nPhase 3: Other ways of seeing beyond color — visual field loss, blur, and more (already selectable under Advanced; on-screen rendering is being extended)",
   "@aboutPhases": {
     "description": "Roadmap paragraph of the About dialog. Newline-separated phase list."
   },
@@ -115,7 +115,7 @@
   "@advancedSectionTitle": {
     "description": "Title of the advanced section listing all 30 sensus filters."
   },
-  "advancedSectionNote": "Pick from all 30 ways of seeing that sensus exposes, grouped by category, and adjust their parameters. Real/live rendering is handled in separate issues.",
+  "advancedSectionNote": "Pick from all 30 ways of seeing that sensus exposes, grouped by category, and adjust their parameters. Live on-screen rendering is available for some filters today, and is being extended to the rest.",
   "@advancedSectionNote": {
     "description": "Explanatory note under the advanced section."
   },
