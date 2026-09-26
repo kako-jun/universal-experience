@@ -102,8 +102,9 @@ app.*.map.json
 coverage/
 
 # Rust/Cargo (flutter_rust_bridge: sensus-core ブリッジ)
+# Cargo.lock は cargokit (#55) が同梱ビルドで使う native lib の再現性のため
+# コミットする（bin/cdylib crate の Cargo.lock は正本、ignore しない）。
 rust/target/
-rust/Cargo.lock
 
 # Exceptions to above rules.
 !**/ios/**/default.mode1v3

@@ -3,7 +3,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:io' show Platform;
-import 'dart:ui' show PlatformDispatcher;
 
 import 'l10n/app_localizations.dart';
 import 'l10n/l10n_extensions.dart';
@@ -11,6 +10,7 @@ import 'services/filter_service.dart';
 import 'services/vision_filter_state.dart';
 import 'services/loupe_window_controller.dart';
 import 'services/tray_service.dart';
+import 'services/native_bridge_service.dart';
 import 'services/settings_service.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/theme/app_theme.dart';
@@ -80,35 +80,88 @@ TrayService _buildTrayService(SettingsService settings) {
 ///
 /// `lookupAppLocalizations` はサポート外 locale で投げるため、システム locale が
 /// 非対応のときは [AppLocalizations.supportedLocales] の先頭（en）へフォールバック。
+///
+/// `WidgetsBinding.instance.platformDispatcher` 経由で読む（`PlatformDispatcher.instance`
+/// を直接参照しない）。本番ではどちらも同じ実プラットフォームディスパッチャを指すため
+/// 挙動は変わらないが、`flutter_test` 下では `WidgetsBinding.instance` が
+/// `TestWidgetsFlutterBinding` になり、その `platformDispatcher` が
+/// `tester.platformDispatcher`（`localeTestValue` で差し替え可能な偽物）と一致するため、
+/// テストからロケールをオーバーライドできるようになる。
 Locale _resolveStartupLocale(Locale? preferred) {
   bool isSupported(Locale l) => AppLocalizations.supportedLocales
       .any((s) => s.languageCode == l.languageCode);
 
   if (preferred != null && isSupported(preferred)) return preferred;
 
-  final system = PlatformDispatcher.instance.locale;
+  final system = WidgetsBinding.instance.platformDispatcher.locale;
   if (isSupported(system)) return Locale(system.languageCode);
 
   return AppLocalizations.supportedLocales.first;
 }
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+/// アプリのルート Widget を組み立てる (#55)。Rust ブリッジ初期化・設定復元・
+/// 共有 `filterService` のシードまでを担い、`main()` と（実プロセスで
+/// `main()` 相当の起動経路を踏みたい）`integration_test/app_bootstrap_test.dart`
+/// の両方から呼ばれる唯一の bootstrap 関数。
+///
+/// 戻り値は `({Widget app, bool bridgeReady})` レコード。呼び出し側は
+/// `bridgeReady` を見て分岐する（Widget のランタイム型 `is NativeBridgeErrorApp`
+/// を見て分岐する必要がない、#55 レビュー nit）。
+///
+/// - [initBridge] は既定で `initNativeBridge()`
+///   （services/native_bridge_service.dart）。失敗時（native lib が壊れている・
+///   同梱されていない等。#52 の実害: プリセット欄が本番で例外表示になっていた）は
+///   クラッシュさせず、`bridgeReady: false` と [NativeBridgeErrorApp] を返す。
+///   以降 [settings] の読込・`filterService` のシードも行わない（Rust ブリッジに
+///   依存する機能を使わせないための最小構成）。integration test がテストダブルの
+///   `initBridge` を注入して失敗系を確認できるよう関数として差し替え可能にしてある。
+/// - 成功時は [settings]（未指定なら新規 `SettingsService()`）を読み込み、
+///   復元済みのフィルタ種別・強度をトップレベル共有の `filterService`（#15、
+///   トレイとウィンドウ内 UI が同じインスタンスを見る）へ一度だけ適用してから
+///   `bridgeReady: true` と [UniversalExperienceApp] を返す。
+///
+/// windowManager / trayService の初期化はここでは行わない。それらは
+/// `main()` 内に閉じたままにする（test/widget_test.dart のコメント参照）。
+Future<({Widget app, bool bridgeReady})> buildRootApp({
+  Future<bool> Function() initBridge = initNativeBridge,
+  SettingsService? settings,
+}) async {
+  if (!await initBridge()) {
+    return (app: const NativeBridgeErrorApp(), bridgeReady: false);
+  }
 
   // Restore persisted settings (theme mode / last filter / intensity / locale)
   // before building the app so the first frame already reflects the user's
   // choices (#17/#18, settings_service.dart).
-  final settings = SettingsService();
-  await settings.load();
-
-  // Build the tray with labels resolved for the startup locale (#18). Must run
-  // after settings.load() so the persisted language (if any) is honoured.
-  trayService = _buildTrayService(settings);
+  final s = settings ?? SettingsService();
+  await s.load();
 
   // Seed the shared FilterService (#15) from the restored settings (#17) so the
   // previously selected filter + intensity are reflected on startup, on the
   // single instance shared by the tray and the in-window UI.
-  filterService.applyFilter(settings.filterType, intensity: settings.intensity);
+  filterService.applyFilter(s.filterType, intensity: s.intensity);
+
+  return (app: UniversalExperienceApp(settings: s), bridgeReady: true);
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // buildRootApp() が Rust ブリッジ初期化・設定復元・filterService のシードを
+  // 行い、成功/失敗いずれの場合も表示すべき Widget を bridgeReady と共に返す（#55）。
+  final settings = SettingsService();
+  final result = await buildRootApp(settings: settings);
+  if (!result.bridgeReady) {
+    runApp(result.app);
+    return;
+  }
+
+  // ここに到達した時点で settings は buildRootApp() 内で load() 済み
+  // （同一インスタンスなので、以下の trayService/windowManager も復元済みの値を見る）。
+
+  // Build the tray with labels resolved for the startup locale (#18). Must run
+  // after settings.load() so the persisted language (if any) is honoured.
+  trayService = _buildTrayService(settings);
 
   // Initialize window manager for desktop platforms
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
@@ -151,7 +204,7 @@ void main() async {
     await _setUpTray();
   }
 
-  runApp(UniversalExperienceApp(settings: settings));
+  runApp(result.app);
 }
 
 /// トレイを初期化し、ウィンドウのクローズ・ポリシーを適用する (#15)。
@@ -238,6 +291,52 @@ class UniversalExperienceApp extends StatelessWidget {
             supportedLocales: AppLocalizations.supportedLocales,
             home: const HomeScreen(),
             debugShowCheckedModeBanner: false,
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Rust ブリッジの初期化失敗時 (#55) に `UniversalExperienceApp` の代わりに
+/// 表示するエラー画面。`initNativeBridge()` が false を返したときだけ使う。
+///
+/// `VisionFilterState` / `FilterService` 等の状態も `SettingsService` も
+/// 一切構築しない（Rust ブリッジに依存する機能を使わせないための最小構成）。
+/// ロケールはシステム追従（設定の読込前なので永続化ロケールは見られない）が、
+/// [locale] を渡せばテスト等から明示的に固定できる（未指定時は
+/// [_resolveStartupLocale] のフォールバックに従う）。
+class NativeBridgeErrorApp extends StatelessWidget {
+  const NativeBridgeErrorApp({super.key, this.locale});
+
+  /// 表示に使うロケール。null ならシステム追従（[_resolveStartupLocale]）。
+  final Locale? locale;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      locale: locale ?? _resolveStartupLocale(null),
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
+      debugShowCheckedModeBanner: false,
+      home: Builder(
+        builder: (context) {
+          final l10n = AppLocalizations.of(context)!;
+          return Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  l10n.nativeBridgeInitFailed,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
           );
         },
       ),

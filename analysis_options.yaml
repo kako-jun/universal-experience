@@ -1,5 +1,14 @@
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  exclude:
+    # cargokit 統合 (#55)。build_tool/ は独立した Dart パッケージで
+    # 自前の pubspec.yaml / 依存を持つため、アプリの analyzer コンテキストからは
+    # 解析対象外にする（依存未解決で誤検出するため。ローカルで通っていたのは
+    # rust_builder/cargokit/build_tool/.dart_tool が既に生成済みで analyzer が
+    # 依存解決を再利用できていたためで、クリーンチェックアウトでは失敗する）。
+    - rust_builder/**
+
 linter:
   rules:
     - prefer_const_constructors

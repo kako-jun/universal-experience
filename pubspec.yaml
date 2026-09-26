@@ -40,6 +40,11 @@ dependencies:
   flutter_rust_bridge: 2.11.1
   # FRB 2.11.1 は freezed 2.x 系を前提（3.x prerelease は非互換）。
   freezed_annotation: ^2.4.4
+  # cargokit 統合 (#55)。rust_builder/ は flutter_rust_bridge_codegen integrate
+  # 相当の手順で追加した FFI plugin で、macOS / Linux ビルド時に rust/ crate を
+  # ビルドしアプリへ同梱する。中身は生成物なので直接編集しない。
+  universal_experience_rust:
+    path: rust_builder
 
 dev_dependencies:
   flutter_test:
@@ -49,6 +54,10 @@ dev_dependencies:
   ffigen: ^20.1.1
   freezed: ^2.5.7
   build_runner: ^2.4.13
+  # 実ブリッジ smoke test (#55)。integration_test/ を `flutter test
+  # integration_test -d macos` で実行するために要る。
+  integration_test:
+    sdk: flutter
 
 flutter:
   uses-material-design: true

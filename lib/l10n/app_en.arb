@@ -6,6 +6,11 @@
     "description": "Application name, shown in the title bar, AppBar and About dialog."
   },
 
+  "nativeBridgeInitFailed": "Failed to load the native library. Please reinstall the app.",
+  "@nativeBridgeInitFailed": {
+    "description": "Shown full-screen at startup when the Rust native bridge (RustLib.init(), #55) fails to load, instead of crashing."
+  },
+
   "headerTagline": "Every sense, for everyone.",
   "@headerTagline": {
     "description": "Hero headline on the home screen."
