@@ -12,6 +12,7 @@ import 'services/vision_filter_state.dart';
 import 'services/loupe_window_controller.dart';
 import 'services/tray_service.dart';
 import 'services/settings_service.dart';
+import 'src/rust/frb_generated.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/theme/app_theme.dart';
 
@@ -94,6 +95,12 @@ Locale _resolveStartupLocale(Locale? preferred) {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Rust ブリッジ (#55)。sensus-core を FRB で消費する `experiences()` 等は
+  // これを呼ぶまで `RustLib.instance` が未初期化で例外になる（#52 の実害:
+  // プリセット欄が本番で例外表示になっていた）。cargokit (rust_builder/) が
+  // 同梱した native lib をロードする。
+  await RustLib.init();
 
   // Restore persisted settings (theme mode / last filter / intensity / locale)
   // before building the app so the first frame already reflects the user's
