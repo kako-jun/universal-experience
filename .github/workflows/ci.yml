@@ -22,6 +22,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          cache: true
 
       - name: Flutter pub get
         run: flutter pub get
@@ -31,6 +32,9 @@ jobs:
 
       - name: Flutter test
         run: flutter test
+
+      - name: Flutter build macos
+        run: flutter build macos --debug
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable

@@ -27,7 +27,8 @@
 Android / Windows は計画中で、ランナーディレクトリ自体がまだありません。
 
 #### macOS開発（現行対応）
-- 最新の安定版 Xcode（macOS 12 以上をターゲットにできるもの）
+- 最新の安定版 Xcode（macOS 13 以上をターゲットにできるもの。Flutter の native assets が
+  macOS 13 を要求する）
 - CocoaPods
 
 #### Linux開発（現行対応）

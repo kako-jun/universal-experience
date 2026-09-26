@@ -258,7 +258,8 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   `test/protanopia_golden_test.dart`）: sensus-core 正本由来の参照 PNG と GPU 描画結果を
   PSNR/maxDiff で比較（詳細は `docs/sensus-integration.md` §6）
 - **Rust 側**: `cargo test`（`rust/`、`golden_gen.rs` の正本一致テストを含む）
-- **CI**（#38、完了）: `.github/workflows/ci.yml` が push/PR で上記を回す
+- **CI**（#38、完了）: `.github/workflows/ci.yml` が push/PR で上記に加え
+  `flutter build macos --debug` を回す（#54）
 - **タスクトレイ常駐**（#15、完了）: 実機でのトレイ表示・メニュー操作は環境制約
   （Wayland + grim、GNOME のトレイ拡張要件）のため未検証。純粋ロジックの単体テストと
   ビルド成功で代替している（上記「実機目視について」）

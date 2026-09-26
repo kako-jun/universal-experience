@@ -139,11 +139,12 @@ flutter run
 
 ## CI
 
-`.github/workflows/ci.yml` が push/PR（main）で flutter analyze / flutter test と、
-`rust/` の cargo fmt --check / clippy --all-targets -D warnings / cargo test を回す
-（runs-on: macos-latest。Flutter golden を生成プラットフォームと揃えるため）。rust 依存は
-crates.io のみ（sensus-core）なので、private 依存を git 経由で引く場合に要る
-deploy key / ssh-agent 設定は不要。
+`.github/workflows/ci.yml` が push/PR（main）で flutter analyze / flutter test /
+flutter build macos --debug と、`rust/` の cargo fmt --check /
+clippy --all-targets -D warnings / cargo test を回す（runs-on: macos-latest。
+Flutter golden を生成プラットフォームと揃えるため）。rust 依存は crates.io のみ
+（sensus-core）なので、private 依存を git 経由で引く場合に要る deploy key /
+ssh-agent 設定は不要。
 
 ## ロードマップ
 
