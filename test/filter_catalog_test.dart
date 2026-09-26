@@ -186,7 +186,7 @@ void main() {
 
     test(
         'field_loss_mode を持つ4フィルタはカタログに fieldLossMode パラメータを公開しない'
-        '（M1: GPU 経路が無視するため意図的に非公開）', () {
+        '（GPU 経路が無視するため意図的に非公開、#56）', () {
       for (final id in [
         'glaucoma',
         'macular_degeneration',
@@ -276,7 +276,7 @@ void main() {
       );
     });
 
-    test('glaucoma の fieldLossMode は常に darken で構築される（M1: カタログに公開しない）',
+    test('glaucoma の fieldLossMode は常に darken で構築される（カタログに公開しない、#56）',
         () {
       final state = VisionFilterState()..select('glaucoma');
       // fieldLossMode はカタログにパラメータが無いため setParam しても build() の
@@ -345,7 +345,7 @@ void main() {
 
     test(
         'macular_degeneration / tunnel_vision は fieldLossMode 常に darken で構築される'
-        '（M1: カタログに公開しない）', () {
+        '（カタログに公開しない、#56）', () {
       final macular = VisionFilterState()..select('macular_degeneration');
       expect(
         macular.build(),

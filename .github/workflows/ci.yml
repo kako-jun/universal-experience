@@ -50,7 +50,7 @@ jobs:
         run: flutter pub get
 
       # shaders/*.frag・pubspec.yaml の shaders: ブロックが tools/sensus_shaders.g.json
-      # と同期していることを明示的に確認する（#56 レビュー S2）。test/shader_codegen_test.dart
+      # と同期していることを明示的に確認する（#56）。test/shader_codegen_test.dart
       # も同じ --check を内部で回すが、ドリフトの原因切り分けをしやすくするため
       # 独立ステップとしても実行する。
       - name: Verify shader codegen has no drift

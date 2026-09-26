@@ -79,7 +79,7 @@ void main() {
 
     test(
         '全 catalog param.labelKey / option.labelKey が en/ja ともフォールバックなしで'
-        '名前解決できる（レビュー S7）', () {
+        '名前解決できる', () {
       // visionParamLabel() のフォールバックは labelKey をそのまま返すので、
       // labelKey と異なれば実翻訳が解決できている（未訳のまま raw key が UI に
       // 出てしまう回帰を検出する）。
