@@ -5,11 +5,18 @@ import '../models/disability_type.dart';
 
 /// Persists and restores user preferences via [SharedPreferences].
 ///
-/// Owns four persisted settings:
+/// Owns three persisted settings:
 /// - [themeMode]   ([ThemeMode], light/dark/system)
 /// - [filterType]  (the last selected [ColorVisionType])
-/// - [intensity]   (the last filter intensity, 0.0..1.0)
 /// - [locale]      (the chosen UI language; null = follow the system locale)
+///
+/// Filter *intensity* used to live here too (a single global value), but as of
+/// #57 it is owned by `FilterService` instead (remembered per [ColorVisionType],
+/// persisted with its own debounce). Routing every intensity change through
+/// this service's [notifyListeners] meant the [MaterialApp] Consumer below
+/// (main.dart) — which exists to react to theme/locale — rebuilt on every
+/// slider tick too. This service only notifies for changes that the
+/// [MaterialApp] actually cares about (theme, locale) plus [filterType].
 ///
 /// The service is a [ChangeNotifier] so widgets (e.g. the [MaterialApp] theme
 /// and locale) rebuild when settings change. Call [load] once at startup before
@@ -20,19 +27,16 @@ class SettingsService extends ChangeNotifier {
   // Persistence keys.
   static const String keyThemeMode = 'settings.themeMode';
   static const String keyFilterType = 'settings.filterType';
-  static const String keyIntensity = 'settings.intensity';
   static const String keyLocale = 'settings.locale';
 
   SharedPreferences? _prefs;
 
   ThemeMode _themeMode = ThemeMode.system;
   ColorVisionType _filterType = ColorVisionType.none;
-  double _intensity = 1.0;
   Locale? _locale;
 
   ThemeMode get themeMode => _themeMode;
   ColorVisionType get filterType => _filterType;
-  double get intensity => _intensity;
 
   /// The chosen UI language, or null to follow the system locale (#18).
   ///
@@ -57,11 +61,6 @@ class SettingsService extends ChangeNotifier {
       _filterType = _filterTypeFromName(filterName);
     }
 
-    final storedIntensity = prefs.getDouble(keyIntensity);
-    if (storedIntensity != null) {
-      _intensity = storedIntensity.clamp(0.0, 1.0);
-    }
-
     final localeCode = prefs.getString(keyLocale);
     if (localeCode != null && localeCode.isNotEmpty) {
       _locale = Locale(localeCode);
@@ -84,15 +83,6 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
     final prefs = _prefs ??= await SharedPreferences.getInstance();
     await prefs.setString(keyFilterType, type.name);
-  }
-
-  Future<void> setIntensity(double value) async {
-    final clamped = value.clamp(0.0, 1.0);
-    if (clamped == _intensity) return;
-    _intensity = clamped;
-    notifyListeners();
-    final prefs = _prefs ??= await SharedPreferences.getInstance();
-    await prefs.setDouble(keyIntensity, clamped);
   }
 
   /// Sets the UI language, or clears it (null) to follow the system locale.

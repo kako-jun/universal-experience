@@ -123,20 +123,31 @@ main.dart が `windowManager.show()` / `hide()` を `onShowLoupe` / `onHideLoupe
 6. **設定を開く…** — フィルタ選択 UI はメインウィンドウ内にあるため
    `windowManager.show()` + `focus()` でウィンドウを表示する
 7. (区切り線)
-8. **終了** — トレイを破棄し `setPreventClose(false)` の上で
-   `windowManager.destroy()`
+8. **終了** — 先頭で `FilterService.flush()`（#57、保留中の intensity
+   デバウンス書き込みを取りこぼさない）した上で、トレイを破棄し
+   `setPreventClose(false)` の上で `windowManager.destroy()`
 
 ### ウィンドウクローズ・ポリシー
 
-**ウィンドウを閉じても終了せず、トレイに最小化される (close = トレイ常駐)。**
-明示的な終了はトレイの "終了" のみ。`main.dart` で
-`windowManager.setPreventClose(true)` + `onWindowClose` → `windowManager.hide()`
-で実装している。
+**トレイが使える環境では、ウィンドウを閉じても終了せず、トレイに最小化される
+(close = トレイ常駐)。** 明示的な終了はトレイの "終了" のみ。
 
-ただしトレイから復帰できなければアプリが行方不明になるため、トレイ初期化が
-**失敗した環境では close = 終了** にフォールバックする (`resolveCloseAction()` が
-この判断を純粋関数として表現し、テスト済み)。よって `setPreventClose` の適用は
-トレイ初期化の成否で決める。
+`windowManager.setPreventClose(true)` はトレイの有無に関わらず常に掛ける
+(`main.dart` `_setUpTray`)。`onWindowClose` の中で `resolveCloseAction()`
+(純粋関数、テスト済み) の結果を見て分岐する:
+
+- **トレイが使える環境 (`hideToTray`)** — `windowManager.hide()` するだけ。
+- **トレイ初期化が失敗した環境 (`exitApp`)** — トレイから復帰できずアプリが
+  行方不明になるため close = 終了にフォールバックする。ただし intensity の
+  デバウンス永続化 (#57) を取りこぼさないよう、`FilterService.flush()` →
+  `setPreventClose(false)` → `windowManager.destroy()` の順で終了する
+  (`flush()` は `try`、残り 2 つは `finally` で必ず実行)。
+
+トレイの "終了" (`onQuit`) も同じ理由で先頭に `flush()` を置く。さらに
+macOS の Cmd+Q やログアウトなど、window_manager のクローズイベントを経由しない
+終了経路もあるため、`main()` で `AppLifecycleListener.onExitRequested` にも
+同じ `flush()` を仕込んでいる（トレイ・ウィンドウクローズ経由の flush はそのまま
+残る、二重の安全網）。
 
 ### プラットフォーム差
 
@@ -273,7 +284,18 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
 - `HomeScreen`: メイン画面。色覚クイック選択・強度スライダ・before/after プレビュー・
   advanced カタログ・体験プリセット・PNG エクスポートをまとめる
 - `FilterService`: 色覚フィルタ（`ColorVisionType`）の選択状態管理。
-  sensus `VisionFilter` へのマッピングを持つ純粋な状態モデル
+  sensus `VisionFilter` へのマッピングを持つ純粋な状態モデル。強度
+  （`intensity`）はタイプごとに `Map<ColorVisionType, double>` で個別記憶し、
+  初めて選ぶタイプは推奨強度（-opia/achromatopsia=1.0、-omaly=0.6）が初期値
+  になる（#57）。永続化・通知も本サービス自身が担う（300ms デバウンスした
+  SharedPreferences 書き込み + 自前の `ChangeNotifier`）。`SettingsService`
+  は `notifyListeners` を購読する `MaterialApp`（テーマ/ロケール用）を持つため、
+  intensity のようにスライダー 1 目盛りごとに変わる値をそちらに混ぜると
+  アプリ全体が毎回再構築されてしまう。それを避けるため intensity は
+  `SettingsService` を経由しない。一方 filterType（どのタイプを選んでいるか）は
+  `SettingsService.setFilterType` 経由で引き続き通知・永続化する。フィルタの
+  選び直しはユーザー操作としてスライダー操作ほど高頻度ではないため、
+  `MaterialApp` 再構築が起きること自体は許容している
 - `VisionFilterState`: advanced カタログ（sensus 全 30 種）の選択・パラメータ状態
 - `ShaderFilter`（`lib/rendering/shader_filter.dart`）: sensus 由来 GLSL を変換した
   Impeller `FragmentProgram` で `ui.Image` にフィルタを適用する。ライブ描画は

@@ -3,6 +3,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:io' show Platform;
+// AppLifecycleListener.onExitRequested の戻り値型（AppExitResponse）は dart:ui
+// 由来で、package:flutter/material.dart からは再エクスポートされない。
+import 'dart:ui' show AppExitResponse;
 
 import 'l10n/app_localizations.dart';
 import 'l10n/l10n_extensions.dart';
@@ -30,6 +33,15 @@ final FilterService filterService = FilterService();
 /// するなら `assets/tray/tray_icon.ico` を追加して分岐すればよい。
 /// 詳細は docs/ARCHITECTURE.md「タスクトレイ (#15)」参照。
 const String _trayIconPath = 'assets/tray/tray_icon.png';
+
+/// OS からの終了要求（macOS の Cmd+Q / メニューバーの「終了」/ ログアウト等）を
+/// 捕捉し、[FilterService.flush] を挟んでから終了を許可する（#57 レビュー
+/// should-1）。トレイ経由・ウィンドウクローズ経由の flush（[_setUpTray] /
+/// `onQuit`）は window_manager のクローズイベントしか見ておらず、Cmd+Q や
+/// ログアウトはそれらを経由せず直接プロセス終了に向かうため、二重の安全網として
+/// 別途これが要る。`main()` 内のローカル変数にすると `main()` の関数フレームが
+/// 終わった時点で参照が切れ GC されうるため、トップレベル変数として保持する。
+late final AppLifecycleListener appLifecycleListener;
 
 /// タスクトレイ常駐 (#15)。トレイ非対応環境では init() が no-op になる。
 ///
@@ -66,6 +78,9 @@ TrayService _buildTrayService(SettingsService settings) {
       await windowManager.focus();
     },
     onQuit: () async {
+      // デバウンス中の intensity 永続化（#57）を、実タイマーの発火を待たず
+      // 確定させてから終了する（待たないと直近のスライダー操作が失われうる）。
+      await filterService.flush();
       // トレイアイコンを破棄し、prevent-close を解除してから実際に終了する。
       await trayService.dispose();
       if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
@@ -116,9 +131,12 @@ Locale _resolveStartupLocale(Locale? preferred) {
 ///   依存する機能を使わせないための最小構成）。integration test がテストダブルの
 ///   `initBridge` を注入して失敗系を確認できるよう関数として差し替え可能にしてある。
 /// - 成功時は [settings]（未指定なら新規 `SettingsService()`）を読み込み、
-///   復元済みのフィルタ種別・強度をトップレベル共有の `filterService`（#15、
-///   トレイとウィンドウ内 UI が同じインスタンスを見る）へ一度だけ適用してから
-///   `bridgeReady: true` と [UniversalExperienceApp] を返す。
+///   トップレベル共有の `filterService`（#15、トレイとウィンドウ内 UI が同じ
+///   インスタンスを見る）に永続化済みの per-type 強度（#57）を読み込んでから、
+///   復元済みのフィルタ種別を一度だけ適用して `bridgeReady: true` と
+///   [UniversalExperienceApp] を返す。intensity 自体は `filterService.load()` が
+///   `FilterService` 自身の永続化ストアから復元する（`settings.intensity` は
+///   #57 で撤去済み。旧キーからの移行はしない）。
 ///
 /// windowManager / trayService の初期化はここでは行わない。それらは
 /// `main()` 内に閉じたままにする（test/widget_test.dart のコメント参照）。
@@ -130,22 +148,42 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
     return (app: const NativeBridgeErrorApp(), bridgeReady: false);
   }
 
-  // Restore persisted settings (theme mode / last filter / intensity / locale)
-  // before building the app so the first frame already reflects the user's
-  // choices (#17/#18, settings_service.dart).
+  // Restore persisted settings (theme mode / last filter / locale) before
+  // building the app so the first frame already reflects the user's choices
+  // (#17/#18, settings_service.dart).
   final s = settings ?? SettingsService();
   await s.load();
 
+  // Restore the shared FilterService's (#15) own per-type intensity store
+  // (#57) before seeding it with the restored filter type. The old
+  // single-value key (if any leftover on disk) is not migrated (M1 review):
+  // the app is pre-release, so there are no existing users to preserve it
+  // for; load() just deletes it.
+  await filterService.load();
+
   // Seed the shared FilterService (#15) from the restored settings (#17) so the
-  // previously selected filter + intensity are reflected on startup, on the
-  // single instance shared by the tray and the in-window UI.
-  filterService.applyFilter(s.filterType, intensity: s.intensity);
+  // previously selected filter is reflected on startup, on the single
+  // instance shared by the tray and the in-window UI. No `intensity:` override
+  // here (#57): the type's own remembered/recommended strength (just loaded
+  // above) is used instead of resetting it.
+  filterService.applyFilter(s.filterType);
 
   return (app: UniversalExperienceApp(settings: s), bridgeReady: true);
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // macOS の Cmd+Q・メニューバーの「終了」・ログアウト等（window_manager の
+  // クローズイベントを経由しない終了経路）でも intensity のデバウンス永続化
+  // （#57）を取りこぼさないための保険（should-1）。トレイ・ウィンドウクローズ
+  // 経由の flush はそのまま残す。
+  appLifecycleListener = AppLifecycleListener(
+    onExitRequested: () async {
+      await filterService.flush();
+      return AppExitResponse.exit;
+    },
+  );
 
   // buildRootApp() が Rust ブリッジ初期化・設定復元・filterService のシードを
   // 行い、成功/失敗いずれの場合も表示すべき Widget を bridgeReady と共に返す（#55）。
@@ -216,25 +254,41 @@ void main() async {
 ///
 /// ただしトレイが立ち上がらなかった環境ではウィンドウが復帰不能になるため、
 /// [resolveCloseAction] がフォールバックを表現する: トレイが無い場合は
-/// クローズ = 終了。よって `setPreventClose` はトレイ初期化の成否で決める。
+/// クローズ = 終了。よって分岐先（トレイに隠すか・実際に終了するか）は
+/// トレイ初期化の成否で決める。いずれの分岐も、実際にウィンドウが閉じる/
+/// 隠れる前に `windowManager.setPreventClose(true)` でいったん介入する
+/// （#57: トレイ不可時の「クローズ=終了」経路でも intensity のデバウンス
+/// 書き込み（[FilterService.flush]）を取りこぼさないため）。
 Future<void> _setUpTray() async {
   await trayService.init();
 
   final closeAction =
       resolveCloseAction(trayAvailable: trayService.isAvailable);
-  if (closeAction == CloseAction.hideToTray) {
-    await windowManager.setPreventClose(true);
-    windowManager.addListener(
-      _AppWindowListener(
-        onClose: () async {
+  await windowManager.setPreventClose(true);
+  windowManager.addListener(
+    _AppWindowListener(
+      onClose: () async {
+        if (closeAction == CloseAction.hideToTray) {
           // 終了ではなく非表示にする。トレイ側のトグルラベルが次回正しくなるよう
           // 表示状態を同期する。
           await windowManager.hide();
           await trayService.setLoupeVisible(false);
-        },
-      ),
-    );
-  }
+          return;
+        }
+        // トレイ非対応環境: ウィンドウを閉じる = アプリを終了する（最終結果は
+        // 元の実装と同じ）。デバウンス中の intensity 永続化（#57）を
+        // 取りこぼさないよう、実際に閉じる前に flush する。flush が万一失敗
+        // しても（`FilterService.flush` 自体は内部で握りつぶすが、念のため）
+        // ウィンドウを閉じずに固まらないよう、実際の終了は finally で行う。
+        try {
+          await filterService.flush();
+        } finally {
+          await windowManager.setPreventClose(false);
+          await windowManager.destroy();
+        }
+      },
+    ),
+  );
 }
 
 /// window_manager のクローズイベントを close-to-tray ハンドラに橋渡しする。
@@ -252,7 +306,7 @@ class _AppWindowListener extends WindowListener {
 class UniversalExperienceApp extends StatelessWidget {
   const UniversalExperienceApp({super.key, required this.settings});
 
-  /// Pre-loaded settings service (theme mode / last filter / intensity).
+  /// Pre-loaded settings service (theme mode / last filter type / locale).
   final SettingsService settings;
 
   @override

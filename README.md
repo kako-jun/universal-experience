@@ -19,6 +19,9 @@
 ue はそれを flutter_rust_bridge 経由で消費する薄いブリッジです（ue 側で LMS 等の
 変換ロジックを再実装する方針は取りません）。フィルタの見え方は sensus 由来の
 GPU シェーダ（`lib/rendering/shader_filter.dart`）で計算し、強度調整も可能です。
+強度は**色覚タイプごとに個別記憶**します（`FilterService`、#57）。まだ選んだ
+ことのないタイプを選ぶと推奨強度（-opia / achromatopsia は 1.0、-omaly は
+0.6）が初期値になり、フィルタを切り替えても切替前のタイプの強度は保持されます。
 
 > ただし現状、protanopia の変換行列（Machado 2009 severity=1.0 行列）は
 > `lib/rendering/shader_filter.dart` に暫定的にハードコードされています
