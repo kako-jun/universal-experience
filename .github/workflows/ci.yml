@@ -32,9 +32,13 @@ jobs:
           components: rustfmt, clippy
 
       # rust/ crate（cargo fmt/clippy/test が直接使う target/）のキャッシュ。
-      # cargokit 経由のビルド（flutter build macos）は Xcode の DerivedData 配下に
-      # 実行のたびに変わる一時ディレクトリへ出力するため、そちらはキャッシュ対象に
-      # 含めていない（安定したパスがない）。crates.io からの依存取得
+      # cargokit 経由のビルド（flutter build macos）の出力先は実は安定したパス
+      # （build_pod.sh が設定する CARGOKIT_TARGET_TEMP_DIR、Flutter の
+      # derived-data 配下 build/macos/Build/Intermediates.noindex/
+      # Pods.build/Debug/universal_experience_rust.build/... で実行のたびに
+      # 変わるわけではない）。ただ現状はそちらをキャッシュ対象に含めていない
+      # （linux-build job の cargokit_build マッピングのような対応は今回は
+      # 見送り、シンプルさを優先）。crates.io からの依存取得
       # （~/.cargo/registry 等）は rust-cache が常にキャッシュするので、
       # cargokit 側のビルドもそこは恩恵を受ける。
       - name: Rust cache
@@ -133,7 +137,9 @@ jobs:
         run: flutter build linux --debug
 
       # 完了条件（#55 レビュー指摘）: Rust ライブラリが実際に Linux バンドルの
-      # lib/ に同梱されていることを ls で確認する。無ければ次のステップで fail。
+      # lib/ に同梱されていることを確認する。ls -la でバンドル内容を可視化した上で、
+      # 同じステップ内の test -f が対象ファイルの有無を判定し、無ければこの
+      # ステップ自体が fail する。
       - name: Verify Rust library is bundled in the Linux bundle
         run: |
           BUNDLE_LIB=build/linux/x64/debug/bundle/lib
