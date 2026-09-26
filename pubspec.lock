@@ -826,6 +826,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.0"
+  universal_experience_rust:
+    dependency: "direct main"
+    description:
+      path: rust_builder
+      relative: true
+    source: path
+    version: "0.0.1"
   vector_graphics:
     dependency: transitive
     description:
