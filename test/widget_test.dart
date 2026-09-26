@@ -8,9 +8,14 @@
 // testWidgets で踏むのは重く headless では不安定。一方、画面を構築する本体
 // ウィジェット `UniversalExperienceApp` はデスクトップ初期化に依存せず、
 // `SettingsService` だけを引数に取る（windowManager/トレイ配線は main() 側に
-// 閉じている）。よってここでは本体ウィジェットだけを pump してスモークする。
+// 閉じている）。よってここでは本体ウィジェットだけを pump してスモークする
+// （高速な widget-level スモークとして今も有効）。
 //
 // SharedPreferences はモックし、ディスク I/O やプラットフォームチャネルを踏まない。
+//
+// `main()`/`buildRootApp()` の実起動経路（Rust ブリッジ初期化含む）自体は、
+// ここでは踏めない代わりに integration_test/app_bootstrap_test.dart が
+// 新しい別プロセスから検証する（#55 レビュー M1）。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

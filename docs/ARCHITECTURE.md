@@ -225,19 +225,36 @@ ShaderFilter (lib/rendering/) — Impeller FragmentProgram で ui.Image に適�
 `Consumer` を持つウィジェットだけが rebuild される。
 
 `rust/` crate は `rust_builder/`（cargokit 統合、#55）経由でビルドされ、
-macOS / Linux アプリに同梱される。`lib/main.dart` の `main()` は `runApp` 前に
-`services/native_bridge_service.dart` の `initNativeBridge()` を呼んで同梱された
-native lib をロードする（呼ばないと `RustLib.instance` が未初期化のまま
-`experiences()` 等が例外になる。#52 で実際に本番のプリセット欄が例外表示に
-なっていた）。`initNativeBridge()` は `main()` と `integration_test/` の両方が
-共有する唯一の初期化経路で、二重初期化（`RustLib.instance.initialized` が
-true）は素通りにし、`RustLib.init()` 自体の失敗は例外を外に投げず `false` を
-返す。`main()` はこれが `false` のとき `UniversalExperienceApp` の代わりに
+macOS / Linux アプリに同梱される。`lib/main.dart` の `buildRootApp()`（#55
+レビュー M1 で `main()` から切り出したルート Widget 組み立て関数）が `runApp`
+前に `services/native_bridge_service.dart` の `initNativeBridge()` を呼んで
+同梱された native lib をロードする（呼ばないと `RustLib.instance` が未初期化の
+まま `experiences()` 等が例外になる。#52 で実際に本番のプリセット欄が例外表示に
+なっていた）。`initNativeBridge()` は `buildRootApp()`（`main()` から呼ぶ）と
+`integration_test/experience_presets_smoke_test.dart` の両方が共有する唯一の
+初期化経路で、二重初期化（`RustLib.instance.initialized` が true）は素通りに
+し、`RustLib.init()` 自体の失敗は例外を外に投げず `false` を返す。
+`buildRootApp()` はこれが `false` のとき `UniversalExperienceApp` の代わりに
 `NativeBridgeErrorApp`（`AppLocalizations.nativeBridgeInitFailed`、ja/en）を
-`runApp` する。native lib が同梱されていない/壊れている状態でもクラッシュせず
-文言表示に落ちる、という契約。`NativeBridgeErrorApp` は任意の `locale` を
-注入できる（未指定ならシステム追従のフォールバック）ため、widget test から
-ja/en それぞれの文言を固定して検証できる（`test/native_bridge_error_app_test.dart`）。
+返し、`main()` はそれをそのまま `runApp` する。native lib が同梱されていない/
+壊れている状態でもクラッシュせず文言表示に落ちる、という契約。
+`NativeBridgeErrorApp` は任意の `locale` を注入できる（未指定ならシステム追従の
+フォールバック）ため、widget test から ja/en それぞれの文言を固定して検証できる
+（`test/native_bridge_error_app_test.dart`）。
+
+`buildRootApp()` は `initBridge`（既定 `initNativeBridge`）と `settings`
+（既定で新規 `SettingsService()`）を差し替え可能な引数に取る。windowManager /
+trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に閉じたまま
+残している（デスクトップ専用の副作用をブリッジ初期化のテストに持ち込まない
+ため）。`integration_test/app_bootstrap_test.dart`（#55 レビュー M1）は
+`main()` を直接は呼べない（windowManager 初期化を含むため）代わりに、新しい
+別プロセスから `buildRootApp()` を直接呼んで実ブリッジの初期化〜
+`UniversalExperienceApp` 描画までの実起動経路を再現し、`initBridge` を
+差し替えて失敗系（`NativeBridgeErrorApp` への分岐）も検証する。既存の
+`experience_presets_smoke_test.dart` は自身の `setUpAll` で先に
+`initNativeBridge()` を呼んでしまうため、`main()`/`buildRootApp()` の呼び出し
+漏れ自体は検知できない — それを埋めるのが `app_bootstrap_test.dart` を
+あえて別ファイルにした理由。
 
 > **注意（Linux の dev ロードパス優先）**: `RustLib.init()`（flutter_rust_bridge の
 > `loadExternalLibrary`）は、まずカレントディレクトリ相対の `rust/target/release/`
@@ -285,18 +302,25 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   `test/protanopia_golden_test.dart`）: sensus-core 正本由来の参照 PNG と GPU 描画結果を
   PSNR/maxDiff で比較（詳細は `docs/sensus-integration.md` §6）
 - **Rust 側**: `cargo test`（`rust/`、`golden_gen.rs` の正本一致テストを含む）
-- **実ブリッジ integration test**（`integration_test/experience_presets_smoke_test.dart`、
-  `flutter test integration_test -d macos`、#55）: widget test は
-  `experiencesProvider` を fixture に差し替えているため検知できない領域を、
-  `initNativeBridge()` 経由で実ネイティブライブラリをロードして確認する。
-  `experiences()` の 4 件・id/分類の内容一致、プリセット欄のタップによる
-  選択状態遷移、全 30 `VisionFilter` の `visionShaderGlsl()` /
-  `visionUniformLayout()` が例外なく呼べること、`initNativeBridge()` の
-  二重初期化が仕様どおり（例外を投げず true を返す）であることを検証する。
-  `setUpAll` の `initNativeBridge()` が `false` を返した場合（native lib が
-  同梱されていない・壊れている）はテスト自体を `fail()` させて検知する
-  （main() 側はクラッシュせず `_NativeBridgeErrorApp` に落ちるが、CI では
-  それを「壊れている」として検知したいため）
+- **実ブリッジ integration test**（`integration_test/`、
+  `flutter test integration_test -d macos`、#55）:
+  - `experience_presets_smoke_test.dart`: widget test は `experiencesProvider`
+    を fixture に差し替えているため検知できない領域を、`initNativeBridge()`
+    経由で実ネイティブライブラリをロードして確認する。`experiences()` の
+    4 件・id/分類の内容一致、プリセット欄のタップによる選択状態遷移、全 30
+    `VisionFilter` の `visionShaderGlsl()` / `visionUniformLayout()` が例外なく
+    呼べること、`initNativeBridge()` の二重初期化が仕様どおり（例外を投げず
+    true を返す）であることを検証する。`setUpAll` の `initNativeBridge()` が
+    `false` を返した場合（native lib が同梱されていない・壊れている）は
+    テスト自体を `fail()` させて検知する（`main()` 側はクラッシュせず
+    `NativeBridgeErrorApp` に落ちるが、CI ではそれを「壊れている」として
+    検知したいため）
+  - `app_bootstrap_test.dart`（#55 レビュー M1）: 上記が自前の `setUpAll` で
+    先に `initNativeBridge()` を呼んでしまうのに対し、こちらは新しい別プロセス
+    （`RustLib` 未初期化）から `main()` が実際に呼ぶ `buildRootApp()` を直接
+    呼んで実起動経路そのものを検証する。`main()` 内の `initNativeBridge()`
+    呼び出しが削除/誤配置される退行（#52 と同種）を、他のテストを変更せずに
+    検知するための専用ファイル
 - **CI**（#38、完了）: `.github/workflows/ci.yml` が push/PR で上記に加え
   `flutter build macos --debug` を回す（#54）。cargokit 統合（#55）により
   この build が rust/ crate のビルドも兼ねるため、Rust toolchain セットアップを

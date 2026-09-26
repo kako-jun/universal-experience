@@ -93,38 +93,65 @@ Locale _resolveStartupLocale(Locale? preferred) {
   return AppLocalizations.supportedLocales.first;
 }
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Rust ブリッジ (#55)。sensus-core を FRB で消費する `experiences()` 等は
-  // これを呼ぶまで `RustLib.instance` が未初期化で例外になる（#52 の実害:
-  // プリセット欄が本番で例外表示になっていた）。cargokit (rust_builder/) が
-  // 同梱した native lib を `initNativeBridge()`（services/native_bridge_service.dart）
-  // でロードする。main() と integration_test/ の両方がこの同じ関数を呼ぶ。
-  //
-  // 失敗時（native lib が壊れている・同梱されていない等）はクラッシュさせず、
-  // ローカライズしたエラー画面を出して runApp を差し替える。以降の Rust 呼び出し
-  // （experiences() 等）はもう行われない。
-  final nativeBridgeReady = await initNativeBridge();
-  if (!nativeBridgeReady) {
-    runApp(const NativeBridgeErrorApp());
-    return;
+/// アプリのルート Widget を組み立てる (#55)。Rust ブリッジ初期化・設定復元・
+/// 共有 `filterService` のシードまでを担い、`main()` と（実プロセスで
+/// `main()` 相当の起動経路を踏みたい）`integration_test/app_bootstrap_test.dart`
+/// の両方から呼ばれる唯一の bootstrap 関数。
+///
+/// - [initBridge] は既定で `initNativeBridge()`
+///   （services/native_bridge_service.dart）。失敗時（native lib が壊れている・
+///   同梱されていない等。#52 の実害: プリセット欄が本番で例外表示になっていた）は
+///   クラッシュさせず、[NativeBridgeErrorApp] を返す。以降 [settings] の読込・
+///   `filterService` のシードも行わない（Rust ブリッジに依存する機能を使わせない
+///   ための最小構成）。integration test がテストダブルの `initBridge` を注入して
+///   失敗系を確認できるよう関数として差し替え可能にしてある。
+/// - 成功時は [settings]（未指定なら新規 `SettingsService()`）を読み込み、
+///   復元済みのフィルタ種別・強度をトップレベル共有の `filterService`（#15、
+///   トレイとウィンドウ内 UI が同じインスタンスを見る）へ一度だけ適用してから
+///   [UniversalExperienceApp] を返す。
+///
+/// windowManager / trayService の初期化はここでは行わない。それらは
+/// `main()` 内に閉じたままにする（test/widget_test.dart のコメント参照）。
+Future<Widget> buildRootApp({
+  Future<bool> Function() initBridge = initNativeBridge,
+  SettingsService? settings,
+}) async {
+  if (!await initBridge()) {
+    return const NativeBridgeErrorApp();
   }
 
   // Restore persisted settings (theme mode / last filter / intensity / locale)
   // before building the app so the first frame already reflects the user's
   // choices (#17/#18, settings_service.dart).
-  final settings = SettingsService();
-  await settings.load();
-
-  // Build the tray with labels resolved for the startup locale (#18). Must run
-  // after settings.load() so the persisted language (if any) is honoured.
-  trayService = _buildTrayService(settings);
+  final s = settings ?? SettingsService();
+  await s.load();
 
   // Seed the shared FilterService (#15) from the restored settings (#17) so the
   // previously selected filter + intensity are reflected on startup, on the
   // single instance shared by the tray and the in-window UI.
-  filterService.applyFilter(settings.filterType, intensity: settings.intensity);
+  filterService.applyFilter(s.filterType, intensity: s.intensity);
+
+  return UniversalExperienceApp(settings: s);
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // buildRootApp() が Rust ブリッジ初期化・設定復元・filterService のシードを
+  // 行い、成功/失敗いずれの場合も表示すべき Widget を返す（#55）。
+  final settings = SettingsService();
+  final app = await buildRootApp(settings: settings);
+  if (app is NativeBridgeErrorApp) {
+    runApp(app);
+    return;
+  }
+
+  // ここに到達した時点で settings は buildRootApp() 内で load() 済み
+  // （同一インスタンスなので、以下の trayService/windowManager も復元済みの値を見る）。
+
+  // Build the tray with labels resolved for the startup locale (#18). Must run
+  // after settings.load() so the persisted language (if any) is honoured.
+  trayService = _buildTrayService(settings);
 
   // Initialize window manager for desktop platforms
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
@@ -167,7 +194,7 @@ void main() async {
     await _setUpTray();
   }
 
-  runApp(UniversalExperienceApp(settings: settings));
+  runApp(app);
 }
 
 /// トレイを初期化し、ウィンドウのクローズ・ポリシーを適用する (#15)。
