@@ -1,7 +1,7 @@
 # sensus 連携 — シェーダ方言調査と統合方針
 
 感覚障害シミュレーションのアルゴリズム正本は別 crate
-[`sensus-core`](https://crates.io/crates/sensus-core)（Rust, crates.io 公開, v0.5.0）に
+[`sensus-core`](https://crates.io/crates/sensus-core)（Rust, crates.io 公開, v0.6.0）に
 一元化する。universal-experience（ue）は GLSL や行列・半径式を**再実装しない**。
 
 このドキュメントは Issue #7（sensus 連携 1/3）のスコープのうち「シェーダ方言の
@@ -100,7 +100,7 @@ Rust で計算して FRB で渡すのが、二重実装を避ける唯一の方�
 > `{ "schema", "sensus_core_version", "shaders": [...] }` のオブジェクト。
 > dumper（`dump_shaders.rs`）が `CARGO_PKG_VERSION` を埋める。
 > `generate_shaders.dart` は (a) `schema` が既知値か、(b)
-> `sensus_core_version` のメジャーが `rust/Cargo.toml` の `sensus-core = "0.5"`
+> `sensus_core_version` のメジャーが `rust/Cargo.toml` の `sensus-core = "0.6"`
 > と一致するか、(c) 各エントリが `name`/`glsl`/`layout` を持つか、を検証して
 > 不一致なら停止する。sensus 更新時の再生成手順とバージョン確認は
 > `tools/sensus_shaders.README.md` を参照。生成 `.frag` のヘッダには sensus
@@ -290,3 +290,56 @@ ue が二重に持っていた色覚ロジックを撤去し、アルゴリズ�
 - **対象外**: 空間・時間依存フィルタ（myopia/glaucoma/vertigo 等）は GPU/CPU のカーネル・
   サンプリング差でピクセル等価にならないため、この PSNR golden 方式の対象にしない。
   別途の検証方式（uniform レイアウト一致は既存の `shader_codegen_test.dart` が担保）。
+
+---
+
+## 7. sensus 0.6.0 への更新（#56）
+
+`sensus-core` を 0.5.0 → 0.6.0 に上げた。API・挙動への影響:
+
+- **Machado 段階（severity）テーブル（sensus#165、#51 注記6）**: `protanopia_uniforms` /
+  `deuteranopia_uniforms` / `tritanopia_uniforms` が、strength を severity として
+  11 段テーブル（`vision::color::{PROTANOMALY,DEUTERANOMALY,TRITANOMALY}_TABLE`）から
+  補間した**解決済み行列**を返すようになった（severity=0.0 で単位行列、1.0 で従来の
+  severity=1.0 行列と同値）。対応して `protanopia.frag`（他2色も同様）は
+  シェーダ内の `uStrength` ブレンドを廃止し、`uMatrix` を直接適用するだけになった。
+  #51 注記6が予告していたとおり中間 severity の出力が変わった。
+  **試した上で見送ったこと**: `shader_filter.dart` の `_protanopiaMatrix` ハードコード
+  （severity=1.0 固定 + 線形ブレンド。#34 の指摘対象）を撤去し
+  `ShaderFilter.applyProtanopiaGpu` が `visionUniforms(VisionFilter.protanopia(), ...)`
+  から解決済み行列を取得する形に一度書き換えたが、`ShaderFilter` はネイティブ
+  ブリッジ未初期化のプレーンな `flutter test`（`before_after_view_test.dart` /
+  `protanopia_golden_test.dart` が直接 exercise する）からも呼ばれ、`RustLib.init()`
+  は `initNativeBridge()` 経由で `main()` / `integration_test/`（`-d macos`、
+  cargokit のネイティブ lib ビルドを経由）からしか呼ばれないため、プレーンな
+  `flutter test` では bridge 呼び出しが必ず失敗することを実測で確認した（CI の
+  `check` ジョブも `flutter build macos --debug` より前に `flutter test` を走らせる
+  順序）。そのため本 PR では **Dart 側での単位行列↔severity=1.0 行列の線形補間を
+  維持**し、コメントで sensus 正本の Machado テーブルと中間 strength が一致しない
+  ことを明記するに留めた（`_protanopiaMatrix` の doc コメント参照）。
+  ブリッジ経由の解決値を使う本格対応（テスト側でネイティブ lib を用意する試験
+  基盤の整備を含む）、中間 strength 用の golden 追加、deuteranopia / tritanopia /
+  achromatopsia の**ライブ UI 配線**、protanomaly/deuteranomaly/tritanomaly の
+  severity 反映は #59 のスコープ。
+- **DetailLoss の strength=0（sensus#167→#175、#51 注記2）**: #51 注記2「DetailLoss が
+  strength を無視する」は sensus#167 で解消済みと report されていたが、0.6.0
+  （sensus#175）で「`strength=0.0` でも pixelation がかかり crate 横断の
+  『strength=0=原画』不変条件に違反する」バグとして再修正された。`rust/src/api/sensus_bridge.rs`
+  に `detail_loss_strength_zero_is_identity`（byte-identical を assert）/
+  `detail_loss_strength_one_changes_pixels`（対照）を追加して回帰させている。
+- **FieldLossMode（Darken/Blur、sensus#171）**: `glaucoma` / `macular_degeneration` /
+  `hemianopia` / `tunnel_vision` の 4 フィルタに `field_loss_mode` payload が追加された。
+  `VisionFieldLossMode`（`darken`/`blur`）として FRB 公開し、
+  `vision_filter_catalog.dart` にパラメータとして加えた。**GPU（FragmentProgram）
+  経路は常に Darken 相当**: `shaders::glaucoma_uniforms` 等の署名は `field_loss_mode`
+  を取らないため（GLSL 側が Blur 未対応）、この4フィルタの GPU 描画は選択に関わらず
+  Darken の見た目になる。`Blur` は `apply_vision_cpu_rgba8`（CPU 経路）でのみ反映される。
+  4 フィルタとも現状カタログ選択がライブプレビューに配線されていないため実害はない。
+- **シェーダダンプの再生成経路**: `tools/sensus_shaders.README.md` は sensus 側の
+  `dump_shaders.rs` example で `tools/sensus_shaders.g.json` を再生成する手順を書いているが、
+  本 PR の作業時点でその example はリポジトリに存在しなかった（別リポジトリでの管理状況に
+  依存する）。代わりに `rust/src/shader_dump_gen.rs`（`#[cfg(test)] #[ignore]` の一回限り
+  ジェネレータ、`cargo test -- --ignored gen_shader_dump`）を追加し、ue/rust が既にリンクして
+  いる sensus-core 0.6.0 から `vision_shader_glsl()` / `vision_uniform_layout()` を直接呼んで
+  同じスキーマの JSON を書き出す形にした。GLSL/layout の値は正本（sensus-core）由来のまま
+  再実装していない。詳細は `tools/sensus_shaders.README.md` の Regenerating 節を参照。
