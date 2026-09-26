@@ -100,8 +100,11 @@ Rust で計算して FRB で渡すのが、二重実装を避ける唯一の方�
 > `{ "schema", "sensus_core_version", "shaders": [...] }` のオブジェクト。
 > dumper（`dump_shaders.rs`）が `CARGO_PKG_VERSION` を埋める。
 > `generate_shaders.dart` は (a) `schema` が既知値か、(b)
-> `sensus_core_version` のメジャーが `rust/Cargo.toml` の `sensus-core = "0.6"`
-> と一致するか、(c) 各エントリが `name`/`glsl`/`layout` を持つか、を検証して
+> `sensus_core_version` が `rust/Cargo.toml` の `sensus-core = "0.6"` と
+> 一致するか（メジャーが 0 の間はマイナーまで一致必須。Cargo の 0.x semver
+> 慣習では `^0.6` が `>=0.6.0, <0.7.0` を意味するため、メジャーだけの一致だと
+> 0.5.x 由来の古い dump を誤って通してしまう）、(c) 各エントリが
+> `name`/`glsl`/`layout` を持つか、を検証して
 > 不一致なら停止する。sensus 更新時の再生成手順とバージョン確認は
 > `tools/sensus_shaders.README.md` を参照。生成 `.frag` のヘッダには sensus
 > version・入力 dump パス・正本（`sensus shaders/<name>.frag`）への参照を残す。
@@ -329,17 +332,25 @@ ue が二重に持っていた色覚ロジックを撤去し、アルゴリズ�
   `detail_loss_strength_one_changes_pixels`（対照）を追加して回帰させている。
 - **FieldLossMode（Darken/Blur、sensus#171）**: `glaucoma` / `macular_degeneration` /
   `hemianopia` / `tunnel_vision` の 4 フィルタに `field_loss_mode` payload が追加された。
-  `VisionFieldLossMode`（`darken`/`blur`）として FRB 公開し、
-  `vision_filter_catalog.dart` にパラメータとして加えた。**GPU（FragmentProgram）
-  経路は常に Darken 相当**: `shaders::glaucoma_uniforms` 等の署名は `field_loss_mode`
-  を取らないため（GLSL 側が Blur 未対応）、この4フィルタの GPU 描画は選択に関わらず
-  Darken の見た目になる。`Blur` は `apply_vision_cpu_rgba8`（CPU 経路）でのみ反映される。
-  4 フィルタとも現状カタログ選択がライブプレビューに配線されていないため実害はない。
-- **シェーダダンプの再生成経路**: `tools/sensus_shaders.README.md` は sensus 側の
-  `dump_shaders.rs` example で `tools/sensus_shaders.g.json` を再生成する手順を書いているが、
-  本 PR の作業時点でその example はリポジトリに存在しなかった（別リポジトリでの管理状況に
-  依存する）。代わりに `rust/src/shader_dump_gen.rs`（`#[cfg(test)] #[ignore]` の一回限り
-  ジェネレータ、`cargo test -- --ignored gen_shader_dump`）を追加し、ue/rust が既にリンクして
-  いる sensus-core 0.6.0 から `vision_shader_glsl()` / `vision_uniform_layout()` を直接呼んで
-  同じスキーマの JSON を書き出す形にした。GLSL/layout の値は正本（sensus-core）由来のまま
-  再実装していない。詳細は `tools/sensus_shaders.README.md` の Regenerating 節を参照。
+  `VisionFieldLossMode`（`darken`/`blur`）として FRB 公開し、bridge の型・写像は
+  持つ。**GPU（FragmentProgram）経路は常に Darken 相当**: `shaders::glaucoma_uniforms`
+  等の署名は `field_loss_mode` を取らないため（GLSL 側が Blur 未対応）、この4フィルタの
+  GPU 描画は選択に関わらず Darken の見た目になる。`Blur` を実際に反映できるのは
+  `apply_vision_cpu_rgba8`（CPU 経路）のみ。この理由から `vision_filter_catalog.dart`
+  には**あえてパラメータとして公開していない**（UI で選ばせても GPU 描画に反映され
+  ないため。レビュー M1 対応）。`VisionFilterState.build()` は常に
+  `VisionFieldLossMode.darken` で構築する。GPU 描画が Blur に対応するか、カタログが
+  CPU 専用パラメータを表現できるようになったら再検討する。
+- **シェーダダンプの再生成経路**: `tools/sensus_shaders.g.json` は `rust/src/shader_dump_gen.rs`
+  （`#[cfg(test)] #[ignore]` の一回限りジェネレータ、`cd rust && cargo test -- --ignored
+  gen_shader_dump`）で再生成する。ue/rust が既にリンクしている sensus-core 0.6.0 から
+  `vision_shader_glsl()` / `vision_uniform_layout()` を直接呼んで同じスキーマの JSON を
+  書き出す形にしており、GLSL/layout の値は正本（sensus-core）由来のまま再実装していない。
+  対象フィルタの一覧は `tools/generate_shaders.dart` の `_excludedFilters` と手で同期させて
+  おり、同じ `shader_dump_gen.rs` の非 ignore テスト
+  （`dump_targets_and_excluded_stems_cover_all_variants` / `generated_json_matches_committed_file`）
+  が両者の同期および生成 JSON と commit 済み `tools/sensus_shaders.g.json` の一致を
+  `cargo test` で常時検証する。Dart 側は `dart run tools/generate_shaders.dart --check`
+  （CI の `check` ジョブに独立ステップとして追加、`test/shader_codegen_test.dart` も内部で
+  同じ `--check` を回す）が `shaders/*.frag` / `pubspec.yaml` の同期を検証する。詳細は
+  `tools/sensus_shaders.README.md` の Regenerating 節を参照。
