@@ -1,12 +1,12 @@
 // GENERATED FILE - DO NOT EDIT.
 //
 // Source of truth: sensus-core vision filter "tetrachromacy"
-// (canonical GLSL: sensus shaders/tetrachromacy.frag, sensus-core v0.5.0).
+// (canonical GLSL: sensus shaders/tetrachromacy.frag, sensus-core v0.6.0).
 // Filter-specific provenance (e.g. the Machado 2009 matrix and
 // its citation) lives in the sensus source, not here.
 //
 // Regenerate with: dart run tools/generate_shaders.dart
-// (input dump: tools/sensus_shaders.g.json, produced by sensus-core v0.5.0).
+// (input dump: tools/sensus_shaders.g.json, produced by sensus-core v0.6.0).
 //
 // scalar uniform order (setFloat index): uStrength, uResolution_x, uResolution_y
 #include <flutter/runtime_effect.glsl>
@@ -17,11 +17,13 @@ uniform float uResolution_y;
 uniform sampler2D uTexture;
 
 // 四色型色覚（Tetrachromacy）シミュレーション。
-// LMS 変換 + 赤-緑 opponent channel 誇張。
-// CPU 実装 vision::tetrachromacy に対応。
+// 疑似 LMS 変換 + 赤-緑 opponent channel 誇張。
+// CPU 実装 vision::tetrachromacy と同じ |delta| < 0.05 メタメリック分岐を持つ
+// （CPU/GPU で分岐ロジックは同一。数値の丸め差はあり得るが簡略化ではない）。
 //
-// メタメリックペア候補領域（|delta| < 0.05）の Cb/Cr 誇張は、
-// GPU では閾値判定が難しいため全領域に opponent channel 誇張を適用する簡略版。
+// 測色的忠実度を主張しない可視化演出であり、L/M 相当値も真の錐体刺激値では
+// ないヒューリスティックな代理量。詳細は CPU 側 vision::tetrachromacy の
+// doc コメントと docs/adr/matrix-provenance.md の Heuristic matrices 節を参照。
 
 out vec4 fragColor;
 
@@ -38,7 +40,9 @@ void main() {
     float g = srgbToLinear(orig.g);
     float b = srgbToLinear(orig.b);
 
-    // Machado 2009 linear sRGB → LMS 変換行列の第1-2行
+    // Hunt-Pointer-Estévez (HPE) XYZ→LMS 変換行列（D65）を linear RGB に直接
+    // 流用したヒューリスティックの第1-2行（Machado 2009 由来ではない。
+    // CPU 側 HPE_LMS_HEURISTIC と同一数値 — 数値は変更していない）
     float lCone = 0.4002 * r + 0.7076 * g + (-0.0808) * b;
     float mCone = (-0.2263) * r + 1.1653 * g + 0.0457 * b;
 

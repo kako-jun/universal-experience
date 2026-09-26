@@ -9,7 +9,7 @@ hand-edit.**
 ```json
 {
   "schema": "sensus-shader-dump/v1",
-  "sensus_core_version": "0.5.0",
+  "sensus_core_version": "0.6.0",
   "shaders": [ { "name", "glsl", "layout" }, ... ]
 }
 ```
@@ -18,7 +18,7 @@ hand-edit.**
   schema (bump it on incompatible shape changes).
 - `sensus_core_version` — the `sensus-core` crate version this dump was produced
   from. `generate_shaders.dart` asserts its **major** matches the `sensus-core`
-  dependency in `rust/Cargo.toml` (`sensus-core = "0.5"`), so a stale vendored
+  dependency in `rust/Cargo.toml` (`sensus-core = "0.6"`), so a stale vendored
   dump fails loudly instead of silently generating against the wrong version.
 
 Each `shaders[]` entry is `{ "name", "glsl", "layout" }`:
@@ -51,8 +51,8 @@ This yields **20** generated shaders.
 
 ## Regenerating (when sensus shaders change)
 
-The sensus repo lives at `<path-to-sensus>` (published crate
-`sensus-core = "0.5"`):
+The canonical path is the sensus repo's own dumper (published crate
+`sensus-core = "0.6"`):
 
 ```sh
 cd <path-to-sensus>
@@ -60,11 +60,32 @@ cargo run -p sensus-core --example dump_shaders \
     > /path/to/universal-experience/tools/sensus_shaders.g.json
 ```
 
+**As of the #56 sensus-core 0.6.0 bump, that `dump_shaders.rs` example did not
+exist in the sensus repo at the time of the update**, so it could not be run.
+Instead, `rust/src/shader_dump_gen.rs` (a `#[cfg(test)] #[ignore]` one-shot
+generator, mirroring the `golden_gen.rs` pattern already used for GPU golden
+refs) was added to `ue/rust`. It calls `vision_shader_glsl()` /
+`vision_uniform_layout()` directly against the sensus-core version already
+linked via `ue/rust`'s own `Cargo.lock` — no GLSL/layout values are
+re-implemented, they come straight from sensus-core. Run it from `ue/rust`:
+
+```sh
+cd rust && cargo test -- --ignored gen_shader_dump
+```
+
+This writes `tools/sensus_shaders.g.json` with the exact same schema as the
+sensus-side dumper (`sensus_core_version` is read from `Cargo.lock`, not
+hardcoded). If the upstream `dump_shaders.rs` example is restored in the
+sensus repo, prefer it again — it is the source of truth for *which* filters
+are in scope (`ue/rust/src/shader_dump_gen.rs`'s filter list must be kept in
+sync with `tools/generate_shaders.dart`'s `_excludedFilters` by hand in the
+meantime).
+
 **Verify the version stamp matches the dependency** (else the next codegen run
 will fail the major-version assert):
 
 ```sh
-# both should agree on the major (0.5.x):
+# both should agree on the major (0.x):
 grep sensus_core_version tools/sensus_shaders.g.json
 grep '^sensus-core' rust/Cargo.toml
 ```

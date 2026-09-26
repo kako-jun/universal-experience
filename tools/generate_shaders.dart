@@ -18,7 +18,7 @@ import 'shader_codegen.dart';
 const String _expectedSchema = 'sensus-shader-dump/v1';
 
 /// Major version of the `sensus-core` crate ue depends on (see
-/// `rust/Cargo.toml`: `sensus-core = "0.5"`). The vendored dump's
+/// `rust/Cargo.toml`: `sensus-core = "0.6"`). The vendored dump's
 /// `sensus_core_version` must share this major, else it is stale/incompatible.
 const int _expectedSensusMajor = 0;
 
