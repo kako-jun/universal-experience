@@ -12,8 +12,9 @@ import 'package:flutter/foundation.dart';
 /// 失敗を検知したらそのキーを即座に削除し、次回呼び出しで [create] を再実行
 /// できるようにする。`ui.FragmentProgram` のような engine 依存の型を持ち出さず
 /// 汎用にしてあるのは、`flutter test` から実 asset ロードなしに単体テストできる
-/// ようにするため。
-@visibleForTesting
+/// ようにするため（クラス自体は汎用ユーティリティなので `@visibleForTesting`
+/// は付けない。テスト専用の観測用フィールドである [debugLength] にのみ付ける
+/// — #58 レビュー nit）。
 class SingleFlightCache<K, V> {
   final Map<K, Future<V>> _entries = <K, Future<V>>{};
 
