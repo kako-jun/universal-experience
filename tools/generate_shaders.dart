@@ -17,10 +17,17 @@ import 'shader_codegen.dart';
 /// Schema id this CLI knows how to read (mirrors the dumper's `DUMP_SCHEMA`).
 const String _expectedSchema = 'sensus-shader-dump/v1';
 
-/// Major version of the `sensus-core` crate ue depends on (see
-/// `rust/Cargo.toml`: `sensus-core = "0.6"`). The vendored dump's
-/// `sensus_core_version` must share this major, else it is stale/incompatible.
-const int _expectedSensusMajor = 0;
+/// The `sensus-core` crate version line ue depends on (see `rust/Cargo.toml`:
+/// `sensus-core = "0.6"`).
+///
+/// Cargo's caret requirement treats **minor** as the breaking component while
+/// major is `0` (0.x semver convention: `^0.6` means `>=0.6.0, <0.7.0`, not
+/// `>=0.6.0, <1.0.0`). So while major is `0`, the vendored dump's
+/// `sensus_core_version` must match on **major.minor**, not just major, else a
+/// dump from an incompatible 0.x line (e.g. 0.5.x vendored against a `0.6`
+/// dependency) would silently pass a major-only check. Once major reaches `1`,
+/// only major needs to match (standard semver).
+const String _expectedSensusVersionLine = '0.6';
 
 /// Filters intentionally NOT in the dump, with the reason each is excluded.
 /// Logged to stderr on every run so the 20-of-N gap is never silent.
@@ -40,6 +47,15 @@ const Map<String, String> _excludedFilters = <String, String>{
   'floaters': 'second sampler (uMask); host wires a single uTexture only',
   'depth_aware_blur':
       'second sampler (uDepth); host wires a single uTexture only',
+  // No known technical blocker (single uTexture sampler, scalar uStrength +
+  // vec2 uResolution, no loops) — this looks like an undocumented scope gap
+  // predating #56 rather than an intentional exclusion. Found while adding
+  // the rust/src/shader_dump_gen.rs sync test (#56 review S2). Left excluded
+  // here to avoid expanding this PR's footprint (would need its own golden
+  // coverage / .frag review); a follow-up issue should either wire it into
+  // the generated 20 or record a real technical reason not to.
+  'detail_loss': 'no known technical blocker; undocumented scope gap, '
+      'deferred to a follow-up issue (see #56 review S2)',
 };
 
 void main(List<String> args) {
@@ -166,18 +182,29 @@ Map<String, dynamic> _parseDump(String contents) {
   if (version is! String || version.isEmpty) {
     throw const FormatException('missing string field `sensus_core_version`.');
   }
-  final major = int.tryParse(version.split('.').first);
+  final versionParts = version.split('.');
+  final major = int.tryParse(versionParts.isNotEmpty ? versionParts[0] : '');
+  final minor =
+      versionParts.length > 1 ? int.tryParse(versionParts[1]) : null;
   if (major == null) {
     throw FormatException(
       'malformed `sensus_core_version` "$version" (expected semver x.y.z).',
     );
   }
-  if (major != _expectedSensusMajor) {
+  final expectedParts = _expectedSensusVersionLine.split('.');
+  final expectedMajor = int.parse(expectedParts[0]);
+  final expectedMinor = int.parse(expectedParts[1]);
+  // 0.x semver convention (see _expectedSensusVersionLine doc): while major is
+  // 0, minor is breaking too, so require it to match; from major 1 on, only
+  // major needs to match.
+  final matches = major == expectedMajor &&
+      (expectedMajor != 0 || minor == expectedMinor);
+  if (!matches) {
     throw FormatException(
-      'sensus_core_version "$version" (major $major) does not match the '
-      'sensus-core dependency major $_expectedSensusMajor (rust/Cargo.toml '
-      '`sensus-core = "$_expectedSensusMajor.x"`). The vendored dump is stale; '
-      'regenerate it.',
+      'sensus_core_version "$version" does not match the sensus-core '
+      'dependency "$_expectedSensusVersionLine" (rust/Cargo.toml '
+      '`sensus-core = "$_expectedSensusVersionLine"`). The vendored dump is '
+      'stale; regenerate it.',
     );
   }
 

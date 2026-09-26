@@ -17,9 +17,12 @@ hand-edit.**
 - `schema` — output format id. `generate_shaders.dart` rejects an unknown
   schema (bump it on incompatible shape changes).
 - `sensus_core_version` — the `sensus-core` crate version this dump was produced
-  from. `generate_shaders.dart` asserts its **major** matches the `sensus-core`
-  dependency in `rust/Cargo.toml` (`sensus-core = "0.6"`), so a stale vendored
-  dump fails loudly instead of silently generating against the wrong version.
+  from. `generate_shaders.dart` asserts it matches the `sensus-core` dependency
+  in `rust/Cargo.toml` (`sensus-core = "0.6"`) — **major.minor** while major is
+  `0` (Cargo's 0.x semver convention: `^0.6` means `>=0.6.0, <0.7.0`, so a
+  0.5.x dump is *not* compatible with a `0.6` dependency even though both share
+  major `0`), or just major once it reaches `1`. A stale vendored dump fails
+  loudly instead of silently generating against the wrong version.
 
 Each `shaders[]` entry is `{ "name", "glsl", "layout" }`:
 
@@ -51,47 +54,39 @@ This yields **20** generated shaders.
 
 ## Regenerating (when sensus shaders change)
 
-The canonical path is the sensus repo's own dumper (published crate
-`sensus-core = "0.6"`):
-
-```sh
-cd <path-to-sensus>
-cargo run -p sensus-core --example dump_shaders \
-    > /path/to/universal-experience/tools/sensus_shaders.g.json
-```
-
-**As of the #56 sensus-core 0.6.0 bump, that `dump_shaders.rs` example did not
-exist in the sensus repo at the time of the update**, so it could not be run.
-Instead, `rust/src/shader_dump_gen.rs` (a `#[cfg(test)] #[ignore]` one-shot
-generator, mirroring the `golden_gen.rs` pattern already used for GPU golden
-refs) was added to `ue/rust`. It calls `vision_shader_glsl()` /
-`vision_uniform_layout()` directly against the sensus-core version already
-linked via `ue/rust`'s own `Cargo.lock` — no GLSL/layout values are
-re-implemented, they come straight from sensus-core. Run it from `ue/rust`:
+Run the one-shot generator from `ue/rust` (`rust/src/shader_dump_gen.rs`,
+a `#[cfg(test)] #[ignore]` test mirroring the `golden_gen.rs` pattern already
+used for GPU golden refs):
 
 ```sh
 cd rust && cargo test -- --ignored gen_shader_dump
 ```
 
-This writes `tools/sensus_shaders.g.json` with the exact same schema as the
-sensus-side dumper (`sensus_core_version` is read from `Cargo.lock`, not
-hardcoded). If the upstream `dump_shaders.rs` example is restored in the
-sensus repo, prefer it again — it is the source of truth for *which* filters
-are in scope (`ue/rust/src/shader_dump_gen.rs`'s filter list must be kept in
-sync with `tools/generate_shaders.dart`'s `_excludedFilters` by hand in the
-meantime).
+It calls `vision_shader_glsl()` / `vision_uniform_layout()` directly against
+the `sensus-core` version already linked via `ue/rust`'s own `Cargo.lock` —
+no GLSL/layout values are re-implemented, they come straight from
+`sensus-core` — and writes `tools/sensus_shaders.g.json` with the schema
+above (`sensus_core_version` is read from `Cargo.lock`, not hardcoded). Its
+filter list (which filters are dumped) must be kept in sync by hand with
+`tools/generate_shaders.dart`'s `_excludedFilters`; `test/shader_codegen_test.dart`
+asserts that sync (see S2 in the #56 review notes) and also asserts the
+generated JSON matches the committed `tools/sensus_shaders.g.json` byte for
+byte, so drift fails CI.
 
 **Verify the version stamp matches the dependency** (else the next codegen run
-will fail the major-version assert):
+will fail the version assert):
 
 ```sh
-# both should agree on the major (0.x):
+# must agree on major.minor while major is 0 (0.x semver convention), or just
+# major once it reaches 1 — see _expectedSensusVersionLine in
+# tools/generate_shaders.dart:
 grep sensus_core_version tools/sensus_shaders.g.json
 grep '^sensus-core' rust/Cargo.toml
 ```
 
-If sensus's major changed, bump `rust/Cargo.toml`'s `sensus-core` constraint and
-`_expectedSensusMajor` in `tools/generate_shaders.dart` together.
+If sensus's dependency line changed, bump `rust/Cargo.toml`'s `sensus-core`
+constraint and `_expectedSensusVersionLine` in `tools/generate_shaders.dart`
+together.
 
 Then regenerate the `.frag` files and `pubspec.yaml` shaders block:
 
