@@ -90,12 +90,14 @@ jobs:
       # or appindicator3-0.1` で FATAL_ERROR になる）。window_manager /
       # screen_retriever は GTK3 のみで追加パッケージ不要（各 linux/CMakeLists.txt
       # で確認済み）。
+      # xvfb は「実ブリッジ integration test を Linux でヘッドレス実行する」ために
+      # 追加（下記 "Flutter integration test (linux)" 参照）。
       - name: Install Linux desktop build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             clang cmake ninja-build pkg-config libgtk-3-dev \
-            libayatana-appindicator3-dev
+            libayatana-appindicator3-dev xvfb
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -135,3 +137,14 @@ jobs:
           echo "Contents of $BUNDLE_LIB:"
           ls -la "$BUNDLE_LIB"
           test -f "$BUNDLE_LIB/libuniversal_experience_rust.so"
+
+      # ファイル存在確認（上のステップ）は「同梱されている」ことしか示さず、
+      # 実際にロード・初期化できることは証明しない（bad rpath・シンボル欠落等は
+      # ここを通過しうる）。実ブリッジ integration test を Linux 上でも走らせて
+      # そのギャップを塞ぐ（macOS 側の `check` job の
+      # `flutter test integration_test -d macos` と対になる）。ヘッドレス実行
+      # のため xvfb-run で仮想ディスプレイを用意する。
+      # experience_presets_smoke_test.dart と app_bootstrap_test.dart（#55）の
+      # 両方がここで実行される。
+      - name: Flutter integration test (linux)
+        run: xvfb-run -a flutter test integration_test -d linux
