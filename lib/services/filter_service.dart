@@ -1,4 +1,8 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/disability_type.dart';
 import '../src/rust/api/sensus_bridge.dart';
 
@@ -18,7 +22,8 @@ const double kAnomalyDefaultSeverity = 0.6;
 ///
 /// anomaly と opia は同じ [VisionFilter] にマップされるため、両者の見え方の
 /// 違いはこの strength の差で表現する。呼び出し側はこの値を sensus / シェーダへ
-/// 渡す strength として用いる責務を持つ。
+/// 渡す strength として用いる責務を持つ。[FilterService] は各タイプを初めて
+/// 選んだときの初期強度としてこの値を使う（#57）。
 double recommendedStrength(ColorVisionType type) {
   switch (type) {
     case ColorVisionType.none:
@@ -44,18 +49,67 @@ double recommendedStrength(ColorVisionType type) {
 ///
 /// このサービスは UI の選択状態（どのフィルタを・どの強度で選んでいるか）だけを
 /// 管理する。選んだフィルタを実際の画像へ適用するのは sensus 経路
-/// （`lib/rendering/shader_filter.dart` の GPU シェーダ）の役割であり、ライブ
-/// 画面キャプチャ経路は別 Issue（#1/#3/#4）で実装する。
+/// （`lib/rendering/shader_filter.dart` の GPU シェーダ）の役割。before/after
+/// プレビュー（`before_after_view.dart`）は protanopia/protanomaly について
+/// [intensity] をそのまま描画 strength として使う。それ以外の型はまだ
+/// 「描画は近日対応」のプレースホルダ（#59）。
+///
+/// ## 強度はタイプごとに記憶する（#57）
+///
+/// [intensity] は色覚タイプ（[ColorVisionType]）ごとに別々に記憶する
+/// （内部 `Map<ColorVisionType, double>`）。まだ選んだことのないタイプは
+/// [recommendedStrength] を初期値として返す（-opia は 1.0、-omaly は弱め）。
+/// [applyFilter] にわざわざ `intensity:` を渡さない限り、フィルタを切り替えても
+/// **切替前のタイプの強度は上書きされない** — 元のバグ（#52 監査 must）は
+/// `FilterSelector` / トレイの両方が `applyFilter(type)` を既定 intensity 1.0
+/// で呼んでいたため、フィルタを選ぶたびに保存済み強度が 1.0 に戻り、かつ
+/// protanomaly が protanopia と全く同じ見た目になっていたことだった。
+///
+/// 永続化は本サービス自身が担う（[load] / [SharedPreferences] キー
+/// [keyIntensityByType]、[setIntensity] は 300ms デバウンスして書き込む）。
+/// かつては `SettingsService` が単一の `intensity` キーで管理していたが（#17）、
+/// スライダーの 1 目盛りごとに `notifyListeners` すると、`SettingsService` を
+/// 購読する `MaterialApp`（テーマ/ロケール用の Consumer）まで巻き込んで毎回
+/// アプリ全体が再構築されてしまっていた（#57）。intensity の通知を
+/// `SettingsService` の外（このサービス自身の `ChangeNotifier`）に出すことで
+/// その再構築を止める。`FilterService` の listener は `Consumer<FilterService>`
+/// を使うウィジェット（スライダー・プレビュー等）だけを再構築する。
+///
+/// [load] 時、per-type の保存（[keyIntensityByType]）が無ければ、旧
+/// `SettingsService` の単一キー（[legacyIntensityKey]）を一度だけ、呼び出し側が
+/// 指定した「起動時に選ばれるタイプ」の初期値として移行する。以降このキーへは
+/// 二度と書かない。
 class FilterService extends ChangeNotifier {
+  FilterService({
+    SharedPreferences? prefs,
+    Duration debounce = const Duration(milliseconds: 300),
+  })  : _prefs = prefs,
+        _debounceDuration = debounce;
+
+  /// 旧 `SettingsService.keyIntensity`（#17）と同じキー文字列。[load] が
+  /// per-type の保存（[keyIntensityByType]）を見つけられなかったときだけ一度
+  /// 読み、移行に使う。
+  static const String legacyIntensityKey = 'settings.intensity';
+
+  /// per-type intensity の永続化キー。JSON オブジェクト
+  /// （例: `{"protanomaly":0.6,"protanopia":1.0}`）として保存する。
+  static const String keyIntensityByType = 'settings.intensityByType';
+
+  SharedPreferences? _prefs;
+  final Duration _debounceDuration;
+  Timer? _debounce;
+
   ColorVisionType _currentFilter = ColorVisionType.none;
-  double _intensity = 1.0;
+  final Map<ColorVisionType, double> _intensityByType = {};
   bool _isActive = false;
 
   /// 現在選択中の色覚タイプ。
   ColorVisionType get currentFilter => _currentFilter;
 
-  /// フィルタ強度 0.0..1.0。
-  double get intensity => _intensity;
+  /// 現在選択中のタイプの強度 0.0..1.0。そのタイプをまだ選んだことがなければ
+  /// [recommendedStrength] を返す（#57）。
+  double get intensity =>
+      _intensityByType[_currentFilter] ?? recommendedStrength(_currentFilter);
 
   /// フィルタが選択されている（none 以外）か。
   bool get isActive => _isActive;
@@ -81,11 +135,8 @@ class FilterService extends ChangeNotifier {
   /// 対応する -opia 型（base）と **同一の** VisionFilter を返す。anomaly と opia の
   /// 違いは、この getter ではなく **レンダリング時の strength（[intensity]）** でのみ
   /// 表現される。すなわち anomaly では intensity < 1（推奨値 [anomalyDefaultSeverity]
-  /// = 0.6）を渡す責務が **呼び出し側** にある。低い strength を渡さない限り、anomaly は
-  /// end-to-end では opia と区別されない（intensity 既定 1.0）。
-  ///
-  // TODO(#1,#3,#4): 現状 UI からは intensity が sensusFilter / 描画 strength と
-  // 未結合のため、ライブ適用（anomaly の軽度表現）は #1/#3/#4 のブリッジ結線待ち。
+  /// = 0.6）を渡す責務が **呼び出し側** にある。[intensity] は #57 よりタイプごとに
+  /// 記憶されるため、protanomaly を選んだ時点で自動的に 0.6 が使われる。
   VisionFilter? get sensusFilter {
     switch (_currentFilter) {
       case ColorVisionType.none:
@@ -107,18 +158,69 @@ class FilterService extends ChangeNotifier {
     }
   }
 
-  /// フィルタを選択する（選択状態の更新のみ。OS への system-wide 適用はしない）。
-  void applyFilter(ColorVisionType type, {double intensity = 1.0}) {
-    _currentFilter = type;
-    _intensity = intensity.clamp(0.0, 1.0);
-    _isActive = type != ColorVisionType.none;
-    notifyListeners();
+  /// 永続化されている per-type intensity（[keyIntensityByType]）を読み込む。
+  ///
+  /// アプリ起動時に一度、`SettingsService.load()` の後・`applyFilter` で起動時の
+  /// フィルタ種別をシードする前に呼ぶ（`main.dart` 参照）。
+  ///
+  /// per-type の保存がまだ無い（#57 より前にインストールされた環境）場合は、旧
+  /// 単一キー [legacyIntensityKey] があれば、[migrateLegacyIntensityFor] に一度だけ
+  /// 移行する（通常は起動時に復元される `SettingsService.filterType` を渡す）。
+  Future<void> load({
+    ColorVisionType migrateLegacyIntensityFor = ColorVisionType.none,
+  }) async {
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+
+    final json = prefs.getString(keyIntensityByType);
+    if (json != null) {
+      try {
+        final decoded = jsonDecode(json);
+        if (decoded is Map) {
+          decoded.forEach((key, value) {
+            final type = _typeFromName(key.toString());
+            if (type != null && value is num) {
+              _intensityByType[type] = value.toDouble().clamp(0.0, 1.0);
+            }
+          });
+        }
+      } catch (_) {
+        // 壊れた JSON は無視する。以降 recommendedStrength へフォールバックする。
+      }
+      return;
+    }
+
+    final legacy = prefs.getDouble(legacyIntensityKey);
+    if (legacy != null) {
+      _intensityByType[migrateLegacyIntensityFor] = legacy.clamp(0.0, 1.0);
+    }
   }
 
-  /// 強度を更新する（0.0..1.0 に clamp）。
-  void setIntensity(double intensity) {
-    _intensity = intensity.clamp(0.0, 1.0);
+  /// フィルタを選択する（選択状態の更新のみ。OS への system-wide 適用はしない）。
+  ///
+  /// [intensity] を渡さない場合、[type] を選んだときの強度は変更しない
+  /// （そのタイプを前回選んだときの値、または初めてなら [recommendedStrength]
+  /// のまま）。[intensity] を渡した場合のみ、そのタイプの記憶を明示的に上書きする
+  /// （起動時のシード・テストなどの用途）。
+  void applyFilter(ColorVisionType type, {double? intensity}) {
+    _currentFilter = type;
+    if (intensity != null) {
+      _intensityByType[type] = intensity.clamp(0.0, 1.0);
+    }
+    _isActive = type != ColorVisionType.none;
     notifyListeners();
+    if (intensity != null) _schedulePersist();
+  }
+
+  /// 現在選択中のタイプの強度を更新する（0.0..1.0 に clamp）。
+  ///
+  /// [notifyListeners] は `FilterService` の listener（スライダー・プレビュー等の
+  /// `Consumer<FilterService>`）だけを再構築する。`SettingsService`
+  /// （延いては `MaterialApp`）へは伝播しない（#57）。永続化は 300ms デバウンス
+  /// して行う。
+  void setIntensity(double intensity) {
+    _intensityByType[_currentFilter] = intensity.clamp(0.0, 1.0);
+    notifyListeners();
+    _schedulePersist();
   }
 
   /// 選択を解除する（none に戻す）。
@@ -126,5 +228,48 @@ class FilterService extends ChangeNotifier {
     _currentFilter = ColorVisionType.none;
     _isActive = false;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _schedulePersist() {
+    _debounce?.cancel();
+    _debounce = Timer(_debounceDuration, () {
+      unawaited(_persist());
+    });
+  }
+
+  Future<void> _persist() async {
+    try {
+      final prefs = _prefs ??= await SharedPreferences.getInstance();
+      final json = jsonEncode({
+        for (final entry in _intensityByType.entries)
+          entry.key.name: entry.value,
+      });
+      await prefs.setString(keyIntensityByType, json);
+    } catch (_) {
+      // 永続化の失敗は致命的ではない（次回起動時は recommendedStrength への
+      // フォールバックに任せる）。UI 側には伝播させない。
+    }
+  }
+
+  /// テスト専用: デバウンス中の永続化を実タイマーの発火を待たず即座に実行する
+  /// （#57）。本体コードからは呼ばない。
+  @visibleForTesting
+  Future<void> debugFlushPersist() async {
+    _debounce?.cancel();
+    _debounce = null;
+    await _persist();
+  }
+
+  static ColorVisionType? _typeFromName(String name) {
+    for (final type in ColorVisionType.values) {
+      if (type.name == name) return type;
+    }
+    return null;
   }
 }

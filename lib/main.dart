@@ -116,9 +116,12 @@ Locale _resolveStartupLocale(Locale? preferred) {
 ///   依存する機能を使わせないための最小構成）。integration test がテストダブルの
 ///   `initBridge` を注入して失敗系を確認できるよう関数として差し替え可能にしてある。
 /// - 成功時は [settings]（未指定なら新規 `SettingsService()`）を読み込み、
-///   復元済みのフィルタ種別・強度をトップレベル共有の `filterService`（#15、
-///   トレイとウィンドウ内 UI が同じインスタンスを見る）へ一度だけ適用してから
-///   `bridgeReady: true` と [UniversalExperienceApp] を返す。
+///   トップレベル共有の `filterService`（#15、トレイとウィンドウ内 UI が同じ
+///   インスタンスを見る）に永続化済みの per-type 強度（#57）を読み込んでから、
+///   復元済みのフィルタ種別を一度だけ適用して `bridgeReady: true` と
+///   [UniversalExperienceApp] を返す。intensity 自体は `filterService.load()` が
+///   `FilterService` 自身の永続化ストアから復元する（`settings.intensity` は
+///   #57 で撤去済み）。
 ///
 /// windowManager / trayService の初期化はここでは行わない。それらは
 /// `main()` 内に閉じたままにする（test/widget_test.dart のコメント参照）。
@@ -130,16 +133,23 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
     return (app: const NativeBridgeErrorApp(), bridgeReady: false);
   }
 
-  // Restore persisted settings (theme mode / last filter / intensity / locale)
-  // before building the app so the first frame already reflects the user's
-  // choices (#17/#18, settings_service.dart).
+  // Restore persisted settings (theme mode / last filter / locale) before
+  // building the app so the first frame already reflects the user's choices
+  // (#17/#18, settings_service.dart).
   final s = settings ?? SettingsService();
   await s.load();
 
+  // Restore the shared FilterService's (#15) own per-type intensity store
+  // (#57) before seeding it with the restored filter type, migrating the
+  // legacy single-value key (if any) into that restored type.
+  await filterService.load(migrateLegacyIntensityFor: s.filterType);
+
   // Seed the shared FilterService (#15) from the restored settings (#17) so the
-  // previously selected filter + intensity are reflected on startup, on the
-  // single instance shared by the tray and the in-window UI.
-  filterService.applyFilter(s.filterType, intensity: s.intensity);
+  // previously selected filter is reflected on startup, on the single
+  // instance shared by the tray and the in-window UI. No `intensity:` override
+  // here (#57): the type's own remembered/recommended strength (just loaded
+  // above) is used instead of resetting it.
+  filterService.applyFilter(s.filterType);
 
   return (app: UniversalExperienceApp(settings: s), bridgeReady: true);
 }

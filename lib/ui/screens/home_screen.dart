@@ -25,8 +25,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Bridge FilterService selection/intensity changes into SettingsService so
-    // the last filter + intensity are persisted (#17). Subscribe once.
+    // Bridge FilterService selection changes into SettingsService so the last
+    // filter type is persisted (#17). Subscribe once.
     final filterService = context.read<FilterService>();
     if (!identical(filterService, _filterService)) {
       _filterService?.removeListener(_persistFilterState);
@@ -35,12 +35,18 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Only filterType is persisted through SettingsService. Intensity is owned
+  // and persisted by FilterService itself (its own debounced SharedPreferences
+  // store, #57) precisely so that dragging the slider — which fires this
+  // listener on every tick via FilterService.notifyListeners — never reaches
+  // SettingsService.notifyListeners, which the MaterialApp Consumer
+  // (main.dart) rebuilds on. setFilterType's own no-op guard (unchanged type)
+  // keeps this a no-op while only intensity is changing.
   void _persistFilterState() {
     final settings = context.read<SettingsService>();
     final filterService = _filterService;
     if (filterService == null) return;
     settings.setFilterType(filterService.currentFilter);
-    settings.setIntensity(filterService.intensity);
   }
 
   @override
