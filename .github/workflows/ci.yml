@@ -76,8 +76,21 @@ jobs:
       # experiences() とプリセット欄の描画を確認する（ローカル実測で約25秒、
       # 直前の Flutter build macos で Rust ビルドキャッシュを再利用するため
       # ここでの追加ビルドは短い）。
-      - name: Flutter integration test (macos)
-        run: flutter test integration_test -d macos
+      #
+      # 1 回の `flutter test integration_test` 呼び出しに複数ファイルを渡すと、
+      # デスクトップ (macOS/Linux 双方で確認済み) では 2 番目以降のファイルの
+      # アプリ起動が "Error waiting for a debug connection: The log reader
+      # stopped unexpectedly, or never started." で失敗する。1 個目のアプリ
+      # プロセスがきれいに終了しきる前に 2 個目を起動しようとして落ちている
+      # とみられる desktop integration_test の既知の制約で、テスト内容の
+      # 問題ではない。ファイルごとに別の CLI 呼び出しに分け、各アプリ
+      # プロセスが完全に終了してから次を起動させることで回避する
+      # （ファイルが増えたら手動で追記する。少数固定なので動的化はしない）。
+      - name: Flutter integration test (macos, experience_presets_smoke_test)
+        run: flutter test integration_test/experience_presets_smoke_test.dart -d macos
+
+      - name: Flutter integration test (macos, app_bootstrap_test)
+        run: flutter test integration_test/app_bootstrap_test.dart -d macos
 
   # Linux でも cargokit (#55) が rust/ crate を実際にビルドして同梱することを
   # 検証する。macOS の `check` job は golden テスト用に必須だが、Linux 側の
@@ -151,9 +164,16 @@ jobs:
       # 実際にロード・初期化できることは証明しない（bad rpath・シンボル欠落等は
       # ここを通過しうる）。実ブリッジ integration test を Linux 上でも走らせて
       # そのギャップを塞ぐ（macOS 側の `check` job の
-      # `flutter test integration_test -d macos` と対になる）。ヘッドレス実行
-      # のため xvfb-run で仮想ディスプレイを用意する。
+      # `flutter test integration_test/... -d macos` と対になる）。ヘッドレス
+      # 実行のため xvfb-run で仮想ディスプレイを用意する。
       # experience_presets_smoke_test.dart と app_bootstrap_test.dart（#55）の
-      # 両方がここで実行される。
-      - name: Flutter integration test (linux)
-        run: xvfb-run -a flutter test integration_test -d linux
+      # 両方をここで実行する。
+      #
+      # macOS 側と同じ理由（上のコメント参照）で、1 回の呼び出しに複数ファイルを
+      # 渡すと 2 番目のファイルのアプリ起動が同じ症状で失敗する（Linux/xvfb でも
+      # 実際に確認済み）ため、ファイルごとに別の xvfb-run 呼び出しに分ける。
+      - name: Flutter integration test (linux, experience_presets_smoke_test)
+        run: xvfb-run -a flutter test integration_test/experience_presets_smoke_test.dart -d linux
+
+      - name: Flutter integration test (linux, app_bootstrap_test)
+        run: xvfb-run -a flutter test integration_test/app_bootstrap_test.dart -d linux
