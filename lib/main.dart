@@ -104,26 +104,30 @@ Locale _resolveStartupLocale(Locale? preferred) {
 /// `main()` 相当の起動経路を踏みたい）`integration_test/app_bootstrap_test.dart`
 /// の両方から呼ばれる唯一の bootstrap 関数。
 ///
+/// 戻り値は `({Widget app, bool bridgeReady})` レコード。呼び出し側は
+/// `bridgeReady` を見て分岐する（Widget のランタイム型 `is NativeBridgeErrorApp`
+/// を見て分岐する必要がない、#55 レビュー nit）。
+///
 /// - [initBridge] は既定で `initNativeBridge()`
 ///   （services/native_bridge_service.dart）。失敗時（native lib が壊れている・
 ///   同梱されていない等。#52 の実害: プリセット欄が本番で例外表示になっていた）は
-///   クラッシュさせず、[NativeBridgeErrorApp] を返す。以降 [settings] の読込・
-///   `filterService` のシードも行わない（Rust ブリッジに依存する機能を使わせない
-///   ための最小構成）。integration test がテストダブルの `initBridge` を注入して
-///   失敗系を確認できるよう関数として差し替え可能にしてある。
+///   クラッシュさせず、`bridgeReady: false` と [NativeBridgeErrorApp] を返す。
+///   以降 [settings] の読込・`filterService` のシードも行わない（Rust ブリッジに
+///   依存する機能を使わせないための最小構成）。integration test がテストダブルの
+///   `initBridge` を注入して失敗系を確認できるよう関数として差し替え可能にしてある。
 /// - 成功時は [settings]（未指定なら新規 `SettingsService()`）を読み込み、
 ///   復元済みのフィルタ種別・強度をトップレベル共有の `filterService`（#15、
 ///   トレイとウィンドウ内 UI が同じインスタンスを見る）へ一度だけ適用してから
-///   [UniversalExperienceApp] を返す。
+///   `bridgeReady: true` と [UniversalExperienceApp] を返す。
 ///
 /// windowManager / trayService の初期化はここでは行わない。それらは
 /// `main()` 内に閉じたままにする（test/widget_test.dart のコメント参照）。
-Future<Widget> buildRootApp({
+Future<({Widget app, bool bridgeReady})> buildRootApp({
   Future<bool> Function() initBridge = initNativeBridge,
   SettingsService? settings,
 }) async {
   if (!await initBridge()) {
-    return const NativeBridgeErrorApp();
+    return (app: const NativeBridgeErrorApp(), bridgeReady: false);
   }
 
   // Restore persisted settings (theme mode / last filter / intensity / locale)
@@ -137,18 +141,18 @@ Future<Widget> buildRootApp({
   // single instance shared by the tray and the in-window UI.
   filterService.applyFilter(s.filterType, intensity: s.intensity);
 
-  return UniversalExperienceApp(settings: s);
+  return (app: UniversalExperienceApp(settings: s), bridgeReady: true);
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // buildRootApp() が Rust ブリッジ初期化・設定復元・filterService のシードを
-  // 行い、成功/失敗いずれの場合も表示すべき Widget を返す（#55）。
+  // 行い、成功/失敗いずれの場合も表示すべき Widget を bridgeReady と共に返す（#55）。
   final settings = SettingsService();
-  final app = await buildRootApp(settings: settings);
-  if (app is NativeBridgeErrorApp) {
-    runApp(app);
+  final result = await buildRootApp(settings: settings);
+  if (!result.bridgeReady) {
+    runApp(result.app);
     return;
   }
 
@@ -200,7 +204,7 @@ void main() async {
     await _setUpTray();
   }
 
-  runApp(app);
+  runApp(result.app);
 }
 
 /// トレイを初期化し、ウィンドウのクローズ・ポリシーを適用する (#15)。

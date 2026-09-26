@@ -43,8 +43,9 @@ void main() {
     // 退行を検知する前提条件）。
     expect(RustLib.instance.initialized, isFalse);
 
-    final app = await buildRootApp();
-    await tester.pumpWidget(app);
+    final result = await buildRootApp();
+    expect(result.bridgeReady, isTrue);
+    await tester.pumpWidget(result.app);
     await tester.pumpAndSettle();
 
     expect(RustLib.instance.initialized, isTrue);
@@ -82,10 +83,11 @@ void main() {
 
   testWidgets('initBridge が false を返す経路は NativeBridgeErrorApp になる',
       (tester) async {
-    final app = await buildRootApp(initBridge: () async => false);
-    expect(app, isA<NativeBridgeErrorApp>());
+    final result = await buildRootApp(initBridge: () async => false);
+    expect(result.bridgeReady, isFalse);
+    expect(result.app, isA<NativeBridgeErrorApp>());
 
-    await tester.pumpWidget(app);
+    await tester.pumpWidget(result.app);
     await tester.pumpAndSettle();
 
     // NativeBridgeErrorApp はロケール未指定だとシステムロケール追従なので、
