@@ -23,26 +23,25 @@ GPU シェーダ（`lib/rendering/shader_filter.dart`）で計算し、強度調
 ことのないタイプを選ぶと推奨強度（-opia / achromatopsia は 1.0、-omaly は
 0.6）が初期値になり、フィルタを切り替えても切替前のタイプの強度は保持されます。
 
-> ただし現状、protanopia の変換行列（Machado 2009 severity=1.0 行列）は
-> `lib/rendering/shader_filter.dart` に暫定的にハードコードされています
-> （sensus 0.6 では Machado 11 段 severity テーブルの非線形補間になりましたが、
-> `ShaderFilter` はネイティブブリッジ未初期化のプレーンな `flutter test` からも
-> 呼ばれるため flutter_rust_bridge 経由の取得ができず、単位行列との線形補間で
-> 近似しています。中間 strength の見え方は sensus 正本と一致しません）。
-> 本格的な解消は #59 で行う予定です。
+> 色覚 3 型（protanopia/deuteranopia/tritanopia）の中間 strength は、sensus 0.6 の
+> Machado 2009 11 段 severity テーブルをグリッド間で区分線形補間した正本値と一致
+> します（#59）。`rust/src/color_matrix_gen.rs` が sensus-core の公開関数から 11
+> グリッド点を汲み出して `tools/color_matrices.g.json` に書き出し、
+> `tools/generate_color_matrices.dart` が `lib/rendering/color_matrices.g.dart`
+> （Dart 定数）へ変換、`ShaderFilter.resolveSeverityMatrix()` が sensus と同じ
+> 補間式でグリッド間を解決します。手書きの行列値は持ちません。
 
 > 旧バージョンは OS 全体へ system-wide フィルタを適用する独自プラグイン
 > （`plugins/color_vision_filter`）と ue 内 LMS 実装を持っていましたが、
 > sensus 一元化に伴い撤去しました。ライブ画面（他アプリ含む全画面）への
 > 適用は、画面キャプチャ経路の実装後に対応予定です。
 
-> 現状、before / after の比較プレビューで実際に描画できるのは
-> protanopia / protanomaly のみです（protanomaly は protanopia の変換を
-> 弱い強度で再利用）。それ以外の色覚 7 型は、クイック選択はできますが
-> ライブ描画は「描画は近日対応」（en: "Rendering coming soon"）のプレースホルダ
-> 表示で、GPU 描画配線は #59 等で順次対応します。後述の advanced カタログ・
-> 体験プリセットの選択も `VisionFilterState` に入るだけで、プレビューへの
-> 描画には反映されません（#60）。
+> before / after の比較プレビューは、色覚 7 型（protanopia/deuteranopia/
+> tritanopia/achromatopsia + 各 -omaly。none は原画表示なので型に含めない）
+> すべてで実際に GPU 描画できます（#59）。後述の advanced カタログ（sensus 全
+> 30 種）・体験プリセットの選択は
+> 引き続き `VisionFilterState` に入るだけで、プレビューへの描画には反映されません
+> （#60）。
 
 ### 視覚 advanced フィルタ（sensus カタログ）
 
@@ -52,7 +51,7 @@ sensus が提供する**計 30 種**（上記の色覚型を含む。屈折／�
 sensus-core であり、ue はカタログ（`lib/models/vision_filter_catalog.dart`）
 から引きます。
 ※ 選択・パラメータ調整は `VisionFilterState` に反映されますが、プレビューへの
-ライブ描画は未配線です（#60）。
+描画は未配線です（#60）。
 
 ### 体験プリセット（複合症状）
 
@@ -76,7 +75,7 @@ sensus-core の `experiences()` です。
 フィルタ適用後（after）の画像を、**症状名・強度・日付（ISO・`YYYY-MM-DD`）**
 を焼き込んだ PNG として書き出せます。保存後はファイルのフルパスを
 クリップボードへコピーします。画像そのもののクリップボード書き込み・
-動画エクスポートは非対応です（ライブ描画がある protanopia / protanomaly で
+動画エクスポートは非対応です（GPU 実描画がある色覚 7 型 + none の原画表示で
 エクスポート可能）。
 
 > 焼き込み機構は受診喚起の注記にも対応していますが、現状エクスポートできる
@@ -96,8 +95,9 @@ UI は **日本語 / 英語** に対応しています（`flutter_localizations`
   sensus から FRB で公開済みだが、実際に音を加工・再生する経路は未実装
 - **ライブ画面キャプチャ** — 他アプリを含む全画面への適用。現状は合成した
   デモ画像に対してのみフィルタを適用する
-- **視覚フィルタのライブ描画拡張** — 現在 protanopia / protanomaly のみ
-  実描画。残りの色覚型・advanced フィルタの GPU 描画配線
+- **視覚フィルタのプレビュー描画拡張** — 色覚 7 型は実描画済み（#59。プレビューの
+  GPU 経路は #85 で CPU の `apply()` に置き換え予定。GPU はルーペのライブ表示
+  専用に残す）。advanced カタログ（sensus 全 30 種）の描画配線は #60/#85
 - **アプリ内の言語ピッカー UI**
 
 ## 対応プラットフォーム

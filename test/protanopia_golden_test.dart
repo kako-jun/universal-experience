@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:universal_experience/rendering/color_matrices.g.dart';
 import 'package:universal_experience/rendering/shader_filter.dart';
 
 /// protanopia GPU golden テスト。
@@ -30,18 +31,6 @@ Future<Uint8List> _rgba(ui.Image img) async {
   final ByteData? bd = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
   return bd!.buffer.asUint8List();
 }
-
-/// protanopia の Machado 2009 severity=1.0 行列（行優先 3x3）。
-///
-/// [ShaderFilter] の同名の値（`_protanopiaMatrix`、library-private）と同値だが、
-/// このテストは独立に期待値を計算する（本体の private 実装に依存せず、行列と
-/// 線形補間の両方が正しいことを検証するため）。値の出典は sensus_core
-/// `PROTANOPIA_MATRIX` / `shaders/protanopia.frag` のコメント。
-const List<double> _protanopiaMatrix = <double>[
-  0.152286, 1.052583, -0.204868, //
-  0.114503, 0.786281, 0.099216, //
-  -0.003882, -0.048116, 1.051998, //
-];
 
 double _srgbToLinear(double c) {
   return c <= 0.04045 ? c / 12.92 : math.pow((c + 0.055) / 1.055, 2.4).toDouble();
@@ -83,20 +72,6 @@ Uint8List _applyColorMatrixSrgb(Uint8List rgba, List<double> matrixRowMajor) {
   return out;
 }
 
-/// 単位行列と [_protanopiaMatrix] を [s] で線形補間した行列（行優先）。
-/// `ShaderFilter.applyProtanopiaGpu` の Dart 側補間式と同じ式
-/// （identity + (M - identity) * s）。
-List<double> _lerpProtanopiaMatrix(double s) {
-  const List<double> identity = <double>[
-    1.0, 0.0, 0.0, //
-    0.0, 1.0, 0.0, //
-    0.0, 0.0, 1.0, //
-  ];
-  return List<double>.generate(
-    9,
-    (i) => identity[i] + (_protanopiaMatrix[i] - identity[i]) * s,
-  );
-}
 
 /// [a] と [b] の最大チャネル差（RGB のみ、alpha は除く）。
 int _maxChannelDiff(Uint8List a, Uint8List b) {
@@ -181,8 +156,9 @@ void main() {
     out.dispose();
   });
 
-  test('strength=0.5 は Dart 側の線形補間の期待値と一致し、原画とも s=1.0 とも十分に異なる',
-      () async {
+  test(
+      'strength=0.5 は ShaderFilter.resolveSeverityMatrix の期待値と一致し、'
+      '原画とも s=1.0 とも十分に異なる', () async {
     final ui.Image src = await _decodeFile('test/golden/protanopia_input.png');
 
     final ui.Image outHalf = await ShaderFilter.applyProtanopiaGpu(src, 0.5);
@@ -192,14 +168,19 @@ void main() {
     final Uint8List outHalfPx = await _rgba(outHalf);
     final Uint8List outFullPx = await _rgba(outFull);
 
-    // Dart 側で独立に計算した「s=0.5 で単位行列と severity=1.0 行列を線形補間した
-    // 行列」を適用した期待値。
-    final List<double> expectedMatrix = _lerpProtanopiaMatrix(0.5);
+    // ShaderFilter が GPU に渡すのと同じ行列（sensus と同じ区分線形補間。
+    // 「行列の正しさ」自体は test/color_matrix_interpolation_test.dart が
+    // sensus CPU fixture と突き合わせて別途検証済み）。本テストの目的は
+    // 「GPU シェーダの色行列適用そのものが CPU 計算と一致するか」の確認。
+    final List<double> expectedMatrix = ShaderFilter.resolveSeverityMatrix(
+      protanopiaColorMatrixGrid,
+      0.5,
+    );
     final Uint8List expectedPx = _applyColorMatrixSrgb(srcPx, expectedMatrix);
 
     final int diffFromExpected = _maxChannelDiff(outHalfPx, expectedPx);
     expect(diffFromExpected, lessThanOrEqualTo(2),
-        reason: 'GPU 出力(s=0.5)が Dart 側で計算した線形補間の期待値と '
+        reason: 'GPU 出力(s=0.5)が CPU 側で計算した期待値と '
             '$diffFromExpected/255 乖離している');
 
     // 原画とも s=1.0 とも十分に異なること（= 補間が実際に効いていること）の対照。

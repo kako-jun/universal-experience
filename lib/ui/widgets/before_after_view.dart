@@ -45,13 +45,13 @@ AfterImageRenderer afterImageRenderer = BeforeAfterView.renderAfter;
 /// visible on saturated reds/greens/blues). The *after* pane shows the same
 /// image with the selected filter applied.
 ///
-/// Only [ColorVisionType.protanopia] / [ColorVisionType.protanomaly] can be
-/// rendered for real today: they route through
-/// [ShaderFilter.applyProtanopiaGpu] (the one GPU path proven by the golden
-/// test). protanomaly reuses the protanopia transform at a reduced strength
-/// ([recommendedStrength]). Every other filter shows a "rendering coming soon"
-/// placeholder, because live/GPU rendering for them is tracked by other issues
-/// (#1/#3/#4 live capture, #59 follow-ups for the remaining shaders).
+/// All eight [ColorVisionType] values render for real (#59): the three -opia
+/// types route through the matching `ShaderFilter.apply*Gpu` (Machado
+/// per-severity matrix, resolved with the same piecewise-linear interpolation
+/// sensus_core uses), the -omaly types reuse their base -opia transform at a
+/// reduced strength ([recommendedStrength]), and achromatopsia uses a
+/// constant BT.709 luma blend. Live *screen* capture (as opposed to this
+/// synthetic sample image) is still tracked by #1/#3/#4.
 class BeforeAfterView extends StatefulWidget {
   const BeforeAfterView({
     super.key,
@@ -75,25 +75,6 @@ class BeforeAfterView extends StatefulWidget {
   /// generating arbitrarily large textures). Tests that want a small,
   /// deterministic image regardless of layout pass an explicit value.
   final int? sampleSize;
-
-  /// Whether [type] can currently be rendered to a real "after" image.
-  ///
-  /// Exposed as a static so tests and callers can reason about render coverage
-  /// without instantiating the widget.
-  static bool canRender(ColorVisionType type) {
-    switch (type) {
-      case ColorVisionType.none:
-      case ColorVisionType.protanopia:
-      case ColorVisionType.protanomaly:
-        return true;
-      case ColorVisionType.deuteranopia:
-      case ColorVisionType.deuteranomaly:
-      case ColorVisionType.tritanopia:
-      case ColorVisionType.tritanomaly:
-      case ColorVisionType.achromatopsia:
-        return false;
-    }
-  }
 
   /// Builds the deterministic sample image used in the *before* pane.
   ///
@@ -152,11 +133,17 @@ class BeforeAfterView extends StatefulWidget {
     }
   }
 
-  /// Produces the *after* image for [type] from [source], or null when the
-  /// filter has no real renderer yet.
+  /// Produces the *after* image for [type] from [source]. Returns null only
+  /// if [type] has no real renderer yet — none of today's eight values does
+  /// (#59), but the nullable return stays so a future `ColorVisionType`
+  /// addition without a renderer degrades to [_ImageView]'s own null-safe
+  /// placeholder instead of a hard error.
   ///
-  /// [ColorVisionType.none] returns [source] unchanged (clone via the shader is
-  /// unnecessary). protanopia/protanomaly route through the GPU shader.
+  /// [ColorVisionType.none] returns [source] unchanged (clone via the shader
+  /// is unnecessary). Each -opia/achromatopsia type routes through its
+  /// matching `ShaderFilter.apply*Gpu`; each -omaly type shares its base
+  /// -opia's renderer (the reduced [strength] is what distinguishes them —
+  /// see [recommendedStrength]).
   static Future<ui.Image?> renderAfter(
     ui.Image source,
     ColorVisionType type,
@@ -170,10 +157,12 @@ class BeforeAfterView extends StatefulWidget {
         return ShaderFilter.applyProtanopiaGpu(source, strength);
       case ColorVisionType.deuteranopia:
       case ColorVisionType.deuteranomaly:
+        return ShaderFilter.applyDeuteranopiaGpu(source, strength);
       case ColorVisionType.tritanopia:
       case ColorVisionType.tritanomaly:
+        return ShaderFilter.applyTritanopiaGpu(source, strength);
       case ColorVisionType.achromatopsia:
-        return null;
+        return ShaderFilter.applyAchromatopsiaGpu(source, strength);
     }
   }
 
@@ -641,25 +630,20 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         );
         // #58 レビュー SHOULD-1: 最新世代が失敗した場合は _failed が立ち、
         // _after は null にされている。stale/不整合な画像を出し続けるより
-        // 失敗を明示する。
-        final Widget afterChild;
-        if (_failed) {
-          afterChild =
-              _ErrorPlaceholder(theme: theme, label: l10n.previewFailed);
-        } else if (_after != null) {
-          afterChild = _ImageView(image: _after);
-        } else {
-          afterChild = _ComingSoonPlaceholder(
-            theme: theme,
-            label: l10n.previewComingSoon,
-          );
-        }
+        // 失敗を明示する。全 ColorVisionType が実描画対応済み（#59）なので、
+        // 失敗以外で `_after` が null のまま安定することはない（一度も成功して
+        // いなければこの分岐に来る前に上の `_loading` ガードで preparing 表示に
+        // なる）。それでも [_ImageView] 自身が null を安全に扱うため、二分岐で
+        // 十分（「描画は近日対応」プレースホルダは #86 レビューで YAGNI 判定・撤去）。
+        final Widget afterChild = _failed
+            ? _ErrorPlaceholder(theme: theme, label: l10n.previewFailed)
+            : _ImageView(image: _after);
         final afterPane = _Pane(
           label: widget.filterType == ColorVisionType.none
               ? l10n.previewPaneOriginal
               : colorVisionTypeName(l10n, widget.filterType),
           // Export is only meaningful when a real "after" image exists.
-          // Coming-soon/failed states (null _after) get no button.
+          // The failed state (null _after) gets no button.
           trailing: _after != null
               ? IconButton(
                   icon: const Icon(Icons.download_outlined),
@@ -778,42 +762,6 @@ class _UiImagePainter extends CustomPainter {
   @override
   bool shouldRepaint(_UiImagePainter oldDelegate) =>
       !identical(oldDelegate.image, image);
-}
-
-class _ComingSoonPlaceholder extends StatelessWidget {
-  const _ComingSoonPlaceholder({required this.theme, required this.label});
-
-  final ThemeData theme;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: theme.colorScheme.surfaceContainerHigh,
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.brush_outlined,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 /// Shown in the "after" pane when the latest generation/render attempt

@@ -3,6 +3,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 
+import 'color_matrices.g.dart';
+
 /// 失敗した Future をキャッシュに残さない汎用の single-flight メモ化キャッシュ
 /// （#58 レビュー S1）。
 ///
@@ -48,74 +50,134 @@ class SingleFlightCache<K, V> {
 /// FragmentProgram (Impeller GPU シェーダ) で sensus 由来の視覚フィルタを
 /// `ui.Image` に適用するヘルパ。
 ///
-/// MVP では protanopia 1 枚のみ。配線は #11 のゴール:
+/// 色覚 3 型（protanopia/deuteranopia/tritanopia）+ achromatopsia が実描画対応
+/// 済み（#59）。配線の骨格は #11 のゴールのまま:
 ///   FragmentProgram.fromAsset → fragmentShader() → setFloat で uniform を積む
 ///   → setImageSampler(0, src) → PictureRecorder.drawRect(Paint..shader) → toImage。
 ///
-/// uniform 順序は shaders/protanopia.frag の宣言順に厳密一致させる:
+/// 色行列系（protanopia/deuteranopia/tritanopia）の uniform 順序は各 `.frag` の
+/// 宣言順に厳密一致させる:
 ///   [uStrength, uMatrix0..uMatrix8, uResolution_x, uResolution_y]（float 12 本）
-///   + setImageSampler(0, src)。
+///   + setImageSampler(0, src)。achromatopsia は
+///   [uStrength, uRWeight, uGWeight, uBWeight, uResolution_x, uResolution_y]。
 class ShaderFilter {
   ShaderFilter._();
 
   static const String _protanopiaAsset = 'shaders/protanopia.frag';
+  static const String _deuteranopiaAsset = 'shaders/deuteranopia.frag';
+  static const String _tritanopiaAsset = 'shaders/tritanopia.frag';
+  static const String _achromatopsiaAsset = 'shaders/achromatopsia.frag';
 
-  /// protanopia の Machado 2009 severity=1.0 行列 (行優先 3x3)。
+  /// sensus_core の `resolve_severity_matrix`（`pub(crate)` で ue から直接呼べない）
+  /// と**同じ計算**を Dart で再現する: [grid]（severity=0.0..1.0 を 0.1 刻みで
+  /// 汲み出した 11 個の解決済み 3x3 行列、行優先・9 要素、
+  /// `lib/rendering/color_matrices.g.dart` 参照）に対し、[strength] が属する
+  /// グリッド区間（`[i0/10, (i0+1)/10]`）だけを要素ごとに線形補間する
+  /// （**11 点を跨いで全域を単一直線で結ぶ旧実装の線形補間とは異なる** — #56/#59
+  /// で判明した不一致の原因そのもの）。
   ///
-  /// 値は sensus_core `PROTANOPIA_MATRIX` / 元 .frag コメントと同値。
+  /// [strength] は NaN→0、範囲外は 0.0..1.0 に clamp（sensus の
+  /// `normalize_strength`/NaN 分岐と同じ挙動）。`grid.length` は必ず 11
+  /// （呼び出し側の契約。テストでも生成物でもこの前提が崩れることはない）。
   ///
-  /// **既知の制約（#56 で判明、#59 に引き継ぎ）**: sensus 0.6 は `strength` を
-  /// Machado 11 段 severity テーブルから**グリッド間の区分線形補間**した解決済み
-  /// 行列を返すようになった（sensus#165）。11 個の固定点（グリッド）間だけを
-  /// 線形補間するため、全域を単一の直線で結ぶ本メソッドの単純な線形補間とは
-  /// 一致しない。この解決は `visionUniforms()`（FRB 経由で
-  /// sensus-core を呼ぶ）でしか取得できないが、`ShaderFilter` はプレーンな
-  /// `flutter test`（ネイティブブリッジ未初期化のホスト実行）からも呼ばれる。
-  /// `RustLib.init()` は `initNativeBridge()` 経由で `main()` /
-  /// `integration_test/`（`-d macos`、ネイティブ lib を同梱する
-  /// `flutter build macos` 相当のビルドを経由）からしか呼ばれず、cargokit の
-  /// ネイティブ lib ビルドを経ないプレーンな `flutter test` では
-  /// `RustLib.init()` 自体が失敗する（#56 で実測確認済み。CI の `check` ジョブも
-  /// `flutter build macos --debug` より前に `flutter test` を走らせる順序）。
-  /// そのため本メソッドは、visionUniforms() を直接呼ばず、severity=1.0 の
-  /// 単一行列を Dart 側で `strength` に**線形**補間する（sensus 0.6 より前の
-  /// `protanopia.frag` が行っていたのと同じ式。0.6 の `.frag` 自体はコード
-  /// 生成で sensus の GLSL をそのまま転写するため、もうこの blend を行わない
-  /// ——シェーダ側の `uStrength` は未使用の参考値になった）。
-  /// **中間 strength（0.0 と 1.0 以外）の見え方は sensus 正本の Machado
-  /// テーブル補間と一致しない**。ブリッジ経由の解決値を使う本格対応
-  /// （テスト側でネイティブ lib を用意する試験基盤の整備を含む）は #59。
-  static const List<double> _protanopiaMatrix = <double>[
-    0.152286, 1.052583, -0.204868, //
-    0.114503, 0.786281, 0.099216, //
-    -0.003882, -0.048116, 1.051998, //
-  ];
+  /// `test/color_matrix_interpolation_test.dart` が、rust 側で sensus CPU から
+  /// 直接汲み出した strength=0/0.25/0.5/0.75/1.0 の行列 fixture と本メソッドの
+  /// 出力を突き合わせ、この再実装が正本と一致することを検証する。
+  @visibleForTesting
+  static List<double> resolveSeverityMatrix(
+    List<List<double>> grid,
+    double strength,
+  ) {
+    assert(grid.length == 11, 'severity grid must have exactly 11 points');
+    final double s = strength.isNaN ? 0.0 : strength.clamp(0.0, 1.0);
+    final double scaled = s * 10.0;
+    final int i0 = scaled.floor().clamp(0, 10);
+    final double frac = scaled - i0;
+    if (frac <= 0.0 || i0 >= 10) {
+      return List<double>.from(grid[i0]);
+    }
+    final List<double> lo = grid[i0];
+    final List<double> hi = grid[i0 + 1];
+    return List<double>.generate(9, (i) => lo[i] + (hi[i] - lo[i]) * frac);
+  }
 
-  static const List<double> _identityMatrix3x3 = <double>[
-    1.0, 0.0, 0.0, //
-    0.0, 1.0, 0.0, //
-    0.0, 0.0, 1.0, //
-  ];
+  /// [grid]（[resolveSeverityMatrix] 参照）で解決した行列を uMatrix として
+  /// [shaderAsset] に適用する、色覚 3 型共通の内部ヘルパ。
+  static Future<ui.Image> _applyMachadoGpu(
+    ui.Image src,
+    String shaderAsset,
+    List<List<double>> grid,
+    double strength,
+  ) {
+    final double s = strength.isNaN ? 0.0 : strength.clamp(0.0, 1.0);
+    final List<double> matrix = resolveSeverityMatrix(grid, s);
+    final List<double> scalarUniforms = <double>[s, ...matrix];
+    return applyColorFilterGpu(src, shaderAsset, scalarUniforms);
+  }
 
   /// protanopia フィルタを GPU で [src] に適用し、新しい [ui.Image] を返す。
   ///
-  /// [strength] は 0.0..=1.0 (0.0=原画, 1.0=完全適用)。単位行列と
-  /// [_protanopiaMatrix] を [strength] で線形補間した行列を `uMatrix` として渡す
-  /// （中間 strength が sensus 正本と一致しない制約は [_protanopiaMatrix] の
-  /// doc コメント参照）。
+  /// [strength] は 0.0..=1.0 (0.0=原画, 1.0=完全適用)。[protanopiaColorMatrixGrid]
+  /// を sensus と同じ区分線形補間（[resolveSeverityMatrix]）で解決した行列を
+  /// `uMatrix` として渡す。
   static Future<ui.Image> applyProtanopiaGpu(
     ui.Image src,
     double strength,
-  ) async {
-    // sensus の normalize_strength 相当 (NaN→0, 0..=1 clamp)。非有限 uniform が
-    // GPU に流れて画面が壊れるのを防ぐ。
+  ) {
+    return _applyMachadoGpu(
+      src,
+      _protanopiaAsset,
+      protanopiaColorMatrixGrid,
+      strength,
+    );
+  }
+
+  /// deuteranopia フィルタを GPU で [src] に適用する。[applyProtanopiaGpu] と同じ
+  /// 契約・同じ補間方式（[deuteranopiaColorMatrixGrid] を使う）。
+  static Future<ui.Image> applyDeuteranopiaGpu(
+    ui.Image src,
+    double strength,
+  ) {
+    return _applyMachadoGpu(
+      src,
+      _deuteranopiaAsset,
+      deuteranopiaColorMatrixGrid,
+      strength,
+    );
+  }
+
+  /// tritanopia フィルタを GPU で [src] に適用する。[applyProtanopiaGpu] と同じ
+  /// 契約・同じ補間方式（[tritanopiaColorMatrixGrid] を使う）。
+  static Future<ui.Image> applyTritanopiaGpu(
+    ui.Image src,
+    double strength,
+  ) {
+    return _applyMachadoGpu(
+      src,
+      _tritanopiaAsset,
+      tritanopiaColorMatrixGrid,
+      strength,
+    );
+  }
+
+  /// achromatopsia フィルタを GPU で [src] に適用する。
+  ///
+  /// Machado severity テーブルを持たず、`achromatopsia.frag` がシェーダ内で
+  /// `uStrength` を直接使って固定重み（[achromatopsiaRWeight] 等、BT.709
+  /// photopic luminance）とのブレンドを行うため、[resolveSeverityMatrix] の
+  /// ような補間は不要（重みは strength に依存しない定数）。
+  static Future<ui.Image> applyAchromatopsiaGpu(
+    ui.Image src,
+    double strength,
+  ) {
     final double s = strength.isNaN ? 0.0 : strength.clamp(0.0, 1.0);
-    final List<double> blendedMatrix = List<double>.generate(9, (i) {
-      final double identity = _identityMatrix3x3[i];
-      return identity + (_protanopiaMatrix[i] - identity) * s;
-    });
-    final List<double> scalarUniforms = <double>[s, ...blendedMatrix];
-    return applyColorFilterGpu(src, _protanopiaAsset, scalarUniforms);
+    final List<double> scalarUniforms = <double>[
+      s,
+      achromatopsiaRWeight,
+      achromatopsiaGWeight,
+      achromatopsiaBWeight,
+    ];
+    return applyColorFilterGpu(src, _achromatopsiaAsset, scalarUniforms);
   }
 
   // ロード済み FragmentProgram を asset パスでキャッシュ（並行ロードの重複を避ける）。

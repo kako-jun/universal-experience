@@ -213,17 +213,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   filterType: filterService.currentFilter,
                   intensity: filterService.intensity,
                 ),
-                if (!BeforeAfterView.canRender(
-                    filterService.currentFilter)) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    l10n.previewUnsupportedNote,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontStyle: FontStyle.italic,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
