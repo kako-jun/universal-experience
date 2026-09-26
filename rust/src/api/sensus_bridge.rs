@@ -978,15 +978,19 @@ pub fn experiences() -> Vec<Experience> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     /// 全 vision バリアントを 1 ループで列挙するためのヘルパ。バリアントが増えたら
     /// ここに追加するだけで全網羅テストが拾う。payload 付きは代表値を入れる。
+    ///
+    /// `pub(crate)`: `shader_dump_gen.rs` の
+    /// `dump_targets_and_excluded_stems_cover_all_variants`（レビュー S2）が
+    /// crate 内の別テストモジュールから参照する。
     // 新しい VisionFilter variant を追加したらこの配列にも足すこと（網羅テスト用）。
     // 本体の `vision_uniforms`/`vision_shader_glsl`/`to_sensus` は網羅 match なので、
     // variant 追加自体はコンパイルエラーで気付ける。
-    const ALL_FILTERS: [VisionFilter; 30] = [
+    pub(crate) const ALL_FILTERS: [VisionFilter; 30] = [
         VisionFilter::Protanopia,
         VisionFilter::Deuteranopia,
         VisionFilter::Tritanopia,
@@ -1341,6 +1345,80 @@ mod tests {
                 let back = VisionFilter::from_sensus(f.to_sensus());
                 assert_eq!(back, Some(f), "{f:?}: field_loss_mode did not roundtrip");
             }
+        }
+    }
+
+    /// (名前, field_loss_mode を受けて VisionFilter を組み立てるコンストラクタ)。
+    type FieldLossModeFilterCtor = (&'static str, fn(VisionFieldLossMode) -> VisionFilter);
+
+    /// field_loss_mode を持つ 4 フィルタの構築ヘルパ一覧。S6 の a/b 両テストで共有する。
+    fn field_loss_mode_filters() -> [FieldLossModeFilterCtor; 4] {
+        [
+            ("glaucoma", |m| VisionFilter::Glaucoma {
+                mode: VisionGlaucomaMode::Vignette,
+                field_loss_mode: m,
+            }),
+            ("macular_degeneration", |m| {
+                VisionFilter::MacularDegeneration { field_loss_mode: m }
+            }),
+            ("hemianopia", |m| VisionFilter::Hemianopia {
+                side: 1.0,
+                field_loss_mode: m,
+            }),
+            ("tunnel_vision", |m| VisionFilter::TunnelVision {
+                field_loss_mode: m,
+            }),
+        ]
+    }
+
+    /// (a) CPU 経路（apply_vision_cpu_rgba8）では Darken と Blur の出力が異なる
+    /// （field_loss_mode が実際に効いていることの確認。レビュー S6a）。
+    #[test]
+    fn field_loss_mode_blur_vs_darken_differs_on_cpu_path() {
+        let w = 8u32;
+        let h = 8u32;
+        let len = (w * h * 4) as usize;
+        // 彩度のある単色（赤系）。Darken は明度だけ落とすが Blur は彩度も落とすため、
+        // 単色一様画像でも両モードの出力は異なるはず。
+        let mut input = vec![0u8; len];
+        for px in input.chunks_mut(4) {
+            px[0] = 220; // R
+            px[1] = 40; // G
+            px[2] = 40; // B
+            px[3] = 255; // A
+        }
+
+        for (name, build) in field_loss_mode_filters() {
+            let darken_out = apply_vision_cpu_rgba8(
+                build(VisionFieldLossMode::Darken),
+                input.clone(),
+                w,
+                h,
+                1.0,
+            )
+            .unwrap();
+            let blur_out =
+                apply_vision_cpu_rgba8(build(VisionFieldLossMode::Blur), input.clone(), w, h, 1.0)
+                    .unwrap();
+            assert_ne!(
+                darken_out, blur_out,
+                "{name}: Darken と Blur の CPU 出力が同一（field_loss_mode が効いていない）"
+            );
+        }
+    }
+
+    /// (b) GPU 経路（vision_uniforms）は Darken/Blur で出力が同一（field_loss_mode を
+    /// 無視して常に Darken 相当になることの確認。レビュー S6b）。
+    #[test]
+    fn field_loss_mode_blur_vs_darken_identical_on_gpu_uniforms() {
+        for (name, build) in field_loss_mode_filters() {
+            let darken = vision_uniforms(build(VisionFieldLossMode::Darken), 0.7, 0.0, 128, 64);
+            let blur = vision_uniforms(build(VisionFieldLossMode::Blur), 0.7, 0.0, 128, 64);
+            assert_eq!(
+                darken, blur,
+                "{name}: GPU uniforms が Darken/Blur で異なる \
+                 （field_loss_mode が GPU 経路に漏れている可能性）"
+            );
         }
     }
 
