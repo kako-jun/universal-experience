@@ -107,10 +107,10 @@ void main() {
 
     test('payload 付きフィルタの parameters 数', () {
       expectParamCount('astigmatism', 1); // axisDeg
-      expectParamCount('glaucoma', 2); // mode,fieldLossMode
-      expectParamCount('macular_degeneration', 1); // fieldLossMode
-      expectParamCount('hemianopia', 2); // side,fieldLossMode
-      expectParamCount('tunnel_vision', 1); // fieldLossMode
+      // glaucoma/hemianopia の field_loss_mode は意図的にカタログ非公開
+      // （kVisionFilterCatalog の doc コメント参照。GPU 経路が無視するため）。
+      expectParamCount('glaucoma', 1); // mode
+      expectParamCount('hemianopia', 1); // side
       expectParamCount('cataract', 1); // seed
       expectParamCount('floaters', 5); // seed,density,size,gazeX,gazeY
       expectParamCount(
@@ -132,6 +132,8 @@ void main() {
         'myopia',
         'hyperopia',
         'presbyopia',
+        'macular_degeneration',
+        'tunnel_vision',
         'photophobia',
         'night_blindness',
         'vertigo',
@@ -182,24 +184,18 @@ void main() {
       expect(kHemianopiaSideValues['right'], 1.0);
     });
 
-    test('field_loss_mode を持つ4フィルタは darken/blur の2択（VisionFieldLossMode と同数）',
-        () {
+    test(
+        'field_loss_mode を持つ4フィルタはカタログに fieldLossMode パラメータを公開しない'
+        '（M1: GPU 経路が無視するため意図的に非公開）', () {
       for (final id in [
         'glaucoma',
         'macular_degeneration',
         'hemianopia',
         'tunnel_vision',
       ]) {
-        final param = kVisionFilterCatalogById[id]!
-            .parameters
-            .firstWhere((p) => p.name == 'fieldLossMode');
-        expect(param.kind, VisionParamKind.enumValue, reason: id);
-        expect(
-          param.options.length,
-          VisionFieldLossMode.values.length,
-          reason: id,
-        );
-        expect(param.defaultValue, 'darken', reason: id);
+        final names =
+            kVisionFilterCatalogById[id]!.parameters.map((p) => p.name);
+        expect(names, isNot(contains('fieldLossMode')), reason: id);
       }
     });
   });
@@ -268,15 +264,31 @@ void main() {
       );
     });
 
-    test('enum payload: glaucoma の fieldLossMode を反映', () {
+    test('未知の mode 文字列は vignette にフォールバックする', () {
       final state = VisionFilterState()..select('glaucoma');
+      state.setParam('mode', 'not-a-real-mode');
+      expect(
+        state.build(),
+        const VisionFilter.glaucoma(
+          mode: VisionGlaucomaMode.vignette,
+          fieldLossMode: VisionFieldLossMode.darken,
+        ),
+      );
+    });
+
+    test('glaucoma の fieldLossMode は常に darken で構築される（M1: カタログに公開しない）',
+        () {
+      final state = VisionFilterState()..select('glaucoma');
+      // fieldLossMode はカタログにパラメータが無いため setParam しても build() の
+      // switch は _raw() ではなく VisionFieldLossMode.darken を直接使う。
       state.setParam('fieldLossMode', 'blur');
       expect(
         state.build(),
         const VisionFilter.glaucoma(
           mode: VisionGlaucomaMode.vignette,
-          fieldLossMode: VisionFieldLossMode.blur,
+          fieldLossMode: VisionFieldLossMode.darken,
         ),
+        reason: 'カタログに無い fieldLossMode setParam は build() に影響しない',
       );
     });
 
@@ -319,20 +331,26 @@ void main() {
       );
     });
 
-    test('enum payload: macular_degeneration / tunnel_vision の fieldLossMode を反映',
-        () {
+    test('未知の side 文字列は left（0.0）にフォールバックする', () {
+      final state = VisionFilterState()..select('hemianopia');
+      state.setParam('side', 'not-a-real-side');
+      expect(
+        state.build(),
+        const VisionFilter.hemianopia(
+          side: 0.0,
+          fieldLossMode: VisionFieldLossMode.darken,
+        ),
+      );
+    });
+
+    test(
+        'macular_degeneration / tunnel_vision は fieldLossMode 常に darken で構築される'
+        '（M1: カタログに公開しない）', () {
       final macular = VisionFilterState()..select('macular_degeneration');
       expect(
         macular.build(),
         const VisionFilter.macularDegeneration(
           fieldLossMode: VisionFieldLossMode.darken,
-        ),
-      );
-      macular.setParam('fieldLossMode', 'blur');
-      expect(
-        macular.build(),
-        const VisionFilter.macularDegeneration(
-          fieldLossMode: VisionFieldLossMode.blur,
         ),
       );
 
@@ -341,13 +359,6 @@ void main() {
         tunnel.build(),
         const VisionFilter.tunnelVision(
           fieldLossMode: VisionFieldLossMode.darken,
-        ),
-      );
-      tunnel.setParam('fieldLossMode', 'blur');
-      expect(
-        tunnel.build(),
-        const VisionFilter.tunnelVision(
-          fieldLossMode: VisionFieldLossMode.blur,
         ),
       );
     });

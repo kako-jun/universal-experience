@@ -209,29 +209,6 @@ class VisionFilterEntry {
   final List<VisionParam> parameters;
 }
 
-/// 視野欠損の表現モードの選択肢（[VisionFieldLossMode] のミラー、sensus 0.6 / #171）。
-///
-/// `glaucoma` / `macular_degeneration` / `hemianopia` / `tunnel_vision` の 4 フィルタが
-/// 共通で持つ。**注意**: ここに両方の選択肢を載せているが、`blur` が実際に反映されるのは
-/// CPU 経路（`apply_vision_cpu_rgba8`）のみ。GPU（FragmentProgram）経路は
-/// `shaders::glaucoma_uniforms` 等が `field_loss_mode` を引数に取らないため、選択に
-/// 関わらず常に `darken` 相当で描画される（`sensus_bridge.dart` の
-/// `VisionFieldLossMode` doc 参照）。この 4 フィルタは現状カタログ選択がライブ
-/// プレビューに配線されていないため実害はないが、配線する側（将来 Issue）は
-/// `blur` を選んでも GPU では見た目が変わらないことを踏まえて UI を設計すること。
-const List<VisionParamOption> _fieldLossModeOptions = [
-  VisionParamOption(
-    value: 'darken',
-    displayName: 'Darken (default)',
-    labelKey: 'param.field_loss_mode.darken',
-  ),
-  VisionParamOption(
-    value: 'blur',
-    displayName: 'Blur (VIP-Sim style, CPU only)',
-    labelKey: 'param.field_loss_mode.blur',
-  ),
-];
-
 /// 緑内障モードの選択肢（[VisionGlaucomaMode] のミラー）。
 const List<VisionParamOption> _glaucomaModeOptions = [
   VisionParamOption(
@@ -262,6 +239,17 @@ const List<VisionParamOption> _glaucomaModeOptions = [
 /// - 30 エントリちょうど（sensus の `VisionFilter` variant 数と一致）。
 /// - id は重複なし。
 /// - payload を持つフィルタの parameters 数が sensus payload と一致する。
+///   **例外**: `glaucoma` / `macular_degeneration` / `hemianopia` / `tunnel_vision`
+///   の `field_loss_mode`（[VisionFieldLossMode]）は意図的にカタログの
+///   `parameters` に含めない。GPU（FragmentProgram）経路は
+///   `shaders::glaucoma_uniforms` 等が `field_loss_mode` を引数に取らないため
+///   選択に関わらず常に Darken 相当で描画されてしまい、UI で選ばせても見た目に
+///   反映されない（`sensus_bridge.dart` の `VisionFieldLossMode` doc 参照）。
+///   `VisionFilterState.build()` は常に `VisionFieldLossMode.darken` で構築する。
+///   Blur を実際に使うのは CPU 経路（`apply_vision_cpu_rgba8` を直接呼ぶ）のみで、
+///   カタログ UI からは到達できない。ライブ GPU 描画が Blur に対応したら
+///   （またはカタログが CPU 専用パラメータを表現できるようになったら）この例外は
+///   解消し、4 フィルタの parameters 数はそれぞれ +1 する。
 const List<VisionFilterEntry> kVisionFilterCatalog = [
   // ── 色覚 ──────────────────────────────────────────────
   VisionFilterEntry(
@@ -357,14 +345,6 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         defaultValue: 'vignette',
         options: _glaucomaModeOptions,
       ),
-      VisionParam(
-        name: 'fieldLossMode',
-        kind: VisionParamKind.enumValue,
-        labelKey: 'param.field_loss_mode',
-        displayName: 'Field loss mode',
-        defaultValue: 'darken',
-        options: _fieldLossModeOptions,
-      ),
     ],
   ),
   VisionFilterEntry(
@@ -373,16 +353,6 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     i18nKey: 'filter.macular_degeneration',
     category: VisionFilterCategory.visualField,
     urgency: VisionFilterUrgency.high,
-    parameters: [
-      VisionParam(
-        name: 'fieldLossMode',
-        kind: VisionParamKind.enumValue,
-        labelKey: 'param.field_loss_mode',
-        displayName: 'Field loss mode',
-        defaultValue: 'darken',
-        options: _fieldLossModeOptions,
-      ),
-    ],
   ),
   VisionFilterEntry(
     id: 'hemianopia',
@@ -413,14 +383,6 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
           ),
         ],
       ),
-      VisionParam(
-        name: 'fieldLossMode',
-        kind: VisionParamKind.enumValue,
-        labelKey: 'param.field_loss_mode',
-        displayName: 'Field loss mode',
-        defaultValue: 'darken',
-        options: _fieldLossModeOptions,
-      ),
     ],
   ),
   VisionFilterEntry(
@@ -429,16 +391,6 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     i18nKey: 'filter.tunnel_vision',
     category: VisionFilterCategory.visualField,
     urgency: VisionFilterUrgency.high,
-    parameters: [
-      VisionParam(
-        name: 'fieldLossMode',
-        kind: VisionParamKind.enumValue,
-        labelKey: 'param.field_loss_mode',
-        displayName: 'Field loss mode',
-        defaultValue: 'darken',
-        options: _fieldLossModeOptions,
-      ),
-    ],
   ),
 
   // ── 光・透明度 ────────────────────────────────────────
@@ -768,20 +720,22 @@ List<VisionFilterEntry> visionFilterEntriesByCategory(
 ) =>
     kVisionFilterCatalog.where((e) => e.category == category).toList();
 
-/// payload を持たない（const 構築できる）[VisionFilter] → カタログ id の写像。
+/// カタログに UI パラメータを持たない [VisionFilter] インスタンス → カタログ id の写像。
 ///
 /// 体験プリセット (#19) の `Experience.vision`（bridge の [VisionFilter] インスタンス）
 /// を、カタログの snake_case id（[VisionFilterState.select] が受ける値）へ変換する
 /// ための単一の正本。**id をハードコード散在させない**ため、ここ 1 箇所に集約する。
 ///
-/// freezed の値等価（payload 無しバリアントは同値）を使って引く。payload を持つ
-/// フィルタ（astigmatism 等）は const 構築できず体験プリセットでも使われないため
-/// 対象外（[visionFilterCatalogId] が null を返す）。
+/// freezed の値等価（同じフィールド値なら同値）を使って引くため、キーは常に
+/// **固定値**で const 構築する。payload を持ちカタログ UI でパラメータ調整できる
+/// フィルタ（astigmatism 等）は対象外（[visionFilterCatalogId] が null を返す）。
 ///
-/// `macularDegeneration` / `tunnelVision` は sensus 0.6 で `fieldLossMode` payload が
-/// 付いたため厳密には「パラメータなし」ではなくなったが、体験プリセット側の意味論
-/// （既定 Darken）は変わらないため、[VisionFieldLossMode.darken] 固定でここに残す。
-final Map<VisionFilter, String> _kCatalogIdByParamlessVision = {
+/// `macularDegeneration` / `tunnelVision` は sensus 0.6 で `field_loss_mode` payload が
+/// 付いたため、bridge の型としては引数が必須。ただしカタログはこのパラメータを
+/// UI に出さない（[kVisionFilterCatalog] の doc コメント参照。GPU 経路が
+/// field_loss_mode を無視するため）ので、ここでは [VisionFieldLossMode.darken] を
+/// 固定値として渡す。
+final Map<VisionFilter, String> _kCatalogIdByFixedVisionInstance = {
   const VisionFilter.protanopia(): 'protanopia',
   const VisionFilter.deuteranopia(): 'deuteranopia',
   const VisionFilter.tritanopia(): 'tritanopia',
@@ -812,4 +766,4 @@ final Map<VisionFilter, String> _kCatalogIdByParamlessVision = {
 /// 体験プリセット (#19) が `Experience.vision` を [VisionFilterState.select] へ橋渡し
 /// するのに使う。payload を持つフィルタ（体験プリセットでは未使用）は null を返す。
 String? visionFilterCatalogId(VisionFilter filter) =>
-    _kCatalogIdByParamlessVision[filter];
+    _kCatalogIdByFixedVisionInstance[filter];

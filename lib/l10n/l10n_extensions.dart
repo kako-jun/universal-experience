@@ -228,12 +228,6 @@ String visionParamLabel(AppLocalizations l10n, String labelKey) {
       return l10n.paramHemianopiaSideLeft;
     case 'param.hemianopia.side.right':
       return l10n.paramHemianopiaSideRight;
-    case 'param.field_loss_mode':
-      return l10n.paramFieldLossMode;
-    case 'param.field_loss_mode.darken':
-      return l10n.paramFieldLossModeDarken;
-    case 'param.field_loss_mode.blur':
-      return l10n.paramFieldLossModeBlur;
     case 'param.cataract.seed':
       return l10n.paramCataractSeed;
     case 'param.floaters.seed':
