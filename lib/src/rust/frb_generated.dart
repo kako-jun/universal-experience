@@ -407,6 +407,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  VisionFieldLossMode dco_decode_vision_field_loss_mode(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return VisionFieldLossMode.values[raw as int];
+  }
+
+  @protected
   VisionFilter dco_decode_vision_filter(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     switch (raw[0]) {
@@ -433,15 +439,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       case 9:
         return VisionFilter_Glaucoma(
           mode: dco_decode_vision_glaucoma_mode(raw[1]),
+          fieldLossMode: dco_decode_vision_field_loss_mode(raw[2]),
         );
       case 10:
-        return const VisionFilter_MacularDegeneration();
+        return VisionFilter_MacularDegeneration(
+          fieldLossMode: dco_decode_vision_field_loss_mode(raw[1]),
+        );
       case 11:
         return VisionFilter_Hemianopia(
           side: dco_decode_f_32(raw[1]),
+          fieldLossMode: dco_decode_vision_field_loss_mode(raw[2]),
         );
       case 12:
-        return const VisionFilter_TunnelVision();
+        return VisionFilter_TunnelVision(
+          fieldLossMode: dco_decode_vision_field_loss_mode(raw[1]),
+        );
       case 13:
         return VisionFilter_Cataract(
           seed: dco_decode_u_64(raw[1]),
@@ -704,6 +716,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  VisionFieldLossMode sse_decode_vision_field_loss_mode(
+      SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return VisionFieldLossMode.values[inner];
+  }
+
+  @protected
   VisionFilter sse_decode_vision_filter(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -730,14 +750,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         return VisionFilter_Astigmatism(axisDeg: var_axisDeg);
       case 9:
         var var_mode = sse_decode_vision_glaucoma_mode(deserializer);
-        return VisionFilter_Glaucoma(mode: var_mode);
+        var var_fieldLossMode = sse_decode_vision_field_loss_mode(deserializer);
+        return VisionFilter_Glaucoma(
+            mode: var_mode, fieldLossMode: var_fieldLossMode);
       case 10:
-        return const VisionFilter_MacularDegeneration();
+        var var_fieldLossMode = sse_decode_vision_field_loss_mode(deserializer);
+        return VisionFilter_MacularDegeneration(
+            fieldLossMode: var_fieldLossMode);
       case 11:
         var var_side = sse_decode_f_32(deserializer);
-        return VisionFilter_Hemianopia(side: var_side);
+        var var_fieldLossMode = sse_decode_vision_field_loss_mode(deserializer);
+        return VisionFilter_Hemianopia(
+            side: var_side, fieldLossMode: var_fieldLossMode);
       case 12:
-        return const VisionFilter_TunnelVision();
+        var var_fieldLossMode = sse_decode_vision_field_loss_mode(deserializer);
+        return VisionFilter_TunnelVision(fieldLossMode: var_fieldLossMode);
       case 13:
         var var_seed = sse_decode_u_64(deserializer);
         return VisionFilter_Cataract(seed: var_seed);
@@ -855,6 +882,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   int cst_encode_urgency(Urgency raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return cst_encode_i_32(raw.index);
+  }
+
+  @protected
+  int cst_encode_vision_field_loss_mode(VisionFieldLossMode raw) {
     // Codec=Cst (C-struct based), see doc to use other codecs
     return cst_encode_i_32(raw.index);
   }
@@ -1041,6 +1074,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_vision_field_loss_mode(
+      VisionFieldLossMode self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
   void sse_encode_vision_filter(VisionFilter self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     switch (self) {
@@ -1063,16 +1103,26 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       case VisionFilter_Astigmatism(axisDeg: final axisDeg):
         sse_encode_i_32(8, serializer);
         sse_encode_f_32(axisDeg, serializer);
-      case VisionFilter_Glaucoma(mode: final mode):
+      case VisionFilter_Glaucoma(
+          mode: final mode,
+          fieldLossMode: final fieldLossMode
+        ):
         sse_encode_i_32(9, serializer);
         sse_encode_vision_glaucoma_mode(mode, serializer);
-      case VisionFilter_MacularDegeneration():
+        sse_encode_vision_field_loss_mode(fieldLossMode, serializer);
+      case VisionFilter_MacularDegeneration(fieldLossMode: final fieldLossMode):
         sse_encode_i_32(10, serializer);
-      case VisionFilter_Hemianopia(side: final side):
+        sse_encode_vision_field_loss_mode(fieldLossMode, serializer);
+      case VisionFilter_Hemianopia(
+          side: final side,
+          fieldLossMode: final fieldLossMode
+        ):
         sse_encode_i_32(11, serializer);
         sse_encode_f_32(side, serializer);
-      case VisionFilter_TunnelVision():
+        sse_encode_vision_field_loss_mode(fieldLossMode, serializer);
+      case VisionFilter_TunnelVision(fieldLossMode: final fieldLossMode):
         sse_encode_i_32(12, serializer);
+        sse_encode_vision_field_loss_mode(fieldLossMode, serializer);
       case VisionFilter_Cataract(seed: final seed):
         sse_encode_i_32(13, serializer);
         sse_encode_u_64(seed, serializer);

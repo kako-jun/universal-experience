@@ -8,8 +8,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:freezed_annotation/freezed_annotation.dart' hide protected;
 part 'sensus_bridge.freezed.dart';
 
-// These functions are ignored because they are not marked as `pub`: `color_matrix_flat`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `to_sensus`, `to_sensus`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These functions are ignored because they are not marked as `pub`: `color_matrix_flat`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `to_sensus`, `to_sensus`, `to_sensus`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// 指定フィルタの GLSL ES 3.00 ソースを返す。
 ///
@@ -211,6 +211,26 @@ enum Urgency {
   ;
 }
 
+/// 視野欠損の表現モード。`sensus_core::vision::FieldLossMode` の FRB 公開ミラー。
+///
+/// `glaucoma` / `macular_degeneration` / `hemianopia` / `tunnel_vision` の 4 フィルタが
+/// 共通 payload として持つ（sensus 0.6, #171）。
+///
+/// **GPU（FragmentProgram）経路は `Darken` 相当のみ**: `shaders::glaucoma_uniforms` /
+/// `macular_degeneration_uniforms` / `hemianopia_uniforms` / `tunnel_vision_uniforms` は
+/// `field_loss_mode` を引数に取らない（GLSL 側が Blur 未対応のため）。よって
+/// [`vision_uniforms`] がこの4フィルタに対して返す uniform は `field_loss_mode` の
+/// 選択に関わらず常に Darken 相当の見え方になる。`Blur` を実際に反映できるのは
+/// CPU 経路（[`apply_vision_cpu_rgba8`] 経由で `sensus_core::apply`）のみ。
+enum VisionFieldLossMode {
+  /// 既定・後方互換: 欠損部を黒方向へ暗転させる。GPU/CPU 両経路で有効。
+  darken,
+
+  /// 欠損部を disk blur + 彩度低下で表現する（VIP-Sim mip 方式相当）。CPU 経路のみ有効。
+  blur,
+  ;
+}
+
 @freezed
 sealed class VisionFilter with _$VisionFilter {
   const VisionFilter._();
@@ -244,22 +264,29 @@ sealed class VisionFilter with _$VisionFilter {
     required double axisDeg,
   }) = VisionFilter_Astigmatism;
 
-  /// 緑内障。`mode`: 暗点モード。
+  /// 緑内障。`mode`: 暗点モード。`field_loss_mode`: 表現モード（GPU は Darken 相当のみ、
+  /// [`VisionFieldLossMode`] 参照）。
   const factory VisionFilter.glaucoma({
     required VisionGlaucomaMode mode,
+    required VisionFieldLossMode fieldLossMode,
   }) = VisionFilter_Glaucoma;
 
-  /// 加齢黄斑変性。
-  const factory VisionFilter.macularDegeneration() =
-      VisionFilter_MacularDegeneration;
+  /// 加齢黄斑変性。`field_loss_mode`: 表現モード（GPU は Darken 相当のみ）。
+  const factory VisionFilter.macularDegeneration({
+    required VisionFieldLossMode fieldLossMode,
+  }) = VisionFilter_MacularDegeneration;
 
-  /// 半盲。`side`: 0.0 = 左視野消失, 1.0 = 右視野消失。
+  /// 半盲。`side`: 0.0 = 左視野消失, 1.0 = 右視野消失。`field_loss_mode`: 表現モード
+  /// （GPU は Darken 相当のみ）。
   const factory VisionFilter.hemianopia({
     required double side,
+    required VisionFieldLossMode fieldLossMode,
   }) = VisionFilter_Hemianopia;
 
-  /// 視野狭窄（トンネル視）。
-  const factory VisionFilter.tunnelVision() = VisionFilter_TunnelVision;
+  /// 視野狭窄（トンネル視）。`field_loss_mode`: 表現モード（GPU は Darken 相当のみ）。
+  const factory VisionFilter.tunnelVision({
+    required VisionFieldLossMode fieldLossMode,
+  }) = VisionFilter_TunnelVision;
 
   /// 白内障。`seed`: 散乱グレア生成シード。
   const factory VisionFilter.cataract({

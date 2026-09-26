@@ -208,6 +208,16 @@ impl CstDecode<crate::api::sensus_bridge::Urgency> for i32 {
         }
     }
 }
+impl CstDecode<crate::api::sensus_bridge::VisionFieldLossMode> for i32 {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    fn cst_decode(self) -> crate::api::sensus_bridge::VisionFieldLossMode {
+        match self {
+            0 => crate::api::sensus_bridge::VisionFieldLossMode::Darken,
+            1 => crate::api::sensus_bridge::VisionFieldLossMode::Blur,
+            _ => unreachable!("Invalid variant for VisionFieldLossMode: {}", self),
+        }
+    }
+}
 impl CstDecode<crate::api::sensus_bridge::VisionGlaucomaMode> for i32 {
     // Codec=Cst (C-struct based), see doc to use other codecs
     fn cst_decode(self) -> crate::api::sensus_bridge::VisionGlaucomaMode {
@@ -441,6 +451,18 @@ impl SseDecode for crate::api::sensus_bridge::Urgency {
     }
 }
 
+impl SseDecode for crate::api::sensus_bridge::VisionFieldLossMode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::sensus_bridge::VisionFieldLossMode::Darken,
+            1 => crate::api::sensus_bridge::VisionFieldLossMode::Blur,
+            _ => unreachable!("Invalid variant for VisionFieldLossMode: {}", inner),
+        };
+    }
+}
+
 impl SseDecode for crate::api::sensus_bridge::VisionFilter {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -479,17 +501,35 @@ impl SseDecode for crate::api::sensus_bridge::VisionFilter {
             9 => {
                 let mut var_mode =
                     <crate::api::sensus_bridge::VisionGlaucomaMode>::sse_decode(deserializer);
-                return crate::api::sensus_bridge::VisionFilter::Glaucoma { mode: var_mode };
+                let mut var_fieldLossMode =
+                    <crate::api::sensus_bridge::VisionFieldLossMode>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::VisionFilter::Glaucoma {
+                    mode: var_mode,
+                    field_loss_mode: var_fieldLossMode,
+                };
             }
             10 => {
-                return crate::api::sensus_bridge::VisionFilter::MacularDegeneration;
+                let mut var_fieldLossMode =
+                    <crate::api::sensus_bridge::VisionFieldLossMode>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::VisionFilter::MacularDegeneration {
+                    field_loss_mode: var_fieldLossMode,
+                };
             }
             11 => {
                 let mut var_side = <f32>::sse_decode(deserializer);
-                return crate::api::sensus_bridge::VisionFilter::Hemianopia { side: var_side };
+                let mut var_fieldLossMode =
+                    <crate::api::sensus_bridge::VisionFieldLossMode>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::VisionFilter::Hemianopia {
+                    side: var_side,
+                    field_loss_mode: var_fieldLossMode,
+                };
             }
             12 => {
-                return crate::api::sensus_bridge::VisionFilter::TunnelVision;
+                let mut var_fieldLossMode =
+                    <crate::api::sensus_bridge::VisionFieldLossMode>::sse_decode(deserializer);
+                return crate::api::sensus_bridge::VisionFilter::TunnelVision {
+                    field_loss_mode: var_fieldLossMode,
+                };
             }
             13 => {
                 let mut var_seed = <u64>::sse_decode(deserializer);
@@ -732,6 +772,27 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::sensus_bridge::Urgency>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::sensus_bridge::VisionFieldLossMode {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Darken => 0.into_dart(),
+            Self::Blur => 1.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::sensus_bridge::VisionFieldLossMode
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::sensus_bridge::VisionFieldLossMode>
+    for crate::api::sensus_bridge::VisionFieldLossMode
+{
+    fn into_into_dart(self) -> crate::api::sensus_bridge::VisionFieldLossMode {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::sensus_bridge::VisionFilter {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         match self {
@@ -746,16 +807,30 @@ impl flutter_rust_bridge::IntoDart for crate::api::sensus_bridge::VisionFilter {
             crate::api::sensus_bridge::VisionFilter::Astigmatism { axis_deg } => {
                 [8.into_dart(), axis_deg.into_into_dart().into_dart()].into_dart()
             }
-            crate::api::sensus_bridge::VisionFilter::Glaucoma { mode } => {
-                [9.into_dart(), mode.into_into_dart().into_dart()].into_dart()
+            crate::api::sensus_bridge::VisionFilter::Glaucoma {
+                mode,
+                field_loss_mode,
+            } => [
+                9.into_dart(),
+                mode.into_into_dart().into_dart(),
+                field_loss_mode.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
+            crate::api::sensus_bridge::VisionFilter::MacularDegeneration { field_loss_mode } => {
+                [10.into_dart(), field_loss_mode.into_into_dart().into_dart()].into_dart()
             }
-            crate::api::sensus_bridge::VisionFilter::MacularDegeneration => {
-                [10.into_dart()].into_dart()
+            crate::api::sensus_bridge::VisionFilter::Hemianopia {
+                side,
+                field_loss_mode,
+            } => [
+                11.into_dart(),
+                side.into_into_dart().into_dart(),
+                field_loss_mode.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
+            crate::api::sensus_bridge::VisionFilter::TunnelVision { field_loss_mode } => {
+                [12.into_dart(), field_loss_mode.into_into_dart().into_dart()].into_dart()
             }
-            crate::api::sensus_bridge::VisionFilter::Hemianopia { side } => {
-                [11.into_dart(), side.into_into_dart().into_dart()].into_dart()
-            }
-            crate::api::sensus_bridge::VisionFilter::TunnelVision => [12.into_dart()].into_dart(),
             crate::api::sensus_bridge::VisionFilter::Cataract { seed } => {
                 [13.into_dart(), seed.into_into_dart().into_dart()].into_dart()
             }
@@ -1064,6 +1139,22 @@ impl SseEncode for crate::api::sensus_bridge::Urgency {
     }
 }
 
+impl SseEncode for crate::api::sensus_bridge::VisionFieldLossMode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::sensus_bridge::VisionFieldLossMode::Darken => 0,
+                crate::api::sensus_bridge::VisionFieldLossMode::Blur => 1,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
 impl SseEncode for crate::api::sensus_bridge::VisionFilter {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1096,19 +1187,41 @@ impl SseEncode for crate::api::sensus_bridge::VisionFilter {
                 <i32>::sse_encode(8, serializer);
                 <f32>::sse_encode(axis_deg, serializer);
             }
-            crate::api::sensus_bridge::VisionFilter::Glaucoma { mode } => {
+            crate::api::sensus_bridge::VisionFilter::Glaucoma {
+                mode,
+                field_loss_mode,
+            } => {
                 <i32>::sse_encode(9, serializer);
                 <crate::api::sensus_bridge::VisionGlaucomaMode>::sse_encode(mode, serializer);
+                <crate::api::sensus_bridge::VisionFieldLossMode>::sse_encode(
+                    field_loss_mode,
+                    serializer,
+                );
             }
-            crate::api::sensus_bridge::VisionFilter::MacularDegeneration => {
+            crate::api::sensus_bridge::VisionFilter::MacularDegeneration { field_loss_mode } => {
                 <i32>::sse_encode(10, serializer);
+                <crate::api::sensus_bridge::VisionFieldLossMode>::sse_encode(
+                    field_loss_mode,
+                    serializer,
+                );
             }
-            crate::api::sensus_bridge::VisionFilter::Hemianopia { side } => {
+            crate::api::sensus_bridge::VisionFilter::Hemianopia {
+                side,
+                field_loss_mode,
+            } => {
                 <i32>::sse_encode(11, serializer);
                 <f32>::sse_encode(side, serializer);
+                <crate::api::sensus_bridge::VisionFieldLossMode>::sse_encode(
+                    field_loss_mode,
+                    serializer,
+                );
             }
-            crate::api::sensus_bridge::VisionFilter::TunnelVision => {
+            crate::api::sensus_bridge::VisionFilter::TunnelVision { field_loss_mode } => {
                 <i32>::sse_encode(12, serializer);
+                <crate::api::sensus_bridge::VisionFieldLossMode>::sse_encode(
+                    field_loss_mode,
+                    serializer,
+                );
             }
             crate::api::sensus_bridge::VisionFilter::Cataract { seed } => {
                 <i32>::sse_encode(13, serializer);
@@ -1393,16 +1506,28 @@ mod io {
                     let ans = unsafe { self.kind.Glaucoma };
                     crate::api::sensus_bridge::VisionFilter::Glaucoma {
                         mode: ans.mode.cst_decode(),
+                        field_loss_mode: ans.field_loss_mode.cst_decode(),
                     }
                 }
-                10 => crate::api::sensus_bridge::VisionFilter::MacularDegeneration,
+                10 => {
+                    let ans = unsafe { self.kind.MacularDegeneration };
+                    crate::api::sensus_bridge::VisionFilter::MacularDegeneration {
+                        field_loss_mode: ans.field_loss_mode.cst_decode(),
+                    }
+                }
                 11 => {
                     let ans = unsafe { self.kind.Hemianopia };
                     crate::api::sensus_bridge::VisionFilter::Hemianopia {
                         side: ans.side.cst_decode(),
+                        field_loss_mode: ans.field_loss_mode.cst_decode(),
                     }
                 }
-                12 => crate::api::sensus_bridge::VisionFilter::TunnelVision,
+                12 => {
+                    let ans = unsafe { self.kind.TunnelVision };
+                    crate::api::sensus_bridge::VisionFilter::TunnelVision {
+                        field_loss_mode: ans.field_loss_mode.cst_decode(),
+                    }
+                }
                 13 => {
                     let ans = unsafe { self.kind.Cataract };
                     crate::api::sensus_bridge::VisionFilter::Cataract {
@@ -1722,7 +1847,9 @@ mod io {
     pub union VisionFilterKind {
         Astigmatism: wire_cst_VisionFilter_Astigmatism,
         Glaucoma: wire_cst_VisionFilter_Glaucoma,
+        MacularDegeneration: wire_cst_VisionFilter_MacularDegeneration,
         Hemianopia: wire_cst_VisionFilter_Hemianopia,
+        TunnelVision: wire_cst_VisionFilter_TunnelVision,
         Cataract: wire_cst_VisionFilter_Cataract,
         Floaters: wire_cst_VisionFilter_Floaters,
         Diplopia: wire_cst_VisionFilter_Diplopia,
@@ -1742,11 +1869,23 @@ mod io {
     #[derive(Clone, Copy)]
     pub struct wire_cst_VisionFilter_Glaucoma {
         mode: i32,
+        field_loss_mode: i32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_VisionFilter_MacularDegeneration {
+        field_loss_mode: i32,
     }
     #[repr(C)]
     #[derive(Clone, Copy)]
     pub struct wire_cst_VisionFilter_Hemianopia {
         side: f32,
+        field_loss_mode: i32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_VisionFilter_TunnelVision {
+        field_loss_mode: i32,
     }
     #[repr(C)]
     #[derive(Clone, Copy)]
@@ -1941,12 +2080,18 @@ mod web {
                 },
                 9 => crate::api::sensus_bridge::VisionFilter::Glaucoma {
                     mode: self_.get(1).cst_decode(),
+                    field_loss_mode: self_.get(2).cst_decode(),
                 },
-                10 => crate::api::sensus_bridge::VisionFilter::MacularDegeneration,
+                10 => crate::api::sensus_bridge::VisionFilter::MacularDegeneration {
+                    field_loss_mode: self_.get(1).cst_decode(),
+                },
                 11 => crate::api::sensus_bridge::VisionFilter::Hemianopia {
                     side: self_.get(1).cst_decode(),
+                    field_loss_mode: self_.get(2).cst_decode(),
                 },
-                12 => crate::api::sensus_bridge::VisionFilter::TunnelVision,
+                12 => crate::api::sensus_bridge::VisionFilter::TunnelVision {
+                    field_loss_mode: self_.get(1).cst_decode(),
+                },
                 13 => crate::api::sensus_bridge::VisionFilter::Cataract {
                     seed: self_.get(1).cst_decode(),
                 },
@@ -2052,6 +2197,14 @@ mod web {
     {
         // Codec=Cst (C-struct based), see doc to use other codecs
         fn cst_decode(self) -> crate::api::sensus_bridge::Urgency {
+            (self.unchecked_into_f64() as i32).cst_decode()
+        }
+    }
+    impl CstDecode<crate::api::sensus_bridge::VisionFieldLossMode>
+        for flutter_rust_bridge::for_generated::wasm_bindgen::JsValue
+    {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> crate::api::sensus_bridge::VisionFieldLossMode {
             (self.unchecked_into_f64() as i32).cst_decode()
         }
     }
