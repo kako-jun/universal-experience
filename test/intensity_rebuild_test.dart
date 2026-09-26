@@ -60,6 +60,14 @@ void main() {
     var settingsNotified = 0;
     settings.addListener(() => settingsNotified++);
 
+    final intensityBefore = filterService.intensity;
+    // ドラッグ前後で MaterialApp の Element/Widget インスタンスが同一のままか
+    // （= 作り直されていないか）を確認する。単に見た目が変わらないだけでは
+    // 「再構築されていない」ことの証明にならないため、インスタンス同一性
+    // （identical）で見る。
+    final materialAppBefore =
+        tester.widget<MaterialApp>(find.byType(MaterialApp));
+
     // 複数回「動かす」= 複数目盛りぶんドラッグする。
     await tester.drag(sliderFinder, const Offset(60, 0));
     await tester.pump();
@@ -73,11 +81,29 @@ void main() {
     // ことまで確認する。
     await tester.pump(const Duration(milliseconds: 400));
 
+    // ドラッグが実際に intensity を動かしたこと自体を確認する（動かせていない
+    // 操作なら、notify が 0 であることに意味がない）。
+    final intensityAfter = filterService.intensity;
+    expect(
+      intensityAfter,
+      isNot(equals(intensityBefore)),
+      reason: 'ドラッグ操作そのものが intensity を実際に変えていることの前提確認',
+    );
+
     expect(
       settingsNotified,
       0,
       reason: 'intensity の変更は FilterService 側だけで完結し、SettingsService '
           '（延いては MaterialApp の Consumer）へは伝播しないはず',
+    );
+
+    final materialAppAfter =
+        tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(
+      identical(materialAppAfter, materialAppBefore),
+      isTrue,
+      reason: 'MaterialApp の Consumer<SettingsService> が再構築されていれば、'
+          '新しい MaterialApp インスタンスに差し替わっているはず',
     );
   });
 }

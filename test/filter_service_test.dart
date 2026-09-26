@@ -238,7 +238,7 @@ void main() {
       a.setIntensity(0.3);
       a.applyFilter(ColorVisionType.deuteranomaly);
       a.setIntensity(0.9);
-      await a.debugFlushPersist();
+      await a.flush();
 
       final b = FilterService();
       await b.load();
@@ -269,32 +269,22 @@ void main() {
       expect(b.intensity, 0.3);
     });
 
-    test('旧単一 intensity キー（settings.intensity）は、load 時に指定したタイプへ一度だけ移行される',
-        () async {
+    test(
+        '旧単一 intensity キーが 1.0 で残っていても読まれない。load 後は protanomaly が '
+        'recommendedStrength になり、旧キーも消えている（#57 レビュー M1: 移行は行わない）', () async {
       SharedPreferences.setMockInitialValues({
-        FilterService.legacyIntensityKey: 0.42,
+        FilterService.legacyIntensityKey: 1.0,
       });
       final service = FilterService();
-      await service.load(migrateLegacyIntensityFor: ColorVisionType.protanopia);
+      await service.load();
 
-      service.applyFilter(ColorVisionType.protanopia);
-      expect(service.intensity, 0.42);
+      service.applyFilter(ColorVisionType.protanomaly);
+      // 旧キーの 1.0 に汚染されず、protanomaly の推奨強度になる
+      // （汚染されると #52 監査 must のバグ＝protanopia と同じ見た目に戻ってしまう）。
+      expect(service.intensity, kAnomalyDefaultSeverity);
 
-      // 移行先ではない他タイプは影響を受けない（recommendedStrength のまま）。
-      service.applyFilter(ColorVisionType.deuteranopia);
-      expect(service.intensity, 1.0);
-    });
-
-    test('per-type の保存が既にあれば旧単一キーは無視される', () async {
-      SharedPreferences.setMockInitialValues({
-        FilterService.keyIntensityByType: '{"protanopia":0.55}',
-        FilterService.legacyIntensityKey: 0.1,
-      });
-      final service = FilterService();
-      await service.load(migrateLegacyIntensityFor: ColorVisionType.protanopia);
-
-      service.applyFilter(ColorVisionType.protanopia);
-      expect(service.intensity, 0.55);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey(FilterService.legacyIntensityKey), isFalse);
     });
 
     test('範囲外の保存値は 0..1 に clamp して復元する', () async {
@@ -309,6 +299,86 @@ void main() {
       expect(service.intensity, 1.0);
       service.applyFilter(ColorVisionType.tritanopia);
       expect(service.intensity, 0.0);
+    });
+
+    test('壊れた JSON（構文エラー）は無視され、recommendedStrength にフォールバックする', () async {
+      SharedPreferences.setMockInitialValues({
+        FilterService.keyIntensityByType: '{broken',
+      });
+      final service = FilterService();
+      await service.load();
+
+      service.applyFilter(ColorVisionType.protanomaly);
+      expect(service.intensity, kAnomalyDefaultSeverity);
+    });
+
+    test('JSON として妥当でも期待する形（オブジェクト）でなければ無視される（配列）', () async {
+      SharedPreferences.setMockInitialValues({
+        FilterService.keyIntensityByType: '[1,2]',
+      });
+      final service = FilterService();
+      await service.load();
+
+      service.applyFilter(ColorVisionType.protanopia);
+      expect(service.intensity, 1.0);
+    });
+
+    test('個々の値の型が不正なエントリだけ無視し、他の妥当なエントリは反映する', () async {
+      SharedPreferences.setMockInitialValues({
+        FilterService.keyIntensityByType:
+            '{"foo":0.3,"protanopia":"x","deuteranopia":0.4}',
+      });
+      final service = FilterService();
+      await service.load();
+
+      // "foo" は ColorVisionType に存在しないキーなので無視。
+      // "protanopia" は値が文字列（num でない）ので無視 → recommendedStrength。
+      service.applyFilter(ColorVisionType.protanopia);
+      expect(service.intensity, 1.0);
+      // "deuteranopia" は妥当な値なので反映される。
+      service.applyFilter(ColorVisionType.deuteranopia);
+      expect(service.intensity, 0.4);
+    });
+  });
+
+  group('flush（#57）', () {
+    test('flush は保留中のデバウンス書き込みを実タイマーの発火を待たず確定させる', () async {
+      SharedPreferences.setMockInitialValues({});
+      final service = FilterService(); // 既定 300ms デバウンス
+      await service.load();
+      service.applyFilter(ColorVisionType.protanopia);
+      service.setIntensity(0.42);
+
+      // デバウンスの実タイマーが発火するには早すぎるタイミングで flush する。
+      await service.flush();
+
+      final prefs = await SharedPreferences.getInstance();
+      final json = prefs.getString(FilterService.keyIntensityByType);
+      expect(json, contains('"protanopia":0.42'));
+    });
+
+    test('保留中の書き込みが無い状態で flush しても例外にならない', () async {
+      SharedPreferences.setMockInitialValues({});
+      final service = FilterService();
+      await service.load();
+      await service.flush();
+    });
+
+    test('dispose 時に保留中の書き込みがあれば永続化される', () async {
+      SharedPreferences.setMockInitialValues({});
+      final service = FilterService();
+      await service.load();
+      service.applyFilter(ColorVisionType.protanopia);
+      service.setIntensity(0.77);
+
+      service.dispose();
+      // dispose() 自体は同期 API のため、内部の unawaited(_persist()) が
+      // マイクロタスクとして完了するのを待つ。
+      await Future<void>.delayed(Duration.zero);
+
+      final prefs = await SharedPreferences.getInstance();
+      final json = prefs.getString(FilterService.keyIntensityByType);
+      expect(json, contains('"protanopia":0.77'));
     });
   });
 }
