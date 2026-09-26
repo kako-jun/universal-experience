@@ -65,6 +65,43 @@ impl VisionGlaucomaMode {
     }
 }
 
+/// 視野欠損の表現モード。`sensus_core::vision::FieldLossMode` の FRB 公開ミラー。
+///
+/// `glaucoma` / `macular_degeneration` / `hemianopia` / `tunnel_vision` の 4 フィルタが
+/// 共通 payload として持つ（sensus 0.6, #171）。
+///
+/// **GPU（FragmentProgram）経路は `Darken` 相当のみ**: `shaders::glaucoma_uniforms` /
+/// `macular_degeneration_uniforms` / `hemianopia_uniforms` / `tunnel_vision_uniforms` は
+/// `field_loss_mode` を引数に取らない（GLSL 側が Blur 未対応のため）。よって
+/// [`vision_uniforms`] がこの4フィルタに対して返す uniform は `field_loss_mode` の
+/// 選択に関わらず常に Darken 相当の見え方になる。`Blur` を実際に反映できるのは
+/// CPU 経路（[`apply_vision_cpu_rgba8`] 経由で `sensus_core::apply`）のみ。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VisionFieldLossMode {
+    /// 既定・後方互換: 欠損部を黒方向へ暗転させる。GPU/CPU 両経路で有効。
+    Darken,
+    /// 欠損部を disk blur + 彩度低下で表現する（VIP-Sim mip 方式相当）。CPU 経路のみ有効。
+    Blur,
+}
+
+impl VisionFieldLossMode {
+    fn to_sensus(self) -> sensus_core::vision::FieldLossMode {
+        use sensus_core::vision::FieldLossMode as M;
+        match self {
+            VisionFieldLossMode::Darken => M::Darken,
+            VisionFieldLossMode::Blur => M::Blur,
+        }
+    }
+
+    fn from_sensus(mode: sensus_core::vision::FieldLossMode) -> Self {
+        use sensus_core::vision::FieldLossMode as M;
+        match mode {
+            M::Darken => VisionFieldLossMode::Darken,
+            M::Blur => VisionFieldLossMode::Blur,
+        }
+    }
+}
+
 /// Dart 側で扱う vision フィルタ。`sensus_core::Filter` の vision バリアント全種を
 /// 網羅する。payload を持つフィルタは Rust enum のフィールド付きバリアントにして
 /// あり、FRB が Dart の sealed class 風コードを生成する。
@@ -96,14 +133,26 @@ pub enum VisionFilter {
     Astigmatism { axis_deg: f32 },
 
     // --- 視野 ---
-    /// 緑内障。`mode`: 暗点モード。
-    Glaucoma { mode: VisionGlaucomaMode },
-    /// 加齢黄斑変性。
-    MacularDegeneration,
-    /// 半盲。`side`: 0.0 = 左視野消失, 1.0 = 右視野消失。
-    Hemianopia { side: f32 },
-    /// 視野狭窄（トンネル視）。
-    TunnelVision,
+    /// 緑内障。`mode`: 暗点モード。`field_loss_mode`: 表現モード（GPU は Darken 相当のみ、
+    /// [`VisionFieldLossMode`] 参照）。
+    Glaucoma {
+        mode: VisionGlaucomaMode,
+        field_loss_mode: VisionFieldLossMode,
+    },
+    /// 加齢黄斑変性。`field_loss_mode`: 表現モード（GPU は Darken 相当のみ）。
+    MacularDegeneration {
+        field_loss_mode: VisionFieldLossMode,
+    },
+    /// 半盲。`side`: 0.0 = 左視野消失, 1.0 = 右視野消失。`field_loss_mode`: 表現モード
+    /// （GPU は Darken 相当のみ）。
+    Hemianopia {
+        side: f32,
+        field_loss_mode: VisionFieldLossMode,
+    },
+    /// 視野狭窄（トンネル視）。`field_loss_mode`: 表現モード（GPU は Darken 相当のみ）。
+    TunnelVision {
+        field_loss_mode: VisionFieldLossMode,
+    },
 
     // --- 光 / 透明度 ---
     /// 白内障。`seed`: 散乱グレア生成シード。
@@ -183,12 +232,26 @@ impl VisionFilter {
             VisionFilter::Hyperopia => F::Hyperopia,
             VisionFilter::Presbyopia => F::Presbyopia,
             VisionFilter::Astigmatism { axis_deg } => F::Astigmatism { axis_deg },
-            VisionFilter::Glaucoma { mode } => F::Glaucoma {
+            VisionFilter::Glaucoma {
+                mode,
+                field_loss_mode,
+            } => F::Glaucoma {
                 mode: mode.to_sensus(),
+                field_loss_mode: field_loss_mode.to_sensus(),
             },
-            VisionFilter::MacularDegeneration => F::MacularDegeneration,
-            VisionFilter::Hemianopia { side } => F::Hemianopia { side },
-            VisionFilter::TunnelVision => F::TunnelVision,
+            VisionFilter::MacularDegeneration { field_loss_mode } => F::MacularDegeneration {
+                field_loss_mode: field_loss_mode.to_sensus(),
+            },
+            VisionFilter::Hemianopia {
+                side,
+                field_loss_mode,
+            } => F::Hemianopia {
+                side,
+                field_loss_mode: field_loss_mode.to_sensus(),
+            },
+            VisionFilter::TunnelVision { field_loss_mode } => F::TunnelVision {
+                field_loss_mode: field_loss_mode.to_sensus(),
+            },
             VisionFilter::Cataract { seed } => F::Cataract { seed },
             VisionFilter::Floaters {
                 seed,
@@ -263,12 +326,26 @@ impl VisionFilter {
             F::Hyperopia => VisionFilter::Hyperopia,
             F::Presbyopia => VisionFilter::Presbyopia,
             F::Astigmatism { axis_deg } => VisionFilter::Astigmatism { axis_deg },
-            F::Glaucoma { mode } => VisionFilter::Glaucoma {
+            F::Glaucoma {
+                mode,
+                field_loss_mode,
+            } => VisionFilter::Glaucoma {
                 mode: VisionGlaucomaMode::from_sensus(mode),
+                field_loss_mode: VisionFieldLossMode::from_sensus(field_loss_mode),
             },
-            F::MacularDegeneration => VisionFilter::MacularDegeneration,
-            F::Hemianopia { side } => VisionFilter::Hemianopia { side },
-            F::TunnelVision => VisionFilter::TunnelVision,
+            F::MacularDegeneration { field_loss_mode } => VisionFilter::MacularDegeneration {
+                field_loss_mode: VisionFieldLossMode::from_sensus(field_loss_mode),
+            },
+            F::Hemianopia {
+                side,
+                field_loss_mode,
+            } => VisionFilter::Hemianopia {
+                side,
+                field_loss_mode: VisionFieldLossMode::from_sensus(field_loss_mode),
+            },
+            F::TunnelVision { field_loss_mode } => VisionFilter::TunnelVision {
+                field_loss_mode: VisionFieldLossMode::from_sensus(field_loss_mode),
+            },
             F::Cataract { seed } => VisionFilter::Cataract { seed },
             F::Floaters {
                 seed,
@@ -348,9 +425,9 @@ pub fn vision_shader_glsl(filter: VisionFilter) -> String {
         VisionFilter::Presbyopia => shaders::presbyopia_glsl(),
         VisionFilter::Astigmatism { .. } => shaders::astigmatism_glsl(),
         VisionFilter::Glaucoma { .. } => shaders::glaucoma_glsl(),
-        VisionFilter::MacularDegeneration => shaders::macular_degeneration_glsl(),
+        VisionFilter::MacularDegeneration { .. } => shaders::macular_degeneration_glsl(),
         VisionFilter::Hemianopia { .. } => shaders::hemianopia_glsl(),
-        VisionFilter::TunnelVision => shaders::tunnel_vision_glsl(),
+        VisionFilter::TunnelVision { .. } => shaders::tunnel_vision_glsl(),
         VisionFilter::Cataract { .. } => shaders::cataract_glsl(),
         VisionFilter::Floaters { .. } => shaders::floaters_glsl(),
         VisionFilter::Photophobia => shaders::photophobia_glsl(),
@@ -432,22 +509,25 @@ pub fn vision_uniforms(
             let u = shaders::astigmatism_uniforms(strength, min_dim, axis_deg);
             vec![u.strength, u.radius_px, u.axis_deg, texel_x, texel_y]
         }
-        VisionFilter::Glaucoma { mode } => {
+        // field_loss_mode は GPU 経路では無視する（`shaders::*_uniforms` が引数に
+        // 取らないため常に Darken 相当。Blur を反映できるのは CPU 経路のみ。
+        // VisionFieldLossMode のモジュール doc 参照）。
+        VisionFilter::Glaucoma { mode, .. } => {
             let u = shaders::glaucoma_uniforms(strength, width, height, mode.to_sensus());
             vec![u.strength, u.aspect, u.mode as f32]
         }
-        VisionFilter::MacularDegeneration => {
+        VisionFilter::MacularDegeneration { .. } => {
             let u = shaders::macular_degeneration_uniforms(strength, width, height);
             vec![u.strength, u.aspect]
         }
-        VisionFilter::Hemianopia { side } => {
+        VisionFilter::Hemianopia { side, .. } => {
             // 公開 API 規約: 0.0=左欠損, 1.0=右欠損。frag の uSide は 1.0=右, -1.0=左。
             // shaders::hemianopia_uniforms は GLSL 内部値をそのまま渡すため、ここで変換する。
             let glsl_side = if side >= 0.5 { 1.0 } else { -1.0 };
             let u = shaders::hemianopia_uniforms(strength, glsl_side);
             vec![u.strength, u.side]
         }
-        VisionFilter::TunnelVision => {
+        VisionFilter::TunnelVision { .. } => {
             let u = shaders::tunnel_vision_uniforms(strength, width, height);
             vec![u.strength, u.aspect]
         }
@@ -651,8 +731,8 @@ pub fn vision_uniform_layout(filter: VisionFilter) -> Vec<String> {
             "uTexelSize.y",
         ],
         VisionFilter::Glaucoma { .. } => &["uStrength", "uAspect", "uMode"],
-        VisionFilter::MacularDegeneration
-        | VisionFilter::TunnelVision
+        VisionFilter::MacularDegeneration { .. }
+        | VisionFilter::TunnelVision { .. }
         | VisionFilter::Teichopsia => &["uStrength", "uAspect"],
         VisionFilter::Hemianopia { .. } => &["uStrength", "uSide"],
         VisionFilter::Cataract { .. } => &["uStrength", "uSeed", "uResolution.x", "uResolution.y"],
@@ -898,15 +978,19 @@ pub fn experiences() -> Vec<Experience> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     /// 全 vision バリアントを 1 ループで列挙するためのヘルパ。バリアントが増えたら
     /// ここに追加するだけで全網羅テストが拾う。payload 付きは代表値を入れる。
+    ///
+    /// `pub(crate)`: `shader_dump_gen.rs` の
+    /// `dump_targets_and_excluded_stems_cover_all_variants`（#56、ダンプ対象
+    /// フィルタ一覧の網羅性検証）が crate 内の別テストモジュールから参照する。
     // 新しい VisionFilter variant を追加したらこの配列にも足すこと（網羅テスト用）。
     // 本体の `vision_uniforms`/`vision_shader_glsl`/`to_sensus` は網羅 match なので、
     // variant 追加自体はコンパイルエラーで気付ける。
-    const ALL_FILTERS: [VisionFilter; 30] = [
+    pub(crate) const ALL_FILTERS: [VisionFilter; 30] = [
         VisionFilter::Protanopia,
         VisionFilter::Deuteranopia,
         VisionFilter::Tritanopia,
@@ -918,10 +1002,18 @@ mod tests {
         VisionFilter::Astigmatism { axis_deg: 45.0 },
         VisionFilter::Glaucoma {
             mode: VisionGlaucomaMode::Biarcuate,
+            field_loss_mode: VisionFieldLossMode::Darken,
         },
-        VisionFilter::MacularDegeneration,
-        VisionFilter::Hemianopia { side: 1.0 },
-        VisionFilter::TunnelVision,
+        VisionFilter::MacularDegeneration {
+            field_loss_mode: VisionFieldLossMode::Darken,
+        },
+        VisionFilter::Hemianopia {
+            side: 1.0,
+            field_loss_mode: VisionFieldLossMode::Darken,
+        },
+        VisionFilter::TunnelVision {
+            field_loss_mode: VisionFieldLossMode::Darken,
+        },
         VisionFilter::Cataract { seed: 7 },
         VisionFilter::Floaters {
             seed: 7,
@@ -1034,7 +1126,10 @@ mod tests {
         let inf = f32::INFINITY;
         let cases = [
             VisionFilter::Astigmatism { axis_deg: nan },
-            VisionFilter::Hemianopia { side: inf },
+            VisionFilter::Hemianopia {
+                side: inf,
+                field_loss_mode: VisionFieldLossMode::Darken,
+            },
             VisionFilter::Diplopia {
                 offset_x: nan,
                 offset_y: inf,
@@ -1172,6 +1267,7 @@ mod tests {
             },
             VisionFilter::Glaucoma {
                 mode: VisionGlaucomaMode::Vignette,
+                field_loss_mode: VisionFieldLossMode::Darken,
             },
         ] {
             let a = vision_uniforms(f, 0.7, 0.0, 256, 128);
@@ -1190,7 +1286,11 @@ mod tests {
             (VisionGlaucomaMode::Biarcuate, 3.0),
         ];
         for (mode, expected) in cases {
-            let u = vision_uniforms(VisionFilter::Glaucoma { mode }, 1.0, 0.0, 64, 64);
+            let f = VisionFilter::Glaucoma {
+                mode,
+                field_loss_mode: VisionFieldLossMode::Darken,
+            };
+            let u = vision_uniforms(f, 1.0, 0.0, 64, 64);
             // layout: [uStrength, uAspect, uMode]
             assert_eq!(u[2], expected, "{mode:?}");
         }
@@ -1199,11 +1299,172 @@ mod tests {
     /// Hemianopia: 公開 side(0=左,1=右) → frag uSide(-1=左,1=右) の変換。
     #[test]
     fn hemianopia_side_conversion() {
-        let right = vision_uniforms(VisionFilter::Hemianopia { side: 1.0 }, 1.0, 0.0, 64, 64);
-        let left = vision_uniforms(VisionFilter::Hemianopia { side: 0.0 }, 1.0, 0.0, 64, 64);
+        let right = vision_uniforms(
+            VisionFilter::Hemianopia {
+                side: 1.0,
+                field_loss_mode: VisionFieldLossMode::Darken,
+            },
+            1.0,
+            0.0,
+            64,
+            64,
+        );
+        let left = vision_uniforms(
+            VisionFilter::Hemianopia {
+                side: 0.0,
+                field_loss_mode: VisionFieldLossMode::Darken,
+            },
+            1.0,
+            0.0,
+            64,
+            64,
+        );
         // layout: [uStrength, uSide]
         assert_eq!(right[1], 1.0, "side=1.0(右) → uSide=1.0");
         assert_eq!(left[1], -1.0, "side=0.0(左) → uSide=-1.0");
+    }
+
+    /// VisionFieldLossMode（Darken/Blur）が to_sensus/from_sensus で 1 対 1 対応する
+    /// （4 フィルタ全てで、payload 中の field_loss_mode が往復すること込み）。
+    #[test]
+    fn field_loss_mode_roundtrips_darken_and_blur() {
+        for field_loss_mode in [VisionFieldLossMode::Darken, VisionFieldLossMode::Blur] {
+            let cases = [
+                VisionFilter::Glaucoma {
+                    mode: VisionGlaucomaMode::Vignette,
+                    field_loss_mode,
+                },
+                VisionFilter::MacularDegeneration { field_loss_mode },
+                VisionFilter::Hemianopia {
+                    side: 0.0,
+                    field_loss_mode,
+                },
+                VisionFilter::TunnelVision { field_loss_mode },
+            ];
+            for f in cases {
+                let back = VisionFilter::from_sensus(f.to_sensus());
+                assert_eq!(back, Some(f), "{f:?}: field_loss_mode did not roundtrip");
+            }
+        }
+    }
+
+    /// (名前, field_loss_mode を受けて VisionFilter を組み立てるコンストラクタ)。
+    type FieldLossModeFilterCtor = (&'static str, fn(VisionFieldLossMode) -> VisionFilter);
+
+    /// field_loss_mode を持つ 4 フィルタの構築ヘルパ一覧。S6 の a/b 両テストで共有する。
+    fn field_loss_mode_filters() -> [FieldLossModeFilterCtor; 4] {
+        [
+            ("glaucoma", |m| VisionFilter::Glaucoma {
+                mode: VisionGlaucomaMode::Vignette,
+                field_loss_mode: m,
+            }),
+            ("macular_degeneration", |m| {
+                VisionFilter::MacularDegeneration { field_loss_mode: m }
+            }),
+            ("hemianopia", |m| VisionFilter::Hemianopia {
+                side: 1.0,
+                field_loss_mode: m,
+            }),
+            ("tunnel_vision", |m| VisionFilter::TunnelVision {
+                field_loss_mode: m,
+            }),
+        ]
+    }
+
+    /// CPU 経路（apply_vision_cpu_rgba8）では Darken と Blur の出力が異なる
+    /// （field_loss_mode が実際に効いていることの確認）。
+    #[test]
+    fn field_loss_mode_blur_vs_darken_differs_on_cpu_path() {
+        let w = 8u32;
+        let h = 8u32;
+        let len = (w * h * 4) as usize;
+        // 彩度のある単色（赤系）。Darken は明度だけ落とすが Blur は彩度も落とすため、
+        // 単色一様画像でも両モードの出力は異なるはず。
+        let mut input = vec![0u8; len];
+        for px in input.chunks_mut(4) {
+            px[0] = 220; // R
+            px[1] = 40; // G
+            px[2] = 40; // B
+            px[3] = 255; // A
+        }
+
+        for (name, build) in field_loss_mode_filters() {
+            let darken_out = apply_vision_cpu_rgba8(
+                build(VisionFieldLossMode::Darken),
+                input.clone(),
+                w,
+                h,
+                1.0,
+            )
+            .unwrap();
+            let blur_out =
+                apply_vision_cpu_rgba8(build(VisionFieldLossMode::Blur), input.clone(), w, h, 1.0)
+                    .unwrap();
+            assert_ne!(
+                darken_out, blur_out,
+                "{name}: Darken と Blur の CPU 出力が同一（field_loss_mode が効いていない）"
+            );
+        }
+    }
+
+    /// GPU 経路（vision_uniforms）は Darken/Blur で出力が同一（field_loss_mode を
+    /// 無視して常に Darken 相当になることの確認）。
+    #[test]
+    fn field_loss_mode_blur_vs_darken_identical_on_gpu_uniforms() {
+        for (name, build) in field_loss_mode_filters() {
+            let darken = vision_uniforms(build(VisionFieldLossMode::Darken), 0.7, 0.0, 128, 64);
+            let blur = vision_uniforms(build(VisionFieldLossMode::Blur), 0.7, 0.0, 128, 64);
+            assert_eq!(
+                darken, blur,
+                "{name}: GPU uniforms が Darken/Blur で異なる \
+                 （field_loss_mode が GPU 経路に漏れている可能性）"
+            );
+        }
+    }
+
+    /// DetailLoss: strength=0.0 は原画と byte 一致する（sensus 0.6 の修正、#175 相当。
+    /// #56 の完了条件: strength が効かない状態に戻っていないことを rust 側で確認する）。
+    #[test]
+    fn detail_loss_strength_zero_is_identity() {
+        let w = 8u32;
+        let h = 8u32;
+        let len = (w * h * 4) as usize;
+        // 単色だと cell_size=8 で退化する（legacy 比較同様）ため、勾配を使う。
+        let input: Vec<u8> = (0..len).map(|i| (i % 251) as u8).collect();
+        let out = apply_vision_cpu_rgba8(
+            VisionFilter::DetailLoss { cell_size: 8 },
+            input.clone(),
+            w,
+            h,
+            0.0,
+        )
+        .unwrap();
+        assert_eq!(
+            out, input,
+            "DetailLoss strength=0.0 must be byte-identical to input"
+        );
+    }
+
+    /// DetailLoss: strength を上げると pixelation が効く（strength=0 が identity なだけで
+    /// 完全に効果が消えたわけではないことの対照）。
+    #[test]
+    fn detail_loss_strength_one_changes_pixels() {
+        let w = 8u32;
+        let h = 8u32;
+        let len = (w * h * 4) as usize;
+        let input: Vec<u8> = (0..len).map(|i| (i % 251) as u8).collect();
+        let out = apply_vision_cpu_rgba8(
+            VisionFilter::DetailLoss { cell_size: 8 },
+            input.clone(),
+            w,
+            h,
+            1.0,
+        )
+        .unwrap();
+        assert_ne!(
+            out, input,
+            "DetailLoss strength=1.0 should visibly pixelate a gradient"
+        );
     }
 
     /// Cataract: seed が flat 配列に乗り、resolution が width/height で来る。

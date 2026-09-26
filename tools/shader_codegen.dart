@@ -312,6 +312,40 @@ List<String> extractUniformFloatOrder(String glsl) {
   return names;
 }
 
+/// Whether [version] (a `sensus_core_version` string from a vendored dump,
+/// e.g. `"0.6.3"`) satisfies the dependency line [expectedLine] (the
+/// `major.minor` ue depends on, e.g. `"0.6"` for `rust/Cargo.toml`'s
+/// `sensus-core = "0.6"`).
+///
+/// Follows Cargo's caret-requirement convention: while major is `0`, minor is
+/// the breaking component (`^0.6` means `>=0.6.0, <0.7.0`, not
+/// `>=0.6.0, <1.0.0`), so [version] must match on **major.minor**. Once major
+/// reaches `1`, only major needs to match (standard semver) — this function
+/// still requires [expectedLine] itself to be in `major.minor` form even
+/// then, since that is the only shape `generate_shaders.dart` ever passes.
+///
+/// Returns `false` (never throws) for malformed input: a non-numeric major in
+/// [version] (e.g. `"x.y"`), a [version] missing the minor component while
+/// major is `0` (e.g. bare `"0"`), or an [expectedLine] not in `major.minor`
+/// form. Callers that need a diagnostic message on mismatch build their own
+/// (see `generate_shaders.dart`'s `_parseDump`).
+bool sensusVersionSatisfiesDependency(String version, String expectedLine) {
+  final versionParts = version.split('.');
+  final major = int.tryParse(versionParts.isNotEmpty ? versionParts[0] : '');
+  if (major == null) return false;
+  final minor =
+      versionParts.length > 1 ? int.tryParse(versionParts[1]) : null;
+
+  final expectedParts = expectedLine.split('.');
+  if (expectedParts.length != 2) return false;
+  final expectedMajor = int.tryParse(expectedParts[0]);
+  final expectedMinor = int.tryParse(expectedParts[1]);
+  if (expectedMajor == null || expectedMinor == null) return false;
+
+  return major == expectedMajor &&
+      (expectedMajor != 0 || minor == expectedMinor);
+}
+
 bool _listEquals(List<String> a, List<String> b) {
   if (a.length != b.length) return false;
   for (var i = 0; i < a.length; i++) {

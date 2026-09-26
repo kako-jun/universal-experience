@@ -107,6 +107,8 @@ void main() {
 
     test('payload 付きフィルタの parameters 数', () {
       expectParamCount('astigmatism', 1); // axisDeg
+      // glaucoma/hemianopia の field_loss_mode は意図的にカタログ非公開
+      // （kVisionFilterCatalog の doc コメント参照。GPU 経路が無視するため）。
       expectParamCount('glaucoma', 1); // mode
       expectParamCount('hemianopia', 1); // side
       expectParamCount('cataract', 1); // seed
@@ -160,7 +162,9 @@ void main() {
     });
 
     test('glaucoma の mode 選択肢は 4（VisionGlaucomaMode と同数）', () {
-      final mode = kVisionFilterCatalogById['glaucoma']!.parameters.single;
+      final mode = kVisionFilterCatalogById['glaucoma']!
+          .parameters
+          .firstWhere((p) => p.name == 'mode');
       expect(mode.kind, VisionParamKind.enumValue);
       expect(mode.options.length, VisionGlaucomaMode.values.length);
     });
@@ -168,7 +172,9 @@ void main() {
     test('hemianopia の side options が kHemianopiaSideValues と一致（drift 検出）', () {
       // 単一の写像源（kHemianopiaSideValues）と catalog の option value 集合が
       // ずれていないことを検証する。どちらか片方だけ変更すると失敗する。
-      final side = kVisionFilterCatalogById['hemianopia']!.parameters.single;
+      final side = kVisionFilterCatalogById['hemianopia']!
+          .parameters
+          .firstWhere((p) => p.name == 'side');
       final optionKeys = side.options.map((o) => o.value).toSet();
       expect(optionKeys, kHemianopiaSideValues.keys.toSet());
       // 既定値も写像源のキーであること。
@@ -176,6 +182,21 @@ void main() {
       // 写像の実値（left=0.0 / right=1.0）が固定であること。
       expect(kHemianopiaSideValues['left'], 0.0);
       expect(kHemianopiaSideValues['right'], 1.0);
+    });
+
+    test(
+        'field_loss_mode を持つ4フィルタはカタログに fieldLossMode パラメータを公開しない'
+        '（GPU 経路が無視するため意図的に非公開、#56）', () {
+      for (final id in [
+        'glaucoma',
+        'macular_degeneration',
+        'hemianopia',
+        'tunnel_vision',
+      ]) {
+        final names =
+            kVisionFilterCatalogById[id]!.parameters.map((p) => p.name);
+        expect(names, isNot(contains('fieldLossMode')), reason: id);
+      }
     });
   });
 
@@ -225,17 +246,49 @@ void main() {
 
     test('enum payload: glaucoma の mode を反映', () {
       final state = VisionFilterState()..select('glaucoma');
-      // デフォルト vignette
+      // デフォルト vignette / darken
       expect(
         state.build(),
-        const VisionFilter.glaucoma(mode: VisionGlaucomaMode.vignette),
+        const VisionFilter.glaucoma(
+          mode: VisionGlaucomaMode.vignette,
+          fieldLossMode: VisionFieldLossMode.darken,
+        ),
       );
       state.setParam('mode', 'arcuateSuperior');
       expect(
         state.build(),
         const VisionFilter.glaucoma(
           mode: VisionGlaucomaMode.arcuateSuperior,
+          fieldLossMode: VisionFieldLossMode.darken,
         ),
+      );
+    });
+
+    test('未知の mode 文字列は vignette にフォールバックする', () {
+      final state = VisionFilterState()..select('glaucoma');
+      state.setParam('mode', 'not-a-real-mode');
+      expect(
+        state.build(),
+        const VisionFilter.glaucoma(
+          mode: VisionGlaucomaMode.vignette,
+          fieldLossMode: VisionFieldLossMode.darken,
+        ),
+      );
+    });
+
+    test('glaucoma の fieldLossMode は常に darken で構築される（カタログに公開しない、#56）',
+        () {
+      final state = VisionFilterState()..select('glaucoma');
+      // fieldLossMode はカタログにパラメータが無いため setParam しても build() の
+      // switch は _raw() ではなく VisionFieldLossMode.darken を直接使う。
+      state.setParam('fieldLossMode', 'blur');
+      expect(
+        state.build(),
+        const VisionFilter.glaucoma(
+          mode: VisionGlaucomaMode.vignette,
+          fieldLossMode: VisionFieldLossMode.darken,
+        ),
+        reason: 'カタログに無い fieldLossMode setParam は build() に影響しない',
       );
     });
 
@@ -260,10 +313,54 @@ void main() {
 
     test('enum payload: hemianopia の side が left=0.0 / right=1.0', () {
       final state = VisionFilterState()..select('hemianopia');
-      // デフォルト left
-      expect(state.build(), const VisionFilter.hemianopia(side: 0.0));
+      // デフォルト left / darken
+      expect(
+        state.build(),
+        const VisionFilter.hemianopia(
+          side: 0.0,
+          fieldLossMode: VisionFieldLossMode.darken,
+        ),
+      );
       state.setParam('side', 'right');
-      expect(state.build(), const VisionFilter.hemianopia(side: 1.0));
+      expect(
+        state.build(),
+        const VisionFilter.hemianopia(
+          side: 1.0,
+          fieldLossMode: VisionFieldLossMode.darken,
+        ),
+      );
+    });
+
+    test('未知の side 文字列は left（0.0）にフォールバックする', () {
+      final state = VisionFilterState()..select('hemianopia');
+      state.setParam('side', 'not-a-real-side');
+      expect(
+        state.build(),
+        const VisionFilter.hemianopia(
+          side: 0.0,
+          fieldLossMode: VisionFieldLossMode.darken,
+        ),
+      );
+    });
+
+    test(
+        'macular_degeneration / tunnel_vision は fieldLossMode 常に darken で構築される'
+        '（カタログに公開しない、#56）', () {
+      final macular = VisionFilterState()..select('macular_degeneration');
+      expect(
+        macular.build(),
+        const VisionFilter.macularDegeneration(
+          fieldLossMode: VisionFieldLossMode.darken,
+        ),
+      );
+
+      final tunnel = VisionFilterState()..select('tunnel_vision');
+      expect(
+        tunnel.build(),
+        const VisionFilter.tunnelVision(
+          fieldLossMode: VisionFieldLossMode.darken,
+        ),
+      );
     });
 
     test('int payload: detail_loss の cellSize を反映', () {

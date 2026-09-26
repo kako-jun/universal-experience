@@ -78,6 +78,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Urgency dco_decode_urgency(dynamic raw);
 
   @protected
+  VisionFieldLossMode dco_decode_vision_field_loss_mode(dynamic raw);
+
+  @protected
   VisionFilter dco_decode_vision_filter(dynamic raw);
 
   @protected
@@ -143,6 +146,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Urgency sse_decode_urgency(SseDeserializer deserializer);
+
+  @protected
+  VisionFieldLossMode sse_decode_vision_field_loss_mode(
+      SseDeserializer deserializer);
 
   @protected
   VisionFilter sse_decode_vision_filter(SseDeserializer deserializer);
@@ -311,16 +318,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       return [8, cst_encode_f_32(raw.axisDeg)].jsify()!;
     }
     if (raw is VisionFilter_Glaucoma) {
-      return [9, cst_encode_vision_glaucoma_mode(raw.mode)].jsify()!;
+      return [
+        9,
+        cst_encode_vision_glaucoma_mode(raw.mode),
+        cst_encode_vision_field_loss_mode(raw.fieldLossMode)
+      ].jsify()!;
     }
     if (raw is VisionFilter_MacularDegeneration) {
-      return [10].jsify()!;
+      return [10, cst_encode_vision_field_loss_mode(raw.fieldLossMode)]
+          .jsify()!;
     }
     if (raw is VisionFilter_Hemianopia) {
-      return [11, cst_encode_f_32(raw.side)].jsify()!;
+      return [
+        11,
+        cst_encode_f_32(raw.side),
+        cst_encode_vision_field_loss_mode(raw.fieldLossMode)
+      ].jsify()!;
     }
     if (raw is VisionFilter_TunnelVision) {
-      return [12].jsify()!;
+      return [12, cst_encode_vision_field_loss_mode(raw.fieldLossMode)]
+          .jsify()!;
     }
     if (raw is VisionFilter_Cataract) {
       return [13, cst_encode_u_64(raw.seed)].jsify()!;
@@ -419,6 +436,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int cst_encode_urgency(Urgency raw);
 
   @protected
+  int cst_encode_vision_field_loss_mode(VisionFieldLossMode raw);
+
+  @protected
   int cst_encode_vision_glaucoma_mode(VisionGlaucomaMode raw);
 
   @protected
@@ -484,6 +504,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_urgency(Urgency self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_vision_field_loss_mode(
+      VisionFieldLossMode self, SseSerializer serializer);
 
   @protected
   void sse_encode_vision_filter(VisionFilter self, SseSerializer serializer);

@@ -26,4 +26,9 @@ mod api;
 #[cfg(test)]
 mod golden_gen;
 
+// tools/sensus_shaders.g.json の一回限り再生成器（#56）。中身は `#[cfg(test)]` のみで、
+// 本体ビルドには何も足さない。
+#[cfg(test)]
+mod shader_dump_gen;
+
 pub use api::sensus_bridge::*;

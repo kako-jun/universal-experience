@@ -239,6 +239,17 @@ const List<VisionParamOption> _glaucomaModeOptions = [
 /// - 30 エントリちょうど（sensus の `VisionFilter` variant 数と一致）。
 /// - id は重複なし。
 /// - payload を持つフィルタの parameters 数が sensus payload と一致する。
+///   **例外**: `glaucoma` / `macular_degeneration` / `hemianopia` / `tunnel_vision`
+///   の `field_loss_mode`（[VisionFieldLossMode]）は意図的にカタログの
+///   `parameters` に含めない。GPU（FragmentProgram）経路は
+///   `shaders::glaucoma_uniforms` 等が `field_loss_mode` を引数に取らないため
+///   選択に関わらず常に Darken 相当で描画されてしまい、UI で選ばせても見た目に
+///   反映されない（`sensus_bridge.dart` の `VisionFieldLossMode` doc 参照）。
+///   `VisionFilterState.build()` は常に `VisionFieldLossMode.darken` で構築する。
+///   Blur を実際に使うのは CPU 経路（`apply_vision_cpu_rgba8` を直接呼ぶ）のみで、
+///   カタログ UI からは到達できない。ライブ GPU 描画が Blur に対応したら
+///   （またはカタログが CPU 専用パラメータを表現できるようになったら）この例外は
+///   解消し、4 フィルタの parameters 数はそれぞれ +1 する。
 const List<VisionFilterEntry> kVisionFilterCatalog = [
   // ── 色覚 ──────────────────────────────────────────────
   VisionFilterEntry(
@@ -709,16 +720,22 @@ List<VisionFilterEntry> visionFilterEntriesByCategory(
 ) =>
     kVisionFilterCatalog.where((e) => e.category == category).toList();
 
-/// payload を持たない（const 構築できる）[VisionFilter] → カタログ id の写像。
+/// カタログに UI パラメータを持たない [VisionFilter] インスタンス → カタログ id の写像。
 ///
 /// 体験プリセット (#19) の `Experience.vision`（bridge の [VisionFilter] インスタンス）
 /// を、カタログの snake_case id（[VisionFilterState.select] が受ける値）へ変換する
 /// ための単一の正本。**id をハードコード散在させない**ため、ここ 1 箇所に集約する。
 ///
-/// freezed の値等価（payload 無しバリアントは同値）を使って引く。payload を持つ
-/// フィルタ（astigmatism 等）は const 構築できず体験プリセットでも使われないため
-/// 対象外（[visionFilterCatalogId] が null を返す）。
-final Map<VisionFilter, String> _kCatalogIdByParamlessVision = {
+/// freezed の値等価（同じフィールド値なら同値）を使って引くため、キーは常に
+/// **固定値**で const 構築する。payload を持ちカタログ UI でパラメータ調整できる
+/// フィルタ（astigmatism 等）は対象外（[visionFilterCatalogId] が null を返す）。
+///
+/// `macularDegeneration` / `tunnelVision` は sensus 0.6 で `field_loss_mode` payload が
+/// 付いたため、bridge の型としては引数が必須。ただしカタログはこのパラメータを
+/// UI に出さない（[kVisionFilterCatalog] の doc コメント参照。GPU 経路が
+/// field_loss_mode を無視するため）ので、ここでは [VisionFieldLossMode.darken] を
+/// 固定値として渡す。
+final Map<VisionFilter, String> _kCatalogIdByFixedVisionInstance = {
   const VisionFilter.protanopia(): 'protanopia',
   const VisionFilter.deuteranopia(): 'deuteranopia',
   const VisionFilter.tritanopia(): 'tritanopia',
@@ -727,8 +744,12 @@ final Map<VisionFilter, String> _kCatalogIdByParamlessVision = {
   const VisionFilter.myopia(): 'myopia',
   const VisionFilter.hyperopia(): 'hyperopia',
   const VisionFilter.presbyopia(): 'presbyopia',
-  const VisionFilter.macularDegeneration(): 'macular_degeneration',
-  const VisionFilter.tunnelVision(): 'tunnel_vision',
+  const VisionFilter.macularDegeneration(
+    fieldLossMode: VisionFieldLossMode.darken,
+  ): 'macular_degeneration',
+  const VisionFilter.tunnelVision(
+    fieldLossMode: VisionFieldLossMode.darken,
+  ): 'tunnel_vision',
   const VisionFilter.photophobia(): 'photophobia',
   const VisionFilter.nightBlindness(): 'night_blindness',
   const VisionFilter.vertigo(): 'vertigo',
@@ -745,4 +766,4 @@ final Map<VisionFilter, String> _kCatalogIdByParamlessVision = {
 /// 体験プリセット (#19) が `Experience.vision` を [VisionFilterState.select] へ橋渡し
 /// するのに使う。payload を持つフィルタ（体験プリセットでは未使用）は null を返す。
 String? visionFilterCatalogId(VisionFilter filter) =>
-    _kCatalogIdByParamlessVision[filter];
+    _kCatalogIdByFixedVisionInstance[filter];

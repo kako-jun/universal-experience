@@ -365,6 +365,35 @@ void main() {
     });
   });
 
+  group('sensusVersionSatisfiesDependency', () {
+    test('patch differences within the same major.minor are compatible', () {
+      expect(sensusVersionSatisfiesDependency('0.6.0', '0.6'), isTrue);
+      expect(sensusVersionSatisfiesDependency('0.6.3', '0.6'), isTrue);
+    });
+
+    test('a different major.minor (even same major) is incompatible', () {
+      // Cargo's 0.x convention: `^0.6` means `>=0.6.0, <0.7.0`, so 0.5.x and
+      // 0.7.x are both outside the compatible range despite sharing major 0.
+      expect(sensusVersionSatisfiesDependency('0.5.0', '0.6'), isFalse);
+      expect(sensusVersionSatisfiesDependency('0.7.0', '0.6'), isFalse);
+    });
+
+    test('malformed version strings are incompatible, not thrown', () {
+      expect(sensusVersionSatisfiesDependency('0', '0.6'), isFalse);
+      expect(sensusVersionSatisfiesDependency('x.y', '0.6'), isFalse);
+    });
+
+    test('major >= 1 only needs major to match (standard semver)', () {
+      expect(sensusVersionSatisfiesDependency('1.9.9', '1.0'), isTrue);
+      expect(sensusVersionSatisfiesDependency('2.0.0', '1.0'), isFalse);
+    });
+
+    test('a malformed expected line is incompatible', () {
+      expect(sensusVersionSatisfiesDependency('0.6.0', '0'), isFalse);
+      expect(sensusVersionSatisfiesDependency('0.6.0', '0.6.0'), isFalse);
+    });
+  });
+
   group('buildPubspecShadersBlock / updatePubspecShaders', () {
     test('emits alphabetically sorted entries under shaders:', () {
       final block =

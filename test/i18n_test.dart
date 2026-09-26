@@ -77,6 +77,42 @@ void main() {
       }
     });
 
+    test(
+        '全 catalog param.labelKey / option.labelKey が en/ja ともフォールバックなしで'
+        '名前解決できる', () {
+      // visionParamLabel() のフォールバックは labelKey をそのまま返すので、
+      // labelKey と異なれば実翻訳が解決できている（未訳のまま raw key が UI に
+      // 出てしまう回帰を検出する）。
+      final en = lookupAppLocalizations(const Locale('en'));
+      final ja = lookupAppLocalizations(const Locale('ja'));
+      for (final entry in kVisionFilterCatalog) {
+        for (final param in entry.parameters) {
+          expect(
+            visionParamLabel(en, param.labelKey),
+            isNot(param.labelKey),
+            reason: '${entry.id}.${param.name} (en)',
+          );
+          expect(
+            visionParamLabel(ja, param.labelKey),
+            isNot(param.labelKey),
+            reason: '${entry.id}.${param.name} (ja)',
+          );
+          for (final option in param.options) {
+            expect(
+              visionParamLabel(en, option.labelKey),
+              isNot(option.labelKey),
+              reason: '${entry.id}.${param.name}.${option.value} (en)',
+            );
+            expect(
+              visionParamLabel(ja, option.labelKey),
+              isNot(option.labelKey),
+              reason: '${entry.id}.${param.name}.${option.value} (ja)',
+            );
+          }
+        }
+      }
+    });
+
     test('全 ColorVisionType の有病率が i18n 解決でき、ja に英語が混入しない', () {
       final en = lookupAppLocalizations(const Locale('en'));
       final ja = lookupAppLocalizations(const Locale('ja'));

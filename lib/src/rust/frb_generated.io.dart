@@ -76,6 +76,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Urgency dco_decode_urgency(dynamic raw);
 
   @protected
+  VisionFieldLossMode dco_decode_vision_field_loss_mode(dynamic raw);
+
+  @protected
   VisionFilter dco_decode_vision_filter(dynamic raw);
 
   @protected
@@ -141,6 +144,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Urgency sse_decode_urgency(SseDeserializer deserializer);
+
+  @protected
+  VisionFieldLossMode sse_decode_vision_field_loss_mode(
+      SseDeserializer deserializer);
 
   @protected
   VisionFilter sse_decode_vision_filter(SseDeserializer deserializer);
@@ -381,22 +388,34 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     }
     if (apiObj is VisionFilter_Glaucoma) {
       var pre_mode = cst_encode_vision_glaucoma_mode(apiObj.mode);
+      var pre_field_loss_mode =
+          cst_encode_vision_field_loss_mode(apiObj.fieldLossMode);
       wireObj.tag = 9;
       wireObj.kind.Glaucoma.mode = pre_mode;
+      wireObj.kind.Glaucoma.field_loss_mode = pre_field_loss_mode;
       return;
     }
     if (apiObj is VisionFilter_MacularDegeneration) {
+      var pre_field_loss_mode =
+          cst_encode_vision_field_loss_mode(apiObj.fieldLossMode);
       wireObj.tag = 10;
+      wireObj.kind.MacularDegeneration.field_loss_mode = pre_field_loss_mode;
       return;
     }
     if (apiObj is VisionFilter_Hemianopia) {
       var pre_side = cst_encode_f_32(apiObj.side);
+      var pre_field_loss_mode =
+          cst_encode_vision_field_loss_mode(apiObj.fieldLossMode);
       wireObj.tag = 11;
       wireObj.kind.Hemianopia.side = pre_side;
+      wireObj.kind.Hemianopia.field_loss_mode = pre_field_loss_mode;
       return;
     }
     if (apiObj is VisionFilter_TunnelVision) {
+      var pre_field_loss_mode =
+          cst_encode_vision_field_loss_mode(apiObj.fieldLossMode);
       wireObj.tag = 12;
+      wireObj.kind.TunnelVision.field_loss_mode = pre_field_loss_mode;
       return;
     }
     if (apiObj is VisionFilter_Cataract) {
@@ -526,6 +545,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int cst_encode_urgency(Urgency raw);
 
   @protected
+  int cst_encode_vision_field_loss_mode(VisionFieldLossMode raw);
+
+  @protected
   int cst_encode_vision_glaucoma_mode(VisionGlaucomaMode raw);
 
   @protected
@@ -591,6 +613,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_urgency(Urgency self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_vision_field_loss_mode(
+      VisionFieldLossMode self, SseSerializer serializer);
 
   @protected
   void sse_encode_vision_filter(VisionFilter self, SseSerializer serializer);
@@ -871,11 +897,27 @@ final class wire_cst_VisionFilter_Astigmatism extends ffi.Struct {
 final class wire_cst_VisionFilter_Glaucoma extends ffi.Struct {
   @ffi.Int32()
   external int mode;
+
+  @ffi.Int32()
+  external int field_loss_mode;
+}
+
+final class wire_cst_VisionFilter_MacularDegeneration extends ffi.Struct {
+  @ffi.Int32()
+  external int field_loss_mode;
 }
 
 final class wire_cst_VisionFilter_Hemianopia extends ffi.Struct {
   @ffi.Float()
   external double side;
+
+  @ffi.Int32()
+  external int field_loss_mode;
+}
+
+final class wire_cst_VisionFilter_TunnelVision extends ffi.Struct {
+  @ffi.Int32()
+  external int field_loss_mode;
 }
 
 final class wire_cst_VisionFilter_Cataract extends ffi.Struct {
@@ -956,7 +998,11 @@ final class VisionFilterKind extends ffi.Union {
 
   external wire_cst_VisionFilter_Glaucoma Glaucoma;
 
+  external wire_cst_VisionFilter_MacularDegeneration MacularDegeneration;
+
   external wire_cst_VisionFilter_Hemianopia Hemianopia;
+
+  external wire_cst_VisionFilter_TunnelVision TunnelVision;
 
   external wire_cst_VisionFilter_Cataract Cataract;
 

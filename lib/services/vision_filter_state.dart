@@ -120,14 +120,28 @@ class VisionFilterState extends ChangeNotifier {
         return VisionFilter.astigmatism(axisDeg: _float('axisDeg'));
 
       // ── 視野 ──
+      // 4 フィルタとも field_loss_mode は常に darken 固定で構築する。
+      // GPU 経路が field_loss_mode を無視する（常に Darken 相当で描画される）ため、
+      // カタログには UI パラメータとして出していない
+      // （kVisionFilterCatalog の doc コメント参照）。
       case 'glaucoma':
-        return VisionFilter.glaucoma(mode: _glaucomaMode('mode'));
+        return VisionFilter.glaucoma(
+          mode: _glaucomaMode('mode'),
+          fieldLossMode: VisionFieldLossMode.darken,
+        );
       case 'macular_degeneration':
-        return const VisionFilter.macularDegeneration();
+        return const VisionFilter.macularDegeneration(
+          fieldLossMode: VisionFieldLossMode.darken,
+        );
       case 'hemianopia':
-        return VisionFilter.hemianopia(side: _hemianopiaSide('side'));
+        return VisionFilter.hemianopia(
+          side: _hemianopiaSide('side'),
+          fieldLossMode: VisionFieldLossMode.darken,
+        );
       case 'tunnel_vision':
-        return const VisionFilter.tunnelVision();
+        return const VisionFilter.tunnelVision(
+          fieldLossMode: VisionFieldLossMode.darken,
+        );
 
       // ── 光・透明度 ──
       case 'cataract':

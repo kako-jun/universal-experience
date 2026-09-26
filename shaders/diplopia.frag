@@ -1,12 +1,12 @@
 // GENERATED FILE - DO NOT EDIT.
 //
 // Source of truth: sensus-core vision filter "diplopia"
-// (canonical GLSL: sensus shaders/diplopia.frag, sensus-core v0.5.0).
+// (canonical GLSL: sensus shaders/diplopia.frag, sensus-core v0.6.0).
 // Filter-specific provenance (e.g. the Machado 2009 matrix and
 // its citation) lives in the sensus source, not here.
 //
 // Regenerate with: dart run tools/generate_shaders.dart
-// (input dump: tools/sensus_shaders.g.json, produced by sensus-core v0.5.0).
+// (input dump: tools/sensus_shaders.g.json, produced by sensus-core v0.6.0).
 //
 // scalar uniform order (setFloat index): uStrength, uOffsetX, uOffsetY, uGhostStrength, uResolution_x, uResolution_y
 #include <flutter/runtime_effect.glsl>

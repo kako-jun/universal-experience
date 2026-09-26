@@ -20,10 +20,13 @@ ue はそれを flutter_rust_bridge 経由で消費する薄いブリッジで�
 変換ロジックを再実装する方針は取りません）。フィルタの見え方は sensus 由来の
 GPU シェーダ（`lib/rendering/shader_filter.dart`）で計算し、強度調整も可能です。
 
-> ただし現状、一部の uniform（シェーダへ渡す変換行列）は
-> `lib/rendering/shader_filter.dart` に暫定的にハードコードされています。
-> これらは #34 で flutter_rust_bridge 経由の sensus-core 取得値へ置き換え、
-> 二重実装を解消する予定です。
+> ただし現状、protanopia の変換行列（Machado 2009 severity=1.0 行列）は
+> `lib/rendering/shader_filter.dart` に暫定的にハードコードされています
+> （sensus 0.6 では Machado 11 段 severity テーブルの非線形補間になりましたが、
+> `ShaderFilter` はネイティブブリッジ未初期化のプレーンな `flutter test` からも
+> 呼ばれるため flutter_rust_bridge 経由の取得ができず、単位行列との線形補間で
+> 近似しています。中間 strength の見え方は sensus 正本と一致しません）。
+> 本格的な解消は #59 で行う予定です。
 
 > 旧バージョンは OS 全体へ system-wide フィルタを適用する独自プラグイン
 > （`plugins/color_vision_filter`）と ue 内 LMS 実装を持っていましたが、

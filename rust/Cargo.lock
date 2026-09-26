@@ -682,9 +682,9 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "sensus-core"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ab0d5416b619e980c105aa5827bd69826c62b4959e92193cf4ed08edc8f291c"
+checksum = "5ab6b953ff8c2d79ddc1af0345ab8e7ba82104972817c749ee03b917be24af8c"
 dependencies = [
  "image",
  "thiserror",

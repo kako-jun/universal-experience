@@ -1,12 +1,12 @@
 // GENERATED FILE - DO NOT EDIT.
 //
 // Source of truth: sensus-core vision filter "protanopia"
-// (canonical GLSL: sensus shaders/protanopia.frag, sensus-core v0.5.0).
+// (canonical GLSL: sensus shaders/protanopia.frag, sensus-core v0.6.0).
 // Filter-specific provenance (e.g. the Machado 2009 matrix and
 // its citation) lives in the sensus source, not here.
 //
 // Regenerate with: dart run tools/generate_shaders.dart
-// (input dump: tools/sensus_shaders.g.json, produced by sensus-core v0.5.0).
+// (input dump: tools/sensus_shaders.g.json, produced by sensus-core v0.6.0).
 //
 // scalar uniform order (setFloat index): uStrength, uMatrix0, uMatrix1, uMatrix2, uMatrix3, uMatrix4, uMatrix5, uMatrix6, uMatrix7, uMatrix8, uResolution_x, uResolution_y
 #include <flutter/runtime_effect.glsl>
@@ -25,7 +25,11 @@ uniform float uResolution_x;
 uniform float uResolution_y;
 uniform sampler2D uTexture;
 
-// Machado 2009 severity=1.0 行列（linear sRGB → simulated linear sRGB）
+// Machado 2009 per-severity 行列（linear sRGB → simulated linear sRGB）。
+// uMatrix は CPU 側 (protanopia_uniforms) で strength から 11 段テーブルを
+// 補間済みの解決済み行列（#165）。severity=0.0 で単位行列・severity=1.0 で
+// 完全 dichromacy 行列になるため、この行列を直接適用するだけでよい
+// （旧実装のような追加の uStrength blend は不要）。
 // 出典: https://www.inf.ufrgs.br/~oliveira/pubs_files/CVD_Simulation/CVD_Simulation.html
 
 out vec4 fragColor;
@@ -48,14 +52,10 @@ void main() {
     float sg = uMatrix3 * r + uMatrix4 * g + uMatrix5 * b;
     float sb = uMatrix6 * r + uMatrix7 * g + uMatrix8 * b;
 
-    float nr = r + (sr - r) * uStrength;
-    float ng = g + (sg - g) * uStrength;
-    float nb = b + (sb - b) * uStrength;
-
     fragColor = vec4(
-        linearToSrgb(clamp(nr, 0.0, 1.0)),
-        linearToSrgb(clamp(ng, 0.0, 1.0)),
-        linearToSrgb(clamp(nb, 0.0, 1.0)),
+        linearToSrgb(clamp(sr, 0.0, 1.0)),
+        linearToSrgb(clamp(sg, 0.0, 1.0)),
+        linearToSrgb(clamp(sb, 0.0, 1.0)),
         tex.a
     );
 }

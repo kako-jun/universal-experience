@@ -2955,10 +2955,14 @@ mixin _$VisionFilter {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -2995,10 +2999,13 @@ mixin _$VisionFilter {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -3034,10 +3041,13 @@ mixin _$VisionFilter {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -3251,10 +3261,14 @@ class _$VisionFilter_ProtanopiaImpl extends VisionFilter_Protanopia {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -3294,10 +3308,13 @@ class _$VisionFilter_ProtanopiaImpl extends VisionFilter_Protanopia {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -3336,10 +3353,13 @@ class _$VisionFilter_ProtanopiaImpl extends VisionFilter_Protanopia {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -3553,10 +3573,14 @@ class _$VisionFilter_DeuteranopiaImpl extends VisionFilter_Deuteranopia {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -3596,10 +3620,13 @@ class _$VisionFilter_DeuteranopiaImpl extends VisionFilter_Deuteranopia {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -3638,10 +3665,13 @@ class _$VisionFilter_DeuteranopiaImpl extends VisionFilter_Deuteranopia {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -3855,10 +3885,14 @@ class _$VisionFilter_TritanopiaImpl extends VisionFilter_Tritanopia {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -3898,10 +3932,13 @@ class _$VisionFilter_TritanopiaImpl extends VisionFilter_Tritanopia {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -3940,10 +3977,13 @@ class _$VisionFilter_TritanopiaImpl extends VisionFilter_Tritanopia {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -4157,10 +4197,14 @@ class _$VisionFilter_AchromatopsiaImpl extends VisionFilter_Achromatopsia {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -4200,10 +4244,13 @@ class _$VisionFilter_AchromatopsiaImpl extends VisionFilter_Achromatopsia {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -4242,10 +4289,13 @@ class _$VisionFilter_AchromatopsiaImpl extends VisionFilter_Achromatopsia {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -4459,10 +4509,14 @@ class _$VisionFilter_TetrachromacyImpl extends VisionFilter_Tetrachromacy {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -4502,10 +4556,13 @@ class _$VisionFilter_TetrachromacyImpl extends VisionFilter_Tetrachromacy {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -4544,10 +4601,13 @@ class _$VisionFilter_TetrachromacyImpl extends VisionFilter_Tetrachromacy {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -4759,10 +4819,14 @@ class _$VisionFilter_MyopiaImpl extends VisionFilter_Myopia {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -4802,10 +4866,13 @@ class _$VisionFilter_MyopiaImpl extends VisionFilter_Myopia {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -4844,10 +4911,13 @@ class _$VisionFilter_MyopiaImpl extends VisionFilter_Myopia {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -5061,10 +5131,14 @@ class _$VisionFilter_HyperopiaImpl extends VisionFilter_Hyperopia {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -5104,10 +5178,13 @@ class _$VisionFilter_HyperopiaImpl extends VisionFilter_Hyperopia {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -5146,10 +5223,13 @@ class _$VisionFilter_HyperopiaImpl extends VisionFilter_Hyperopia {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -5363,10 +5443,14 @@ class _$VisionFilter_PresbyopiaImpl extends VisionFilter_Presbyopia {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -5406,10 +5490,13 @@ class _$VisionFilter_PresbyopiaImpl extends VisionFilter_Presbyopia {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -5448,10 +5535,13 @@ class _$VisionFilter_PresbyopiaImpl extends VisionFilter_Presbyopia {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -5692,10 +5782,14 @@ class _$VisionFilter_AstigmatismImpl extends VisionFilter_Astigmatism {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -5735,10 +5829,13 @@ class _$VisionFilter_AstigmatismImpl extends VisionFilter_Astigmatism {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -5777,10 +5874,13 @@ class _$VisionFilter_AstigmatismImpl extends VisionFilter_Astigmatism {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -5957,7 +6057,7 @@ abstract class _$$VisionFilter_GlaucomaImplCopyWith<$Res> {
           $Res Function(_$VisionFilter_GlaucomaImpl) then) =
       __$$VisionFilter_GlaucomaImplCopyWithImpl<$Res>;
   @useResult
-  $Res call({VisionGlaucomaMode mode});
+  $Res call({VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode});
 }
 
 /// @nodoc
@@ -5974,12 +6074,17 @@ class __$$VisionFilter_GlaucomaImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? mode = null,
+    Object? fieldLossMode = null,
   }) {
     return _then(_$VisionFilter_GlaucomaImpl(
       mode: null == mode
           ? _value.mode
           : mode // ignore: cast_nullable_to_non_nullable
               as VisionGlaucomaMode,
+      fieldLossMode: null == fieldLossMode
+          ? _value.fieldLossMode
+          : fieldLossMode // ignore: cast_nullable_to_non_nullable
+              as VisionFieldLossMode,
     ));
   }
 }
@@ -5987,14 +6092,18 @@ class __$$VisionFilter_GlaucomaImplCopyWithImpl<$Res>
 /// @nodoc
 
 class _$VisionFilter_GlaucomaImpl extends VisionFilter_Glaucoma {
-  const _$VisionFilter_GlaucomaImpl({required this.mode}) : super._();
+  const _$VisionFilter_GlaucomaImpl(
+      {required this.mode, required this.fieldLossMode})
+      : super._();
 
   @override
   final VisionGlaucomaMode mode;
+  @override
+  final VisionFieldLossMode fieldLossMode;
 
   @override
   String toString() {
-    return 'VisionFilter.glaucoma(mode: $mode)';
+    return 'VisionFilter.glaucoma(mode: $mode, fieldLossMode: $fieldLossMode)';
   }
 
   @override
@@ -6002,11 +6111,13 @@ class _$VisionFilter_GlaucomaImpl extends VisionFilter_Glaucoma {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$VisionFilter_GlaucomaImpl &&
-            (identical(other.mode, mode) || other.mode == mode));
+            (identical(other.mode, mode) || other.mode == mode) &&
+            (identical(other.fieldLossMode, fieldLossMode) ||
+                other.fieldLossMode == fieldLossMode));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, mode);
+  int get hashCode => Object.hash(runtimeType, mode, fieldLossMode);
 
   /// Create a copy of VisionFilter
   /// with the given fields replaced by the non-null parameter values.
@@ -6029,10 +6140,14 @@ class _$VisionFilter_GlaucomaImpl extends VisionFilter_Glaucoma {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -6057,7 +6172,7 @@ class _$VisionFilter_GlaucomaImpl extends VisionFilter_Glaucoma {
     required TResult Function() teichopsia,
     required TResult Function(BigInt seed) flickeringStars,
   }) {
-    return glaucoma(mode);
+    return glaucoma(mode, fieldLossMode);
   }
 
   @override
@@ -6072,10 +6187,13 @@ class _$VisionFilter_GlaucomaImpl extends VisionFilter_Glaucoma {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -6099,7 +6217,7 @@ class _$VisionFilter_GlaucomaImpl extends VisionFilter_Glaucoma {
     TResult? Function()? teichopsia,
     TResult? Function(BigInt seed)? flickeringStars,
   }) {
-    return glaucoma?.call(mode);
+    return glaucoma?.call(mode, fieldLossMode);
   }
 
   @override
@@ -6114,10 +6232,13 @@ class _$VisionFilter_GlaucomaImpl extends VisionFilter_Glaucoma {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -6143,7 +6264,7 @@ class _$VisionFilter_GlaucomaImpl extends VisionFilter_Glaucoma {
     required TResult orElse(),
   }) {
     if (glaucoma != null) {
-      return glaucoma(mode);
+      return glaucoma(mode, fieldLossMode);
     }
     return orElse();
   }
@@ -6275,10 +6396,13 @@ class _$VisionFilter_GlaucomaImpl extends VisionFilter_Glaucoma {
 
 abstract class VisionFilter_Glaucoma extends VisionFilter {
   const factory VisionFilter_Glaucoma(
-      {required final VisionGlaucomaMode mode}) = _$VisionFilter_GlaucomaImpl;
+          {required final VisionGlaucomaMode mode,
+          required final VisionFieldLossMode fieldLossMode}) =
+      _$VisionFilter_GlaucomaImpl;
   const VisionFilter_Glaucoma._() : super._();
 
   VisionGlaucomaMode get mode;
+  VisionFieldLossMode get fieldLossMode;
 
   /// Create a copy of VisionFilter
   /// with the given fields replaced by the non-null parameter values.
@@ -6293,6 +6417,8 @@ abstract class _$$VisionFilter_MacularDegenerationImplCopyWith<$Res> {
           _$VisionFilter_MacularDegenerationImpl value,
           $Res Function(_$VisionFilter_MacularDegenerationImpl) then) =
       __$$VisionFilter_MacularDegenerationImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({VisionFieldLossMode fieldLossMode});
 }
 
 /// @nodoc
@@ -6307,28 +6433,56 @@ class __$$VisionFilter_MacularDegenerationImplCopyWithImpl<$Res>
 
   /// Create a copy of VisionFilter
   /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? fieldLossMode = null,
+  }) {
+    return _then(_$VisionFilter_MacularDegenerationImpl(
+      fieldLossMode: null == fieldLossMode
+          ? _value.fieldLossMode
+          : fieldLossMode // ignore: cast_nullable_to_non_nullable
+              as VisionFieldLossMode,
+    ));
+  }
 }
 
 /// @nodoc
 
 class _$VisionFilter_MacularDegenerationImpl
     extends VisionFilter_MacularDegeneration {
-  const _$VisionFilter_MacularDegenerationImpl() : super._();
+  const _$VisionFilter_MacularDegenerationImpl({required this.fieldLossMode})
+      : super._();
+
+  @override
+  final VisionFieldLossMode fieldLossMode;
 
   @override
   String toString() {
-    return 'VisionFilter.macularDegeneration()';
+    return 'VisionFilter.macularDegeneration(fieldLossMode: $fieldLossMode)';
   }
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
-            other is _$VisionFilter_MacularDegenerationImpl);
+            other is _$VisionFilter_MacularDegenerationImpl &&
+            (identical(other.fieldLossMode, fieldLossMode) ||
+                other.fieldLossMode == fieldLossMode));
   }
 
   @override
-  int get hashCode => runtimeType.hashCode;
+  int get hashCode => Object.hash(runtimeType, fieldLossMode);
+
+  /// Create a copy of VisionFilter
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$VisionFilter_MacularDegenerationImplCopyWith<
+          _$VisionFilter_MacularDegenerationImpl>
+      get copyWith => __$$VisionFilter_MacularDegenerationImplCopyWithImpl<
+          _$VisionFilter_MacularDegenerationImpl>(this, _$identity);
 
   @override
   @optionalTypeArgs
@@ -6342,10 +6496,14 @@ class _$VisionFilter_MacularDegenerationImpl
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -6370,7 +6528,7 @@ class _$VisionFilter_MacularDegenerationImpl
     required TResult Function() teichopsia,
     required TResult Function(BigInt seed) flickeringStars,
   }) {
-    return macularDegeneration();
+    return macularDegeneration(fieldLossMode);
   }
 
   @override
@@ -6385,10 +6543,13 @@ class _$VisionFilter_MacularDegenerationImpl
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -6412,7 +6573,7 @@ class _$VisionFilter_MacularDegenerationImpl
     TResult? Function()? teichopsia,
     TResult? Function(BigInt seed)? flickeringStars,
   }) {
-    return macularDegeneration?.call();
+    return macularDegeneration?.call(fieldLossMode);
   }
 
   @override
@@ -6427,10 +6588,13 @@ class _$VisionFilter_MacularDegenerationImpl
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -6456,7 +6620,7 @@ class _$VisionFilter_MacularDegenerationImpl
     required TResult orElse(),
   }) {
     if (macularDegeneration != null) {
-      return macularDegeneration();
+      return macularDegeneration(fieldLossMode);
     }
     return orElse();
   }
@@ -6587,9 +6751,19 @@ class _$VisionFilter_MacularDegenerationImpl
 }
 
 abstract class VisionFilter_MacularDegeneration extends VisionFilter {
-  const factory VisionFilter_MacularDegeneration() =
+  const factory VisionFilter_MacularDegeneration(
+          {required final VisionFieldLossMode fieldLossMode}) =
       _$VisionFilter_MacularDegenerationImpl;
   const VisionFilter_MacularDegeneration._() : super._();
+
+  VisionFieldLossMode get fieldLossMode;
+
+  /// Create a copy of VisionFilter
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$VisionFilter_MacularDegenerationImplCopyWith<
+          _$VisionFilter_MacularDegenerationImpl>
+      get copyWith => throw _privateConstructorUsedError;
 }
 
 /// @nodoc
@@ -6599,7 +6773,7 @@ abstract class _$$VisionFilter_HemianopiaImplCopyWith<$Res> {
           $Res Function(_$VisionFilter_HemianopiaImpl) then) =
       __$$VisionFilter_HemianopiaImplCopyWithImpl<$Res>;
   @useResult
-  $Res call({double side});
+  $Res call({double side, VisionFieldLossMode fieldLossMode});
 }
 
 /// @nodoc
@@ -6617,12 +6791,17 @@ class __$$VisionFilter_HemianopiaImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? side = null,
+    Object? fieldLossMode = null,
   }) {
     return _then(_$VisionFilter_HemianopiaImpl(
       side: null == side
           ? _value.side
           : side // ignore: cast_nullable_to_non_nullable
               as double,
+      fieldLossMode: null == fieldLossMode
+          ? _value.fieldLossMode
+          : fieldLossMode // ignore: cast_nullable_to_non_nullable
+              as VisionFieldLossMode,
     ));
   }
 }
@@ -6630,14 +6809,18 @@ class __$$VisionFilter_HemianopiaImplCopyWithImpl<$Res>
 /// @nodoc
 
 class _$VisionFilter_HemianopiaImpl extends VisionFilter_Hemianopia {
-  const _$VisionFilter_HemianopiaImpl({required this.side}) : super._();
+  const _$VisionFilter_HemianopiaImpl(
+      {required this.side, required this.fieldLossMode})
+      : super._();
 
   @override
   final double side;
+  @override
+  final VisionFieldLossMode fieldLossMode;
 
   @override
   String toString() {
-    return 'VisionFilter.hemianopia(side: $side)';
+    return 'VisionFilter.hemianopia(side: $side, fieldLossMode: $fieldLossMode)';
   }
 
   @override
@@ -6645,11 +6828,13 @@ class _$VisionFilter_HemianopiaImpl extends VisionFilter_Hemianopia {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$VisionFilter_HemianopiaImpl &&
-            (identical(other.side, side) || other.side == side));
+            (identical(other.side, side) || other.side == side) &&
+            (identical(other.fieldLossMode, fieldLossMode) ||
+                other.fieldLossMode == fieldLossMode));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, side);
+  int get hashCode => Object.hash(runtimeType, side, fieldLossMode);
 
   /// Create a copy of VisionFilter
   /// with the given fields replaced by the non-null parameter values.
@@ -6672,10 +6857,14 @@ class _$VisionFilter_HemianopiaImpl extends VisionFilter_Hemianopia {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -6700,7 +6889,7 @@ class _$VisionFilter_HemianopiaImpl extends VisionFilter_Hemianopia {
     required TResult Function() teichopsia,
     required TResult Function(BigInt seed) flickeringStars,
   }) {
-    return hemianopia(side);
+    return hemianopia(side, fieldLossMode);
   }
 
   @override
@@ -6715,10 +6904,13 @@ class _$VisionFilter_HemianopiaImpl extends VisionFilter_Hemianopia {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -6742,7 +6934,7 @@ class _$VisionFilter_HemianopiaImpl extends VisionFilter_Hemianopia {
     TResult? Function()? teichopsia,
     TResult? Function(BigInt seed)? flickeringStars,
   }) {
-    return hemianopia?.call(side);
+    return hemianopia?.call(side, fieldLossMode);
   }
 
   @override
@@ -6757,10 +6949,13 @@ class _$VisionFilter_HemianopiaImpl extends VisionFilter_Hemianopia {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -6786,7 +6981,7 @@ class _$VisionFilter_HemianopiaImpl extends VisionFilter_Hemianopia {
     required TResult orElse(),
   }) {
     if (hemianopia != null) {
-      return hemianopia(side);
+      return hemianopia(side, fieldLossMode);
     }
     return orElse();
   }
@@ -6917,11 +7112,14 @@ class _$VisionFilter_HemianopiaImpl extends VisionFilter_Hemianopia {
 }
 
 abstract class VisionFilter_Hemianopia extends VisionFilter {
-  const factory VisionFilter_Hemianopia({required final double side}) =
+  const factory VisionFilter_Hemianopia(
+          {required final double side,
+          required final VisionFieldLossMode fieldLossMode}) =
       _$VisionFilter_HemianopiaImpl;
   const VisionFilter_Hemianopia._() : super._();
 
   double get side;
+  VisionFieldLossMode get fieldLossMode;
 
   /// Create a copy of VisionFilter
   /// with the given fields replaced by the non-null parameter values.
@@ -6936,6 +7134,8 @@ abstract class _$$VisionFilter_TunnelVisionImplCopyWith<$Res> {
           _$VisionFilter_TunnelVisionImpl value,
           $Res Function(_$VisionFilter_TunnelVisionImpl) then) =
       __$$VisionFilter_TunnelVisionImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({VisionFieldLossMode fieldLossMode});
 }
 
 /// @nodoc
@@ -6949,27 +7149,54 @@ class __$$VisionFilter_TunnelVisionImplCopyWithImpl<$Res>
 
   /// Create a copy of VisionFilter
   /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? fieldLossMode = null,
+  }) {
+    return _then(_$VisionFilter_TunnelVisionImpl(
+      fieldLossMode: null == fieldLossMode
+          ? _value.fieldLossMode
+          : fieldLossMode // ignore: cast_nullable_to_non_nullable
+              as VisionFieldLossMode,
+    ));
+  }
 }
 
 /// @nodoc
 
 class _$VisionFilter_TunnelVisionImpl extends VisionFilter_TunnelVision {
-  const _$VisionFilter_TunnelVisionImpl() : super._();
+  const _$VisionFilter_TunnelVisionImpl({required this.fieldLossMode})
+      : super._();
+
+  @override
+  final VisionFieldLossMode fieldLossMode;
 
   @override
   String toString() {
-    return 'VisionFilter.tunnelVision()';
+    return 'VisionFilter.tunnelVision(fieldLossMode: $fieldLossMode)';
   }
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
-            other is _$VisionFilter_TunnelVisionImpl);
+            other is _$VisionFilter_TunnelVisionImpl &&
+            (identical(other.fieldLossMode, fieldLossMode) ||
+                other.fieldLossMode == fieldLossMode));
   }
 
   @override
-  int get hashCode => runtimeType.hashCode;
+  int get hashCode => Object.hash(runtimeType, fieldLossMode);
+
+  /// Create a copy of VisionFilter
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$VisionFilter_TunnelVisionImplCopyWith<_$VisionFilter_TunnelVisionImpl>
+      get copyWith => __$$VisionFilter_TunnelVisionImplCopyWithImpl<
+          _$VisionFilter_TunnelVisionImpl>(this, _$identity);
 
   @override
   @optionalTypeArgs
@@ -6983,10 +7210,14 @@ class _$VisionFilter_TunnelVisionImpl extends VisionFilter_TunnelVision {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -7011,7 +7242,7 @@ class _$VisionFilter_TunnelVisionImpl extends VisionFilter_TunnelVision {
     required TResult Function() teichopsia,
     required TResult Function(BigInt seed) flickeringStars,
   }) {
-    return tunnelVision();
+    return tunnelVision(fieldLossMode);
   }
 
   @override
@@ -7026,10 +7257,13 @@ class _$VisionFilter_TunnelVisionImpl extends VisionFilter_TunnelVision {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -7053,7 +7287,7 @@ class _$VisionFilter_TunnelVisionImpl extends VisionFilter_TunnelVision {
     TResult? Function()? teichopsia,
     TResult? Function(BigInt seed)? flickeringStars,
   }) {
-    return tunnelVision?.call();
+    return tunnelVision?.call(fieldLossMode);
   }
 
   @override
@@ -7068,10 +7302,13 @@ class _$VisionFilter_TunnelVisionImpl extends VisionFilter_TunnelVision {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -7097,7 +7334,7 @@ class _$VisionFilter_TunnelVisionImpl extends VisionFilter_TunnelVision {
     required TResult orElse(),
   }) {
     if (tunnelVision != null) {
-      return tunnelVision();
+      return tunnelVision(fieldLossMode);
     }
     return orElse();
   }
@@ -7228,8 +7465,18 @@ class _$VisionFilter_TunnelVisionImpl extends VisionFilter_TunnelVision {
 }
 
 abstract class VisionFilter_TunnelVision extends VisionFilter {
-  const factory VisionFilter_TunnelVision() = _$VisionFilter_TunnelVisionImpl;
+  const factory VisionFilter_TunnelVision(
+          {required final VisionFieldLossMode fieldLossMode}) =
+      _$VisionFilter_TunnelVisionImpl;
   const VisionFilter_TunnelVision._() : super._();
+
+  VisionFieldLossMode get fieldLossMode;
+
+  /// Create a copy of VisionFilter
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$VisionFilter_TunnelVisionImplCopyWith<_$VisionFilter_TunnelVisionImpl>
+      get copyWith => throw _privateConstructorUsedError;
 }
 
 /// @nodoc
@@ -7311,10 +7558,14 @@ class _$VisionFilter_CataractImpl extends VisionFilter_Cataract {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -7354,10 +7605,13 @@ class _$VisionFilter_CataractImpl extends VisionFilter_Cataract {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -7396,10 +7650,13 @@ class _$VisionFilter_CataractImpl extends VisionFilter_Cataract {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -7688,10 +7945,14 @@ class _$VisionFilter_FloatersImpl extends VisionFilter_Floaters {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -7731,10 +7992,13 @@ class _$VisionFilter_FloatersImpl extends VisionFilter_Floaters {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -7773,10 +8037,13 @@ class _$VisionFilter_FloatersImpl extends VisionFilter_Floaters {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -8007,10 +8274,14 @@ class _$VisionFilter_PhotophobiaImpl extends VisionFilter_Photophobia {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -8050,10 +8321,13 @@ class _$VisionFilter_PhotophobiaImpl extends VisionFilter_Photophobia {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -8092,10 +8366,13 @@ class _$VisionFilter_PhotophobiaImpl extends VisionFilter_Photophobia {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -8309,10 +8586,14 @@ class _$VisionFilter_NightBlindnessImpl extends VisionFilter_NightBlindness {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -8352,10 +8633,13 @@ class _$VisionFilter_NightBlindnessImpl extends VisionFilter_NightBlindness {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -8394,10 +8678,13 @@ class _$VisionFilter_NightBlindnessImpl extends VisionFilter_NightBlindness {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -8610,10 +8897,14 @@ class _$VisionFilter_VertigoImpl extends VisionFilter_Vertigo {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -8653,10 +8944,13 @@ class _$VisionFilter_VertigoImpl extends VisionFilter_Vertigo {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -8695,10 +8989,13 @@ class _$VisionFilter_VertigoImpl extends VisionFilter_Vertigo {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -8912,10 +9209,14 @@ class _$VisionFilter_BppvRotationImpl extends VisionFilter_BppvRotation {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -8955,10 +9256,13 @@ class _$VisionFilter_BppvRotationImpl extends VisionFilter_BppvRotation {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -8997,10 +9301,13 @@ class _$VisionFilter_BppvRotationImpl extends VisionFilter_BppvRotation {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -9216,10 +9523,14 @@ class _$VisionFilter_VestibularNeuritisImpl
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -9259,10 +9570,13 @@ class _$VisionFilter_VestibularNeuritisImpl
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -9301,10 +9615,13 @@ class _$VisionFilter_VestibularNeuritisImpl
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -9566,10 +9883,14 @@ class _$VisionFilter_DiplopiaImpl extends VisionFilter_Diplopia {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -9609,10 +9930,13 @@ class _$VisionFilter_DiplopiaImpl extends VisionFilter_Diplopia {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -9651,10 +9975,13 @@ class _$VisionFilter_DiplopiaImpl extends VisionFilter_Diplopia {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -9920,10 +10247,14 @@ class _$VisionFilter_NystagmusImpl extends VisionFilter_Nystagmus {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -9963,10 +10294,13 @@ class _$VisionFilter_NystagmusImpl extends VisionFilter_Nystagmus {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -10005,10 +10339,13 @@ class _$VisionFilter_NystagmusImpl extends VisionFilter_Nystagmus {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -10297,10 +10634,14 @@ class _$VisionFilter_StarburstsImpl extends VisionFilter_Starbursts {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -10340,10 +10681,13 @@ class _$VisionFilter_StarburstsImpl extends VisionFilter_Starbursts {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -10382,10 +10726,13 @@ class _$VisionFilter_StarburstsImpl extends VisionFilter_Starbursts {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -10614,10 +10961,14 @@ class _$VisionFilter_EyeStrainImpl extends VisionFilter_EyeStrain {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -10657,10 +11008,13 @@ class _$VisionFilter_EyeStrainImpl extends VisionFilter_EyeStrain {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -10699,10 +11053,13 @@ class _$VisionFilter_EyeStrainImpl extends VisionFilter_EyeStrain {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -10914,10 +11271,14 @@ class _$VisionFilter_DryEyeImpl extends VisionFilter_DryEye {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -10957,10 +11318,13 @@ class _$VisionFilter_DryEyeImpl extends VisionFilter_DryEye {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -10999,10 +11363,13 @@ class _$VisionFilter_DryEyeImpl extends VisionFilter_DryEye {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -11253,10 +11620,14 @@ class _$VisionFilter_MetamorphopsiaImpl extends VisionFilter_Metamorphopsia {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -11296,10 +11667,13 @@ class _$VisionFilter_MetamorphopsiaImpl extends VisionFilter_Metamorphopsia {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -11338,10 +11712,13 @@ class _$VisionFilter_MetamorphopsiaImpl extends VisionFilter_Metamorphopsia {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -11568,10 +11945,14 @@ class _$VisionFilter_ContrastSensitivityImpl
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -11611,10 +11992,13 @@ class _$VisionFilter_ContrastSensitivityImpl
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -11653,10 +12037,13 @@ class _$VisionFilter_ContrastSensitivityImpl
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -11899,10 +12286,14 @@ class _$VisionFilter_DetailLossImpl extends VisionFilter_DetailLoss {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -11942,10 +12333,13 @@ class _$VisionFilter_DetailLossImpl extends VisionFilter_DetailLoss {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -11984,10 +12378,13 @@ class _$VisionFilter_DetailLossImpl extends VisionFilter_DetailLoss {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -12210,10 +12607,14 @@ class _$VisionFilter_TeichopsiaImpl extends VisionFilter_Teichopsia {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -12253,10 +12654,13 @@ class _$VisionFilter_TeichopsiaImpl extends VisionFilter_Teichopsia {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -12295,10 +12699,13 @@ class _$VisionFilter_TeichopsiaImpl extends VisionFilter_Teichopsia {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -12540,10 +12947,14 @@ class _$VisionFilter_FlickeringStarsImpl extends VisionFilter_FlickeringStars {
     required TResult Function() hyperopia,
     required TResult Function() presbyopia,
     required TResult Function(double axisDeg) astigmatism,
-    required TResult Function(VisionGlaucomaMode mode) glaucoma,
-    required TResult Function() macularDegeneration,
-    required TResult Function(double side) hemianopia,
-    required TResult Function() tunnelVision,
+    required TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)
+        glaucoma,
+    required TResult Function(VisionFieldLossMode fieldLossMode)
+        macularDegeneration,
+    required TResult Function(double side, VisionFieldLossMode fieldLossMode)
+        hemianopia,
+    required TResult Function(VisionFieldLossMode fieldLossMode) tunnelVision,
     required TResult Function(BigInt seed) cataract,
     required TResult Function(BigInt seed, double density, double size,
             double gazeX, double gazeY)
@@ -12583,10 +12994,13 @@ class _$VisionFilter_FlickeringStarsImpl extends VisionFilter_FlickeringStars {
     TResult? Function()? hyperopia,
     TResult? Function()? presbyopia,
     TResult? Function(double axisDeg)? astigmatism,
-    TResult? Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult? Function()? macularDegeneration,
-    TResult? Function(double side)? hemianopia,
-    TResult? Function()? tunnelVision,
+    TResult? Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult? Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult? Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult? Function(BigInt seed)? cataract,
     TResult? Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
@@ -12625,10 +13039,13 @@ class _$VisionFilter_FlickeringStarsImpl extends VisionFilter_FlickeringStars {
     TResult Function()? hyperopia,
     TResult Function()? presbyopia,
     TResult Function(double axisDeg)? astigmatism,
-    TResult Function(VisionGlaucomaMode mode)? glaucoma,
-    TResult Function()? macularDegeneration,
-    TResult Function(double side)? hemianopia,
-    TResult Function()? tunnelVision,
+    TResult Function(
+            VisionGlaucomaMode mode, VisionFieldLossMode fieldLossMode)?
+        glaucoma,
+    TResult Function(VisionFieldLossMode fieldLossMode)? macularDegeneration,
+    TResult Function(double side, VisionFieldLossMode fieldLossMode)?
+        hemianopia,
+    TResult Function(VisionFieldLossMode fieldLossMode)? tunnelVision,
     TResult Function(BigInt seed)? cataract,
     TResult Function(BigInt seed, double density, double size, double gazeX,
             double gazeY)?
