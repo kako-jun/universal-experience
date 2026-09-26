@@ -225,10 +225,17 @@ ShaderFilter (lib/rendering/) — Impeller FragmentProgram で ui.Image に適�
 `Consumer` を持つウィジェットだけが rebuild される。
 
 `rust/` crate は `rust_builder/`（cargokit 統合、#55）経由でビルドされ、
-macOS / Linux アプリに同梱される。`lib/main.dart` の `main()` が
-`runApp` 前に `RustLib.init()` を呼んで同梱された native lib をロードする
-（呼ばないと `RustLib.instance` が未初期化のまま `experiences()` 等が例外になる。
-#52 で実際に本番のプリセット欄が例外表示になっていた）。
+macOS / Linux アプリに同梱される。`lib/main.dart` の `main()` は `runApp` 前に
+`services/native_bridge_service.dart` の `initNativeBridge()` を呼んで同梱された
+native lib をロードする（呼ばないと `RustLib.instance` が未初期化のまま
+`experiences()` 等が例外になる。#52 で実際に本番のプリセット欄が例外表示に
+なっていた）。`initNativeBridge()` は `main()` と `integration_test/` の両方が
+共有する唯一の初期化経路で、二重初期化（`RustLib.instance.initialized` が
+true）は素通りにし、`RustLib.init()` 自体の失敗は例外を外に投げず `false` を
+返す。`main()` はこれが `false` のとき `UniversalExperienceApp` の代わりに
+`_NativeBridgeErrorApp`（`AppLocalizations.nativeBridgeInitFailed`、ja/en）を
+`runApp` する。native lib が同梱されていない/壊れている状態でもクラッシュせず
+文言表示に落ちる、という契約。
 
 ### 主要コンポーネント
 
@@ -266,8 +273,16 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
 - **Rust 側**: `cargo test`（`rust/`、`golden_gen.rs` の正本一致テストを含む）
 - **実ブリッジ integration test**（`integration_test/experience_presets_smoke_test.dart`、
   `flutter test integration_test -d macos`、#55）: widget test は
-  `experiencesProvider` を fixture に差し替えているため検知できない、
-  ブリッジ未初期化・native lib 未同梱を実機相当の経路で検知する
+  `experiencesProvider` を fixture に差し替えているため検知できない領域を、
+  `initNativeBridge()` 経由で実ネイティブライブラリをロードして確認する。
+  `experiences()` の 4 件・id/分類の内容一致、プリセット欄のタップによる
+  選択状態遷移、全 30 `VisionFilter` の `visionShaderGlsl()` /
+  `visionUniformLayout()` が例外なく呼べること、`initNativeBridge()` の
+  二重初期化が仕様どおり（例外を投げず true を返す）であることを検証する。
+  `setUpAll` の `initNativeBridge()` が `false` を返した場合（native lib が
+  同梱されていない・壊れている）はテスト自体を `fail()` させて検知する
+  （main() 側はクラッシュせず `_NativeBridgeErrorApp` に落ちるが、CI では
+  それを「壊れている」として検知したいため）
 - **CI**（#38、完了）: `.github/workflows/ci.yml` が push/PR で上記に加え
   `flutter build macos --debug` を回す（#54）。cargokit 統合（#55）により
   この build が rust/ crate のビルドも兼ねるため、Rust toolchain セットアップを

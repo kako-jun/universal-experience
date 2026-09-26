@@ -11,8 +11,8 @@ import 'services/filter_service.dart';
 import 'services/vision_filter_state.dart';
 import 'services/loupe_window_controller.dart';
 import 'services/tray_service.dart';
+import 'services/native_bridge_service.dart';
 import 'services/settings_service.dart';
-import 'src/rust/frb_generated.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/theme/app_theme.dart';
 
@@ -99,8 +99,17 @@ void main() async {
   // Rust ブリッジ (#55)。sensus-core を FRB で消費する `experiences()` 等は
   // これを呼ぶまで `RustLib.instance` が未初期化で例外になる（#52 の実害:
   // プリセット欄が本番で例外表示になっていた）。cargokit (rust_builder/) が
-  // 同梱した native lib をロードする。
-  await RustLib.init();
+  // 同梱した native lib を `initNativeBridge()`（services/native_bridge_service.dart）
+  // でロードする。main() と integration_test/ の両方がこの同じ関数を呼ぶ。
+  //
+  // 失敗時（native lib が壊れている・同梱されていない等）はクラッシュさせず、
+  // ローカライズしたエラー画面を出して runApp を差し替える。以降の Rust 呼び出し
+  // （experiences() 等）はもう行われない。
+  final nativeBridgeReady = await initNativeBridge();
+  if (!nativeBridgeReady) {
+    runApp(const _NativeBridgeErrorApp());
+    return;
+  }
 
   // Restore persisted settings (theme mode / last filter / intensity / locale)
   // before building the app so the first frame already reflects the user's
@@ -245,6 +254,47 @@ class UniversalExperienceApp extends StatelessWidget {
             supportedLocales: AppLocalizations.supportedLocales,
             home: const HomeScreen(),
             debugShowCheckedModeBanner: false,
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Rust ブリッジの初期化失敗時 (#55) に `UniversalExperienceApp` の代わりに
+/// 表示するエラー画面。`initNativeBridge()` が false を返したときだけ使う。
+///
+/// `VisionFilterState` / `FilterService` 等の状態も `SettingsService` も
+/// 一切構築しない（Rust ブリッジに依存する機能を使わせないための最小構成）。
+/// ロケールはシステム追従（設定の読込前なので永続化ロケールは見られない）。
+class _NativeBridgeErrorApp extends StatelessWidget {
+  const _NativeBridgeErrorApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      locale: _resolveStartupLocale(null),
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
+      debugShowCheckedModeBanner: false,
+      home: Builder(
+        builder: (context) {
+          final l10n = AppLocalizations.of(context)!;
+          return Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  l10n.nativeBridgeInitFailed,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
           );
         },
       ),

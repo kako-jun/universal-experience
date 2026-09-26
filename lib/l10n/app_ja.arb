@@ -3,6 +3,8 @@
 
   "appTitle": "Universal Experience",
 
+  "nativeBridgeInitFailed": "ネイティブライブラリの読み込みに失敗しました。アプリを再インストールしてください。",
+
   "headerTagline": "すべての感覚を、すべての人に。",
   "headerSubtitle": "あらゆる視点を体験し、あらゆる困難を理解する。",
 
