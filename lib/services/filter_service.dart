@@ -240,6 +240,7 @@ class FilterService extends ChangeNotifier {
   void _schedulePersist() {
     _debounce?.cancel();
     _debounce = Timer(_debounceDuration, () {
+      _debounce = null;
       unawaited(_persist());
     });
   }
@@ -260,11 +261,14 @@ class FilterService extends ChangeNotifier {
 
   /// 保留中のデバウンス書き込みがあれば、実タイマーの発火を待たず即座に実行する
   /// （#57）。アプリ終了シーケンス（トレイの終了・ウィンドウを閉じて終了する
-  /// 経路、`main.dart` 参照）で、デバウンス待ち（既定 300ms）のせいで直近の
-  /// intensity 変更が失われないよう呼ぶ。テストでも、実タイマーの発火を待たず
-  /// 永続化結果を検証するのに使える。
+  /// 経路・`AppLifecycleListener.onExitRequested`、`main.dart` 参照）で、
+  /// デバウンス待ち（既定 300ms）のせいで直近の intensity 変更が失われないよう
+  /// 呼ぶ。保留中の書き込みが無ければ何もしない（無条件に書くと、変更が無い
+  /// のに毎回 SharedPreferences へ書き込むことになる）。テストでも、実タイマーの
+  /// 発火を待たず永続化結果を検証するのに使える。
   Future<void> flush() async {
-    _debounce?.cancel();
+    if (_debounce == null) return;
+    _debounce!.cancel();
     _debounce = null;
     await _persist();
   }

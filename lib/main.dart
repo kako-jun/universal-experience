@@ -3,6 +3,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:io' show Platform;
+// AppLifecycleListener.onExitRequested の戻り値型（AppExitResponse）は dart:ui
+// 由来で、package:flutter/material.dart からは再エクスポートされない。
+import 'dart:ui' show AppExitResponse;
 
 import 'l10n/app_localizations.dart';
 import 'l10n/l10n_extensions.dart';
@@ -30,6 +33,15 @@ final FilterService filterService = FilterService();
 /// するなら `assets/tray/tray_icon.ico` を追加して分岐すればよい。
 /// 詳細は docs/ARCHITECTURE.md「タスクトレイ (#15)」参照。
 const String _trayIconPath = 'assets/tray/tray_icon.png';
+
+/// OS からの終了要求（macOS の Cmd+Q / メニューバーの「終了」/ ログアウト等）を
+/// 捕捉し、[FilterService.flush] を挟んでから終了を許可する（#57 レビュー
+/// should-1）。トレイ経由・ウィンドウクローズ経由の flush（[_setUpTray] /
+/// `onQuit`）は window_manager のクローズイベントしか見ておらず、Cmd+Q や
+/// ログアウトはそれらを経由せず直接プロセス終了に向かうため、二重の安全網として
+/// 別途これが要る。`main()` 内のローカル変数にすると `main()` の関数フレームが
+/// 終わった時点で参照が切れ GC されうるため、トップレベル変数として保持する。
+late final AppLifecycleListener appLifecycleListener;
 
 /// タスクトレイ常駐 (#15)。トレイ非対応環境では init() が no-op になる。
 ///
@@ -162,6 +174,17 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // macOS の Cmd+Q・メニューバーの「終了」・ログアウト等（window_manager の
+  // クローズイベントを経由しない終了経路）でも intensity のデバウンス永続化
+  // （#57）を取りこぼさないための保険（should-1）。トレイ・ウィンドウクローズ
+  // 経由の flush はそのまま残す。
+  appLifecycleListener = AppLifecycleListener(
+    onExitRequested: () async {
+      await filterService.flush();
+      return AppExitResponse.exit;
+    },
+  );
+
   // buildRootApp() が Rust ブリッジ初期化・設定復元・filterService のシードを
   // 行い、成功/失敗いずれの場合も表示すべき Widget を bridgeReady と共に返す（#55）。
   final settings = SettingsService();
@@ -254,10 +277,15 @@ Future<void> _setUpTray() async {
         }
         // トレイ非対応環境: ウィンドウを閉じる = アプリを終了する（最終結果は
         // 元の実装と同じ）。デバウンス中の intensity 永続化（#57）を
-        // 取りこぼさないよう、実際に閉じる前に flush する。
-        await filterService.flush();
-        await windowManager.setPreventClose(false);
-        await windowManager.destroy();
+        // 取りこぼさないよう、実際に閉じる前に flush する。flush が万一失敗
+        // しても（`FilterService.flush` 自体は内部で握りつぶすが、念のため）
+        // ウィンドウを閉じずに固まらないよう、実際の終了は finally で行う。
+        try {
+          await filterService.flush();
+        } finally {
+          await windowManager.setPreventClose(false);
+          await windowManager.destroy();
+        }
       },
     ),
   );

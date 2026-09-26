@@ -357,11 +357,14 @@ void main() {
       expect(json, contains('"protanopia":0.42'));
     });
 
-    test('保留中の書き込みが無い状態で flush しても例外にならない', () async {
+    test('保留中の書き込みが無い状態で flush しても例外にならず、何も書き込まない（nit-2）', () async {
       SharedPreferences.setMockInitialValues({});
       final service = FilterService();
       await service.load();
       await service.flush();
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.containsKey(FilterService.keyIntensityByType), isFalse);
     });
 
     test('dispose 時に保留中の書き込みがあれば永続化される', () async {
