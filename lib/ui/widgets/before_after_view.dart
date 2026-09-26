@@ -187,6 +187,12 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   bool _loading = true;
   bool _exporting = false;
 
+  /// Set when the most recently *applied* generation failed (#58 レビュー
+  /// SHOULD-1). Gates the "after" pane to a [_ErrorPlaceholder] instead of a
+  /// stale/possibly-inconsistent image. Cleared back to `null` on the next
+  /// successful generation.
+  Object? _error;
+
   /// Resolution (square side, pixels) the currently-held [_before]/[_after]
   /// were generated at. `null` until the first generation completes (#58).
   int? _currentSampleSize;
@@ -195,6 +201,14 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// debounced) but not yet applied — guards against re-scheduling the same
   /// resize on every intermediate build (#58).
   int? _pendingResizeSampleSize;
+
+  /// Sample size the *latest completed* [_rebuild] attempt failed at (#58
+  /// レビュー MUST-1). A permanent failure (missing asset, shader compile
+  /// error, …) must not turn into a busy loop: [_evaluateAutoResize] refuses
+  /// to auto-retry the same size again — only a genuine size change (a real
+  /// resize) or a user action (filterType/intensity change, handled in
+  /// [didUpdateWidget]) retries. Cleared back to `null` on success.
+  int? _failedSampleSize;
 
   /// Debounces auto-size regeneration while the pane is being resized, so a
   /// drag/window-resize doesn't regenerate the sample image on every frame.
@@ -250,12 +264,19 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       // #58 レビュー M1: auto モードで初回生成がまだ完了していない間に
       // filterType/intensity が変わると、_currentSampleSize はまだ null。
       // その場合は _pendingResizeSampleSize（初回/リサイズで既に決まっている
-      // 生成先サイズ）を使う。どちらも null なら auto の初回レイアウトが
+      // 生成先サイズ）を使う。
+      // #58 レビュー MUST-1: 恒久的な失敗で _currentSampleSize/
+      // _pendingResizeSampleSize がどちらも null のままのことがある
+      // （auto-resize 側は busy loop を避けるため自動では再試行しない）。
+      // その場合は _failedSampleSize を使い、ユーザー操作（フィルタ/強度の変更）
+      // での再試行を可能にする。すべて null なら auto の初回レイアウトが
       // まだ来ていないということなので、そのレイアウトに任せてここでは何もしない
       // （実行される _rebuild は呼び出し時点の widget.filterType/intensity を
       // 読むので、更新は取りこぼされない）。
-      final size =
-          widget.sampleSize ?? _pendingResizeSampleSize ?? _currentSampleSize;
+      final size = widget.sampleSize ??
+          _pendingResizeSampleSize ??
+          _currentSampleSize ??
+          _failedSampleSize;
       if (size != null) {
         // 直接 _rebuild するので、保留中のデバウンスタイマー（あれば）は不要。
         _cancelResizeTimer();
@@ -323,6 +344,15 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       return;
     }
     if (target == _pendingResizeSampleSize) return;
+    if (target == _failedSampleSize) {
+      // #58 レビュー MUST-1: 恒久的な失敗（アセット欠落・シェーダのコンパイル
+      // 失敗など）を、毎フレーム（初回）や 300ms 周期（リサイズ後）で
+      // 再試行し続ける busy loop にしない。サイズが変わらない限り自動では
+      // 再試行しない。ユーザー操作（filterType/intensity の変更）による
+      // 再試行は didUpdateWidget 側の size 解決式でカバーする。時間ベースの
+      // 再試行・バックオフは方針として入れない。
+      return;
+    }
 
     _pendingResizeSampleSize = target;
     _cancelResizeTimer();
@@ -338,15 +368,30 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     }
   }
 
-  /// Cleans up after a failed [_rebuild] (#58 レビュー S1): if this call is
-  /// still the latest request, resets `_loading`/`_pendingResizeSampleSize`
-  /// so the UI doesn't stay stuck on the "preparing" placeholder and a later
-  /// layout/update can retry. If a newer request has already superseded this
-  /// one, does nothing (that newer request owns the state now).
-  void _onRebuildFailed(int generation) {
+  /// Cleans up after a failed [_rebuild] (#58 レビュー S1/MUST-1/SHOULD-1): if
+  /// this call is still the latest request, resets `_loading` so the UI
+  /// doesn't stay stuck on the "preparing" placeholder, records [sampleSize]
+  /// in [_failedSampleSize] (so [_evaluateAutoResize] won't busy-loop
+  /// retrying the same size — MUST-1) and clears `_pendingResizeSampleSize`
+  /// (so a genuine size change or a user action can still retry), and shows
+  /// a failure state instead of the (possibly now-stale) `_after` (SHOULD-1).
+  /// If a newer request has already superseded this one, does nothing (that
+  /// newer request owns the state now).
+  void _onRebuildFailed(int generation, int sampleSize, Object error) {
     if (generation != _generation || !mounted) return;
-    setState(() => _loading = false);
+    _failedSampleSize = sampleSize;
     _pendingResizeSampleSize = null;
+    final oldAfter = _after;
+    setState(() {
+      _loading = false;
+      _error = error;
+      _after = null;
+    });
+    // _after may have aliased _before (filterType == none) — don't dispose
+    // the image that's still the current `_before`.
+    if (oldAfter != null && !identical(oldAfter, _before)) {
+      oldAfter.dispose();
+    }
   }
 
   Future<void> _rebuild(int sampleSize) async {
@@ -361,10 +406,10 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     } else {
       try {
         before = await sampleImageGenerator(sampleSize);
-      } catch (_) {
+      } catch (e) {
         // #58 レビュー S1: 生成に失敗しても loading に固着させず、次の
         // レイアウト/更新で再試行できるようにする。
-        _onRebuildFailed(generation);
+        _onRebuildFailed(generation, sampleSize, e);
         return;
       }
     }
@@ -390,13 +435,13 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         widget.filterType,
         widget.intensity,
       );
-    } catch (_) {
+    } catch (e) {
       if (clonedInput) {
         rendererInput.dispose();
       } else if (!identical(before, _before)) {
         before.dispose();
       }
-      _onRebuildFailed(generation);
+      _onRebuildFailed(generation, sampleSize, e);
       return;
     }
 
@@ -406,11 +451,15 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       // discard everything we produced instead of leaking or touching state
       // a newer request already owns.
       if (!reuseBefore && !identical(before, _before)) before.dispose();
-      if (clonedInput && !identical(rendererInput, after)) {
-        rendererInput.dispose();
-      }
+      // #58 レビュー SHOULD-2: `rendererInput` は clone された時点でこの呼び出し
+      // だけが所有する私有オブジェクト。`after` と同一（filterType == none で
+      // clone がそのまま返った場合）でも無条件に dispose する — 「同一なら
+      // どちらかに任せる」という以前の条件分岐は、両方の条件が同時に false に
+      // なる組み合わせで dispose 漏れ（リーク）を起こしていた。
+      if (clonedInput) rendererInput.dispose();
       if (after != null &&
           !identical(after, rendererInput) &&
+          !identical(after, before) &&
           !identical(after, _after)) {
         after.dispose();
       }
@@ -424,8 +473,10 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       _after = after;
       _currentSampleSize = sampleSize;
       _loading = false;
+      _error = null; // #58 レビュー SHOULD-1: 成功したら失敗表示を解除する。
     });
     _pendingResizeSampleSize = null;
+    _failedSampleSize = null; // #58 レビュー MUST-1: 成功したので再試行を許可する。
 
     if (clonedInput && !identical(rendererInput, after)) {
       // The clone only exists to protect the renderer call; it never becomes
@@ -564,12 +615,27 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
           label: l10n.previewPaneOriginal,
           child: _ImageView(image: _before),
         );
+        // #58 レビュー SHOULD-1: 最新世代が失敗した場合は _error が立ち、
+        // _after は null にされている。stale/不整合な画像を出し続けるより
+        // 失敗を明示する。
+        final Widget afterChild;
+        if (_error != null) {
+          afterChild =
+              _ErrorPlaceholder(theme: theme, label: l10n.previewFailed);
+        } else if (_after != null) {
+          afterChild = _ImageView(image: _after);
+        } else {
+          afterChild = _ComingSoonPlaceholder(
+            theme: theme,
+            label: l10n.previewComingSoon,
+          );
+        }
         final afterPane = _Pane(
           label: widget.filterType == ColorVisionType.none
               ? l10n.previewPaneOriginal
               : colorVisionTypeName(l10n, widget.filterType),
           // Export is only meaningful when a real "after" image exists.
-          // Coming-soon filters (null _after) get no button.
+          // Coming-soon/failed states (null _after) get no button.
           trailing: _after != null
               ? IconButton(
                   icon: const Icon(Icons.download_outlined),
@@ -579,12 +645,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                   onPressed: _exporting ? null : () => _export(l10n),
                 )
               : null,
-          child: _after != null
-              ? _ImageView(image: _after)
-              : _ComingSoonPlaceholder(
-                  theme: theme,
-                  label: l10n.previewComingSoon,
-                ),
+          child: afterChild,
         );
 
         if (stackVertically) {
@@ -721,6 +782,45 @@ class _ComingSoonPlaceholder extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown in the "after" pane when the latest generation/render attempt
+/// failed (#58 レビュー SHOULD-1). Colours come only from `colorScheme` roles
+/// (#72 の方針): the `error`/`onErrorContainer` family, not a hardcoded value.
+class _ErrorPlaceholder extends StatelessWidget {
+  const _ErrorPlaceholder({required this.theme, required this.label});
+
+  final ThemeData theme;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: theme.colorScheme.errorContainer,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.error_outline,
+                color: theme.colorScheme.onErrorContainer,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onErrorContainer,
                 ),
               ),
             ],
