@@ -141,14 +141,20 @@ flutter run
 
 ## CI
 
-`.github/workflows/ci.yml` が push/PR（main）で flutter analyze / flutter test /
-`rust/` の cargo fmt --check / clippy --all-targets -D warnings / cargo test /
-flutter build macos --debug / 実ブリッジ integration test
-（`flutter test integration_test -d macos`、#55）を回す（runs-on: macos-latest。
-Flutter golden を生成プラットフォームと揃えるため）。cargokit 統合（#55）により
-`flutter build macos` が rust/ crate のビルドも兼ねるため、Setup Rust は
-Flutter build より前に置く。rust 依存は crates.io のみ（sensus-core）なので、
-private 依存を git 経由で引く場合に要る deploy key / ssh-agent 設定は不要。
+`.github/workflows/ci.yml` は2ジョブ構成。`check`（runs-on: macos-latest。
+Flutter golden を生成プラットフォームと揃えるため）が push/PR（main）で
+flutter analyze / flutter test / `rust/` の cargo fmt --check /
+clippy --all-targets -D warnings / cargo test / flutter build macos --debug /
+実ブリッジ integration test（`flutter test integration_test -d macos`、#55）
+を回す。cargokit 統合（#55）により `flutter build macos` が rust/ crate の
+ビルドも兼ねるため、Setup Rust は Flutter build より前に置く。rust 依存は
+crates.io のみ（sensus-core）なので、private 依存を git 経由で引く場合に要る
+deploy key / ssh-agent 設定は不要。
+
+`linux-build`（runs-on: ubuntu-latest、#55）は Linux 側の cargokit 同梱経路
+（`flutter build linux --debug`、`.so` がバンドルされることを ls/test -f で
+確認）と、xvfb 上での実ブリッジ integration test を検証する。両ジョブとも
+`Swatinem/rust-cache` で crates.io 依存 + cargokit のビルド出力をキャッシュする。
 
 ## ロードマップ
 

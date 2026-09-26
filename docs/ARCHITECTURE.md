@@ -321,10 +321,14 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
     呼んで実起動経路そのものを検証する。`main()` 内の `initNativeBridge()`
     呼び出しが削除/誤配置される退行（#52 と同種）を、他のテストを変更せずに
     検知するための専用ファイル
-- **CI**（#38、完了）: `.github/workflows/ci.yml` が push/PR で上記に加え
-  `flutter build macos --debug` を回す（#54）。cargokit 統合（#55）により
-  この build が rust/ crate のビルドも兼ねるため、Rust toolchain セットアップを
-  build より前に置く
+- **CI**（#38、完了）: `.github/workflows/ci.yml` は2ジョブ構成。`check`
+  （macos-latest）が push/PR で上記に加え `flutter build macos --debug` を
+  回す（#54）。cargokit 統合（#55）によりこの build が rust/ crate のビルドも
+  兼ねるため、Rust toolchain セットアップを build より前に置く。`linux-build`
+  （ubuntu-latest、#55）は Linux 側の cargokit 同梱経路（`.so` がバンドルに
+  含まれることの確認）と、xvfb 上での実ブリッジ integration test を検証する。
+  両ジョブとも `Swatinem/rust-cache` で crates.io 依存 + cargokit のビルド
+  出力をキャッシュする
 - **タスクトレイ常駐**（#15、完了）: 実機でのトレイ表示・メニュー操作は環境制約
   （Wayland + grim、GNOME のトレイ拡張要件）のため未検証。純粋ロジックの単体テストと
   ビルド成功で代替している（上記「実機目視について」）
