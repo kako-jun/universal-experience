@@ -29,11 +29,24 @@ import 'filter_service.dart';
 /// ## ウィンドウクローズ・ポリシー (ここで決定)
 ///
 /// Universal Experience は典型的な「トレイ常駐ユーティリティ」として振る舞う。
-/// **メインウィンドウを閉じてもトレイに最小化されるだけで、終了しない。**
-/// 明示的な終了はトレイの "終了" 項目 (または OS) のみ。
-/// これは `main.dart` で `windowManager.setPreventClose(true)` +
-/// `onWindowClose` → `windowManager.hide()` として実装する。純粋関数
-/// [resolveCloseAction] がこの判断を表現・テストする。
+/// **トレイが使える環境では、メインウィンドウを閉じてもトレイに最小化される
+/// だけで、終了しない。** 明示的な終了はトレイの "終了" 項目 (または OS) のみ。
+///
+/// `windowManager.setPreventClose(true)` は（トレイの有無に関わらず）常に掛ける
+/// (`main.dart` `_setUpTray`)。`onWindowClose` の中で [resolveCloseAction] の
+/// 結果を見て分岐する:
+///  * トレイが使える環境 (`hideToTray`) — `windowManager.hide()` するだけで
+///    終了しない。
+///  * トレイが立ち上がらなかった環境 (`exitApp`) — クローズ = 終了。ただし
+///    intensity のデバウンス永続化 (#57) を取りこぼさないよう、実際に
+///    ウィンドウを破棄する前に `FilterService.flush()` → `setPreventClose(false)`
+///    → `windowManager.destroy()` の順で行う。
+///
+/// トレイのクリック "終了" (`onQuit`) も同じ理由で先頭に `flush()` を置く。
+/// さらに、macOS の Cmd+Q やログアウトなど window_manager のクローズイベントを
+/// 経由しない終了経路もあるため、`main()` で `AppLifecycleListener
+/// .onExitRequested` にも同じ `flush()` を仕込んでいる（トレイ・ウィンドウ
+/// クローズ経由の flush はそのまま残り、こちらは二重の安全網）。
 ///
 /// ## プラットフォーム差 (トレイ事情は環境差が大きい)
 ///
