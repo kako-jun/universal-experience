@@ -24,6 +24,13 @@ jobs:
           channel: stable
           cache: true
 
+      # cargokit 統合 (#55) により `flutter build macos` が rust/ crate を
+      # ビルドして同梱するため、Rust toolchain を Flutter build より前に用意する。
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
       - name: Flutter pub get
         run: flutter pub get
 
@@ -32,14 +39,6 @@ jobs:
 
       - name: Flutter test
         run: flutter test
-
-      - name: Flutter build macos
-        run: flutter build macos --debug
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
 
       # rust 依存は crates.io のみ (sensus-core)。private git 依存が無いので
       # deploy key / ssh-agent 手順は不要。
@@ -54,3 +53,13 @@ jobs:
       - name: Rust test
         working-directory: rust
         run: cargo test
+
+      - name: Flutter build macos
+        run: flutter build macos --debug
+
+      # 実ブリッジ smoke test (#55)。cargokit が同梱した native lib を使い、
+      # experiences() とプリセット欄の描画を確認する（ローカル実測で約25秒、
+      # 直前の Flutter build macos で Rust ビルドキャッシュを再利用するため
+      # ここでの追加ビルドは短い）。
+      - name: Flutter integration test (macos)
+        run: flutter test integration_test -d macos
