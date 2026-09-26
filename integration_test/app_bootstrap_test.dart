@@ -22,6 +22,7 @@ import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/main.dart';
 import 'package:universal_experience/src/rust/frb_generated.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart';
+import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -44,7 +45,34 @@ void main() {
 
     expect(RustLib.instance.initialized, isTrue);
     expect(find.byType(HomeScreen), findsOneWidget);
-    expect(find.byType(Card), findsNWidgets(4));
+
+    // HomeScreen の body は素の ListView（暗黙 SliverList）なので、初期ビュー
+    // ポート + デフォルトの cache extent より下にあるセクションは、実際に
+    // スクロールされるまでツリーに build されない。ExperiencePresets は 6
+    // セクション中 5 番目で、実起動時のウィンドウでは初期表示では画面外
+    // （experience_presets_smoke_test.dart は ExperiencePresets 単体を自前の
+    // 小さな Scaffold+SingleChildScrollView に包んで pump するだけなので
+    // この問題を踏まない）。まず ExperiencePresets をスクロールで可視化する。
+    await tester.scrollUntilVisible(
+      find.byType(ExperiencePresets),
+      300.0,
+      // このテスト時点で画面上の Scrollable はこの HomeScreen 本体の ListView
+      // 1 つだけ（DropdownButton 等はメニューを開かない限り Scrollable を
+      // 生成しない）なので .first で一意に解決できる。
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    // HomeScreen の他 5 セクション（filter/controls/preview/advanced/info）も
+    // それぞれ自前で Card を使っているため、素の find.byType(Card) はツリー
+    // 全体では 4 に確定しない。ExperiencePresets の子孫だけに絞って検証する。
+    expect(
+      find.descendant(
+        of: find.byType(ExperiencePresets),
+        matching: find.byType(Card),
+      ),
+      findsNWidgets(4),
+    );
     expect(tester.takeException(), isNull);
   });
 
