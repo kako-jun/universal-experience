@@ -75,10 +75,9 @@ double recommendedStrength(ColorVisionType type) {
 /// その再構築を止める。`FilterService` の listener は `Consumer<FilterService>`
 /// を使うウィジェット（スライダー・プレビュー等）だけを再構築する。
 ///
-/// [load] 時、per-type の保存（[keyIntensityByType]）が無ければ、旧
-/// `SettingsService` の単一キー（[legacyIntensityKey]）を一度だけ、呼び出し側が
-/// 指定した「起動時に選ばれるタイプ」の初期値として移行する。以降このキーへは
-/// 二度と書かない。
+/// 旧 `SettingsService` の単一キー（[legacyIntensityKey]）からの移行は行わない
+/// （#57 時点でアプリは未リリースで既存ユーザーがいないため）。[load] はこの
+/// キーを一切読まず、残っていれば削除するだけ。
 class FilterService extends ChangeNotifier {
   FilterService({
     SharedPreferences? prefs,
@@ -86,9 +85,9 @@ class FilterService extends ChangeNotifier {
   })  : _prefs = prefs,
         _debounceDuration = debounce;
 
-  /// 旧 `SettingsService.keyIntensity`（#17）と同じキー文字列。[load] が
-  /// per-type の保存（[keyIntensityByType]）を見つけられなかったときだけ一度
-  /// 読み、移行に使う。
+  /// 旧 `SettingsService.keyIntensity`（#17、#57 で撤去）と同じキー文字列。
+  /// [load] はこの値を読まない（移行しない、M1）。ディスクに残っていれば
+  /// [load] が削除するだけの、掃除専用のキー名。
   static const String legacyIntensityKey = 'settings.intensity';
 
   /// per-type intensity の永続化キー。JSON オブジェクト
@@ -163,12 +162,11 @@ class FilterService extends ChangeNotifier {
   /// アプリ起動時に一度、`SettingsService.load()` の後・`applyFilter` で起動時の
   /// フィルタ種別をシードする前に呼ぶ（`main.dart` 参照）。
   ///
-  /// per-type の保存がまだ無い（#57 より前にインストールされた環境）場合は、旧
-  /// 単一キー [legacyIntensityKey] があれば、[migrateLegacyIntensityFor] に一度だけ
-  /// 移行する（通常は起動時に復元される `SettingsService.filterType` を渡す）。
-  Future<void> load({
-    ColorVisionType migrateLegacyIntensityFor = ColorVisionType.none,
-  }) async {
+  /// 旧単一キー [legacyIntensityKey] は読まない（M1: 移行はしない。アプリは
+  /// #57 時点で未リリースのため既存ユーザーはいない）。ディスクに残っていれば
+  /// 値を見ずに削除するだけで、以降のタイプ選択は素直に [recommendedStrength]
+  /// から始まる。
+  Future<void> load() async {
     final prefs = _prefs ??= await SharedPreferences.getInstance();
 
     final json = prefs.getString(keyIntensityByType);
@@ -186,13 +184,9 @@ class FilterService extends ChangeNotifier {
       } catch (_) {
         // 壊れた JSON は無視する。以降 recommendedStrength へフォールバックする。
       }
-      return;
     }
 
-    final legacy = prefs.getDouble(legacyIntensityKey);
-    if (legacy != null) {
-      _intensityByType[migrateLegacyIntensityFor] = legacy.clamp(0.0, 1.0);
-    }
+    await prefs.remove(legacyIntensityKey);
   }
 
   /// フィルタを選択する（選択状態の更新のみ。OS への system-wide 適用はしない）。
@@ -232,7 +226,14 @@ class FilterService extends ChangeNotifier {
 
   @override
   void dispose() {
-    _debounce?.cancel();
+    // 保留中のデバウンス書き込みがあれば、実タイマーの発火を待たず飛ばす
+    // （待つと dispose() が完了するまでの間、直近の intensity 変更が失われうる）。
+    // dispose() 自体は同期 API なので await はできない。
+    if (_debounce != null) {
+      _debounce!.cancel();
+      _debounce = null;
+      unawaited(_persist());
+    }
     super.dispose();
   }
 
@@ -257,10 +258,12 @@ class FilterService extends ChangeNotifier {
     }
   }
 
-  /// テスト専用: デバウンス中の永続化を実タイマーの発火を待たず即座に実行する
-  /// （#57）。本体コードからは呼ばない。
-  @visibleForTesting
-  Future<void> debugFlushPersist() async {
+  /// 保留中のデバウンス書き込みがあれば、実タイマーの発火を待たず即座に実行する
+  /// （#57）。アプリ終了シーケンス（トレイの終了・ウィンドウを閉じて終了する
+  /// 経路、`main.dart` 参照）で、デバウンス待ち（既定 300ms）のせいで直近の
+  /// intensity 変更が失われないよう呼ぶ。テストでも、実タイマーの発火を待たず
+  /// 永続化結果を検証するのに使える。
+  Future<void> flush() async {
     _debounce?.cancel();
     _debounce = null;
     await _persist();
