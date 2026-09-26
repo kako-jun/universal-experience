@@ -273,7 +273,15 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
 - `HomeScreen`: メイン画面。色覚クイック選択・強度スライダ・before/after プレビュー・
   advanced カタログ・体験プリセット・PNG エクスポートをまとめる
 - `FilterService`: 色覚フィルタ（`ColorVisionType`）の選択状態管理。
-  sensus `VisionFilter` へのマッピングを持つ純粋な状態モデル
+  sensus `VisionFilter` へのマッピングを持つ純粋な状態モデル。強度
+  （`intensity`）はタイプごとに `Map<ColorVisionType, double>` で個別記憶し、
+  初めて選ぶタイプは推奨強度（-opia/achromatopsia=1.0、-omaly=0.6）が初期値
+  になる（#57）。永続化・通知も本サービス自身が担う（300ms デバウンスした
+  SharedPreferences 書き込み + 自前の `ChangeNotifier`）。`SettingsService`
+  は `notifyListeners` を購読する `MaterialApp`（テーマ/ロケール用）を持つため、
+  intensity のようにスライダー 1 目盛りごとに変わる値をそちらに混ぜると
+  アプリ全体が毎回再構築されてしまう。それを避けるため intensity は
+  `SettingsService` を経由しない
 - `VisionFilterState`: advanced カタログ（sensus 全 30 種）の選択・パラメータ状態
 - `ShaderFilter`（`lib/rendering/shader_filter.dart`）: sensus 由来 GLSL を変換した
   Impeller `FragmentProgram` で `ui.Image` にフィルタを適用する。ライブ描画は
