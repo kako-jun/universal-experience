@@ -31,6 +31,17 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      # rust/ crate（cargo fmt/clippy/test が直接使う target/）のキャッシュ。
+      # cargokit 経由のビルド（flutter build macos）は Xcode の DerivedData 配下に
+      # 実行のたびに変わる一時ディレクトリへ出力するため、そちらはキャッシュ対象に
+      # 含めていない（安定したパスがない）。crates.io からの依存取得
+      # （~/.cargo/registry 等）は rust-cache が常にキャッシュするので、
+      # cargokit 側のビルドもそこは恩恵を受ける。
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
       - name: Flutter pub get
         run: flutter pub get
 
@@ -63,3 +74,64 @@ jobs:
       # ここでの追加ビルドは短い）。
       - name: Flutter integration test (macos)
         run: flutter test integration_test -d macos
+
+  # Linux でも cargokit (#55) が rust/ crate を実際にビルドして同梱することを
+  # 検証する。macOS の `check` job は golden テスト用に必須だが、Linux 側の
+  # 同梱経路（linux/CMakeLists.txt の apply_cargokit、rpath $ORIGIN/lib）は
+  # 別途ここで実証する。
+  linux-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Flutter Linux デスクトップビルドの標準要件（clang/cmake/ninja/pkg-config/
+      # GTK3）に加え、tray_manager が要求する libayatana-appindicator3-dev
+      # （無ければ CMake 構成が `tray_manager requires ayatana-appindicator3-0.1
+      # or appindicator3-0.1` で FATAL_ERROR になる）。window_manager /
+      # screen_retriever は GTK3 のみで追加パッケージ不要（各 linux/CMakeLists.txt
+      # で確認済み）。
+      - name: Install Linux desktop build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config libgtk-3-dev \
+            libayatana-appindicator3-dev
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # cargokit が rustup を直接呼ぶため、rustup 経由でインストールする
+      # dtolnay/rust-toolchain を使う（#55、docs/GETTING_STARTED.md 参照）。
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # rust/ 本体に加え、cargokit が `flutter build linux` 時に実際にビルドで
+      # 使う一時ディレクトリ（CMAKE_CURRENT_BINARY_DIR/cargokit_build、
+      # rust_builder/cargokit/cmake/cargokit.cmake 参照）もキャッシュする。
+      # Flutter Linux の標準ビルドパス（build/linux/x64/<config>/plugins/<plugin>）
+      # を前提にしており、Flutter のバージョンでこの構造が変わった場合は
+      # キャッシュがヒットしないだけで（保存対象が存在しない）ビルド自体は失敗しない。
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            rust
+            rust -> ../build/linux/x64/debug/plugins/universal_experience_rust/cargokit_build
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Flutter build linux
+        run: flutter build linux --debug
+
+      # 完了条件（#55 レビュー指摘）: Rust ライブラリが実際に Linux バンドルの
+      # lib/ に同梱されていることを ls で確認する。無ければ次のステップで fail。
+      - name: Verify Rust library is bundled in the Linux bundle
+        run: |
+          BUNDLE_LIB=build/linux/x64/debug/bundle/lib
+          echo "Contents of $BUNDLE_LIB:"
+          ls -la "$BUNDLE_LIB"
+          test -f "$BUNDLE_LIB/libuniversal_experience_rust.so"
