@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 
 /// BeforeAfterView の before/after 生成ロジックと描画カバレッジのテスト（#17）。
@@ -91,6 +92,32 @@ void main() {
       );
       expect(out, isNotNull);
       out!.dispose();
+    });
+
+    test(
+        'protanomaly は推奨強度（0.6）で描画すると protanopia（1.0）と出力が異なる '
+        '（#57: 以前は両方とも intensity 1.0 で描画され同一の見た目になっていた）', () async {
+      final protanopiaOut = await BeforeAfterView.renderAfter(
+        src,
+        ColorVisionType.protanopia,
+        recommendedStrength(ColorVisionType.protanopia),
+      );
+      final protanomalyOut = await BeforeAfterView.renderAfter(
+        src,
+        ColorVisionType.protanomaly,
+        recommendedStrength(ColorVisionType.protanomaly),
+      );
+      expect(protanopiaOut, isNotNull);
+      expect(protanomalyOut, isNotNull);
+
+      final protanopiaPng = await encodeImagePng(protanopiaOut!);
+      final protanomalyPng = await encodeImagePng(protanomalyOut!);
+      expect(protanopiaPng, isNotNull);
+      expect(protanomalyPng, isNotNull);
+      expect(protanomalyPng, isNot(equals(protanopiaPng)));
+
+      protanopiaOut.dispose();
+      protanomalyOut.dispose();
     });
 
     test('未実装フィルタは null（プレースホルダ）を返す', () async {

@@ -12,28 +12,25 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsService 初期状態 / load', () {
-    test('保存値が無いときは既定（system / none / 1.0）を保つ', () async {
+    test('保存値が無いときは既定（system / none）を保つ', () async {
       SharedPreferences.setMockInitialValues({});
       final settings = SettingsService();
       await settings.load();
 
       expect(settings.themeMode, ThemeMode.system);
       expect(settings.filterType, ColorVisionType.none);
-      expect(settings.intensity, 1.0);
     });
 
     test('保存済みの値を復元する', () async {
       SharedPreferences.setMockInitialValues({
         SettingsService.keyThemeMode: ThemeMode.dark.name,
         SettingsService.keyFilterType: ColorVisionType.protanopia.name,
-        SettingsService.keyIntensity: 0.4,
       });
       final settings = SettingsService();
       await settings.load();
 
       expect(settings.themeMode, ThemeMode.dark);
       expect(settings.filterType, ColorVisionType.protanopia);
-      expect(settings.intensity, 0.4);
     });
 
     test('未知の文字列は既定にフォールバックする', () async {
@@ -46,15 +43,6 @@ void main() {
 
       expect(settings.themeMode, ThemeMode.system);
       expect(settings.filterType, ColorVisionType.none);
-    });
-
-    test('範囲外の intensity は 0..1 に clamp して復元する', () async {
-      SharedPreferences.setMockInitialValues({
-        SettingsService.keyIntensity: 5.0,
-      });
-      final settings = SettingsService();
-      await settings.load();
-      expect(settings.intensity, 1.0);
     });
   });
 
@@ -76,18 +64,16 @@ void main() {
       expect(b.themeMode, ThemeMode.light);
     });
 
-    test('setFilterType / setIntensity が往復する', () async {
+    test('setFilterType が往復する', () async {
       SharedPreferences.setMockInitialValues({});
       final a = SettingsService();
       await a.load();
 
       await a.setFilterType(ColorVisionType.deuteranomaly);
-      await a.setIntensity(0.25);
 
       final b = SettingsService();
       await b.load();
       expect(b.filterType, ColorVisionType.deuteranomaly);
-      expect(b.intensity, 0.25);
     });
 
     test('同じ値の再設定では notify しない', () async {
@@ -98,21 +84,8 @@ void main() {
       settings.addListener(() => notified++);
 
       await settings.setThemeMode(ThemeMode.system); // 既定と同じ
-      await settings.setIntensity(1.0); // 既定と同じ
       await settings.setFilterType(ColorVisionType.none); // 既定と同じ
       expect(notified, 0);
-    });
-
-    test('setIntensity は clamp してから保存する', () async {
-      SharedPreferences.setMockInitialValues({});
-      final a = SettingsService();
-      await a.load();
-      await a.setIntensity(-3.0);
-      expect(a.intensity, 0.0);
-
-      final b = SettingsService();
-      await b.load();
-      expect(b.intensity, 0.0);
     });
 
     test('全 ThemeMode が name 経由で往復する', () async {
