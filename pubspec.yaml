@@ -54,6 +54,10 @@ dev_dependencies:
   ffigen: ^20.1.1
   freezed: ^2.5.7
   build_runner: ^2.4.13
+  # 実ブリッジ smoke test (#55)。integration_test/ を `flutter test
+  # integration_test -d macos` で実行するために要る。
+  integration_test:
+    sdk: flutter
 
 flutter:
   uses-material-design: true
