@@ -45,13 +45,16 @@ AfterImageRenderer afterImageRenderer = BeforeAfterView.renderAfter;
 /// visible on saturated reds/greens/blues). The *after* pane shows the same
 /// image with the selected filter applied.
 ///
-/// Only [ColorVisionType.protanopia] / [ColorVisionType.protanomaly] can be
-/// rendered for real today: they route through
-/// [ShaderFilter.applyProtanopiaGpu] (the one GPU path proven by the golden
-/// test). protanomaly reuses the protanopia transform at a reduced strength
-/// ([recommendedStrength]). Every other filter shows a "rendering coming soon"
-/// placeholder, because live/GPU rendering for them is tracked by other issues
-/// (#1/#3/#4 live capture, #59 follow-ups for the remaining shaders).
+/// All eight [ColorVisionType] values render for real (#59): the three -opia
+/// types route through the matching `ShaderFilter.apply*Gpu` (Machado
+/// per-severity matrix, resolved with the same piecewise-linear interpolation
+/// sensus_core uses), the -omaly types reuse their base -opia transform at a
+/// reduced strength ([recommendedStrength]), and achromatopsia uses a
+/// constant BT.709 luma blend. The "rendering coming soon" placeholder
+/// (`_ComingSoonPlaceholder`) machinery is kept for defensiveness (a future
+/// `ColorVisionType` addition without a renderer yet would fall back to it)
+/// but nothing in the current enum reaches it. Live *screen* capture (as
+/// opposed to this synthetic sample image) is still tracked by #1/#3/#4.
 class BeforeAfterView extends StatefulWidget {
   const BeforeAfterView({
     super.key,
@@ -79,21 +82,11 @@ class BeforeAfterView extends StatefulWidget {
   /// Whether [type] can currently be rendered to a real "after" image.
   ///
   /// Exposed as a static so tests and callers can reason about render coverage
-  /// without instantiating the widget.
-  static bool canRender(ColorVisionType type) {
-    switch (type) {
-      case ColorVisionType.none:
-      case ColorVisionType.protanopia:
-      case ColorVisionType.protanomaly:
-        return true;
-      case ColorVisionType.deuteranopia:
-      case ColorVisionType.deuteranomaly:
-      case ColorVisionType.tritanopia:
-      case ColorVisionType.tritanomaly:
-      case ColorVisionType.achromatopsia:
-        return false;
-    }
-  }
+  /// without instantiating the widget. All eight values render for real as of
+  /// #59 (see the class doc); kept as a function rather than inlining `true`
+  /// at call sites so a future non-colour-vision extension of this widget has
+  /// a single place to gate on.
+  static bool canRender(ColorVisionType type) => true;
 
   /// Builds the deterministic sample image used in the *before* pane.
   ///
@@ -152,11 +145,17 @@ class BeforeAfterView extends StatefulWidget {
     }
   }
 
-  /// Produces the *after* image for [type] from [source], or null when the
-  /// filter has no real renderer yet.
+  /// Produces the *after* image for [type] from [source]. Returns null only
+  /// if [type] has no real renderer yet — none of today's eight values does
+  /// (#59), but the nullable return stays so a future `ColorVisionType`
+  /// addition without a renderer degrades to the coming-soon placeholder
+  /// instead of a hard error.
   ///
-  /// [ColorVisionType.none] returns [source] unchanged (clone via the shader is
-  /// unnecessary). protanopia/protanomaly route through the GPU shader.
+  /// [ColorVisionType.none] returns [source] unchanged (clone via the shader
+  /// is unnecessary). Each -opia/achromatopsia type routes through its
+  /// matching `ShaderFilter.apply*Gpu`; each -omaly type shares its base
+  /// -opia's renderer (the reduced [strength] is what distinguishes them —
+  /// see [recommendedStrength]).
   static Future<ui.Image?> renderAfter(
     ui.Image source,
     ColorVisionType type,
@@ -170,10 +169,12 @@ class BeforeAfterView extends StatefulWidget {
         return ShaderFilter.applyProtanopiaGpu(source, strength);
       case ColorVisionType.deuteranopia:
       case ColorVisionType.deuteranomaly:
+        return ShaderFilter.applyDeuteranopiaGpu(source, strength);
       case ColorVisionType.tritanopia:
       case ColorVisionType.tritanomaly:
+        return ShaderFilter.applyTritanopiaGpu(source, strength);
       case ColorVisionType.achromatopsia:
-        return null;
+        return ShaderFilter.applyAchromatopsiaGpu(source, strength);
     }
   }
 

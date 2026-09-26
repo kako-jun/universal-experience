@@ -36,18 +36,10 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('canRender 描画カバレッジ', () {
-    test('protanopia / protanomaly / none は描画可能', () {
-      expect(BeforeAfterView.canRender(ColorVisionType.none), isTrue);
-      expect(BeforeAfterView.canRender(ColorVisionType.protanopia), isTrue);
-      expect(BeforeAfterView.canRender(ColorVisionType.protanomaly), isTrue);
-    });
-
-    test('未実装フィルタは描画不可（プレースホルダ）', () {
-      expect(BeforeAfterView.canRender(ColorVisionType.deuteranopia), isFalse);
-      expect(BeforeAfterView.canRender(ColorVisionType.tritanopia), isFalse);
-      expect(BeforeAfterView.canRender(ColorVisionType.achromatopsia), isFalse);
-      expect(BeforeAfterView.canRender(ColorVisionType.deuteranomaly), isFalse);
-      expect(BeforeAfterView.canRender(ColorVisionType.tritanomaly), isFalse);
+    test('全 ColorVisionType が描画可能になった（#59）', () {
+      for (final type in ColorVisionType.values) {
+        expect(BeforeAfterView.canRender(type), isTrue, reason: '$type');
+      }
     });
   });
 
@@ -138,16 +130,56 @@ void main() {
       protanomalyOut.dispose();
     });
 
-    test('未実装フィルタは null（プレースホルダ）を返す', () async {
+    test('deuteranopia / tritanopia / achromatopsia も GPU 実描画で after 画像を'
+        '生成する（#59）', () async {
       for (final type in [
         ColorVisionType.deuteranopia,
         ColorVisionType.tritanopia,
         ColorVisionType.achromatopsia,
-        ColorVisionType.deuteranomaly,
-        ColorVisionType.tritanomaly,
       ]) {
         final out = await BeforeAfterView.renderAfter(src, type, 1.0);
-        expect(out, isNull, reason: '$type');
+        expect(out, isNotNull, reason: '$type');
+        expect(out!.width, 64, reason: '$type');
+        expect(out.height, 64, reason: '$type');
+
+        final beforePng = await encodeImagePng(src);
+        final afterPng = await encodeImagePng(out);
+        expect(afterPng, isNot(equals(beforePng)), reason: '$type');
+        out.dispose();
+      }
+    });
+
+    test(
+        'deuteranomaly/tritanomaly は推奨強度で描画すると対応する -opia（1.0）と '
+        '出力が異なる（#59。#57 の protanomaly と同じ不変条件を残り2型にも広げる）',
+        () async {
+      final pairs = <ColorVisionType, ColorVisionType>{
+        ColorVisionType.deuteranomaly: ColorVisionType.deuteranopia,
+        ColorVisionType.tritanomaly: ColorVisionType.tritanopia,
+      };
+      for (final entry in pairs.entries) {
+        final anomalyType = entry.key;
+        final opiaType = entry.value;
+
+        final opiaOut = await BeforeAfterView.renderAfter(
+          src,
+          opiaType,
+          recommendedStrength(opiaType),
+        );
+        final anomalyOut = await BeforeAfterView.renderAfter(
+          src,
+          anomalyType,
+          recommendedStrength(anomalyType),
+        );
+        expect(opiaOut, isNotNull, reason: '$opiaType');
+        expect(anomalyOut, isNotNull, reason: '$anomalyType');
+
+        final opiaPng = await encodeImagePng(opiaOut!);
+        final anomalyPng = await encodeImagePng(anomalyOut!);
+        expect(anomalyPng, isNot(equals(opiaPng)), reason: '$anomalyType');
+
+        opiaOut.dispose();
+        anomalyOut.dispose();
       }
     });
   });
@@ -202,7 +234,9 @@ void main() {
       expect(find.text(protoName), findsOneWidget);
     });
 
-    testWidgets('未実装フィルタでは coming soon プレースホルダを出す', (tester) async {
+    testWidgets(
+        'deuteranopia でも coming soon プレースホルダは出ず、フィルタ名ラベルの'
+        'ペインを出す（#59: canRender/renderAfter の対象拡大）', (tester) async {
       await tester.pumpWidget(
         localized(
           const BeforeAfterView(
@@ -212,9 +246,13 @@ void main() {
           ),
         ),
       );
-      await pumpUntilText(tester, en.previewComingSoon);
+      final deuteranopiaName =
+          colorVisionTypeName(en, ColorVisionType.deuteranopia);
+      await pumpUntilText(tester, deuteranopiaName);
 
-      expect(find.text(en.previewComingSoon), findsOneWidget);
+      expect(find.text(en.previewPaneOriginal), findsOneWidget);
+      expect(find.text(deuteranopiaName), findsOneWidget);
+      expect(find.text(en.previewComingSoon), findsNothing);
     });
 
     // #58: プレビューが GPU 画像をリークする／古い結果で上書きされる／Retina で
