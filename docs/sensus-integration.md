@@ -180,7 +180,9 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
 > 以下の表は代表例のドキュメントであり網羅ではない。シェーダ codegen（§2.1）は
 > 20 フィルタを `.frag` に変換済みで、うち色覚 4 型（protanopia/deuteranopia/
 > tritanopia/achromatopsia、+各 -omaly は base の -opia を再利用）は UI
-> （`before_after_view.dart`）から実際にライブ GPU 描画で呼ばれる（#59）。
+> （`before_after_view.dart`）から実際に GPU 描画で呼ばれる（#59。この GPU 経路
+> 自体は #85 で sensus の CPU `apply()` に置き換え予定。GPU はルーペのライブ
+> 表示専用に残す）。
 > それ以外（myopia 等の advanced フィルタ）は `ShaderFilter.applyColorFilterGpu`
 > の汎用経路自体は使えるが、ホーム画面の before/after プレビューへの配線は
 > まだ（#60）。各フィルタの正確なレイアウトは実装時に必ず
@@ -230,7 +232,7 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
    テスト（PSNR/maxDiff 一致）で代替しており、実機での目視確認は未実施。
 4. 部分: **フィルタ網羅の拡張**。`VisionFilter`/カタログは
    `sensus_core::Filter` の全 30 種を選択・パラメータ調整できる状態まで広がった
-   （#16）が、ライブ GPU 描画が配線されているのは上記のとおり一部のみ。
+   （#16）が、プレビューの GPU 描画が配線されているのは上記のとおり一部のみ。
    payload 付きフィルタ（cataract/floaters の seed、glaucoma の mode、astigmatism
    の axis_deg、時間依存の vertigo/bppv 等）の描画配線は個別 Issue（#59 等）で継続中。
 5. 完了（#13）: 既存 `lib/core/color_vision_simulator.dart`（ue 内の LMS 実装）の
@@ -323,7 +325,7 @@ ue が二重に持っていた色覚ロジックを撤去し、アルゴリズ�
   ことを明記するに留めた（`_protanopiaMatrix` の doc コメント参照）。
   ブリッジ経由の解決値を使う本格対応（テスト側でネイティブ lib を用意する試験
   基盤の整備を含む）、中間 strength 用の golden 追加、deuteranopia / tritanopia /
-  achromatopsia の**ライブ UI 配線**、protanomaly/deuteranomaly/tritanomaly の
+  achromatopsia の**プレビュー UI 配線**、protanomaly/deuteranomaly/tritanomaly の
   severity 反映は #59 のスコープ。
 - **DetailLoss の strength=0（sensus#167→#175、#51 注記2）**: #51 注記2「DetailLoss が
   strength を無視する」は sensus#167 で解消済みと report されていたが、0.6.0
@@ -358,16 +360,18 @@ ue が二重に持っていた色覚ロジックを撤去し、アルゴリズ�
 
 ---
 
-## 8. 色覚 3 型の Machado テーブル一元化・ライブ UI 配線（#59、#34 解消）
+## 8. 色覚 3 型の Machado テーブル一元化・プレビュー UI 配線（#59、#34 解消）
 
 §7 が見送った項目（ブリッジ経由の解決値取得、中間 strength 用 golden、
-deuteranopia/tritanopia/achromatopsia のライブ UI 配線、-omaly の severity 反映）
+deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の severity
+反映）
 を本 Issue でまとめて解消した。採った方式は §7 で候補に挙げた (a)（実行時に
 `visionUniforms()` を呼ぶ）ではなく (b)（テーブルを生成物として書き出し、Dart
 側で同じ補間をかける）。(a) を選ばなかった理由は §7 と同じ: `ShaderFilter` は
 ネイティブブリッジ未初期化のプレーンな `flutter test` からも呼ばれ、そこでは
-`RustLib.init()` が失敗する。(b) はブリッジ初期化なしに正本とビット単位で
-一致させられる。
+`RustLib.init()` が失敗する。(b) はブリッジ初期化なしに正本と f32 の丸め誤差
+（1ulp）以内で一致させられる（Dart 側は f32 由来の値を f64 リテラルとして
+読み込んで演算するため、独立の丸め経路を通る分だけ完全なビット一致ではない）。
 
 - **Machado 11 段テーブルの汲み出し**: sensus-core の `PROTANOMALY_TABLE` 等は
   `pub(crate)` で crate 外から直接参照できない。`rust/src/color_matrix_gen.rs` は、
@@ -398,15 +402,34 @@ deuteranopia/tritanopia/achromatopsia のライブ UI 配線、-omaly の severi
   汎用経路を通る。
 - **完了条件の検証**: `test/color_matrix_interpolation_test.dart` が、rust
   `golden_gen::gen_color_matrix_strength_fixture` が sensus_core の
-  `vision_uniforms()` から直接汲み出した strength=0/0.25/0.5/0.75/1.0 の
-  fixture（`test/golden/color_matrix_strengths.g.json`）と
-  `resolveSeverityMatrix()` の出力を突き合わせる。0.25/0.75 はグリッド区間の
-  ちょうど中間（frac=0.5）にあたるため、グリッド点だけでは検出できない
-  「補間の式そのもの」の一致を確認できる。`test/protanopia_golden_test.dart` の
-  strength=0.5 期待値も、この生成物由来のグリッド + `resolveSeverityMatrix` を
-  使うよう更新した（手書きの `_lerpProtanopiaMatrix` を撤去）。
-- **ライブ UI 配線**: `before_after_view.dart` の `canRender`/`renderAfter` を
-  色覚 8 型（-opia 4 種 + -omaly 3 種 + none）全部に広げた。-omaly は base の
-  -opia と同じレンダラを、`recommendedStrength`（0.6）で呼ぶだけ（専用テーブルは
-  不要）。「描画は近日対応」のプレースホルダ機構自体は将来の拡張に備えて残すが、
-  現行 `ColorVisionType` ではもう到達しない。
+  `vision_uniforms()` から直接汲み出した strength=0/0.125/0.25/0.5/0.75/0.875/1.0
+  の fixture（`test/golden/color_matrix_strengths.g.json`）と
+  `resolveSeverityMatrix()` の出力を f32 の丸め誤差（1ulp）以内で突き合わせる。
+  0.25/0.75 はグリッド区間のちょうど中間（frac=0.5）にあたり、グリッド点だけでは
+  検出できない「補間の式そのもの」の一致を確認できる。0.125/0.875（frac=0.25/0.75、
+  2進で正確な 1/8・7/8）は、frac=0.5 だけでは検出できない lo/hi 取り違えバグを
+  捕まえる（`lerp(lo, hi, 0.5)` は lo/hi を入れ替えても同じ値になるため。#86
+  レビュー should-1、`rust/src/golden_gen.rs` のコメントで実際に取り違えて
+  再現・確認済み）。`test/protanopia_golden_test.dart` の strength=0.5 期待値も、
+  この生成物由来のグリッド + `resolveSeverityMatrix` を使うよう更新した
+  （手書きの `_lerpProtanopiaMatrix` を撤去）。
+- **高レベル API 自体の golden（#86 レビュー should-4）**:
+  `test/vision_filter_golden_test.dart` は `applyColorFilterGpu` に JSON 由来の
+  生 uniform を直接流し込む経路のテストで、`before_after_view.dart` が実際に
+  呼ぶ `applyDeuteranopiaGpu`/`applyTritanopiaGpu`/`applyAchromatopsiaGpu`
+  そのものは golden で検証されていなかった。`test/color_matrix_wrapper_golden_test.dart`
+  を追加し、strength=1.0 を各参照 PNG と（maxDiff≤2）、deuteranopia の
+  strength=0.5 を `resolveSeverityMatrix` 経由の CPU 期待値と
+  （`protanopia_golden_test.dart` と同じ形で）突き合わせる。
+- **プレビュー UI 配線**: `before_after_view.dart` の `renderAfter` を色覚 7 型
+  （-opia 4 種 + -omaly 3 種。none は原画をそのまま返すだけで元から対応済み）
+  全部に広げた。-omaly は base の -opia と同じレンダラを、`recommendedStrength`
+  （0.6）で呼ぶだけ（専用テーブルは不要）。この GPU 経路自体は静止画プレビュー用の
+  暫定実装で、#85 で sensus の CPU `apply()` に置き換わる予定（GPU はルーペの
+  ライブ表示専用に残る）。
+- **YAGNI 撤去（#86 レビュー should-3）**: 上記の結果、`canRender`（常に `true`
+  を返すだけになっていた）・「描画は近日対応」のプレースホルダ
+  （`_ComingSoonPlaceholder` / ARB の `previewComingSoon`）・`home_screen.dart`
+  の `previewUnsupportedNote` 分岐は、どの `ColorVisionType` からも到達しない
+  死んだコードになったため撤去した。将来また未実装の型が増えたときは、その時点
+  で改めて必要な形（コード自体が変わっているはず）で作る。

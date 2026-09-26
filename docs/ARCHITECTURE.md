@@ -298,12 +298,15 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   `MaterialApp` 再構築が起きること自体は許容している
 - `VisionFilterState`: advanced カタログ（sensus 全 30 種）の選択・パラメータ状態
 - `ShaderFilter`（`lib/rendering/shader_filter.dart`）: sensus 由来 GLSL を変換した
-  Impeller `FragmentProgram` で `ui.Image` にフィルタを適用する。色覚 8 型
+  Impeller `FragmentProgram` で `ui.Image` にフィルタを適用する。色覚 7 型
   （protanopia/deuteranopia/tritanopia/achromatopsia + 各 -omaly）が実描画対応
   済み（#59）。protanopia/deuteranopia/tritanopia は sensus の Machado 11 段
   severity テーブルを `resolveSeverityMatrix()` で区分線形補間して解決する
   （グリッドは `lib/rendering/color_matrices.g.dart`、sensus-core からの生成物）。
-  advanced カタログ（sensus 全 30 種）は未配線（#60）
+  advanced カタログ（sensus 全 30 種）は未配線（#60）。**プレビューの GPU 経路は
+  #85 で sensus の CPU `apply()` に置き換え予定**（30 種全部を CPU で描画する）。
+  `ShaderFilter` はその後、ルーペ窓（`loupe_window_controller.dart`）のライブ
+  表示専用になる
 - `ExportService`: フィルタ適用後（after）画像のメタ焼き込み PNG エクスポート
 - `ExperiencePresets`（`lib/ui/widgets/experience_presets.dart`）: sensus の
   `experiences()` をワンタップ適用 UI として消費する（複合体験、#19）

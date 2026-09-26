@@ -161,10 +161,12 @@ build より前に置く。rust 依存は crates.io のみ（sensus-core）な�
 
 ## ロードマップ
 
-- **Phase 1**: 色覚障害シミュレーション — 色覚 8 型（protanopia/deuteranopia/
-  tritanopia/achromatopsia + 各 -omaly）はライブ GPU 描画まで配線済み（#34/#59
-  で完了）。advanced カタログ・体験プリセットの選択は `VisionFilterState` に
-  入るだけでプレビューには反映されない（#60）
+- **Phase 1**: 色覚障害シミュレーション — 色覚 7 型（protanopia/deuteranopia/
+  tritanopia/achromatopsia + 各 -omaly）は before/after プレビューの GPU 描画まで
+  配線済み（#34/#59 で完了。プレビューの GPU 経路は #85 で CPU の `apply()` に
+  置き換え予定。GPU はルーペのライブ表示専用に残す）。advanced カタログ・
+  体験プリセットの選択は `VisionFilterState` に入るだけでプレビューには反映
+  されない（#60）
 - **Phase 2**: 聴覚障害シミュレーション — 複合体験の型定義（FRB, `HearingFilter`）は
   公開済みだが、音声の加工・再生は未実装
 - **Phase 3**: 視野欠損、視覚ぼやけ、運動障害 — 未着手
