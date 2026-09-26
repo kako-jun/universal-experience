@@ -281,7 +281,10 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   は `notifyListeners` を購読する `MaterialApp`（テーマ/ロケール用）を持つため、
   intensity のようにスライダー 1 目盛りごとに変わる値をそちらに混ぜると
   アプリ全体が毎回再構築されてしまう。それを避けるため intensity は
-  `SettingsService` を経由しない
+  `SettingsService` を経由しない。一方 filterType（どのタイプを選んでいるか）は
+  `SettingsService.setFilterType` 経由で引き続き通知・永続化する。フィルタの
+  選び直しはユーザー操作としてスライダー操作ほど高頻度ではないため、
+  `MaterialApp` 再構築が起きること自体は許容している
 - `VisionFilterState`: advanced カタログ（sensus 全 30 種）の選択・パラメータ状態
 - `ShaderFilter`（`lib/rendering/shader_filter.dart`）: sensus 由来 GLSL を変換した
   Impeller `FragmentProgram` で `ui.Image` にフィルタを適用する。ライブ描画は
