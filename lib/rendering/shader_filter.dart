@@ -1,6 +1,50 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
+
+/// 失敗した Future をキャッシュに残さない汎用の single-flight メモ化キャッシュ
+/// （#58 レビュー S1）。
+///
+/// 素朴な `Map<K, Future<V>> ??=` キャッシュは、一度失敗した Future もそのまま
+/// キャッシュし続けてしまうため、一時的な asset ロード失敗（I/O エラー等）が
+/// 永続化し、以後すべての呼び出しが同じ失敗を再生するだけになる。本クラスは
+/// 失敗を検知したらそのキーを即座に削除し、次回呼び出しで [create] を再実行
+/// できるようにする。`ui.FragmentProgram` のような engine 依存の型を持ち出さず
+/// 汎用にしてあるのは、`flutter test` から実 asset ロードなしに単体テストできる
+/// ようにするため（クラス自体は汎用ユーティリティなので `@visibleForTesting`
+/// は付けない。テスト専用の観測用フィールドである [debugLength] にのみ付ける
+/// — #58 レビュー nit）。
+class SingleFlightCache<K, V> {
+  final Map<K, Future<V>> _entries = <K, Future<V>>{};
+
+  /// [key] に対応する進行中/完了済みの Future を返す。無ければ [create] を呼んで
+  /// キャッシュする。[create] が返す Future が失敗したら、そのキーのキャッシュを
+  /// 削除する（次回呼び出しは新しい Future で再試行できる）。
+  Future<V> get(K key, Future<V> Function() create) {
+    final cached = _entries[key];
+    if (cached != null) return cached;
+
+    final future = create();
+    _entries[key] = future;
+    // 失敗を観測してキャッシュを剥がすための副チェーン。`onError` はここで
+    // エラーを飲み込む（rethrow しない）ことでこの副チェーン自体は正常終了とし、
+    // 「誰も listen していない Future の unhandled error」を起こさない。
+    // 呼び出し元が await する元の `future` はここでは変更されないため、
+    // 失敗はそちらには変わらずそのまま伝わる。
+    future.then((_) {}, onError: (Object error) {
+      if (identical(_entries[key], future)) {
+        _entries.remove(key);
+      }
+    });
+    return future;
+  }
+
+  /// 現在キャッシュされているキー数（テスト用）。
+  @visibleForTesting
+  int get debugLength => _entries.length;
+}
+
 /// FragmentProgram (Impeller GPU シェーダ) で sensus 由来の視覚フィルタを
 /// `ui.Image` に適用するヘルパ。
 ///
@@ -75,11 +119,13 @@ class ShaderFilter {
   }
 
   // ロード済み FragmentProgram を asset パスでキャッシュ（並行ロードの重複を避ける）。
-  static final Map<String, Future<ui.FragmentProgram>> _programCache =
-      <String, Future<ui.FragmentProgram>>{};
+  // 失敗した Future を残さない SingleFlightCache を使う（#58 レビュー S1）。
+  @visibleForTesting
+  static final SingleFlightCache<String, ui.FragmentProgram> programCache =
+      SingleFlightCache<String, ui.FragmentProgram>();
 
   static Future<ui.FragmentProgram> _loadProgram(String asset) {
-    return _programCache[asset] ??= ui.FragmentProgram.fromAsset(asset);
+    return programCache.get(asset, () => ui.FragmentProgram.fromAsset(asset));
   }
 
   /// 色変換系フィルタ（色行列 / luma 重み）を GPU で [src] に適用する汎用経路。

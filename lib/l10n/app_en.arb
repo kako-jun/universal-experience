@@ -115,6 +115,10 @@
   "@previewComingSoon": {
     "description": "Placeholder in the 'after' pane for filters without a live renderer."
   },
+  "previewFailed": "Preview failed to render",
+  "@previewFailed": {
+    "description": "Shown in the 'after' pane when generating or rendering the latest preview failed (#58)."
+  },
 
   "advancedSectionTitle": "Advanced (all sensus filters)",
   "@advancedSectionTitle": {
