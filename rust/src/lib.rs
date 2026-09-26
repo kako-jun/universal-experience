@@ -14,7 +14,7 @@
 // flutter_rust_bridge v2.11.1 はマクロ生成コード内で `cfg(frb_expand)` を
 // 参照する。rustc 1.80+ はこれに対し `unexpected_cfgs` 警告を出すが、
 // これは上流マクロのフィーチャ検出ガードであり無害（ここからは直せない）。
-// selona と同じ抑制を入れる。
+// 別の flutter_rust_bridge プロジェクトと同じ抑制を入れる。
 #![allow(unexpected_cfgs)]
 
 mod frb_generated; /* AUTO INJECTED BY flutter_rust_bridge. This line may not be accurate, and you can change it according to your needs. */
