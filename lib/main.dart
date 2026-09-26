@@ -3,7 +3,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:io' show Platform;
-import 'dart:ui' show PlatformDispatcher;
 
 import 'l10n/app_localizations.dart';
 import 'l10n/l10n_extensions.dart';
@@ -81,13 +80,20 @@ TrayService _buildTrayService(SettingsService settings) {
 ///
 /// `lookupAppLocalizations` はサポート外 locale で投げるため、システム locale が
 /// 非対応のときは [AppLocalizations.supportedLocales] の先頭（en）へフォールバック。
+///
+/// `WidgetsBinding.instance.platformDispatcher` 経由で読む（`PlatformDispatcher.instance`
+/// を直接参照しない）。本番ではどちらも同じ実プラットフォームディスパッチャを指すため
+/// 挙動は変わらないが、`flutter_test` 下では `WidgetsBinding.instance` が
+/// `TestWidgetsFlutterBinding` になり、その `platformDispatcher` が
+/// `tester.platformDispatcher`（`localeTestValue` で差し替え可能な偽物）と一致するため、
+/// テストからロケールをオーバーライドできるようになる。
 Locale _resolveStartupLocale(Locale? preferred) {
   bool isSupported(Locale l) => AppLocalizations.supportedLocales
       .any((s) => s.languageCode == l.languageCode);
 
   if (preferred != null && isSupported(preferred)) return preferred;
 
-  final system = PlatformDispatcher.instance.locale;
+  final system = WidgetsBinding.instance.platformDispatcher.locale;
   if (isSupported(system)) return Locale(system.languageCode);
 
   return AppLocalizations.supportedLocales.first;
