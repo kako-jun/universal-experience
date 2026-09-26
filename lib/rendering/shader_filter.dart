@@ -21,8 +21,10 @@ class ShaderFilter {
   /// 値は sensus_core `PROTANOPIA_MATRIX` / 元 .frag コメントと同値。
   ///
   /// **既知の制約（#56 で判明、#59 に引き継ぎ）**: sensus 0.6 は `strength` を
-  /// Machado 11 段 severity テーブルから**非線形**補間した解決済み行列を返す
-  /// ようになった（sensus#165）。この解決は `visionUniforms()`（FRB 経由で
+  /// Machado 11 段 severity テーブルから**グリッド間の区分線形補間**した解決済み
+  /// 行列を返すようになった（sensus#165）。11 個の固定点（グリッド）間だけを
+  /// 線形補間するため、全域を単一の直線で結ぶ本メソッドの単純な線形補間とは
+  /// 一致しない。この解決は `visionUniforms()`（FRB 経由で
   /// sensus-core を呼ぶ）でしか取得できないが、`ShaderFilter` はプレーンな
   /// `flutter test`（ネイティブブリッジ未初期化のホスト実行）からも呼ばれる。
   /// `RustLib.init()` は `initNativeBridge()` 経由で `main()` /
