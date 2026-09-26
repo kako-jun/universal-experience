@@ -98,7 +98,7 @@ Rust で計算して FRB で渡すのが、二重実装を避ける唯一の方�
 >
 > **dump の鮮度検証（#24）**: `sensus_shaders.g.json` は配列ではなく
 > `{ "schema", "sensus_core_version", "shaders": [...] }` のオブジェクト。
-> dumper（`dump_shaders.rs`）が `CARGO_PKG_VERSION` を埋める。
+> `rust/src/shader_dump_gen.rs` が `Cargo.lock` の sensus-core バージョンを埋める。
 > `generate_shaders.dart` は (a) `schema` が既知値か、(b)
 > `sensus_core_version` が `rust/Cargo.toml` の `sensus-core = "0.6"` と
 > 一致するか（メジャーが 0 の間はマイナーまで一致必須。Cargo の 0.x semver
@@ -338,7 +338,7 @@ ue が二重に持っていた色覚ロジックを撤去し、アルゴリズ�
   GPU 描画は選択に関わらず Darken の見た目になる。`Blur` を実際に反映できるのは
   `apply_vision_cpu_rgba8`（CPU 経路）のみ。この理由から `vision_filter_catalog.dart`
   には**あえてパラメータとして公開していない**（UI で選ばせても GPU 描画に反映され
-  ないため。レビュー M1 対応）。`VisionFilterState.build()` は常に
+  ないため、#56）。`VisionFilterState.build()` は常に
   `VisionFieldLossMode.darken` で構築する。GPU 描画が Blur に対応するか、カタログが
   CPU 専用パラメータを表現できるようになったら再検討する。
 - **シェーダダンプの再生成経路**: `tools/sensus_shaders.g.json` は `rust/src/shader_dump_gen.rs`

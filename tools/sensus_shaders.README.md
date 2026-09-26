@@ -68,10 +68,15 @@ no GLSL/layout values are re-implemented, they come straight from
 `sensus-core` — and writes `tools/sensus_shaders.g.json` with the schema
 above (`sensus_core_version` is read from `Cargo.lock`, not hardcoded). Its
 filter list (which filters are dumped) must be kept in sync by hand with
-`tools/generate_shaders.dart`'s `_excludedFilters`; `test/shader_codegen_test.dart`
-asserts that sync (see S2 in the #56 review notes) and also asserts the
-generated JSON matches the committed `tools/sensus_shaders.g.json` byte for
-byte, so drift fails CI.
+`tools/generate_shaders.dart`'s `_excludedFilters`. Two non-`#[ignore]`
+`cargo test`s in the same file assert that continuously (#56):
+`dump_targets_and_excluded_stems_cover_all_variants` checks the dumped/excluded
+split covers all `VisionFilter` variants without overlap, and
+`generated_json_matches_committed_file` checks the generated JSON matches the
+committed `tools/sensus_shaders.g.json` byte for byte — so drift fails
+`cargo test`. `test/shader_codegen_test.dart` covers a different layer: it runs
+`dart run tools/generate_shaders.dart --check` to verify the committed
+`shaders/*.frag` and `pubspec.yaml` are in sync with this JSON.
 
 **Verify the version stamp matches the dependency** (else the next codegen run
 will fail the version assert):
