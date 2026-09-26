@@ -24,7 +24,6 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::VisionFilter;
     use sensus_core::shaders;
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -170,26 +169,42 @@ mod tests {
         );
     }
 
-    /// severity=1.0（グリッド末尾）が既存の `VisionFilter::Protanopia` 等、strength=1.0
-    /// 描画（既存 golden の前提）と食い違っていないことの簡易防御。golden_gen.rs 側の
-    /// `protanopia_ref_matches_sensus_core` が画素レベルで守っているのと同じ不変条件を
-    /// 行列レベルでも確認する（回帰があれば golden よりこちらが先に落ちる）。
+    /// severity=1.0（グリッド末尾）が sensus_core 公開のディクロマシー定数
+    /// （strength=1.0 描画・既存 golden の前提）と食い違っていないことの簡易防御。
+    /// golden_gen.rs 側の `protanopia_ref_matches_sensus_core` が画素レベルで守っている
+    /// のと同じ不変条件を行列レベルでも確認する（回帰があれば golden よりこちらが先に
+    /// 落ちる）。
+    ///
+    /// **#86 レビュー nit**: [`protanopia_grid`] 等は内部で
+    /// `shaders::protanopia_uniforms(1.0).matrix` を呼ぶだけなので、
+    /// `protanopia_grid()[10]` を期待値にすると「同じ計算を自分自身と比べる」だけの
+    /// 無意味な assert になっていた。sensus-core が独立に公開している定数
+    /// `shaders::{PROTANOPIA,DEUTERANOPIA,TRITANOPIA}_MATRIX`（severity=1.0 の
+    /// 正解値そのもの）と直接比較する。
     #[test]
-    fn severity_1_0_grid_point_matches_vision_uniforms_strength_1_0() {
-        use crate::vision_uniforms;
-
-        let cases: [(VisionFilter, [f32; 9]); 3] = [
-            (VisionFilter::Protanopia, protanopia_grid()[10]),
-            (VisionFilter::Deuteranopia, deuteranopia_grid()[10]),
-            (VisionFilter::Tritanopia, tritanopia_grid()[10]),
+    fn severity_1_0_grid_point_matches_sensus_core_dichromacy_constants() {
+        let cases: [(&str, [f32; 9], [f32; 9]); 3] = [
+            (
+                "Protanopia",
+                protanopia_grid()[10],
+                shaders::PROTANOPIA_MATRIX,
+            ),
+            (
+                "Deuteranopia",
+                deuteranopia_grid()[10],
+                shaders::DEUTERANOPIA_MATRIX,
+            ),
+            (
+                "Tritanopia",
+                tritanopia_grid()[10],
+                shaders::TRITANOPIA_MATRIX,
+            ),
         ];
-        for (filter, expected_matrix) in cases {
-            let u = vision_uniforms(filter, 1.0, 0.0, 8, 8);
-            // u = [uStrength, uMatrix0..8]。
+        for (name, grid_10, constant) in cases {
             assert_eq!(
-                &u[1..10],
-                &expected_matrix,
-                "{filter:?} severity=1.0 mismatch"
+                grid_10, constant,
+                "{name} severity=1.0 grid point does not match sensus_core's own \
+                 published dichromacy constant"
             );
         }
     }
