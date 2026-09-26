@@ -224,6 +224,12 @@ ShaderFilter (lib/rendering/) — Impeller FragmentProgram で ui.Image に適�
 `VisionFilterState` が状態変更時に `notifyListeners()` を呼び、それを購読する
 `Consumer` を持つウィジェットだけが rebuild される。
 
+`rust/` crate は `rust_builder/`（cargokit 統合、#55）経由でビルドされ、
+macOS / Linux アプリに同梱される。`lib/main.dart` の `main()` が
+`runApp` 前に `RustLib.init()` を呼んで同梱された native lib をロードする
+（呼ばないと `RustLib.instance` が未初期化のまま `experiences()` 等が例外になる。
+#52 で実際に本番のプリセット欄が例外表示になっていた）。
+
 ### 主要コンポーネント
 
 - `HomeScreen`: メイン画面。色覚クイック選択・強度スライダ・before/after プレビュー・
@@ -258,8 +264,14 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   `test/protanopia_golden_test.dart`）: sensus-core 正本由来の参照 PNG と GPU 描画結果を
   PSNR/maxDiff で比較（詳細は `docs/sensus-integration.md` §6）
 - **Rust 側**: `cargo test`（`rust/`、`golden_gen.rs` の正本一致テストを含む）
+- **実ブリッジ integration test**（`integration_test/experience_presets_smoke_test.dart`、
+  `flutter test integration_test -d macos`、#55）: widget test は
+  `experiencesProvider` を fixture に差し替えているため検知できない、
+  ブリッジ未初期化・native lib 未同梱を実機相当の経路で検知する
 - **CI**（#38、完了）: `.github/workflows/ci.yml` が push/PR で上記に加え
-  `flutter build macos --debug` を回す（#54）
+  `flutter build macos --debug` を回す（#54）。cargokit 統合（#55）により
+  この build が rust/ crate のビルドも兼ねるため、Rust toolchain セットアップを
+  build より前に置く
 - **タスクトレイ常駐**（#15、完了）: 実機でのトレイ表示・メニュー操作は環境制約
   （Wayland + grim、GNOME のトレイ拡張要件）のため未検証。純粋ロジックの単体テストと
   ビルド成功で代替している（上記「実機目視について」）

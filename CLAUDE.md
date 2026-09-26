@@ -41,6 +41,8 @@ rust/                        # sensus-core を FRB で公開する Rust crate
     ├── api/sensus_bridge.rs
     ├── frb_generated.rs
     └── golden_gen.rs        # GPU golden 参照生成（#[cfg(test)] のみ）
+rust_builder/                 # cargokit 統合（#55）。flutter build/run 時に rust/ をビルドし
+                               # macOS/Linux アプリへ同梱する FFI plugin（生成物、直接編集しない）
 
 tools/                       # シェーダ codegen（sensus の .frag → Impeller サブセットへ機械変換）
 shaders/                     # 変換済み .frag（ビルド時 impellerc がコンパイル）
@@ -140,11 +142,13 @@ flutter run
 ## CI
 
 `.github/workflows/ci.yml` が push/PR（main）で flutter analyze / flutter test /
-flutter build macos --debug と、`rust/` の cargo fmt --check /
-clippy --all-targets -D warnings / cargo test を回す（runs-on: macos-latest。
-Flutter golden を生成プラットフォームと揃えるため）。rust 依存は crates.io のみ
-（sensus-core）なので、private 依存を git 経由で引く場合に要る deploy key /
-ssh-agent 設定は不要。
+`rust/` の cargo fmt --check / clippy --all-targets -D warnings / cargo test /
+flutter build macos --debug / 実ブリッジ integration test
+（`flutter test integration_test -d macos`、#55）を回す（runs-on: macos-latest。
+Flutter golden を生成プラットフォームと揃えるため）。cargokit 統合（#55）により
+`flutter build macos` が rust/ crate のビルドも兼ねるため、Setup Rust は
+Flutter build より前に置く。rust 依存は crates.io のみ（sensus-core）なので、
+private 依存を git 経由で引く場合に要る deploy key / ssh-agent 設定は不要。
 
 ## ロードマップ
 

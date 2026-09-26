@@ -15,7 +15,10 @@
 - **Git**: バージョン管理用
 
 - **Rust toolchain**（`rustc` / `cargo`, stable channel）: `rust/` crate
-  （flutter_rust_bridge 経由で sensus-core を公開する）のビルドに必要
+  （flutter_rust_bridge 経由で sensus-core を公開する）に必要。`cargo test` /
+  clippy だけでなく、`rust_builder/`（cargokit 統合、#55）が `flutter run` /
+  `flutter build macos` / `flutter build linux` のたびに `cargo build` を
+  呼んで native lib をビルド・同梱するため、通常のアプリ実行にも要ります
   ```bash
   rustc --version
   cargo --version
@@ -115,6 +118,7 @@ universal-experience/
 │   ├── src/rust/          # flutter_rust_bridge 生成コード（sensus-core 連携、experiences() 等）
 │   └── ui/                # UIコンポーネント
 ├── rust/                  # sensus-core を FRB で公開する Rust crate（Dart バインディング lib/src/rust/ の生成元）
+├── rust_builder/          # cargokit 統合（#55）。flutter build/run 時に rust/ をビルドし同梱する FFI plugin
 ├── tools/                 # シェーダ codegen（sensus の .frag → Impeller サブセット変換）
 ├── shaders/               # 変換済み .frag（ビルド時 impellerc がコンパイル）
 ├── macos/                 # macOS固有コード（現行対応）
@@ -177,6 +181,19 @@ export PATH="$PATH:/path/to/flutter/bin"
 ```bash
 cd macos
 pod install
+cd ..
+```
+
+#### 3. Rust ビルドエラー（`cargokit`, `cargo build failed` 等）
+
+`rust_builder/`（cargokit 統合、#55）が `flutter build` / `flutter run` の
+たびに裏で `cargo build` を実行します。Rust toolchain が入っていない、または
+`rust/` の `cargo build` 自体が失敗する環境ではここで落ちます。
+
+```bash
+# rust/ 単体でビルドが通るか確認する
+cd rust
+cargo build
 cd ..
 ```
 

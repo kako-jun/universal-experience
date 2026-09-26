@@ -117,8 +117,10 @@ flutter pub get
 flutter run
 ```
 
-Rust は `rust/` の `cargo test` / clippy と flutter_rust_bridge の codegen に必要です。
-アプリ本体への同梱は #55 で対応中です（詳細は `docs/GETTING_STARTED.md`）。
+Rust は `rust/` の `cargo test` / clippy、flutter_rust_bridge の codegen に加え、
+`flutter run` / `flutter build macos` / `flutter build linux` でのビルドにも
+必要です（`rust_builder/` の cargokit 統合が同梱まで自動で行う、#55。詳細は
+`docs/GETTING_STARTED.md`）。
 
 ## 技術スタック
 
