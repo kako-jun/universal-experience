@@ -121,13 +121,23 @@ class VisionFilterState extends ChangeNotifier {
 
       // ── 視野 ──
       case 'glaucoma':
-        return VisionFilter.glaucoma(mode: _glaucomaMode('mode'));
+        return VisionFilter.glaucoma(
+          mode: _glaucomaMode('mode'),
+          fieldLossMode: _fieldLossMode('fieldLossMode'),
+        );
       case 'macular_degeneration':
-        return const VisionFilter.macularDegeneration();
+        return VisionFilter.macularDegeneration(
+          fieldLossMode: _fieldLossMode('fieldLossMode'),
+        );
       case 'hemianopia':
-        return VisionFilter.hemianopia(side: _hemianopiaSide('side'));
+        return VisionFilter.hemianopia(
+          side: _hemianopiaSide('side'),
+          fieldLossMode: _fieldLossMode('fieldLossMode'),
+        );
       case 'tunnel_vision':
-        return const VisionFilter.tunnelVision();
+        return VisionFilter.tunnelVision(
+          fieldLossMode: _fieldLossMode('fieldLossMode'),
+        );
 
       // ── 光・透明度 ──
       case 'cataract':
@@ -240,6 +250,18 @@ class VisionFilterState extends ChangeNotifier {
         return VisionGlaucomaMode.biarcuate;
       default:
         return VisionGlaucomaMode.vignette;
+    }
+  }
+
+  /// 視野欠損の表現モード（'darken'/'blur'）を [VisionFieldLossMode] へ写像する。
+  /// 未知キーは 'darken' にフォールバック（既定・後方互換、GPU 経路が唯一反映できる値）。
+  VisionFieldLossMode _fieldLossMode(String name) {
+    switch (_raw(name)) {
+      case 'blur':
+        return VisionFieldLossMode.blur;
+      case 'darken':
+      default:
+        return VisionFieldLossMode.darken;
     }
   }
 

@@ -107,8 +107,10 @@ void main() {
 
     test('payload 付きフィルタの parameters 数', () {
       expectParamCount('astigmatism', 1); // axisDeg
-      expectParamCount('glaucoma', 1); // mode
-      expectParamCount('hemianopia', 1); // side
+      expectParamCount('glaucoma', 2); // mode,fieldLossMode
+      expectParamCount('macular_degeneration', 1); // fieldLossMode
+      expectParamCount('hemianopia', 2); // side,fieldLossMode
+      expectParamCount('tunnel_vision', 1); // fieldLossMode
       expectParamCount('cataract', 1); // seed
       expectParamCount('floaters', 5); // seed,density,size,gazeX,gazeY
       expectParamCount(
@@ -130,8 +132,6 @@ void main() {
         'myopia',
         'hyperopia',
         'presbyopia',
-        'macular_degeneration',
-        'tunnel_vision',
         'photophobia',
         'night_blindness',
         'vertigo',
@@ -160,7 +160,9 @@ void main() {
     });
 
     test('glaucoma の mode 選択肢は 4（VisionGlaucomaMode と同数）', () {
-      final mode = kVisionFilterCatalogById['glaucoma']!.parameters.single;
+      final mode = kVisionFilterCatalogById['glaucoma']!
+          .parameters
+          .firstWhere((p) => p.name == 'mode');
       expect(mode.kind, VisionParamKind.enumValue);
       expect(mode.options.length, VisionGlaucomaMode.values.length);
     });
@@ -168,7 +170,9 @@ void main() {
     test('hemianopia の side options が kHemianopiaSideValues と一致（drift 検出）', () {
       // 単一の写像源（kHemianopiaSideValues）と catalog の option value 集合が
       // ずれていないことを検証する。どちらか片方だけ変更すると失敗する。
-      final side = kVisionFilterCatalogById['hemianopia']!.parameters.single;
+      final side = kVisionFilterCatalogById['hemianopia']!
+          .parameters
+          .firstWhere((p) => p.name == 'side');
       final optionKeys = side.options.map((o) => o.value).toSet();
       expect(optionKeys, kHemianopiaSideValues.keys.toSet());
       // 既定値も写像源のキーであること。
@@ -176,6 +180,27 @@ void main() {
       // 写像の実値（left=0.0 / right=1.0）が固定であること。
       expect(kHemianopiaSideValues['left'], 0.0);
       expect(kHemianopiaSideValues['right'], 1.0);
+    });
+
+    test('field_loss_mode を持つ4フィルタは darken/blur の2択（VisionFieldLossMode と同数）',
+        () {
+      for (final id in [
+        'glaucoma',
+        'macular_degeneration',
+        'hemianopia',
+        'tunnel_vision',
+      ]) {
+        final param = kVisionFilterCatalogById[id]!
+            .parameters
+            .firstWhere((p) => p.name == 'fieldLossMode');
+        expect(param.kind, VisionParamKind.enumValue, reason: id);
+        expect(
+          param.options.length,
+          VisionFieldLossMode.values.length,
+          reason: id,
+        );
+        expect(param.defaultValue, 'darken', reason: id);
+      }
     });
   });
 
@@ -225,16 +250,32 @@ void main() {
 
     test('enum payload: glaucoma の mode を反映', () {
       final state = VisionFilterState()..select('glaucoma');
-      // デフォルト vignette
+      // デフォルト vignette / darken
       expect(
         state.build(),
-        const VisionFilter.glaucoma(mode: VisionGlaucomaMode.vignette),
+        const VisionFilter.glaucoma(
+          mode: VisionGlaucomaMode.vignette,
+          fieldLossMode: VisionFieldLossMode.darken,
+        ),
       );
       state.setParam('mode', 'arcuateSuperior');
       expect(
         state.build(),
         const VisionFilter.glaucoma(
           mode: VisionGlaucomaMode.arcuateSuperior,
+          fieldLossMode: VisionFieldLossMode.darken,
+        ),
+      );
+    });
+
+    test('enum payload: glaucoma の fieldLossMode を反映', () {
+      final state = VisionFilterState()..select('glaucoma');
+      state.setParam('fieldLossMode', 'blur');
+      expect(
+        state.build(),
+        const VisionFilter.glaucoma(
+          mode: VisionGlaucomaMode.vignette,
+          fieldLossMode: VisionFieldLossMode.blur,
         ),
       );
     });
@@ -260,10 +301,55 @@ void main() {
 
     test('enum payload: hemianopia の side が left=0.0 / right=1.0', () {
       final state = VisionFilterState()..select('hemianopia');
-      // デフォルト left
-      expect(state.build(), const VisionFilter.hemianopia(side: 0.0));
+      // デフォルト left / darken
+      expect(
+        state.build(),
+        const VisionFilter.hemianopia(
+          side: 0.0,
+          fieldLossMode: VisionFieldLossMode.darken,
+        ),
+      );
       state.setParam('side', 'right');
-      expect(state.build(), const VisionFilter.hemianopia(side: 1.0));
+      expect(
+        state.build(),
+        const VisionFilter.hemianopia(
+          side: 1.0,
+          fieldLossMode: VisionFieldLossMode.darken,
+        ),
+      );
+    });
+
+    test('enum payload: macular_degeneration / tunnel_vision の fieldLossMode を反映',
+        () {
+      final macular = VisionFilterState()..select('macular_degeneration');
+      expect(
+        macular.build(),
+        const VisionFilter.macularDegeneration(
+          fieldLossMode: VisionFieldLossMode.darken,
+        ),
+      );
+      macular.setParam('fieldLossMode', 'blur');
+      expect(
+        macular.build(),
+        const VisionFilter.macularDegeneration(
+          fieldLossMode: VisionFieldLossMode.blur,
+        ),
+      );
+
+      final tunnel = VisionFilterState()..select('tunnel_vision');
+      expect(
+        tunnel.build(),
+        const VisionFilter.tunnelVision(
+          fieldLossMode: VisionFieldLossMode.darken,
+        ),
+      );
+      tunnel.setParam('fieldLossMode', 'blur');
+      expect(
+        tunnel.build(),
+        const VisionFilter.tunnelVision(
+          fieldLossMode: VisionFieldLossMode.blur,
+        ),
+      );
     });
 
     test('int payload: detail_loss の cellSize を反映', () {

@@ -209,6 +209,29 @@ class VisionFilterEntry {
   final List<VisionParam> parameters;
 }
 
+/// 視野欠損の表現モードの選択肢（[VisionFieldLossMode] のミラー、sensus 0.6 / #171）。
+///
+/// `glaucoma` / `macular_degeneration` / `hemianopia` / `tunnel_vision` の 4 フィルタが
+/// 共通で持つ。**注意**: ここに両方の選択肢を載せているが、`blur` が実際に反映されるのは
+/// CPU 経路（`apply_vision_cpu_rgba8`）のみ。GPU（FragmentProgram）経路は
+/// `shaders::glaucoma_uniforms` 等が `field_loss_mode` を引数に取らないため、選択に
+/// 関わらず常に `darken` 相当で描画される（`sensus_bridge.dart` の
+/// `VisionFieldLossMode` doc 参照）。この 4 フィルタは現状カタログ選択がライブ
+/// プレビューに配線されていないため実害はないが、配線する側（将来 Issue）は
+/// `blur` を選んでも GPU では見た目が変わらないことを踏まえて UI を設計すること。
+const List<VisionParamOption> _fieldLossModeOptions = [
+  VisionParamOption(
+    value: 'darken',
+    displayName: 'Darken (default)',
+    labelKey: 'param.field_loss_mode.darken',
+  ),
+  VisionParamOption(
+    value: 'blur',
+    displayName: 'Blur (VIP-Sim style, CPU only)',
+    labelKey: 'param.field_loss_mode.blur',
+  ),
+];
+
 /// 緑内障モードの選択肢（[VisionGlaucomaMode] のミラー）。
 const List<VisionParamOption> _glaucomaModeOptions = [
   VisionParamOption(
@@ -334,6 +357,14 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         defaultValue: 'vignette',
         options: _glaucomaModeOptions,
       ),
+      VisionParam(
+        name: 'fieldLossMode',
+        kind: VisionParamKind.enumValue,
+        labelKey: 'param.field_loss_mode',
+        displayName: 'Field loss mode',
+        defaultValue: 'darken',
+        options: _fieldLossModeOptions,
+      ),
     ],
   ),
   VisionFilterEntry(
@@ -342,6 +373,16 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     i18nKey: 'filter.macular_degeneration',
     category: VisionFilterCategory.visualField,
     urgency: VisionFilterUrgency.high,
+    parameters: [
+      VisionParam(
+        name: 'fieldLossMode',
+        kind: VisionParamKind.enumValue,
+        labelKey: 'param.field_loss_mode',
+        displayName: 'Field loss mode',
+        defaultValue: 'darken',
+        options: _fieldLossModeOptions,
+      ),
+    ],
   ),
   VisionFilterEntry(
     id: 'hemianopia',
@@ -372,6 +413,14 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
           ),
         ],
       ),
+      VisionParam(
+        name: 'fieldLossMode',
+        kind: VisionParamKind.enumValue,
+        labelKey: 'param.field_loss_mode',
+        displayName: 'Field loss mode',
+        defaultValue: 'darken',
+        options: _fieldLossModeOptions,
+      ),
     ],
   ),
   VisionFilterEntry(
@@ -380,6 +429,16 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     i18nKey: 'filter.tunnel_vision',
     category: VisionFilterCategory.visualField,
     urgency: VisionFilterUrgency.high,
+    parameters: [
+      VisionParam(
+        name: 'fieldLossMode',
+        kind: VisionParamKind.enumValue,
+        labelKey: 'param.field_loss_mode',
+        displayName: 'Field loss mode',
+        defaultValue: 'darken',
+        options: _fieldLossModeOptions,
+      ),
+    ],
   ),
 
   // ── 光・透明度 ────────────────────────────────────────
@@ -718,6 +777,10 @@ List<VisionFilterEntry> visionFilterEntriesByCategory(
 /// freezed の値等価（payload 無しバリアントは同値）を使って引く。payload を持つ
 /// フィルタ（astigmatism 等）は const 構築できず体験プリセットでも使われないため
 /// 対象外（[visionFilterCatalogId] が null を返す）。
+///
+/// `macularDegeneration` / `tunnelVision` は sensus 0.6 で `fieldLossMode` payload が
+/// 付いたため厳密には「パラメータなし」ではなくなったが、体験プリセット側の意味論
+/// （既定 Darken）は変わらないため、[VisionFieldLossMode.darken] 固定でここに残す。
 final Map<VisionFilter, String> _kCatalogIdByParamlessVision = {
   const VisionFilter.protanopia(): 'protanopia',
   const VisionFilter.deuteranopia(): 'deuteranopia',
@@ -727,8 +790,12 @@ final Map<VisionFilter, String> _kCatalogIdByParamlessVision = {
   const VisionFilter.myopia(): 'myopia',
   const VisionFilter.hyperopia(): 'hyperopia',
   const VisionFilter.presbyopia(): 'presbyopia',
-  const VisionFilter.macularDegeneration(): 'macular_degeneration',
-  const VisionFilter.tunnelVision(): 'tunnel_vision',
+  const VisionFilter.macularDegeneration(
+    fieldLossMode: VisionFieldLossMode.darken,
+  ): 'macular_degeneration',
+  const VisionFilter.tunnelVision(
+    fieldLossMode: VisionFieldLossMode.darken,
+  ): 'tunnel_vision',
   const VisionFilter.photophobia(): 'photophobia',
   const VisionFilter.nightBlindness(): 'night_blindness',
   const VisionFilter.vertigo(): 'vertigo',
