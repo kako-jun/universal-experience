@@ -47,15 +47,10 @@ const Map<String, String> _excludedFilters = <String, String>{
   'floaters': 'second sampler (uMask); host wires a single uTexture only',
   'depth_aware_blur':
       'second sampler (uDepth); host wires a single uTexture only',
-  // No known technical blocker (single uTexture sampler, scalar uStrength +
-  // vec2 uResolution, no loops) — this looks like an undocumented scope gap
-  // predating #56 rather than an intentional exclusion. Found while adding
-  // the rust/src/shader_dump_gen.rs sync test (#56 review S2). Left excluded
-  // here to avoid expanding this PR's footprint (would need its own golden
-  // coverage / .frag review); a follow-up issue should either wire it into
-  // the generated 20 or record a real technical reason not to.
-  'detail_loss': 'no known technical blocker; undocumented scope gap, '
-      'deferred to a follow-up issue (see #56 review S2)',
+  'detail_loss': 'GLSL derives tile_size from strength (vision::detail_loss) '
+      'and has no cell_size uniform; the exposed DetailLoss{cell_size} '
+      'corresponds to detail_loss_with_cell_size instead, so the GPU path '
+      "can't reproduce cell_size/strength semantics (tracked in #61)",
 };
 
 void main(List<String> args) {
@@ -150,13 +145,14 @@ void main(List<String> args) {
   }
 }
 
-/// Parses + validates the top-level dump object (M2 freshness, S2 schema).
+/// Parses + validates the top-level dump object.
 ///
 /// Throws [FormatException] (with a human-readable message) on: non-object
 /// root, missing/unknown `schema`, missing/malformed `sensus_core_version`,
-/// a major-version mismatch against [_expectedSensusMajor], or a missing
-/// `shaders` array. The pre-#24 shape was a bare JSON array; that legacy form is
-/// rejected here so a stale vendored file fails loudly.
+/// a version mismatch against [_expectedSensusVersionLine]
+/// (see [sensusVersionSatisfiesDependency]), or a missing `shaders` array.
+/// The pre-#24 shape was a bare JSON array; that legacy form is rejected here
+/// so a stale vendored file fails loudly.
 Map<String, dynamic> _parseDump(String contents) {
   final decoded = jsonDecode(contents);
   if (decoded is! Map<String, dynamic>) {
@@ -182,24 +178,12 @@ Map<String, dynamic> _parseDump(String contents) {
   if (version is! String || version.isEmpty) {
     throw const FormatException('missing string field `sensus_core_version`.');
   }
-  final versionParts = version.split('.');
-  final major = int.tryParse(versionParts.isNotEmpty ? versionParts[0] : '');
-  final minor =
-      versionParts.length > 1 ? int.tryParse(versionParts[1]) : null;
-  if (major == null) {
+  if (int.tryParse(version.split('.').first) == null) {
     throw FormatException(
       'malformed `sensus_core_version` "$version" (expected semver x.y.z).',
     );
   }
-  final expectedParts = _expectedSensusVersionLine.split('.');
-  final expectedMajor = int.parse(expectedParts[0]);
-  final expectedMinor = int.parse(expectedParts[1]);
-  // 0.x semver convention (see _expectedSensusVersionLine doc): while major is
-  // 0, minor is breaking too, so require it to match; from major 1 on, only
-  // major needs to match.
-  final matches = major == expectedMajor &&
-      (expectedMajor != 0 || minor == expectedMinor);
-  if (!matches) {
+  if (!sensusVersionSatisfiesDependency(version, _expectedSensusVersionLine)) {
     throw FormatException(
       'sensus_core_version "$version" does not match the sensus-core '
       'dependency "$_expectedSensusVersionLine" (rust/Cargo.toml '
