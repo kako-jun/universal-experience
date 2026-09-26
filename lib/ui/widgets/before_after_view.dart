@@ -22,7 +22,7 @@ import '../../services/export_service.dart';
 /// test). protanomaly reuses the protanopia transform at a reduced strength
 /// ([recommendedStrength]). Every other filter shows a "rendering coming soon"
 /// placeholder, because live/GPU rendering for them is tracked by other issues
-/// (#1/#3/#4 live capture, #11 follow-ups for the remaining shaders).
+/// (#1/#3/#4 live capture, #59 follow-ups for the remaining shaders).
 class BeforeAfterView extends StatefulWidget {
   const BeforeAfterView({
     super.key,
