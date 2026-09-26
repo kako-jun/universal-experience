@@ -31,4 +31,9 @@ mod golden_gen;
 #[cfg(test)]
 mod shader_dump_gen;
 
+// tools/color_matrices.g.json の一回限り再生成器（#59、#34）。中身は `#[cfg(test)]`
+// のみで、本体ビルドには何も足さない。
+#[cfg(test)]
+mod color_matrix_gen;
+
 pub use api::sensus_bridge::*;
