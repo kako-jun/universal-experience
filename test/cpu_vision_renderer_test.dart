@@ -11,18 +11,23 @@ import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 /// `CpuVisionRenderer.apply()` 自体は実ブリッジ（`applyVisionCpuRgba8`）を必要と
 /// するため、native lib をロードしない `flutter test` では呼べない（実描画の
 /// 検証は `integration_test/cpu_preview_all_filters_test.dart` が担う）。
-/// 本ファイルはブリッジを挟まない往復変換部分（`imageToRgba8`/`rgba8ToImage`）
-/// のみを検証する。
+/// 本ファイルはブリッジを挟まない往復変換部分（`imageToRgba8`/
+/// `premultiplyStraightRgba8`/`rgba8ToImage`）のみを検証する。
 ///
-/// 数値一致の調査（#85 の依頼事項）: `ui.Image.toByteData(format: rawRgba)` /
-/// `ui.decodeImageFromPixels(..., PixelFormat.rgba8888, ...)` はいずれも
-/// straight（非 premultiplied）RGBA8 のメモリ表現をそのまま読み書きするだけで、
-/// sRGB⇄linear のガンマ変換や再圧縮を一切行わない。したがって
-/// `CpuVisionRenderer` がこの往復で持ち込む誤差は理論上ゼロで、以下のテストは
-/// それを実測で固定する。GPU（`ShaderFilter`）側は `srgbToLinear`/`linearToSrgb`
-/// を通すため sensus 正本と GPU/CPU 丸め差（`test/vision_filter_golden_test.dart`
-/// が maxDiff≤8 で許容）が生じるが、これは GPU シェーダ内部の話であり、本ファイル
-/// が検証する Dart 側の往復変換とは別の層の差である。
+/// ## alpha の扱い（#85 レビュー S1、訂正）
+///
+/// Flutter の `ui.Image` は premultiplied alpha で GPU テクスチャを保持する
+/// （`ImageByteFormat.rawRgba` で読む生バイト列、`PixelFormat.rgba8888` で
+/// 書き込む生バイト列のいずれも premultiplied）。sensus（`image` crate 経由）は
+/// straight（非 premultiplied）alpha を前提にした画素処理を行うため、
+/// `CpuVisionRenderer` は境界で明示的に変換する: 入力は
+/// `ImageByteFormat.rawStraightRgba` で straight を読み（[imageToRgba8]）、
+/// 出力は `premultiplyStraightRgba8` で premultiplied に変換してから `ui.Image`
+/// を組み立てる（[rgba8ToImage]）。alpha==255（このアプリが実運用で扱う画像は
+/// ほぼ全て不透明）では premultiply は恒等変換になるため、以下の「往復して
+/// バイト完全一致」テストは alpha==255 の入力に対する検証であり、
+/// alpha<255 の透過ピクセルに対する変換の正しさは別途
+/// 「透過ピクセルを含む往復」テストで検証する。
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -58,8 +63,10 @@ void main() {
       expect(
         roundTrippedRgba8,
         equals(originalRgba8),
-        reason: 'straight RGBA8 の往復は sRGB/linear 変換や再圧縮を含まないため、'
-            'バイト単位で完全一致するはず（#85 の数値一致調査）',
+        reason: 'golden PNG は alpha==255（不透明）のみなので premultiply は'
+            '恒等変換になり、sRGB/linear 変換や再圧縮も挟まないため、'
+            'バイト単位で完全一致するはず（#85 の数値一致調査。alpha<255 の'
+            'ケースは下の「透過ピクセルを含む往復」テストを参照）',
       );
     });
 
@@ -70,6 +77,77 @@ void main() {
 
       final Uint8List rgba8 = await CpuVisionRenderer.imageToRgba8(image);
       expect(rgba8.length, image.width * image.height * 4);
+    });
+
+    test(
+        '透過ピクセル（alpha=128 の既知の色）を含む往復で straight alpha が保たれる '
+        '(#85 レビュー S1)', () async {
+      // 1x1 の半透明ピクセル。straight alpha 前提で描画する: Canvas に
+      // Paint(color) で塗ると Skia は不透明色×アルファのブレンドで
+      // 内部的に premultiply して合成するため、ここでは
+      // `CpuVisionRenderer.rgba8ToImage`（premultiply 済みの
+      // ImageDescriptor.raw 経路）を直接使って、straight な色 (200, 100, 50,
+      // 128) を意図通りに埋め込んだ画像を作る。
+      const straightR = 200, straightG = 100, straightB = 50, alpha = 128;
+      final straightIn = Uint8List.fromList(
+        [straightR, straightG, straightB, alpha],
+      );
+
+      final image = await CpuVisionRenderer.rgba8ToImage(straightIn, 1, 1);
+      addTearDown(image.dispose);
+
+      final straightOut = await CpuVisionRenderer.imageToRgba8(image);
+
+      // premultiply→(GPU 内部表現)→imageToRgba8 の straight 変換という
+      // 8bit 整数の往復を経るため、丸め誤差 1 まで許容する。alpha は
+      // premultiply/straight 変換のどちらでも変化しないので厳密一致。
+      expect(straightOut[3], alpha, reason: 'alpha 自体は変換で変わらない');
+      expect((straightOut[0] - straightR).abs(), lessThanOrEqualTo(1),
+          reason: 'R: straight 往復の丸め誤差は 1 まで');
+      expect((straightOut[1] - straightG).abs(), lessThanOrEqualTo(1),
+          reason: 'G: straight 往復の丸め誤差は 1 まで');
+      expect((straightOut[2] - straightB).abs(), lessThanOrEqualTo(1),
+          reason: 'B: straight 往復の丸め誤差は 1 まで');
+    });
+  });
+
+  group('premultiplyStraightRgba8 (#85 レビュー S1)', () {
+    test('alpha==255 は恒等変換', () {
+      final straight =
+          Uint8List.fromList([255, 255, 255, 255, 10, 20, 30, 255]);
+      final out = CpuVisionRenderer.premultiplyStraightRgba8(straight);
+      expect(out, equals(straight));
+    });
+
+    test('alpha==0 は RGB がすべて 0 になる', () {
+      final straight = Uint8List.fromList([255, 0, 0, 0]);
+      final out = CpuVisionRenderer.premultiplyStraightRgba8(straight);
+      expect(out, equals(Uint8List.fromList([0, 0, 0, 0])));
+    });
+
+    test('alpha==128 は round(straight * alpha / 255) になる', () {
+      // 200*128=25600, +127=25727, ~/255=100（255*100=25500, 余り227）。
+      // 100*128=12800, +127=12927, ~/255=50（255*50=12750, 余り177）。
+      // 50*128=6400, +127=6527, ~/255=25（255*25=6375, 余り152）。
+      final straight = Uint8List.fromList([200, 100, 50, 128]);
+      final out = CpuVisionRenderer.premultiplyStraightRgba8(straight);
+      expect(out, equals(Uint8List.fromList([100, 50, 25, 128])));
+    });
+  });
+
+  group('rgba8ToImage の失敗 (#85 レビュー S2)', () {
+    test('バッファ長が width*height*4 と食い違うと例外になる（ハングしない）', () async {
+      // decodeImageFromPixels（コールバック API）はデコード失敗時にコール
+      // バックが一度も呼ばれず Future が永久に解決しないことがあった。
+      // ImmutableBuffer/ImageDescriptor/instantiateCodec ベースの現在の実装は
+      // 失敗が普通の例外として Future の rejection で伝わることを確認する
+      // （テストがハングしてタイムアウトするのではなく、明示的に失敗として
+      // 検出できる）。
+      final tooShort = Uint8List(4); // 100x100x4 バイト必要なところ 4 バイトのみ。
+      await expectLater(
+        CpuVisionRenderer.rgba8ToImage(tooShort, 100, 100),
+        throwsA(anything),
+      );
     });
   });
 
