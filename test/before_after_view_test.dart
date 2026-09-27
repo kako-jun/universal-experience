@@ -8,6 +8,7 @@ import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
+import 'package:universal_experience/services/export_service.dart';
 import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
@@ -296,10 +297,10 @@ void main() {
       // #85 レビュー S3: `_scheduleRebuild` が実行を直列化する（同時に走る
       // ジョブは常に1本）ようになったため、以前このテストが前提にしていた
       // 「3件が本当に同時に in-flight」という状況はもう production コードから
-      // 起こり得ない。2回目・3回目の要求は最新の1件だけがコツ合され、1回目が
+      // 起こり得ない。2回目・3回目の要求は最新の1件だけが集約され、1回目が
       // 完了してから走る。
       testWidgets(
-          '連続更新では中間の要求はコツ合され、最終的に最新の結果だけが残る '
+          '連続更新では中間の要求は集約され、最終的に最新の結果だけが残る '
           '(#85 レビュー S3)', (tester) async {
         late ui.Image before1;
         late ui.Image afterA, afterB;
@@ -328,7 +329,7 @@ void main() {
             );
 
         // 3回連続で更新する（インテンシティのスライダー操作を想定）。1回目の
-        // 要求だけが実際に in-flight になり、2・3回目はコツ合されて1件だけ
+        // 要求だけが実際に in-flight になり、2・3回目は集約されて1件だけ
         // 保留される。
         await tester.pumpWidget(build(0.1));
         await tester.pump();
@@ -336,9 +337,9 @@ void main() {
         await tester.pump();
         await tester.pumpWidget(build(0.3));
         await tester.pump();
-        expect(completers.length, 1, reason: '2・3回目はコツ合され、実際にはまだ呼ばれていない');
+        expect(completers.length, 1, reason: '2・3回目は集約され、実際にはまだ呼ばれていない');
 
-        // 1回目（intensity=0.1）を解決する。コツ合された保留分（最新の
+        // 1回目（intensity=0.1）を解決する。集約された保留分（最新の
         // intensity=0.3 を使う）が続けて自動的に走り始める。
         completers[0].complete(afterA);
         await tester.pump();
@@ -347,7 +348,7 @@ void main() {
         expect(capturedStrengths, [0.1, 0.3],
             reason: '保留分は要求時点(0.2)ではなく実行時点の最新値(0.3)を使う');
         expect(afterA.debugDisposed, isFalse,
-            reason: '2件目の解決前は1回目の結果が表示されたままになる（コツ合の許容する遷移）');
+            reason: '2件目の解決前は1回目の結果が表示されたままになる（集約の許容する遷移）');
 
         // 2回目（実際には intensity=0.3 用）を解決する。
         completers[1].complete(afterB);
@@ -509,7 +510,7 @@ void main() {
       // レビュー S4 で auto モード自体（レイアウト依存のサイズ決定）を撤去した
       // ため前提が消滅した。「初期生成中に filterType が変わっても最新の結果
       // だけが残る」という一般的な不変条件自体は、上の
-      // 「連続更新では中間の要求はコツ合され…」(#85 レビュー S3) テストで
+      // 「連続更新では中間の要求は集約され…」(#85 レビュー S3) テストで
       // 別の切り口から検証済み。
 
       testWidgets(
@@ -573,6 +574,78 @@ void main() {
       // `_rebuild` が同時に in-flight になり得なくなったため、この状況を
       // widget test から再現できなくなった（`_rebuild` 内の discard 分岐自体は
       // dispose 安全性の防御として残してあるが、素通しでは踏めない）。
+
+      testWidgets(
+          '保留中の要求がある状態で dispose したら、renderer は再び呼ばれない '
+          '(#85 レビュー N12)', (tester) async {
+        late ui.Image before1;
+        await tester.runAsync(() async {
+          before1 = await BeforeAfterView.generateSampleImage(4);
+        });
+        sampleImageGenerator = (size) => Future.value(before1);
+
+        var rendererCallCount = 0;
+        final completer = Completer<ui.Image?>();
+        afterImageRenderer = (source, type, strength) {
+          rendererCallCount++;
+          return completer.future;
+        };
+
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filterType: ColorVisionType.protanopia,
+          intensity: 1.0,
+          sampleSize: 16,
+        )));
+        await tester.pump();
+        expect(rendererCallCount, 1);
+
+        // intensity を変える → 1回目がまだ in-flight なので集約されて
+        // pending になるだけで、まだ renderer は呼ばれない。
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filterType: ColorVisionType.protanopia,
+          intensity: 0.5,
+          sampleSize: 16,
+        )));
+        await tester.pump();
+        expect(rendererCallCount, 1, reason: '2回目は集約されているだけでまだ呼ばれていない');
+
+        // 保留が残ったまま widget を破棄する。
+        await tester.pumpWidget(const SizedBox());
+
+        // 1回目の要求をようやく解決する。_runRebuild は mounted チェックに
+        // より、保留中の要求（intensity=0.5 分）を再スケジュールしないはず。
+        completer.complete(before1);
+        await tester.pump();
+        await tester.pump();
+
+        expect(rendererCallCount, 1,
+            reason: 'dispose 後は保留中の要求があっても renderer が再度呼ばれて'
+                'はいけない');
+      });
+
+      testWidgets(
+          'sampleSize 未指定のとき generator は canonicalSampleSize（1024）で'
+          '呼ばれる (#85 レビュー N12)', (tester) async {
+        late ui.Image stub;
+        await tester.runAsync(() async {
+          stub = await BeforeAfterView.generateSampleImage(4);
+        });
+        final requestedSizes = <int>[];
+        sampleImageGenerator = (size) {
+          requestedSizes.add(size);
+          return Future.value(stub);
+        };
+        afterImageRenderer = (source, type, strength) => Future.value(source);
+
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filterType: ColorVisionType.none,
+          intensity: 1.0,
+        )));
+        await tester.pump();
+        await tester.pump();
+
+        expect(requestedSizes, [BeforeAfterView.canonicalSampleSize]);
+      });
     });
 
     group('例外処理と復帰 (#58 レビュー S1)', () {
@@ -843,6 +916,107 @@ void main() {
 
         expect(find.text(en.previewFailed), findsNothing);
         expect(goodAfter2.debugDisposed, isFalse);
+      });
+    });
+
+    group('export の caption (#85 レビュー S8)', () {
+      tearDown(() {
+        sampleImageGenerator = BeforeAfterView.generateSampleImage;
+        afterImageRenderer = BeforeAfterView.renderAfter;
+        exportImageComposer = composeExportImage;
+        pngSaver = savePng;
+      });
+
+      testWidgets(
+          '1回目の結果を表示中に強度を変えてから export しても、caption は'
+          '描画時の強度になる', (tester) async {
+        late ui.Image before1, after1, composedStub;
+        await tester.runAsync(() async {
+          before1 = await BeforeAfterView.generateSampleImage(4);
+          after1 = await BeforeAfterView.generateSampleImage(4);
+          composedStub = await BeforeAfterView.generateSampleImage(4);
+        });
+        sampleImageGenerator = (size) => Future.value(before1);
+
+        // 1回目（intensity=1.0）はすぐ解決する。2回目（intensity=0.5、
+        // コアレス後に走る）は意図的に未解決のまま止め、「表示中の _after は
+        // まだ1回目のまま」という状況を作る。
+        var rendererCallCount = 0;
+        final pending = Completer<ui.Image?>();
+        afterImageRenderer = (source, type, strength) {
+          rendererCallCount++;
+          if (rendererCallCount == 1) return Future.value(after1);
+          return pending.future;
+        };
+
+        ExportCaption? capturedCaption;
+        exportImageComposer = (base, caption) async {
+          capturedCaption = caption;
+          // 本物の composeExportImage は常に base とは別の新しい ui.Image を
+          // 返す（base を下地に新しいキャンバスへ描き直すため）。_export は
+          // 戻り値を dispose する責務を持つので、base（＝表示中の _after）を
+          // そのまま返すと _after を誤って dispose してしまう。フェイクでも
+          // 別オブジェクトを返して契約を守る。
+          return composedStub;
+        };
+        String? savedFilename;
+        pngSaver = (bytes, filename) async {
+          savedFilename = filename;
+          return '/fake/downloads/$filename';
+        };
+
+        final en = lookupAppLocalizations(const Locale('en'));
+
+        // 1回目: protanopia, intensity=1.0 で描画完了させる。
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filterType: ColorVisionType.protanopia,
+          intensity: 1.0,
+          sampleSize: 16,
+        )));
+        await tester.pump();
+        await tester.pump();
+        expect(rendererCallCount, 1);
+
+        // intensity を 0.5 に変える。_scheduleRebuild は実行中でなければ
+        // 即座に2回目を起動する（#85 レビュー S3）が、その2回目は上の
+        // フェイクで意図的に未解決のまま止めてあるので、_after はまだ
+        // 1回目（after1, strength=1.0）のままになる。
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filterType: ColorVisionType.protanopia,
+          intensity: 0.5,
+          sampleSize: 16,
+        )));
+        await tester.pump();
+        expect(rendererCallCount, 2, reason: '2回目のレンダリングは開始しているが、まだ完了していない');
+
+        // ここで export をタップする。表示されている _after はまだ1回目の
+        // 結果なので、caption も1回目の strength（100%）になるべき——
+        // widget.intensity の現在値（0.5 → 50%）を使ってはいけない
+        // （#85 レビュー S8）。
+        await tester.tap(find.byTooltip(en.exportButtonTooltip));
+        // encodeImagePng は実エンジンの PNG エンコードを行う（フェイクにして
+        // いない）ため、素の pump() だけでは終わらないことがある。他の
+        // テスト（pumpUntilText 参照）と同じく tester.runAsync の中で実時間
+        // ポンプして待つ。
+        await tester.runAsync(() async {
+          for (var i = 0; i < 50; i++) {
+            if (savedFilename != null) return;
+            await tester.pump(const Duration(milliseconds: 20));
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+          }
+        });
+        await tester.pump();
+
+        expect(capturedCaption, isNotNull);
+        expect(capturedCaption!.strengthLabel, en.strengthLabel(100),
+            reason: '描画時（1回目、strength=1.0=100%）の値を使うべき');
+        expect(
+          capturedCaption!.symptomLabel,
+          colorVisionTypeName(en, ColorVisionType.protanopia),
+        );
+        expect(savedFilename, isNotNull);
+        expect(savedFilename, contains('100pct'));
+        expect(savedFilename, isNot(contains('50pct')));
       });
     });
   });
