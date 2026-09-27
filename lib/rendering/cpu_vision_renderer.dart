@@ -115,8 +115,22 @@ class CpuVisionRenderer {
   ///
   /// `premultiplied = round(straight * alpha / 255)`。alpha==255（このアプリの
   /// 実運用画像はほぼ全て不透明）のピクセルは恒等変換になる。
+  ///
+  /// fast path（#85 レビュー N5）: 全ピクセルの alpha が 255 なら変換自体が
+  /// 恒等写像なので、新しいバッファを確保・コピーせず [straight] をそのまま
+  /// 返す。1024px 四方（4MB）のバッファをフィルタのたびに複製するコストを、
+  /// このアプリの主要ケース（不透明画像）で消す。
   @visibleForTesting
   static Uint8List premultiplyStraightRgba8(Uint8List straight) {
+    var allOpaque = true;
+    for (var i = 3; i < straight.length; i += 4) {
+      if (straight[i] != 255) {
+        allOpaque = false;
+        break;
+      }
+    }
+    if (allOpaque) return straight;
+
     final out = Uint8List(straight.length);
     for (var i = 0; i + 3 < straight.length; i += 4) {
       final a = straight[i + 3];
