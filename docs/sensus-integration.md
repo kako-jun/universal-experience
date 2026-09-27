@@ -186,13 +186,14 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
 > tritanopia/achromatopsia、+各 -omaly は base の -opia を再利用）は
 > `ShaderFilter` 経由で GPU 描画できる（#59）。**UI の before/after プレビュー
 > （`before_after_view.dart`）はこの GPU 経路を呼ばない**: #85 で sensus の CPU
-> `apply()`（`CpuVisionRenderer`）に置き換え済みで、GPU 経路はルーペの
-> ライブ表示専用（`lib/main.dart` のルーペ窓）に位置づけを変えた。この節の
-> uniform レイアウトはルーペのライブ描画・GPU golden テスト向けの参照情報として
-> 残す。
+> `apply()`（`CpuVisionRenderer`）に置き換え済みで、GPU 経路は将来のライブ画面
+> キャプチャ（#1/#3/#4、ルーペ窓での実描画を想定）向けに残置してあるが、その
+> 機能自体が未実装のため現状 production コードからは呼ばれない。この節の
+> uniform レイアウトは、その将来のライブ描画実装時・GPU golden テスト向けの
+> 参照情報として残す。
 > myopia 等の advanced フィルタも `ShaderFilter.applyColorFilterGpu` の汎用経路
-> 自体は使えるが、ルーペのライブ描画への配線はまだ（#60 のプレビュー結線とは
-> 別スコープ）。各フィルタの正確なレイアウトは実装時に必ず
+> 自体は使えるが、ライブ描画（ルーペ）への配線自体がまだ存在しない（#60 の
+> プレビュー結線とは別スコープ）。各フィルタの正確なレイアウトは実装時に必ず
 > `visionUniformLayout()` で確認すること（ここに書き写した値を信用しない）。
 
 | フィルタ | flat 配列 | 要素数 |
@@ -433,7 +434,8 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   全部に広げた。-omaly は base の -opia と同じレンダラを、`recommendedStrength`
   （0.6）で呼ぶだけ（専用テーブルは不要）。この GPU 経路自体は静止画プレビュー用の
   暫定実装で、後に #85 で sensus の CPU `apply()` に置き換わった（§9 参照。GPU は
-  ルーペのライブ表示専用に残る）。
+  将来のライブ画面キャプチャ（#1/#3/#4）向けに残るが、現状 production からは
+  呼ばれない）。
 - **YAGNI 撤去（#86 レビュー should-3）**: 上記の結果、`canRender`（常に `true`
   を返すだけになっていた）・「描画は近日対応」のプレースホルダ
   （`_ComingSoonPlaceholder` / ARB の `previewComingSoon`）・`home_screen.dart`
@@ -450,32 +452,84 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
 - **変更**: `apply_vision_cpu_rgba8` の `#[frb(sync)]` を外して非同期公開にし
   （Rust 側スレッドプールで実行、Dart 側の `await` が UI スレッドを塞がない）、
   `lib/rendering/cpu_vision_renderer.dart` に `CpuVisionRenderer` を新設した。
-  `ui.Image` → raw RGBA8（`toByteData(format: rawRgba)`）→ 実ブリッジ呼び出し →
-  `ui.Image`（`decodeImageFromPixels`）の往復のみを行い、アルゴリズムは持たない。
   `before_after_view.dart` の `renderAfter` は
   `FilterService`（`visionFilterForColorVisionType`、単一の対応表）で
   `ColorVisionType` を `VisionFilter` へ写像し、`CpuVisionRenderer.applier`
-  （`@visibleForTesting` の seam、#58 と同じパターン）へ委譲する形に置き換えた。
+  （production からも直接呼ぶ seam。`sampleImageGenerator`/
+  `afterImageRenderer` と同じパターンだが、production コード自身が参照するため
+  `@visibleForTesting` は付けていない、#85 レビュー N1）へ委譲する形に置き換えた。
   レンダラ自体は任意の `VisionFilter`（payload 込み）を受け取れるため、advanced
   カタログ 30 種すべてを描画できる（UI からの結線は #60 のスコープ）。
-- **GPU の位置づけ**: `ShaderFilter`（§8）は削除せず、ルーペのライブ表示専用
-  （`lib/main.dart` のルーペ窓）として残した。GPU と CPU の等価性は
-  `test/vision_filter_golden_test.dart` 等の既存 GPU golden テストが引き続き
-  担保する。
+- **alpha の扱い（レビュー S1、初版の誤り）**: Flutter の `ui.Image` は
+  premultiplied alpha で GPU テクスチャを保持するが、sensus（`image` crate）は
+  straight alpha を前提にした画素処理を行う。初版はこの違いを踏まえず
+  `ImageByteFormat.rawRgba`（premultiplied を返す）で読み、
+  `decodeImageFromPixels` に straight のまま書き込んでいたため、alpha<255 の
+  ピクセルで色がずれる欠陥があった。修正: 入力は
+  `ImageByteFormat.rawStraightRgba` で straight を読み、出力は
+  `CpuVisionRenderer.premultiplyStraightRgba8`（`round(straight × alpha / 255)`）
+  で premultiplied に変換してから `ui.Image` を組み立てる。変換は
+  sensus_core/`apply_vision_cpu_rgba8` 側ではなく Dart 側（Flutter 固有の
+  premultiplied 前提が閉じたレイヤー）で行う。`test/cpu_vision_renderer_test.dart`
+  が既知の透過ピクセル（alpha=128）を含む往復と `premultiplyStraightRgba8` の
+  変換式そのものを検証する。
+- **デコードのハング（レビュー S2、初版の欠陥）**: 初版は `ui.decodeImageFromPixels`
+  （コールバック API）で出力バイト列から `ui.Image` を組み立てていたが、この API
+  はデコードに失敗した場合にコールバックが一度も呼ばれず `Future` が永久に
+  解決しないことがある。`CpuVisionRenderer.rgba8ToImage` を
+  `ImmutableBuffer.fromUint8List` → `ImageDescriptor.raw` →
+  `instantiateCodec` → `getNextFrame` の await 連鎖に書き換え、失敗が普通の
+  例外として `Future` の rejection で伝わるようにした（`buffer`/`descriptor`/
+  `codec` は `finally` で必ず dispose する）。これにより既存の `_rebuild` の
+  try/catch・失敗表示（#58）にそのまま乗る。`test/cpu_vision_renderer_test.dart`
+  が、サイズの合わないバッファを渡すと（ハングせず）例外になることを検証する。
+- **実行の集約（レビュー S3）**: CPU `apply()` は GPU シェーダより重いため、
+  スライダーの連続操作で `_rebuild` を何本も同時に実行すると実ブリッジ呼び出しが
+  積み上がる。`_BeforeAfterViewState._scheduleRebuild` を新設し、`_rebuild` が
+  実行中なら新しい要求は「最新の1件」だけを `_pendingRebuildSampleSize` に
+  記録して待たせ、完了時にそれを走らせる（同時に走るジョブは常に1本）。
+  `_rebuild` 自体の世代管理・dispose・失敗表示（#58）は変更していない。
+  `test/before_after_view_test.dart` が、連続更新で中間の要求がコツ合される
+  ことと、同時に実行される `afterImageRenderer` が1本を超えないことを検証する。
+- **正準サイズでの描画（レビュー S4）**: 旧 GPU 時代（#58）はプレビューをペインの
+  論理サイズ × `devicePixelRatio` に自動で追従させ、リサイズをデバウンスして
+  いた。CPU プレビューではこれをやめ、常に固定の正準サイズ
+  （`BeforeAfterView.canonicalSampleSize` = 1024）で描画し、表示側で
+  `FilterQuality.medium` によるスケーリングに任せる。理由: (1) `DetailLoss`
+  の `cellSize` のように絶対ピクセル数でパラメータを取るフィルタは、画像
+  サイズが変わるたびに見え方自体が変わってしまう、(2) disk blur 系
+  （myopia/hyperopia/presbyopia/astigmatism）は半径を
+  `strength × 比率 × min(width, height)` で決めており、比率最小の
+  astigmatism/presbyopia（1.1%）では画像が小さいと半径が 1px 未満に退化して
+  楕円カーネルが中心 1 点だけになり完全な no-op になる（sensus-core の
+  `build_ellipse_spans` の `<=1.0` 判定）。1024 ならこの比率でも半径 11px 超と
+  余裕があるが、sensus 側の比率定数や canonical サイズ自体を変えるとこの余裕は
+  変わる点に注意（`integration_test/cpu_preview_all_filters_test.dart` の
+  コメント参照）。ペインサイズ連動の auto-sizing（#58）とそのテスト群は
+  丸ごと撤去した。
+- **GPU の位置づけ**: `ShaderFilter`（§8）は削除せず、将来のライブ画面キャプチャ
+  （#1/#3/#4、ルーペ窓での実描画を想定）向けに残した。ただしその機能自体が
+  未実装のため、**現状 production コードから呼ばれることはない**。GPU と CPU
+  の等価性は `test/vision_filter_golden_test.dart` 等の既存 GPU golden テストが
+  （production の呼び出しとは独立に）引き続き担保する。
 - **数値一致の調査（依頼事項）**: 色覚型について CPU 出力と既存 GPU golden の
   差を調べた。
   - CPU（`apply_vision_cpu_rgba8`）自体は golden 参照 PNG の生成に使われた経路
     そのもの（`rust/src/golden_gen.rs`）なので、strength=1.0 では参照 PNG と
-    **バイト完全一致**する。
-  - `CpuVisionRenderer` が追加する Dart 側の往復変換（`ui.Image` ⇄ raw RGBA8）
-    は sRGB⇄linear のガンマ変換や再圧縮を一切行わない straight RGBA8 のメモリ
-    コピーであり、理論上ゼロ誤差。`test/cpu_vision_renderer_test.dart` が
-    golden 参照 PNG を往復させてバイト完全一致することを実測で固定した。
+    **バイト完全一致**する（`integration_test/cpu_preview_all_filters_test.dart`
+    の protanopia 数値テストが実ブリッジで実測確認する）。
+  - `CpuVisionRenderer` が追加する Dart 側の往復変換（straight RGBA8 ⇄
+    premultiplied RGBA8）は、alpha==255（このアプリの実運用画像はほぼ全て
+    不透明）では premultiply が恒等変換になるためゼロ誤差、alpha<255 でも
+    8bit 整数の丸め誤差 1 未満に収まる。`test/cpu_vision_renderer_test.dart` が
+    golden 参照 PNG（alpha==255）でのバイト完全一致と、既知の透過ピクセル
+    （alpha=128）での丸め誤差 1 以内の往復を実測で固定した。
   - 既存の GPU vs golden 比較（`test/vision_filter_golden_test.dart`）は
     maxDiff≤8（PSNR≥30dB）を許容しており、依頼の目安（2/255）より緩い。この差は
     GPU シェーダ内部の `srgbToLinear`/`linearToSrgb`（pow 演算）に伴う GPU/CPU
     丸め差であり、本 Issue が変更した範囲（プレビューの描画経路の切替）とは
     無関係かつ既存（#31/#59 由来）のまま。**プレビューは CPU 出力そのものに
     なった**ため、この GPU/CPU 差はプレビューの見え方には一切影響しない
-    （GPU 経路はルーペのライブ表示にのみ残るため、そちらでは従来どおり
-    maxDiff≤8 の差が生じうる）。
+    （GPU 経路は現状どこからも呼ばれないため、この差が実際に見えることもない。
+    将来ライブ画面キャプチャで GPU 経路が使われる際は従来どおり maxDiff≤8 の
+    差が生じうる）。

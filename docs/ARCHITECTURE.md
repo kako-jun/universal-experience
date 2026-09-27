@@ -8,8 +8,10 @@
 > 正本は sensus-core crate（Rust）に一元化し、ue は flutter_rust_bridge 経由で
 > 消費する（`lib/src/rust/`、詳細は `docs/sensus-integration.md`）。プレビュー
 > （静止画）は sensus の CPU `apply()`（`lib/rendering/cpu_vision_renderer.dart`
-> の `CpuVisionRenderer`、#85）が担い、GPU シェーダ（`lib/rendering/
-> shader_filter.dart`）はルーペのライブ表示専用に位置づけを変えた。
+> の `CpuVisionRenderer`、#85）が担う。GPU シェーダ（`lib/rendering/
+> shader_filter.dart`）は将来のライブ画面キャプチャ（#1/#3/#4）向けに残置して
+> あるが、現状 production コードから呼ばれることはなく、GPU golden テスト
+> （`test/vision_filter_golden_test.dart` 等）だけが検証のために使う。
 > `FilterService` は選択状態のみを保持する。他アプリ含む全画面への適用は
 > 画面キャプチャ経路（#1/#3/#4）の実装後。
 >
@@ -231,7 +233,9 @@ flutter_rust_bridge (lib/src/rust/)
 sensus-core (Rust, CPU apply() + GLSL/uniform 計算の正本)
       ↓
 CpuVisionRenderer (lib/rendering/) — プレビュー（静止画）の正本経路（#85）
-ShaderFilter    (lib/rendering/) — Impeller FragmentProgram。ルーペのライブ表示専用
+ShaderFilter    (lib/rendering/) — Impeller FragmentProgram。将来のライブ画面
+                キャプチャ（#1/#3/#4）向けに残置。現状 production からの
+                呼び出しはなく、GPU golden テストのみが使う
 ```
 
 状態管理は Provider の `ChangeNotifier` ベース: `FilterService` /
@@ -302,15 +306,38 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
 - `VisionFilterState`: advanced カタログ（sensus 全 30 種）の選択・パラメータ状態
 - `CpuVisionRenderer`（`lib/rendering/cpu_vision_renderer.dart`）: sensus の CPU
   `apply()`（`applyVisionCpuRgba8`）で `ui.Image` にフィルタを適用する、
-  **プレビュー（静止画）描画の正本**（#85）。`ui.Image` → raw RGBA8 → 実ブリッジ
-  呼び出し → `ui.Image` の往復のみを行い、アルゴリズムは一切持たない。任意の
-  `VisionFilter`（payload 込み）を受け取れるため sensus 全 30 種を描画できる
-  （`before_after_view.dart` の既定 `afterImageRenderer` は色覚 7 型のみを配線
-  済み、advanced カタログとの結線は #60）。`applyVisionCpuRgba8` は
-  `#[frb(sync)]` を外し非同期公開にしてあり（Rust 側スレッドプールで実行）、
-  UI スレッドを塞がない。テストでは `CpuVisionRenderer.applier` をフェイクに
-  差し替えられる（`@visibleForTesting`、#58 の世代管理・dispose 規約と同じ
-  seam パターン）
+  **プレビュー（静止画）描画の正本**（#85）。`ui.Image` → straight RGBA8
+  （`ImageByteFormat.rawStraightRgba`）→ 実ブリッジ呼び出し → premultiply →
+  `ui.Image`（`ImmutableBuffer`/`ImageDescriptor.raw`/`instantiateCodec` の
+  await 連鎖。`decodeImageFromPixels` は使わない — デコード失敗時にコール
+  バックが呼ばれず呼び出し元がハングし得るため）の往復のみを行い、
+  アルゴリズムは一切持たない。sensus は straight alpha、Flutter の `ui.Image`
+  は premultiplied alpha を前提とするため、境界でこの変換を明示的に行う
+  （#85 レビュー S1）。任意の `VisionFilter`（payload 込み）を受け取れるため
+  sensus 全 30 種を描画できる（`before_after_view.dart` の既定
+  `afterImageRenderer` は色覚 7 型のみを配線済み、advanced カタログとの結線は
+  #60）。`applyVisionCpuRgba8` は `#[frb(sync)]` を外し非同期公開にしてあり
+  （Rust 側スレッドプールで実行）、UI スレッドを塞がない。`before_after_view.dart`
+  の `renderAfter` はこれを直接呼ぶ production コードなので、テストで差し替える
+  ための `CpuVisionRenderer.applier`（`sampleImageGenerator`/
+  `afterImageRenderer` と同じ seam パターン、#58）に `@visibleForTesting` は
+  付けていない（同一ライブラリ外の production コードから正当に参照するため）
+- `BeforeAfterView`（`lib/ui/widgets/before_after_view.dart`）: before/after
+  プレビューペイン。#85 レビュー S4 で、ペインの論理サイズ・
+  `devicePixelRatio` に連動して都度サイズを変えていた旧 GPU 時代の auto-sizing
+  （#58）を撤去し、常に固定の正準サイズ（`canonicalSampleSize` = 1024）で
+  `CpuVisionRenderer` に描画させ、表示側は `FilterQuality.medium` でスケールする
+  方式に変えた。理由は2つ: (1) `DetailLoss.cellSize` のように**絶対ピクセル数**
+  でパラメータを取るフィルタは、画像サイズが変わるたびに見え方自体が変わって
+  しまう、(2) disk blur 系（myopia/hyperopia/presbyopia/astigmatism）は半径を
+  `strength × 比率 × min(width, height)` で決めており、比率が最小の
+  astigmatism/presbyopia（1.1%）では画像サイズが小さいと半径が 1px 未満に
+  退化してカーネルが中心 1 点だけになり完全な no-op になる（sensus-core の
+  `build_ellipse_spans`、`integration_test/cpu_preview_all_filters_test.dart`
+  参照）。CPU `apply()` は GPU シェーダより重いため、`_scheduleRebuild` が
+  `_rebuild` の実行を直列化し（同時に走るジョブは常に1本、#85 レビュー S3）、
+  スライダーを連続操作しても実ブリッジ呼び出しが積み上がらないようにしている
+  （#58 の世代管理・dispose・失敗表示の規約自体は変更していない）
 - `ShaderFilter`（`lib/rendering/shader_filter.dart`）: sensus 由来 GLSL を変換した
   Impeller `FragmentProgram` で `ui.Image` にフィルタを適用する。色覚 7 型
   （protanopia/deuteranopia/tritanopia/achromatopsia + 各 -omaly）に対応
@@ -318,9 +345,11 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   severity テーブルを `resolveSeverityMatrix()` で区分線形補間して解決する
   （グリッドは `lib/rendering/color_matrices.g.dart`、sensus-core からの生成物）。
   **プレビューの描画経路は #85 で `CpuVisionRenderer`（CPU `apply()`）に
-  置き換え済み**。`ShaderFilter` はルーペ窓（`loupe_window_controller.dart`）の
-  ライブ表示専用として残る。GPU と CPU の等価性は `test/vision_filter_golden_test.dart`
-  等の GPU golden テストが担保する
+  置き換え済み**。`ShaderFilter` は将来のライブ画面キャプチャ（#1/#3/#4、
+  ルーペ窓 `loupe_window_controller.dart` での実描画を想定）向けに残置して
+  あるが、その機能自体が未実装のため**現状 production コードから呼ばれることは
+  ない**。GPU と CPU の等価性は `test/vision_filter_golden_test.dart` 等の
+  GPU golden テストが（production の呼び出しとは独立に）担保する
 - `ExportService`: フィルタ適用後（after）画像のメタ焼き込み PNG エクスポート
 - `ExperiencePresets`（`lib/ui/widgets/experience_presets.dart`）: sensus の
   `experiences()` をワンタップ適用 UI として消費する（複合体験、#19）
@@ -341,12 +370,18 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   検証・体験プリセット等を含む。`before_after_view_test.dart` の `renderAfter`
   は実ブリッジを要する `CpuVisionRenderer.applier`（#85）をフェイクに差し替え、
   `ColorVisionType` → `VisionFilter` のマッピング契約（#57/#59 の不変条件）を
-  検証する（実描画そのものは下記の実ブリッジ integration test が担う）
+  検証する（実描画そのものは下記の実ブリッジ integration test が担う）。
+  同ファイルは `_scheduleRebuild` が実行を直列化すること（同時に走るジョブは
+  常に1本、#85 レビュー S3）も検証する。`cpu_vision_renderer_test.dart` は
+  実ブリッジなしで検証できる部分（straight⇄premultiplied 変換の正しさ・
+  `ImageDescriptor.raw` 経路のデコード失敗が例外として伝わること、#85 レビュー
+  S1/S2）を担う
 - **GPU golden テスト**（`test/vision_filter_golden_test.dart` /
   `test/protanopia_golden_test.dart`）: sensus-core 正本由来の参照 PNG と GPU 描画結果を
   PSNR/maxDiff で比較（詳細は `docs/sensus-integration.md` §6）。プレビュー自体は
-  #85 で CPU 経路に切り替わったが、ルーペのライブ表示用 GPU 経路の正しさは
-  引き続きこれらのテストが担保する
+  #85 で CPU 経路に切り替わり、GPU（`ShaderFilter`）は現状どの production
+  コードからも呼ばれないが、将来のライブ画面キャプチャ（#1/#3/#4）向けに GPU
+  経路自体の正しさ（sensus 正本との等価性）を引き続きこれらのテストが担保する
 - **Rust 側**: `cargo test`（`rust/`、`golden_gen.rs` の正本一致テストを含む）
 - **実ブリッジ integration test**（`integration_test/`、ファイルごとに
   `flutter test integration_test/<file> -d macos`（CI では linux -d linux も）、
@@ -372,13 +407,15 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   - `cpu_preview_all_filters_test.dart`（#85）: `kVisionFilterCatalog` の全 30
     エントリについて、`VisionFilterState.select()/build()` でカタログ既定値の
     payload を埋めた `VisionFilter` を組み立て、`CpuVisionRenderer.apply()`
-    （実ブリッジ）で 128x128 のサンプル画像に適用する（disk blur 系フィルタの
-    半径が 1px 未満に退化しないサイズ、`cpu_preview_all_filters_test.dart` の
-    コメント参照）。例外が出ないこと・出力が
-    入力サイズと一致すること・出力ピクセルが入力と異なること（strength=1.0 で
-    全フィルタが視覚的に効果を持つ設計であるため）を検証する。widget test の
-    フェイク注入では検知できない「実際に sensus-core の CPU apply が 30 種
-    すべてで動く」ことを保証するのがこのファイルの役割
+    （実ブリッジ）で production と同じ [canonicalSampleSize]（1024、#85 レビュー
+    S4）のサンプル画像に適用する。例外が出ないこと・出力が入力サイズと
+    一致すること・出力ピクセルが入力と異なること（strength=1.0 で全フィルタが
+    視覚的に効果を持つ設計であるため）を検証する。加えて protanopia について、
+    strength=0.0 が原画とバイト一致すること・strength による出力の違い・
+    変化したピクセル比率の下限・golden 参照（`protanopia_ref.png`）との
+    ほぼバイト一致（#85 レビュー S7）も検証する。widget test のフェイク注入
+    では検知できない「実際に sensus-core の CPU apply が 30 種すべてで動く」
+    ことを保証するのがこのファイルの役割
 - **CI**（#38、完了）: `.github/workflows/ci.yml` は2ジョブ構成。`check`
   （macos-latest）が push/PR で上記に加え `flutter build macos --debug` を
   回す（#54）。cargokit 統合（#55）によりこの build が rust/ crate のビルドも

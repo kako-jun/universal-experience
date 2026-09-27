@@ -164,7 +164,8 @@ build より前に置く。rust 依存は crates.io のみ（sensus-core）な�
 - **Phase 1**: 色覚障害シミュレーション — 色覚 7 型（protanopia/deuteranopia/
   tritanopia/achromatopsia + 各 -omaly）は before/after プレビューの実描画まで
   配線済み（#34/#59 で GPU、#85 で sensus の CPU `apply()` 経路に置き換え済み。
-  GPU はルーペのライブ表示専用）。プレビューのレンダラ自体は sensus 全 30 種
+  GPU は将来のライブ画面キャプチャ向けに残置してあるが現状未使用）。
+  プレビューのレンダラ自体は sensus 全 30 種
   （advanced カタログ）を描画できるが、advanced カタログ・体験プリセットの選択は
   `VisionFilterState` に入るだけでプレビューへの UI 結線はまだ（#60）
 - **Phase 2**: 聴覚障害シミュレーション — 複合体験の型定義（FRB, `HearingFilter`）は
