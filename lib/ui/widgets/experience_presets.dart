@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_catalog.dart';
-import '../../services/filter_service.dart';
 import '../../services/vision_filter_state.dart';
 import '../../src/rust/api/sensus_bridge.dart';
 
@@ -28,8 +27,14 @@ ExperiencesProvider experiencesProvider = experiences;
 /// 4 体験）を消費し、各体験をタップで「視覚フィルタの選択」に橋渡しする。
 ///
 /// - 視覚: `Experience.vision`（bridge の [VisionFilter]）を [visionFilterCatalogId]
-///   でカタログ id（snake_case）へ写し、[VisionFilterState.select] に渡す。id を
-///   ハードコードせずカタログを正本に引く。
+///   でカタログ id（snake_case）へ写し、[VisionFilterState.selectPreset] に渡す
+///   （#60: `FilterService.deactivate()` は呼ばない — 色覚クイック選択の状態は
+///   このプリセット適用と無関係に残る。プレビューは [VisionFilterState] の
+///   選択だけを見るため、干渉しない）。id をハードコードせずカタログを正本に引く。
+/// - 選択表示: meniere と labyrinthitis はどちらもカタログ id `vertigo` に写る
+///   ため、選択表示（`isSelected`）はカタログ id ではなく
+///   [VisionFilterState.selectedPresetId]（`Experience.id`）で比較する
+///   （#60: 2 枚同時点灯バグの修正）。
 /// - 受診喚起: `Experience.urgency`（bridge の [Urgency]）を [urgencyConsultMessage]
 ///   で i18n 注記へ写す。`none` では出さない。
 /// - 聴覚: hearing を含む体験（meniere / labyrinthitis）は「聴覚症状も含む」注記に
@@ -73,7 +78,10 @@ class _ExperienceCard extends StatelessWidget {
     final catalogId = experience.vision == null
         ? null
         : visionFilterCatalogId(experience.vision!);
-    final isSelected = catalogId != null && state.selectedId == catalogId;
+    // #60: カタログ id ではなく experience id で比較する。meniere と
+    // labyrinthitis はどちらも catalogId == 'vertigo' に写るため、catalogId
+    // 比較だと選択していない方まで点灯してしまう。
+    final isSelected = state.selectedPresetId == experience.id;
     final consult = urgencyConsultMessage(l10n, experience.urgency);
     final includesHearing = experience.hearing != null;
 
@@ -171,12 +179,15 @@ class _ExperienceCard extends StatelessWidget {
     );
   }
 
-  /// 体験を適用する: 視覚フィルタを選択状態にする。
+  /// 体験を適用する: 視覚フィルタを選択状態にする（#60）。
   ///
-  /// 体験は advanced 系（[VisionFilterState]）で適用するため、色覚系
-  /// （[FilterService]）は none に戻し、色覚との二重適用を避ける（重ね掛けは #41）。
+  /// [VisionFilterState.selectPreset] は experience id とカタログ id の両方を
+  /// 記録する（選択表示の比較・プレビューの単一の正本）。色覚系
+  /// （`FilterService`）は触らない — `deactivate()` は呼ばない。色覚クイック
+  /// 選択の状態はこのプリセット適用と独立に残るが、プレビューは
+  /// [VisionFilterState] の選択（今まさに選んだプリセット）だけを見るため、
+  /// 二重適用にはならない。
   void _apply(BuildContext context, String catalogId) {
-    context.read<VisionFilterState>().select(catalogId);
-    context.read<FilterService>().deactivate();
+    context.read<VisionFilterState>().selectPreset(experience.id, catalogId);
   }
 }
