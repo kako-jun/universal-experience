@@ -48,13 +48,12 @@ AfterImageRenderer afterImageRenderer = BeforeAfterView.renderAfter;
 ///
 /// All eight [ColorVisionType] values render for real. Rendering routes
 /// through sensus's CPU `apply()` (`CpuVisionRenderer`, #85) — the *preview*
-/// (this static image) is the CPU path's canonical consumer; the GPU
-/// `ShaderFilter` path (#59) is reserved for the loupe's *live* display. The
+/// (this static image) is the CPU path's canonical consumer. The GPU
+/// `ShaderFilter` path (#59) is kept for a future *live* screen-capture
+/// display (#1/#3/#4) but isn't called from any production code today. The
 /// -omaly types reuse their base -opia's [VisionFilter] at a reduced strength
 /// ([recommendedStrength]); see [visionFilterForColorVisionType] for the
-/// single source of the `ColorVisionType` → `VisionFilter` mapping. Live
-/// *screen* capture (as opposed to this synthetic sample image) is still
-/// tracked by #1/#3/#4.
+/// single source of the `ColorVisionType` → `VisionFilter` mapping.
 class BeforeAfterView extends StatefulWidget {
   const BeforeAfterView({
     super.key,
@@ -72,12 +71,40 @@ class BeforeAfterView extends StatefulWidget {
 
   /// Explicit width/height (in pixels) for the generated square sample
   /// image. When `null` (the default, used by real callers), the resolution
-  /// is instead derived automatically from the rendered pane's logical size
-  /// × `devicePixelRatio`, capped at [_BeforeAfterViewState._maxAutoSampleSize]
-  /// (#58: avoids blurry upscaling on Retina/HiDPI displays without
-  /// generating arbitrarily large textures). Tests that want a small,
-  /// deterministic image regardless of layout pass an explicit value.
+  /// is [canonicalSampleSize] — **not** derived from the pane's layout size or
+  /// `devicePixelRatio` (#85 レビュー S4: this pane used to auto-size to the
+  /// rendered box × DPR, #58, but the CPU preview now always renders at a
+  /// fixed canonical resolution and lets the display scale it — see
+  /// [canonicalSampleSize] for why). Tests that want a small, fast image
+  /// regardless of the canonical size pass an explicit (smaller) value here.
   final int? sampleSize;
+
+  /// The fixed resolution (square side, pixels) the CPU preview renders at
+  /// when [sampleSize] is `null` (#85 レビュー S4).
+  ///
+  /// Rationale for a **canonical size** instead of sizing to the rendered
+  /// pane × `devicePixelRatio` (the pre-#85 GPU-era behaviour, #58):
+  /// - Several sensus filters key their effect off **fixed pixel counts**
+  ///   rather than a size-relative ratio (e.g. `DetailLoss.cellSize`,
+  ///   `Starbursts.rayLengthRatio` combined with absolute ray geometry) —
+  ///   re-rendering at a different resolution every time the window resizes
+  ///   would change how those filters look, independent of any real change
+  ///   in strength.
+  /// - The disk-blur family (myopia/hyperopia/presbyopia/astigmatism) derives
+  ///   its blur radius as `strength × ratio × min(width, height)`; sensus's
+  ///   elliptical kernel degenerates to a single center pixel (a no-op) once
+  ///   that radius drops under ~1px (see
+  ///   `integration_test/cpu_preview_all_filters_test.dart`). A small pane on
+  ///   a low-DPR display could shrink the old auto-derived sample size enough
+  ///   to silently lose the effect for the tightest-ratio filters
+  ///   (astigmatism/presbyopia, ratio 1.1%).
+  ///
+  /// 1024 keeps every filter's effect comfortably visible while staying cheap
+  /// for the CPU `apply()` path (sub-second per filter at this size). The
+  /// pane simply scales the rendered image up/down to fit
+  /// (`_UiImagePainter.paint`, `FilterQuality.medium`); it never re-renders
+  /// on resize.
+  static const int canonicalSampleSize = 1024;
 
   /// Builds the deterministic sample image used in the *before* pane.
   ///
@@ -147,7 +174,8 @@ class BeforeAfterView extends StatefulWidget {
   /// [visionFilterForColorVisionType] (the single source shared with
   /// [FilterService.sensusFilter]) and renders through
   /// [CpuVisionRenderer.applier] — CPU `apply()`, not the GPU shader path
-  /// (#85; GPU is reserved for the loupe's live display). Each -omaly type
+  /// (#85; GPU is kept for a future live screen-capture display, unused
+  /// today). Each -omaly type
   /// maps to the same [VisionFilter] as its base -opia; the reduced
   /// [strength] is what distinguishes them (see [recommendedStrength]).
   static Future<ui.Image?> renderAfter(
@@ -180,201 +208,103 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
 
   /// Resolution (square side, pixels) the currently-held [_before]/[_after]
   /// were generated at. `null` until the first generation completes (#58).
+  /// Since #85 レビュー S4 removed pane-size-driven auto-sizing, this only
+  /// changes if [BeforeAfterView.sampleSize] itself changes (test-only in
+  /// practice) — production always uses [BeforeAfterView.canonicalSampleSize].
   int? _currentSampleSize;
-
-  /// Auto-sizing target already requested (generation in flight or
-  /// debounced) but not yet applied — guards against re-scheduling the same
-  /// resize on every intermediate build (#58).
-  int? _pendingResizeSampleSize;
-
-  /// Sample size the *latest completed* [_rebuild] attempt failed at (#58
-  /// レビュー MUST-1). A permanent failure (missing asset, shader compile
-  /// error, …) must not turn into a busy loop: [_evaluateAutoResize] refuses
-  /// to auto-retry the same size again — only a genuine size change (a real
-  /// resize) or a user action (filterType/intensity change, handled in
-  /// [didUpdateWidget]) retries. Cleared back to `null` on success.
-  int? _failedSampleSize;
-
-  /// Debounces auto-size regeneration while the pane is being resized, so a
-  /// drag/window-resize doesn't regenerate the sample image on every frame.
-  Timer? _resizeDebounceTimer;
 
   /// Monotonic request id. Bumped on every [_rebuild] call so a slow/late
   /// async result can tell it has been superseded by a newer request and
   /// discard (dispose) itself instead of overwriting `_before`/`_after` with
-  /// stale data or leaking GPU images (#58).
+  /// stale data or leaking GPU images (#58). [_scheduleRebuild] (#85 レビュー
+  /// S3) now serializes calls to [_rebuild] so at most one is ever in flight
+  /// at a time, but this check stays as the defense against a slow result
+  /// racing a `dispose()` (see [_rebuild]'s own `mounted` guards).
   int _generation = 0;
 
-  /// Latest pane logical square side / devicePixelRatio recorded by
-  /// [build]'s `LayoutBuilder` (#58 レビュー Q1: layout フェーズ自体は記録するだけ
-  /// で、判定・タイマー起動などの副作用は起こさない). Consumed by
-  /// [_evaluateAutoResize], which runs from a post-frame callback.
-  double? _pendingPaneLogicalSize;
-  double? _pendingDevicePixelRatio;
-  bool _autoResizeCallbackScheduled = false;
+  /// Whether a [_rebuild] is currently in flight (#85 レビュー S3). While
+  /// `true`, [_scheduleRebuild] doesn't start another one — it just records
+  /// the request in [_pendingRebuildSampleSize] so the CPU `apply()` path
+  /// (heavier than the old GPU shader path) never has more than one job
+  /// running at once, e.g. while a slider is being dragged.
+  bool _rebuildInFlight = false;
 
-  static const int _minAutoSampleSize = 32;
-  static const int _maxAutoSampleSize = 2048; // #58 レビュー N5
-  static const Duration _resizeDebounceDuration = Duration(milliseconds: 300);
+  /// The most recently requested sample size while a [_rebuild] is already
+  /// running (#85 レビュー S3). Overwritten by each new request — only the
+  /// latest survives. Consumed (and cleared) by [_runRebuild] once the
+  /// in-flight job finishes.
+  int? _pendingRebuildSampleSize;
 
-  /// Logical pane side used when the incoming layout constraints are
-  /// unbounded (e.g. inside a horizontally-scrolling list) and no real size
-  /// can be derived (#58 レビュー Q2).
-  static const double _fallbackPaneLogicalSize = 256;
+  /// The sample size to render at when [BeforeAfterView.sampleSize] isn't
+  /// explicitly set — [BeforeAfterView.canonicalSampleSize] in production;
+  /// tests can override via the widget's `sampleSize` constructor param.
+  int get _effectiveSampleSize =>
+      widget.sampleSize ?? BeforeAfterView.canonicalSampleSize;
 
   @override
   void initState() {
     super.initState();
-    // Auto mode (widget.sampleSize == null) can't size itself yet — it has
-    // no layout constraints until the first LayoutBuilder pass in build(),
-    // which triggers the first generation via _evaluateAutoResize instead
-    // (#58).
-    final explicitSize = widget.sampleSize;
-    if (explicitSize != null) {
-      _rebuild(explicitSize);
-    }
+    // #85 レビュー S4: the sample size no longer depends on the pane's
+    // layout (it's canonical/fixed), so there's no need to wait for a
+    // LayoutBuilder pass before triggering the first generation.
+    _scheduleRebuild(_effectiveSampleSize);
   }
 
   @override
   void didUpdateWidget(BeforeAfterView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.sampleSize != null) {
-      // #58 レビュー N2: 明示サイズに切り替わったら auto 用のリサイズタイマーは
-      // 不要（残っていると意味のない再生成が後から起きる）。
-      _cancelResizeTimer();
-    }
     if (oldWidget.filterType != widget.filterType ||
         oldWidget.intensity != widget.intensity ||
         oldWidget.sampleSize != widget.sampleSize) {
-      // #58 レビュー M1: auto モードで初回生成がまだ完了していない間に
-      // filterType/intensity が変わると、_currentSampleSize はまだ null。
-      // その場合は _pendingResizeSampleSize（初回/リサイズで既に決まっている
-      // 生成先サイズ）を使う。
-      // #58 レビュー MUST-1/nit-3: 恒久的な失敗で _currentSampleSize/
-      // _pendingResizeSampleSize がどちらも null のままのことがある
-      // （auto-resize 側は busy loop を避けるため自動では再試行しない）。
-      // その場合は _failedSampleSize を使い、ユーザー操作（フィルタ/強度の変更）
-      // での再試行を可能にする。_failedSampleSize は _currentSampleSize より
-      // 優先する: 一度成功したサイズが残っていても、レイアウトが変わった後に
-      // 失敗したのであれば、古い（もう画面のサイズに合っていない）成功時の
-      // サイズへ後戻りさせるとちらつく。すべて null なら auto の初回レイアウトが
-      // まだ来ていないということなので、そのレイアウトに任せてここでは何もしない
-      // （実行される _rebuild は呼び出し時点の widget.filterType/intensity を
-      // 読むので、更新は取りこぼされない）。
-      final size = widget.sampleSize ??
-          _pendingResizeSampleSize ??
-          _failedSampleSize ??
-          _currentSampleSize;
-      if (size != null) {
-        // 直接 _rebuild するので、保留中のデバウンスタイマー（あれば）は不要。
-        _cancelResizeTimer();
-        _rebuild(size);
-      }
+      _scheduleRebuild(_effectiveSampleSize);
     }
   }
 
-  void _cancelResizeTimer() {
-    _resizeDebounceTimer?.cancel();
-    _resizeDebounceTimer = null;
-  }
-
-  /// Desired sample resolution for a pane whose logical square side is
-  /// [paneLogicalSize] at the given [devicePixelRatio], capped at
-  /// [_maxAutoSampleSize] so a large window/high DPR doesn't generate an
-  /// arbitrarily large texture (#58).
-  int _autoSampleSize(double paneLogicalSize, double devicePixelRatio) {
-    final physical = (paneLogicalSize * devicePixelRatio).round();
-    if (physical < _minAutoSampleSize) return _minAutoSampleSize;
-    if (physical > _maxAutoSampleSize) return _maxAutoSampleSize;
-    return physical;
-  }
-
-  /// Called from [build]'s `LayoutBuilder` with the pane's current logical
-  /// square side and device pixel ratio (#58).
-  ///
-  /// #58 レビュー Q1: レイアウトフェーズでは値を記録し、まだ1回も予約していなけ
-  /// れば post-frame コールバックを1つ予約するだけに留める。実際の判定（サイズ
-  /// が変わったか）・タイマーの起動・`_rebuild` の呼び出しはすべて
-  /// [_evaluateAutoResize]（post-frame コールバックからのみ呼ばれる）で行う。
-  void _recordPaneLayout(double paneLogicalSize, double devicePixelRatio) {
-    _pendingPaneLogicalSize = paneLogicalSize;
-    _pendingDevicePixelRatio = devicePixelRatio;
-    if (widget.sampleSize != null || _autoResizeCallbackScheduled) return;
-    _autoResizeCallbackScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _autoResizeCallbackScheduled = false;
-      _evaluateAutoResize();
-    });
-  }
-
-  /// Runs (only from a post-frame callback, never during layout/build — Q1)
-  /// the actual auto-size decision: no-ops when [BeforeAfterView.sampleSize]
-  /// is set explicitly (re-checked here too — N2 — in case it changed while
-  /// this callback was in flight) or the widget was disposed. Otherwise: the
-  /// very first generation runs immediately; later changes (the pane being
-  /// resized) are debounced so a drag doesn't regenerate on every frame.
-  void _evaluateAutoResize() {
-    if (!mounted || widget.sampleSize != null) return;
-    final paneLogicalSize = _pendingPaneLogicalSize;
-    final devicePixelRatio = _pendingDevicePixelRatio;
-    if (paneLogicalSize == null || devicePixelRatio == null) return;
-    final target = _autoSampleSize(paneLogicalSize, devicePixelRatio);
-
-    if (target == _currentSampleSize) {
-      // #58 レビュー N1: A→B→A のようにサイズが元に戻った場合、B 用に予約され
-      // ていたデバウンスタイマーが残っていると、後で誤って B へ作り直してしまう
-      // ので、ここで破棄しておく。
-      if (_pendingResizeSampleSize != null &&
-          _pendingResizeSampleSize != target) {
-        _cancelResizeTimer();
-        _pendingResizeSampleSize = null;
-      }
+  /// Entry point for triggering a [_rebuild] (#85 レビュー S3). If one is
+  /// already running, records [sampleSize] as the pending request (replacing
+  /// any earlier pending one) and returns without starting a second job —
+  /// the CPU `apply()` path is heavier than the old GPU shader path, so
+  /// letting a rapidly-changing slider spawn one native-bridge call per
+  /// frame would waste work and could reorder unpredictably. Once the
+  /// in-flight job finishes, [_runRebuild] starts the pending request (if
+  /// any) using whatever [_effectiveSampleSize]/`widget.filterType`/
+  /// `widget.intensity` are current *at that time* — not stale snapshots
+  /// from when the request was made — so the final result always reflects
+  /// the latest inputs. [_rebuild]'s own generation/dispose/failure
+  /// bookkeeping (#58) is unchanged; this only gates how many are in flight.
+  void _scheduleRebuild(int sampleSize) {
+    if (_rebuildInFlight) {
+      _pendingRebuildSampleSize = sampleSize;
       return;
     }
-    if (target == _pendingResizeSampleSize) return;
-    if (target == _failedSampleSize) {
-      // #58 レビュー MUST-1: 恒久的な失敗（アセット欠落・シェーダのコンパイル
-      // 失敗など）を、毎フレーム（初回）や 300ms 周期（リサイズ後）で
-      // 再試行し続ける busy loop にしない。サイズが変わらない限り自動では
-      // 再試行しない。ユーザー操作（filterType/intensity の変更）による
-      // 再試行は didUpdateWidget 側の size 解決式でカバーする。時間ベースの
-      // 再試行・バックオフは方針として入れない。
-      return;
-    }
+    _rebuildInFlight = true;
+    unawaited(_runRebuild(sampleSize));
+  }
 
-    _pendingResizeSampleSize = target;
-    _cancelResizeTimer();
-    if (_currentSampleSize == null && _failedSampleSize == null) {
-      // Very first generation ever attempted for this widget: no debounce.
-      // We're already inside a post-frame callback here, so calling
-      // _rebuild (and its setState) is safe.
-      // #58 レビュー nit-2: a *previous* failure (even though it also left
-      // _currentSampleSize null) must NOT be treated as "first generation"
-      // here — otherwise resizing right after a permanent failure would
-      // retry immediately (and again on every subsequent resize frame while
-      // it keeps failing) instead of going through the debounce path below.
-      _rebuild(target);
-    } else {
-      _resizeDebounceTimer = Timer(_resizeDebounceDuration, () {
-        // #58 レビュー N2: 発火時点で改めて確認する。
-        if (mounted && widget.sampleSize == null) _rebuild(target);
-      });
+  Future<void> _runRebuild(int sampleSize) async {
+    await _rebuild(sampleSize);
+    _rebuildInFlight = false;
+    if (!mounted) return;
+    final pending = _pendingRebuildSampleSize;
+    if (pending != null) {
+      _pendingRebuildSampleSize = null;
+      _scheduleRebuild(pending);
     }
   }
 
-  /// Cleans up after a failed [_rebuild] (#58 レビュー S1/MUST-1/SHOULD-1): if
-  /// this call is still the latest request, resets `_loading` so the UI
-  /// doesn't stay stuck on the "preparing" placeholder, records [sampleSize]
-  /// in [_failedSampleSize] (so [_evaluateAutoResize] won't busy-loop
-  /// retrying the same size — MUST-1) and clears `_pendingResizeSampleSize`
-  /// (so a genuine size change or a user action can still retry), and shows
-  /// a failure state instead of the (possibly now-stale) `_after` (SHOULD-1).
-  /// If a newer request has already superseded this one, does nothing (that
-  /// newer request owns the state now).
+  /// Cleans up after a failed [_rebuild] (#58 レビュー S1/SHOULD-1): if this
+  /// call is still the latest request, resets `_loading` so the UI doesn't
+  /// stay stuck on the "preparing" placeholder, and shows a failure state
+  /// instead of the (possibly now-stale) `_after` (SHOULD-1). A permanent
+  /// failure doesn't retry itself (no timer, no auto-resize) — only a user
+  /// action (`didUpdateWidget` seeing a filterType/intensity/sampleSize
+  /// change) calls [_scheduleRebuild] again, so there's no busy-loop risk
+  /// (#85 レビュー S4 removed the resize-driven retry path that MUST-1
+  /// originally guarded; retrying is now inherently user-driven only). If a
+  /// newer request has already superseded this one, does nothing (that newer
+  /// request owns the state now).
   void _onRebuildFailed(int generation, int sampleSize) {
     if (generation != _generation || !mounted) return;
-    _failedSampleSize = sampleSize;
-    _pendingResizeSampleSize = null;
     final oldAfter = _after;
     setState(() {
       _loading = false;
@@ -482,8 +412,6 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       _loading = false;
       _failed = false; // #58 レビュー SHOULD-1: 成功したら失敗表示を解除する。
     });
-    _pendingResizeSampleSize = null;
-    _failedSampleSize = null; // #58 レビュー MUST-1: 成功したので再試行を許可する。
 
     if (clonedInput && !identical(rendererInput, after)) {
       // The clone only exists to protect the renderer call; it never becomes
@@ -505,7 +433,6 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
 
   @override
   void dispose() {
-    _cancelResizeTimer();
     _before?.dispose();
     // _after may alias _before (when filterType == none); avoid double dispose.
     if (!identical(_after, _before)) {
@@ -574,32 +501,18 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    // #58 レビュー N4: DPR だけを購読する（MediaQuery 全体の変更で余計に
-    // rebuild しない）。
-    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
 
-    // Wraps the whole widget (including the loading placeholder) so the
-    // pane's logical size is known from the very first build — auto sizing
-    // (#58) needs it to trigger the first sample generation.
+    // #85 レビュー S4: the CPU preview renders at a canonical fixed size
+    // (see [BeforeAfterView.canonicalSampleSize]) regardless of the pane's
+    // layout size or devicePixelRatio — LayoutBuilder here only decides
+    // whether to stack the panes, it no longer drives sample-size generation
+    // (the pre-#85 GPU-era `_recordPaneLayout`/auto-resize machinery, #58,
+    // was removed along with it). The rendered image is simply scaled to fit
+    // the pane (`_UiImagePainter.paint`, `FilterQuality.medium`).
     return LayoutBuilder(
       builder: (context, constraints) {
         // Stack the two panes vertically on narrow widths.
         final stackVertically = constraints.maxWidth < 420;
-        // Mirrors how each pane is actually sized below: full width when
-        // stacked, half (minus the 12px gutter) side-by-side. Falls back to
-        // a fixed logical size when the incoming constraints are unbounded
-        // (e.g. inside a horizontally-scrolling list) — #58 レビュー Q2.
-        final rawPaneLogicalSize = stackVertically
-            ? constraints.maxWidth
-            : (constraints.maxWidth - 12) / 2;
-        final paneLogicalSize =
-            rawPaneLogicalSize.isFinite && rawPaneLogicalSize > 0
-                ? rawPaneLogicalSize
-                : _fallbackPaneLogicalSize;
-        // #58 レビュー Q1: レイアウト（build）フェーズでは値を記録するだけ。
-        // 判定・タイマー起動などの副作用は _evaluateAutoResize（post-frame）で
-        // 行う。
-        _recordPaneLayout(paneLogicalSize, devicePixelRatio);
 
         if (_loading && _before == null) {
           // Non-animating placeholder while the first sample image is
