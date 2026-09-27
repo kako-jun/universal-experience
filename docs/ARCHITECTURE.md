@@ -6,8 +6,10 @@
 > 撤去経緯・判断根拠は、当該節を ADR に畳んだ
 > `docs/adr/2026-05-31-sensus-core-consolidation.md` を参照。色覚アルゴリズムの
 > 正本は sensus-core crate（Rust）に一元化し、ue は flutter_rust_bridge 経由で
-> 消費する（`lib/src/rust/`、詳細は `docs/sensus-integration.md`）。フィルタ適用は
-> sensus 由来の GPU シェーダ（`lib/rendering/shader_filter.dart`）が担い、
+> 消費する（`lib/src/rust/`、詳細は `docs/sensus-integration.md`）。プレビュー
+> （静止画）は sensus の CPU `apply()`（`lib/rendering/cpu_vision_renderer.dart`
+> の `CpuVisionRenderer`、#85）が担い、GPU シェーダ（`lib/rendering/
+> shader_filter.dart`）はルーペのライブ表示専用に位置づけを変えた。
 > `FilterService` は選択状態のみを保持する。他アプリ含む全画面への適用は
 > 画面キャプチャ経路（#1/#3/#4）の実装後。
 >
@@ -16,11 +18,11 @@
 > `experiences()` / `Experience` / `Urgency` / `HearingFilter`、ただし音声再生は
 > 未実装）、体験プリセット集 UI（#19・`lib/ui/widgets/experience_presets.dart`）、
 > フィルタ済み画像のメタ焼き込み PNG エクスポート（#43・
-> `lib/services/export_service.dart`）。色覚のクイック選択で描画できない型は
-> 「描画は近日対応」のプレースホルダを出す。advanced カタログ・体験プリセットの
-> 選択は `VisionFilterState` に入るだけでプレビューには反映されない（#60）。
-> プリセットのタップでは `FilterService` が deactivate され、before/after
-> 両ペインとも原画のままになる（#60）。
+> `lib/services/export_service.dart`）、色覚 7 型すべての CPU 実描画（#85）。
+> advanced カタログ・体験プリセットの選択は `VisionFilterState` に入るだけで
+> プレビューには反映されない（#60。レンダラ自体は任意の `VisionFilter` を
+> 受け取れるので、結線するだけで済む）。プリセットのタップでは `FilterService`
+> が deactivate され、before/after 両ペインとも原画のままになる（#60）。
 
 ## ルーペ窓挙動 (#14)
 
@@ -226,9 +228,10 @@ FilterService / VisionFilterState (選択状態モデル)
       ↓
 flutter_rust_bridge (lib/src/rust/)
       ↓
-sensus-core (Rust, GLSL + uniform 計算の正本)
+sensus-core (Rust, CPU apply() + GLSL/uniform 計算の正本)
       ↓
-ShaderFilter (lib/rendering/) — Impeller FragmentProgram で ui.Image に適用
+CpuVisionRenderer (lib/rendering/) — プレビュー（静止画）の正本経路（#85）
+ShaderFilter    (lib/rendering/) — Impeller FragmentProgram。ルーペのライブ表示専用
 ```
 
 状態管理は Provider の `ChangeNotifier` ベース: `FilterService` /
@@ -297,16 +300,27 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   選び直しはユーザー操作としてスライダー操作ほど高頻度ではないため、
   `MaterialApp` 再構築が起きること自体は許容している
 - `VisionFilterState`: advanced カタログ（sensus 全 30 種）の選択・パラメータ状態
+- `CpuVisionRenderer`（`lib/rendering/cpu_vision_renderer.dart`）: sensus の CPU
+  `apply()`（`applyVisionCpuRgba8`）で `ui.Image` にフィルタを適用する、
+  **プレビュー（静止画）描画の正本**（#85）。`ui.Image` → raw RGBA8 → 実ブリッジ
+  呼び出し → `ui.Image` の往復のみを行い、アルゴリズムは一切持たない。任意の
+  `VisionFilter`（payload 込み）を受け取れるため sensus 全 30 種を描画できる
+  （`before_after_view.dart` の既定 `afterImageRenderer` は色覚 7 型のみを配線
+  済み、advanced カタログとの結線は #60）。`applyVisionCpuRgba8` は
+  `#[frb(sync)]` を外し非同期公開にしてあり（Rust 側スレッドプールで実行）、
+  UI スレッドを塞がない。テストでは `CpuVisionRenderer.applier` をフェイクに
+  差し替えられる（`@visibleForTesting`、#58 の世代管理・dispose 規約と同じ
+  seam パターン）
 - `ShaderFilter`（`lib/rendering/shader_filter.dart`）: sensus 由来 GLSL を変換した
   Impeller `FragmentProgram` で `ui.Image` にフィルタを適用する。色覚 7 型
-  （protanopia/deuteranopia/tritanopia/achromatopsia + 各 -omaly）が実描画対応
+  （protanopia/deuteranopia/tritanopia/achromatopsia + 各 -omaly）に対応
   済み（#59）。protanopia/deuteranopia/tritanopia は sensus の Machado 11 段
   severity テーブルを `resolveSeverityMatrix()` で区分線形補間して解決する
   （グリッドは `lib/rendering/color_matrices.g.dart`、sensus-core からの生成物）。
-  advanced カタログ（sensus 全 30 種）は未配線（#60）。**プレビューの GPU 経路は
-  #85 で sensus の CPU `apply()` に置き換え予定**（30 種全部を CPU で描画する）。
-  `ShaderFilter` はその後、ルーペ窓（`loupe_window_controller.dart`）のライブ
-  表示専用になる
+  **プレビューの描画経路は #85 で `CpuVisionRenderer`（CPU `apply()`）に
+  置き換え済み**。`ShaderFilter` はルーペ窓（`loupe_window_controller.dart`）の
+  ライブ表示専用として残る。GPU と CPU の等価性は `test/vision_filter_golden_test.dart`
+  等の GPU golden テストが担保する
 - `ExportService`: フィルタ適用後（after）画像のメタ焼き込み PNG エクスポート
 - `ExperiencePresets`（`lib/ui/widgets/experience_presets.dart`）: sensus の
   `experiences()` をワンタップ適用 UI として消費する（複合体験、#19）
@@ -324,16 +338,20 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
 
 - **ユニット/ウィジェットテスト**（`test/*.dart`, `flutter test`）: ARB 整合性・
   トレイ純粋ロジック・ルーペ窓ポリシー・PNG エクスポート・シェーダ codegen ドリフト
-  検証・体験プリセット等を含む
+  検証・体験プリセット等を含む。`before_after_view_test.dart` の `renderAfter`
+  は実ブリッジを要する `CpuVisionRenderer.applier`（#85）をフェイクに差し替え、
+  `ColorVisionType` → `VisionFilter` のマッピング契約（#57/#59 の不変条件）を
+  検証する（実描画そのものは下記の実ブリッジ integration test が担う）
 - **GPU golden テスト**（`test/vision_filter_golden_test.dart` /
   `test/protanopia_golden_test.dart`）: sensus-core 正本由来の参照 PNG と GPU 描画結果を
-  PSNR/maxDiff で比較（詳細は `docs/sensus-integration.md` §6）
+  PSNR/maxDiff で比較（詳細は `docs/sensus-integration.md` §6）。プレビュー自体は
+  #85 で CPU 経路に切り替わったが、ルーペのライブ表示用 GPU 経路の正しさは
+  引き続きこれらのテストが担保する
 - **Rust 側**: `cargo test`（`rust/`、`golden_gen.rs` の正本一致テストを含む）
-- **実ブリッジ integration test**（`integration_test/`、
-  `flutter test integration_test/experience_presets_smoke_test.dart -d macos` と
-  `flutter test integration_test/app_bootstrap_test.dart -d macos` の2コマンド
-  （CI では linux -d linux も）、#55。2ファイルを1回の `flutter test integration_test`
-  呼び出しにまとめるとデスクトップでは2番目のアプリ起動が失敗するため個別に実行する）:
+- **実ブリッジ integration test**（`integration_test/`、ファイルごとに
+  `flutter test integration_test/<file> -d macos`（CI では linux -d linux も）、
+  #55。1回の `flutter test integration_test` 呼び出しに複数ファイルを渡すと
+  デスクトップでは2番目以降のアプリ起動が失敗するため個別に実行する）:
   - `experience_presets_smoke_test.dart`: widget test は `experiencesProvider`
     を fixture に差し替えているため検知できない領域を、`initNativeBridge()`
     経由で実ネイティブライブラリをロードして確認する。`experiences()` の
@@ -351,6 +369,14 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
     呼んで実起動経路そのものを検証する。`buildRootApp()` 内の `initNativeBridge()`
     呼び出しが削除/誤配置される退行（#52 と同種）を、他のテストを変更せずに
     検知するための専用ファイル
+  - `cpu_preview_all_filters_test.dart`（#85）: `kVisionFilterCatalog` の全 30
+    エントリについて、`VisionFilterState.select()/build()` でカタログ既定値の
+    payload を埋めた `VisionFilter` を組み立て、`CpuVisionRenderer.apply()`
+    （実ブリッジ）で 64x64 のサンプル画像に適用する。例外が出ないこと・出力が
+    入力サイズと一致すること・出力ピクセルが入力と異なること（strength=1.0 で
+    全フィルタが視覚的に効果を持つ設計であるため）を検証する。widget test の
+    フェイク注入では検知できない「実際に sensus-core の CPU apply が 30 種
+    すべてで動く」ことを保証するのがこのファイルの役割
 - **CI**（#38、完了）: `.github/workflows/ci.yml` は2ジョブ構成。`check`
   （macos-latest）が push/PR で上記に加え `flutter build macos --debug` を
   回す（#54）。cargokit 統合（#55）によりこの build が rust/ crate のビルドも

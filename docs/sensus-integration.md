@@ -144,7 +144,11 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
   それ以外のフィルタでは無視される）
 - `visionUniformLayout(filter)` → `List<String>`（各インデックスの uniform 名。
   `.frag` の宣言順と突き合わせる検証用。`visionUniforms` と同じ長さ・順序）
-- `applyVisionCpuRgba8(...)` → `Uint8List`（将来用の CPU フォールバック。MVP 未使用）
+- `applyVisionCpuRgba8(...)` → `Future<Uint8List>`（**プレビュー（静止画）描画の
+  正本経路**、#85。`#[frb(sync)]` を外して非同期公開しており、Rust 側スレッド
+  プールで実行されるため Dart 側の `await` は UI スレッドを塞がない。
+  `lib/rendering/cpu_vision_renderer.dart` の `CpuVisionRenderer` が薄くラップし、
+  `ui.Image` ⇄ raw RGBA8 の往復を行う）
 
 #### 複合体験（Experience）API（#10）
 
@@ -179,13 +183,16 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
 
 > 以下の表は代表例のドキュメントであり網羅ではない。シェーダ codegen（§2.1）は
 > 20 フィルタを `.frag` に変換済みで、うち色覚 4 型（protanopia/deuteranopia/
-> tritanopia/achromatopsia、+各 -omaly は base の -opia を再利用）は UI
-> （`before_after_view.dart`）から実際に GPU 描画で呼ばれる（#59。この GPU 経路
-> 自体は #85 で sensus の CPU `apply()` に置き換え予定。GPU はルーペのライブ
-> 表示専用に残す）。
-> それ以外（myopia 等の advanced フィルタ）は `ShaderFilter.applyColorFilterGpu`
-> の汎用経路自体は使えるが、ホーム画面の before/after プレビューへの配線は
-> まだ（#60）。各フィルタの正確なレイアウトは実装時に必ず
+> tritanopia/achromatopsia、+各 -omaly は base の -opia を再利用）は
+> `ShaderFilter` 経由で GPU 描画できる（#59）。**UI の before/after プレビュー
+> （`before_after_view.dart`）はこの GPU 経路を呼ばない**: #85 で sensus の CPU
+> `apply()`（`CpuVisionRenderer`）に置き換え済みで、GPU 経路はルーペの
+> ライブ表示専用（`lib/main.dart` のルーペ窓）に位置づけを変えた。この節の
+> uniform レイアウトはルーペのライブ描画・GPU golden テスト向けの参照情報として
+> 残す。
+> myopia 等の advanced フィルタも `ShaderFilter.applyColorFilterGpu` の汎用経路
+> 自体は使えるが、ルーペのライブ描画への配線はまだ（#60 のプレビュー結線とは
+> 別スコープ）。各フィルタの正確なレイアウトは実装時に必ず
 > `visionUniformLayout()` で確認すること（ここに書き写した値を信用しない）。
 
 | フィルタ | flat 配列 | 要素数 |
@@ -425,11 +432,50 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   （-opia 4 種 + -omaly 3 種。none は原画をそのまま返すだけで元から対応済み）
   全部に広げた。-omaly は base の -opia と同じレンダラを、`recommendedStrength`
   （0.6）で呼ぶだけ（専用テーブルは不要）。この GPU 経路自体は静止画プレビュー用の
-  暫定実装で、#85 で sensus の CPU `apply()` に置き換わる予定（GPU はルーペの
-  ライブ表示専用に残る）。
+  暫定実装で、後に #85 で sensus の CPU `apply()` に置き換わった（§9 参照。GPU は
+  ルーペのライブ表示専用に残る）。
 - **YAGNI 撤去（#86 レビュー should-3）**: 上記の結果、`canRender`（常に `true`
   を返すだけになっていた）・「描画は近日対応」のプレースホルダ
   （`_ComingSoonPlaceholder` / ARB の `previewComingSoon`）・`home_screen.dart`
   の `previewUnsupportedNote` 分岐は、どの `ColorVisionType` からも到達しない
   死んだコードになったため撤去した。将来また未実装の型が増えたときは、その時点
   で改めて必要な形（コード自体が変わっているはず）で作る。
+
+## 9. プレビューを CPU `apply()` に統一（#85）
+
+- **背景**: ブリッジには `apply_vision_cpu_rgba8`（sensus の `apply()`）が #10
+  時点から存在していたが、UI からは一度も呼ばれておらず、テストでしか使われて
+  いなかった。プレビューは §8 の GPU 経路（色覚 7 型のみ）に限定され、advanced
+  カタログの残り 23 種は「プレビューには反映されない」状態だった。
+- **変更**: `apply_vision_cpu_rgba8` の `#[frb(sync)]` を外して非同期公開にし
+  （Rust 側スレッドプールで実行、Dart 側の `await` が UI スレッドを塞がない）、
+  `lib/rendering/cpu_vision_renderer.dart` に `CpuVisionRenderer` を新設した。
+  `ui.Image` → raw RGBA8（`toByteData(format: rawRgba)`）→ 実ブリッジ呼び出し →
+  `ui.Image`（`decodeImageFromPixels`）の往復のみを行い、アルゴリズムは持たない。
+  `before_after_view.dart` の `renderAfter` は
+  `FilterService`（`visionFilterForColorVisionType`、単一の対応表）で
+  `ColorVisionType` を `VisionFilter` へ写像し、`CpuVisionRenderer.applier`
+  （`@visibleForTesting` の seam、#58 と同じパターン）へ委譲する形に置き換えた。
+  レンダラ自体は任意の `VisionFilter`（payload 込み）を受け取れるため、advanced
+  カタログ 30 種すべてを描画できる（UI からの結線は #60 のスコープ）。
+- **GPU の位置づけ**: `ShaderFilter`（§8）は削除せず、ルーペのライブ表示専用
+  （`lib/main.dart` のルーペ窓）として残した。GPU と CPU の等価性は
+  `test/vision_filter_golden_test.dart` 等の既存 GPU golden テストが引き続き
+  担保する。
+- **数値一致の調査（依頼事項）**: 色覚型について CPU 出力と既存 GPU golden の
+  差を調べた。
+  - CPU（`apply_vision_cpu_rgba8`）自体は golden 参照 PNG の生成に使われた経路
+    そのもの（`rust/src/golden_gen.rs`）なので、strength=1.0 では参照 PNG と
+    **バイト完全一致**する。
+  - `CpuVisionRenderer` が追加する Dart 側の往復変換（`ui.Image` ⇄ raw RGBA8）
+    は sRGB⇄linear のガンマ変換や再圧縮を一切行わない straight RGBA8 のメモリ
+    コピーであり、理論上ゼロ誤差。`test/cpu_vision_renderer_test.dart` が
+    golden 参照 PNG を往復させてバイト完全一致することを実測で固定した。
+  - 既存の GPU vs golden 比較（`test/vision_filter_golden_test.dart`）は
+    maxDiff≤8（PSNR≥30dB）を許容しており、依頼の目安（2/255）より緩い。この差は
+    GPU シェーダ内部の `srgbToLinear`/`linearToSrgb`（pow 演算）に伴う GPU/CPU
+    丸め差であり、本 Issue が変更した範囲（プレビューの描画経路の切替）とは
+    無関係かつ既存（#31/#59 由来）のまま。**プレビューは CPU 出力そのものに
+    なった**ため、この GPU/CPU 差はプレビューの見え方には一切影響しない
+    （GPU 経路はルーペのライブ表示にのみ残るため、そちらでは従来どおり
+    maxDiff≤8 の差が生じうる）。
