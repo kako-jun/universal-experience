@@ -372,7 +372,9 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   - `cpu_preview_all_filters_test.dart`（#85）: `kVisionFilterCatalog` の全 30
     エントリについて、`VisionFilterState.select()/build()` でカタログ既定値の
     payload を埋めた `VisionFilter` を組み立て、`CpuVisionRenderer.apply()`
-    （実ブリッジ）で 64x64 のサンプル画像に適用する。例外が出ないこと・出力が
+    （実ブリッジ）で 128x128 のサンプル画像に適用する（disk blur 系フィルタの
+    半径が 1px 未満に退化しないサイズ、`cpu_preview_all_filters_test.dart` の
+    コメント参照）。例外が出ないこと・出力が
     入力サイズと一致すること・出力ピクセルが入力と異なること（strength=1.0 で
     全フィルタが視覚的に効果を持つ設計であるため）を検証する。widget test の
     フェイク注入では検知できない「実際に sensus-core の CPU apply が 30 種

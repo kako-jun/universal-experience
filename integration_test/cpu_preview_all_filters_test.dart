@@ -53,14 +53,22 @@ void main() {
         // 色覚デバイスで最も差が出やすいサンプル（色相スイープ + 明度ランプ +
         // 原色スウォッチ）を共有する。輝度の高い領域を含むため、閾値依存の
         // フィルタ（starbursts 等）も strength=1.0 で効果が現れる。
-        final src = await BeforeAfterView.generateSampleImage(64);
+        //
+        // サイズは 128（64 ではなく）にしてある: sensus の disk blur 系
+        // （hyperopia/presbyobia/astigmatism）は半径を「画像サイズ ×
+        // 固定比率」で決め、半径が 1px 未満だと楕円カーネルが中心 1 点のみに
+        // 退化して strength=1.0 でも完全な no-op になる
+        // （`build_ellipse_spans` の `<=1.0` 判定、sensus-core
+        // src/vision/common.rs）。astigmatism の比率が最小（1.1%）で、
+        // 64px だと半径 0.7px（no-op）・128px だと半径 1.4px（有効）になる。
+        final src = await BeforeAfterView.generateSampleImage(128);
         addTearDown(src.dispose);
 
         final out = await CpuVisionRenderer.apply(src, filter!, 1.0);
         addTearDown(out.dispose);
 
-        expect(out.width, 64, reason: entry.id);
-        expect(out.height, 64, reason: entry.id);
+        expect(out.width, 128, reason: entry.id);
+        expect(out.height, 128, reason: entry.id);
 
         final srcPixels = await _rgba(src);
         final outPixels = await _rgba(out);
