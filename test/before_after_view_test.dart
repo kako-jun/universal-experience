@@ -7,15 +7,25 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
 import 'package:universal_experience/services/filter_service.dart';
+import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 
 /// BeforeAfterView の before/after 生成ロジックと描画カバレッジのテスト（#17）。
 ///
 /// 静的ヘルパ（generateSampleImage / renderAfter）を直接検証する。全
-/// ColorVisionType が ShaderFilter 経由で実描画される（#59。`canRender` と
-/// 「描画は近日対応」プレースホルダは、到達しなくなったため #86 レビューで
-/// 撤去した）。
+/// ColorVisionType が実描画される（#59 で GPU、#85 で sensus の CPU `apply()`
+/// 経路に切替。`canRender` と「描画は近日対応」プレースホルダは、到達しなくなった
+/// ため #86 レビューで撤去した）。
+///
+/// `renderAfter` は実ブリッジ（`applyVisionCpuRgba8`）を必要とする
+/// [CpuVisionRenderer.applier] へ委譲するため（#85）、`flutter test`（native lib
+/// 未ロード）では実際の CPU 描画は呼べない。`group('renderAfter', ...)` は
+/// [CpuVisionRenderer.applier] をフェイクに差し替え、`ColorVisionType` →
+/// `VisionFilter` のマッピング契約（#57/#59 の不変条件も含む）を検証する。
+/// 実ブリッジでの実描画は `integration_test/cpu_preview_all_filters_test.dart`
+/// （CI）が担う。
 
 /// `_rebuild` は例外を `FlutterError.reportError` で報告するようになった
 /// （#58 レビュー nit-1）。意図的に失敗を起こすテストがそれで落ちないよう、
@@ -50,129 +60,124 @@ void main() {
 
   group('renderAfter', () {
     late ui.Image src;
+    late ui.Image fakeOut;
 
     setUp(() async {
-      src = await BeforeAfterView.generateSampleImage(64);
+      src = await BeforeAfterView.generateSampleImage(4);
+      fakeOut = await BeforeAfterView.generateSampleImage(4);
     });
 
     tearDown(() {
       src.dispose();
+      if (!identical(fakeOut, src)) fakeOut.dispose();
+      // #85: renderAfter は CpuVisionRenderer.applier（実ブリッジ必須）へ委譲する
+      // ため、各テストで差し替えたフェイクを既定へ戻す。
+      CpuVisionRenderer.applier = CpuVisionRenderer.apply;
     });
 
-    test('none は元画像をそのまま返す', () async {
+    test('none は CpuVisionRenderer を呼ばず元画像をそのまま返す', () async {
+      var called = false;
+      CpuVisionRenderer.applier = (source, filter, strength) async {
+        called = true;
+        return fakeOut;
+      };
+
       final out = await BeforeAfterView.renderAfter(
         src,
         ColorVisionType.none,
         1.0,
       );
       expect(identical(out, src), isTrue);
-    });
-
-    test('protanopia は GPU 実描画で after 画像を生成する', () async {
-      final out = await BeforeAfterView.renderAfter(
-        src,
-        ColorVisionType.protanopia,
-        1.0,
-      );
-      expect(out, isNotNull);
-      expect(out!.width, 64);
-      expect(out.height, 64);
-
-      // after が原画と異なる（実際にフィルタが効いている）ことを確認。
-      final beforePng = await encodeImagePng(src);
-      final afterPng = await encodeImagePng(out);
-      expect(beforePng, isNotNull);
-      expect(afterPng, isNotNull);
-      expect(afterPng, isNot(equals(beforePng)));
-      out.dispose();
-    });
-
-    test('protanomaly も protanopia 経路で描画できる', () async {
-      final out = await BeforeAfterView.renderAfter(
-        src,
-        ColorVisionType.protanomaly,
-        0.6,
-      );
-      expect(out, isNotNull);
-      out!.dispose();
+      expect(called, isFalse, reason: 'none はフィルタなしなので CPU レンダラを呼ぶ必要がない');
     });
 
     test(
-        'protanomaly は推奨強度（0.6）で描画すると protanopia（1.0）と出力が異なる '
-        '（#57: 以前は両方とも intensity 1.0 で描画され同一の見た目になっていた）', () async {
-      final protanopiaOut = await BeforeAfterView.renderAfter(
+        'protanopia は VisionFilter.protanopia() と指定 strength で '
+        'CpuVisionRenderer.applier を呼ぶ', () async {
+      VisionFilter? capturedFilter;
+      double? capturedStrength;
+      ui.Image? capturedSource;
+      CpuVisionRenderer.applier = (source, filter, strength) async {
+        capturedSource = source;
+        capturedFilter = filter;
+        capturedStrength = strength;
+        return fakeOut;
+      };
+
+      final out = await BeforeAfterView.renderAfter(
         src,
         ColorVisionType.protanopia,
-        recommendedStrength(ColorVisionType.protanopia),
+        0.75,
       );
-      final protanomalyOut = await BeforeAfterView.renderAfter(
-        src,
-        ColorVisionType.protanomaly,
-        recommendedStrength(ColorVisionType.protanomaly),
-      );
-      expect(protanopiaOut, isNotNull);
-      expect(protanomalyOut, isNotNull);
-
-      final protanopiaPng = await encodeImagePng(protanopiaOut!);
-      final protanomalyPng = await encodeImagePng(protanomalyOut!);
-      expect(protanopiaPng, isNotNull);
-      expect(protanomalyPng, isNotNull);
-      expect(protanomalyPng, isNot(equals(protanopiaPng)));
-
-      protanopiaOut.dispose();
-      protanomalyOut.dispose();
+      expect(identical(out, fakeOut), isTrue);
+      expect(identical(capturedSource, src), isTrue);
+      expect(capturedFilter, const VisionFilter.protanopia());
+      expect(capturedStrength, 0.75);
     });
 
-    test('deuteranopia / tritanopia / achromatopsia も GPU 実描画で after 画像を'
-        '生成する（#59）', () async {
-      for (final type in [
-        ColorVisionType.deuteranopia,
-        ColorVisionType.tritanopia,
-        ColorVisionType.achromatopsia,
-      ]) {
-        final out = await BeforeAfterView.renderAfter(src, type, 1.0);
-        expect(out, isNotNull, reason: '$type');
-        expect(out!.width, 64, reason: '$type');
-        expect(out.height, 64, reason: '$type');
+    test(
+        'protanomaly は protanopia と同一の VisionFilter にマップされる '
+        '（#57: 強度差のみで区別する契約。マッピング自体が strength に依存して '
+        '分岐してはいけない）', () async {
+      VisionFilter? capturedFilter;
+      double? capturedStrength;
+      CpuVisionRenderer.applier = (source, filter, strength) async {
+        capturedFilter = filter;
+        capturedStrength = strength;
+        return fakeOut;
+      };
 
-        final beforePng = await encodeImagePng(src);
-        final afterPng = await encodeImagePng(out);
-        expect(afterPng, isNot(equals(beforePng)), reason: '$type');
-        out.dispose();
+      await BeforeAfterView.renderAfter(
+        src,
+        ColorVisionType.protanomaly,
+        kAnomalyDefaultSeverity,
+      );
+      expect(capturedFilter, const VisionFilter.protanopia());
+      expect(capturedStrength, kAnomalyDefaultSeverity);
+    });
+
+    test(
+        'deuteranopia / tritanopia / achromatopsia もそれぞれ対応する '
+        'VisionFilter にマップされる（#59）', () async {
+      final expected = <ColorVisionType, VisionFilter>{
+        ColorVisionType.deuteranopia: const VisionFilter.deuteranopia(),
+        ColorVisionType.tritanopia: const VisionFilter.tritanopia(),
+        ColorVisionType.achromatopsia: const VisionFilter.achromatopsia(),
+      };
+      for (final entry in expected.entries) {
+        VisionFilter? capturedFilter;
+        CpuVisionRenderer.applier = (source, filter, strength) async {
+          capturedFilter = filter;
+          return fakeOut;
+        };
+
+        final out = await BeforeAfterView.renderAfter(src, entry.key, 1.0);
+        expect(identical(out, fakeOut), isTrue, reason: '${entry.key}');
+        expect(capturedFilter, entry.value, reason: '${entry.key}');
       }
     });
 
     test(
-        'deuteranomaly/tritanomaly は推奨強度で描画すると対応する -opia（1.0）と '
-        '出力が異なる（#59。#57 の protanomaly と同じ不変条件を残り2型にも広げる）',
-        () async {
-      final pairs = <ColorVisionType, ColorVisionType>{
-        ColorVisionType.deuteranomaly: ColorVisionType.deuteranopia,
-        ColorVisionType.tritanomaly: ColorVisionType.tritanopia,
+        'deuteranomaly/tritanomaly はそれぞれ対応する -opia と同一の '
+        'VisionFilter にマップされる（#59。#57 の protanomaly と同じ不変条件を '
+        '残り2型にも広げる）', () async {
+      final pairs = <ColorVisionType, VisionFilter>{
+        ColorVisionType.deuteranomaly: const VisionFilter.deuteranopia(),
+        ColorVisionType.tritanomaly: const VisionFilter.tritanopia(),
       };
       for (final entry in pairs.entries) {
-        final anomalyType = entry.key;
-        final opiaType = entry.value;
+        VisionFilter? capturedFilter;
+        CpuVisionRenderer.applier = (source, filter, strength) async {
+          capturedFilter = filter;
+          return fakeOut;
+        };
 
-        final opiaOut = await BeforeAfterView.renderAfter(
+        await BeforeAfterView.renderAfter(
           src,
-          opiaType,
-          recommendedStrength(opiaType),
+          entry.key,
+          recommendedStrength(entry.key),
         );
-        final anomalyOut = await BeforeAfterView.renderAfter(
-          src,
-          anomalyType,
-          recommendedStrength(anomalyType),
-        );
-        expect(opiaOut, isNotNull, reason: '$opiaType');
-        expect(anomalyOut, isNotNull, reason: '$anomalyType');
-
-        final opiaPng = await encodeImagePng(opiaOut!);
-        final anomalyPng = await encodeImagePng(anomalyOut!);
-        expect(anomalyPng, isNot(equals(opiaPng)), reason: '$anomalyType');
-
-        opiaOut.dispose();
-        anomalyOut.dispose();
+        expect(capturedFilter, entry.value, reason: '${entry.key}');
       }
     });
   });
@@ -210,41 +215,55 @@ void main() {
           home: Scaffold(body: child),
         );
 
-    testWidgets('protanopia で原画ラベルとフィルタ名ラベルの両ペインを出す', (tester) async {
-      await tester.pumpWidget(
-        localized(
-          const BeforeAfterView(
-            filterType: ColorVisionType.protanopia,
-            intensity: 1.0,
-            sampleSize: 32,
+    group('ラベル表示', () {
+      // #85: renderAfter の既定実装は実ブリッジ必須の CpuVisionRenderer.applier
+      // へ委譲するため、`flutter test`（native lib 未ロード）ではフェイクに
+      // 差し替える。ここではラベル表示（`_after` が非 null になること）だけを
+      // 見たいので、フェイクは source をそのまま返すだけでよい（実描画・実ブリッジの
+      // 検証は integration_test/cpu_preview_all_filters_test.dart の役割）。
+      setUp(() {
+        CpuVisionRenderer.applier = (source, filter, strength) async => source;
+      });
+      tearDown(() {
+        CpuVisionRenderer.applier = CpuVisionRenderer.apply;
+      });
+
+      testWidgets('protanopia で原画ラベルとフィルタ名ラベルの両ペインを出す', (tester) async {
+        await tester.pumpWidget(
+          localized(
+            const BeforeAfterView(
+              filterType: ColorVisionType.protanopia,
+              intensity: 1.0,
+              sampleSize: 32,
+            ),
           ),
-        ),
-      );
-      final protoName = colorVisionTypeName(en, ColorVisionType.protanopia);
-      await pumpUntilText(tester, protoName);
+        );
+        final protoName = colorVisionTypeName(en, ColorVisionType.protanopia);
+        await pumpUntilText(tester, protoName);
 
-      expect(find.text(en.previewPaneOriginal), findsOneWidget);
-      expect(find.text(protoName), findsOneWidget);
-    });
+        expect(find.text(en.previewPaneOriginal), findsOneWidget);
+        expect(find.text(protoName), findsOneWidget);
+      });
 
-    testWidgets(
-        'deuteranopia でも原画ラベルとフィルタ名ラベルの両ペインを出す'
-        '（#59: renderAfter の対象拡大）', (tester) async {
-      await tester.pumpWidget(
-        localized(
-          const BeforeAfterView(
-            filterType: ColorVisionType.deuteranopia,
-            intensity: 1.0,
-            sampleSize: 32,
+      testWidgets(
+          'deuteranopia でも原画ラベルとフィルタ名ラベルの両ペインを出す'
+          '（#59: renderAfter の対象拡大）', (tester) async {
+        await tester.pumpWidget(
+          localized(
+            const BeforeAfterView(
+              filterType: ColorVisionType.deuteranopia,
+              intensity: 1.0,
+              sampleSize: 32,
+            ),
           ),
-        ),
-      );
-      final deuteranopiaName =
-          colorVisionTypeName(en, ColorVisionType.deuteranopia);
-      await pumpUntilText(tester, deuteranopiaName);
+        );
+        final deuteranopiaName =
+            colorVisionTypeName(en, ColorVisionType.deuteranopia);
+        await pumpUntilText(tester, deuteranopiaName);
 
-      expect(find.text(en.previewPaneOriginal), findsOneWidget);
-      expect(find.text(deuteranopiaName), findsOneWidget);
+        expect(find.text(en.previewPaneOriginal), findsOneWidget);
+        expect(find.text(deuteranopiaName), findsOneWidget);
+      });
     });
 
     // #58: プレビューが GPU 画像をリークする／古い結果で上書きされる／Retina で

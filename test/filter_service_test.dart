@@ -174,6 +174,25 @@ void main() {
     });
   });
 
+  group(
+      'visionFilterForColorVisionType（#85: sensusFilter と CPU プレビュー'
+      'レンダラが共有する単一の対応表）', () {
+    test('sensusFilter getter と同じ結果を返す（インスタンスを介さず直接引ける）', () {
+      for (final type in ColorVisionType.values) {
+        final service = FilterService()..applyFilter(type);
+        expect(
+          visionFilterForColorVisionType(type),
+          service.sensusFilter,
+          reason: '$type',
+        );
+      }
+    });
+
+    test('none は null', () {
+      expect(visionFilterForColorVisionType(ColorVisionType.none), isNull);
+    });
+  });
+
   group('強度はタイプごとに記憶する（#57）', () {
     test('intensity: を渡さない applyFilter は初めて選ぶタイプで recommendedStrength になる', () {
       final service = FilterService();
