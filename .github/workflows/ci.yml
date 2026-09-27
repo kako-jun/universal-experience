@@ -49,6 +49,28 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      # lib/src/rust/（FRB 生成 Dart バインディング）と rust/src/frb_generated.rs
+      # が rust/src/api/ の Rust コード・flutter_rust_bridge.yaml と同期している
+      # ことを検証する（#85 レビュー N4）。flutter_rust_bridge_codegen 自体は
+      # 比較的重いバイナリなので、cargo bin をキャッシュしてキャッシュヒット時は
+      # 再ビルドしない。バージョンは Cargo.toml / pubspec.yaml の
+      # `flutter_rust_bridge = "=2.11.1"` 固定と揃える。
+      - name: Cache flutter_rust_bridge_codegen binary
+        id: cache-frb-codegen
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/flutter_rust_bridge_codegen
+          key: frb-codegen-2.11.1-${{ runner.os }}
+
+      - name: Install flutter_rust_bridge_codegen
+        if: steps.cache-frb-codegen.outputs.cache-hit != 'true'
+        run: cargo install flutter_rust_bridge_codegen --version 2.11.1 --locked
+
+      - name: Verify FRB codegen has no drift
+        run: |
+          flutter_rust_bridge_codegen generate
+          git diff --exit-code -- lib/src/rust rust/src/frb_generated.rs
+
       # shaders/*.frag・pubspec.yaml の shaders: ブロックが tools/sensus_shaders.g.json
       # と同期していることを明示的に確認する（#56）。test/shader_codegen_test.dart
       # も同じ --check を内部で回すが、ドリフトの原因切り分けをしやすくするため
