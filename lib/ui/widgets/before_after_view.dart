@@ -39,6 +39,33 @@ typedef AfterImageRenderer = Future<ui.Image?> Function(
 @visibleForTesting
 AfterImageRenderer afterImageRenderer = BeforeAfterView.renderAfter;
 
+/// [_BeforeAfterViewState._export] が使うキャプション合成ステップの型。
+///
+/// 実体は [composeExportImage]。widget test が実ファイル I/O（[pngSaver]）に
+/// 触れずに export の挙動（#85 レビュー S8: caption が描画時の
+/// `(filterType, strength)` から作られること）を検証できるようにするための
+/// seam（#58 の `sampleImageGenerator`/`afterImageRenderer` と同じパターン）。
+typedef ExportImageComposer = Future<ui.Image> Function(
+  ui.Image base,
+  ExportCaption caption,
+);
+
+/// export 用画像合成の供給源（テストで差し替え可能）。既定は
+/// [composeExportImage]。
+@visibleForTesting
+ExportImageComposer exportImageComposer = composeExportImage;
+
+/// [_BeforeAfterViewState._export] が使う PNG 書き出しステップの型。
+///
+/// 実体は [savePng]。`path_provider` の実プラットフォームを要する I/O
+/// （`test/export_service_test.dart` の doc 参照）なので、widget test では
+/// フェイクに差し替えて実ファイルへ触れずに済ませる。
+typedef PngSaver = Future<String> Function(Uint8List bytes, String filename);
+
+/// PNG 書き出しの供給源（テストで差し替え可能）。既定は [savePng]。
+@visibleForTesting
+PngSaver pngSaver = savePng;
+
 /// Side-by-side "before / after" preview for a colour-vision filter.
 ///
 /// The *before* pane shows a generated sample image (a smooth hue gradient with
@@ -85,11 +112,16 @@ class BeforeAfterView extends StatefulWidget {
   /// Rationale for a **canonical size** instead of sizing to the rendered
   /// pane × `devicePixelRatio` (the pre-#85 GPU-era behaviour, #58):
   /// - Several sensus filters key their effect off **fixed pixel counts**
-  ///   rather than a size-relative ratio (e.g. `DetailLoss.cellSize`,
-  ///   `Starbursts.rayLengthRatio` combined with absolute ray geometry) —
+  ///   rather than a size-relative ratio — e.g. `DetailLoss.cellSize` (a
+  ///   payload the UI lets the user pick directly, in px), eye_strain's
+  ///   pillbox blur radius (`strength × 1.5px`), dry_eye's noise tile
+  ///   (32px), cataract's noise cell (32px), metamorphopsia's max
+  ///   displacement (8px), flickering_stars' point blob radius (2px) —
   ///   re-rendering at a different resolution every time the window resizes
   ///   would change how those filters look, independent of any real change
-  ///   in strength.
+  ///   in strength (`starbursts` is excluded from this list: its ray length
+  ///   is itself a size-relative *ratio*, `rayLengthRatio`, not a fixed
+  ///   pixel count).
   /// - The disk-blur family (myopia/hyperopia/presbyopia/astigmatism) derives
   ///   its blur radius as `strength × ratio × min(width, height)`; sensus's
   ///   elliptical kernel degenerates to a single center pixel (a no-op) once
@@ -99,11 +131,12 @@ class BeforeAfterView extends StatefulWidget {
   ///   to silently lose the effect for the tightest-ratio filters
   ///   (astigmatism/presbyopia, ratio 1.1%).
   ///
-  /// 1024 keeps every filter's effect comfortably visible while staying cheap
-  /// for the CPU `apply()` path (sub-second per filter at this size). The
-  /// pane simply scales the rendered image up/down to fit
-  /// (`_UiImagePainter.paint`, `FilterQuality.medium`); it never re-renders
-  /// on resize.
+  /// 1024 keeps every filter's effect comfortably visible. Per-filter CPU
+  /// `apply()` timing at this size (#85 レビュー S9) is recorded on Issue
+  /// #85 — see that Issue for the measured numbers/method rather than a
+  /// number here that could silently go stale. The pane simply scales the
+  /// rendered image up/down to fit (`_UiImagePainter.paint`,
+  /// `FilterQuality.medium`); it never re-renders on resize.
   static const int canonicalSampleSize = 1024;
 
   /// Builds the deterministic sample image used in the *before* pane.
@@ -213,6 +246,20 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// practice) — production always uses [BeforeAfterView.canonicalSampleSize].
   int? _currentSampleSize;
 
+  /// The `(filterType, strength)` that actually produced the currently-held
+  /// [_after] (#85 レビュー S8). `null` until the first successful render.
+  ///
+  /// [_export] must build its [ExportCaption] from these, **not** from
+  /// `widget.filterType`/`widget.intensity`: those reflect the *live* widget
+  /// props, which can already have moved on (e.g. the user dragged the
+  /// intensity slider again) while `_after` still shows the previous render
+  /// — [_scheduleRebuild] (#85 レビュー S3) coalesces the new request instead
+  /// of applying it immediately, so there's a real window where the two
+  /// diverge. Exporting during that window must burn a caption matching the
+  /// pixels actually being exported, not the slider's current position.
+  ColorVisionType? _afterFilterType;
+  double? _afterStrength;
+
   /// Monotonic request id. Bumped on every [_rebuild] call so a slow/late
   /// async result can tell it has been superseded by a newer request and
   /// discard (dispose) itself instead of overwriting `_before`/`_after` with
@@ -282,8 +329,14 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   }
 
   Future<void> _runRebuild(int sampleSize) async {
-    await _rebuild(sampleSize);
-    _rebuildInFlight = false;
+    try {
+      await _rebuild(sampleSize);
+    } finally {
+      // #85 レビュー N6: _rebuild が例外を投げても（現状は内部で catch して
+      // いるため起きない想定だが）_rebuildInFlight が true のまま固着して
+      // 以後の要求が永久に集約されたまま実行されなくなる事態を避ける。
+      _rebuildInFlight = false;
+    }
     if (!mounted) return;
     final pending = _pendingRebuildSampleSize;
     if (pending != null) {
@@ -303,7 +356,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// originally guarded; retrying is now inherently user-driven only). If a
   /// newer request has already superseded this one, does nothing (that newer
   /// request owns the state now).
-  void _onRebuildFailed(int generation, int sampleSize) {
+  void _onRebuildFailed(int generation) {
     if (generation != _generation || !mounted) return;
     final oldAfter = _after;
     setState(() {
@@ -340,7 +393,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         ));
         // #58 レビュー S1: 生成に失敗しても loading に固着させず、次の
         // レイアウト/更新で再試行できるようにする。
-        _onRebuildFailed(generation, sampleSize);
+        _onRebuildFailed(generation);
         return;
       }
     }
@@ -378,7 +431,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       } else if (!identical(before, _before)) {
         before.dispose();
       }
-      _onRebuildFailed(generation, sampleSize);
+      _onRebuildFailed(generation);
       return;
     }
 
@@ -408,6 +461,8 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     setState(() {
       _before = before;
       _after = after;
+      _afterFilterType = widget.filterType; // #85 レビュー S8
+      _afterStrength = widget.intensity; // #85 レビュー S8
       _currentSampleSize = sampleSize;
       _loading = false;
       _failed = false; // #58 レビュー SHOULD-1: 成功したら失敗表示を解除する。
@@ -444,31 +499,41 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// Exports the current "after" image as a PNG with burned-in metadata (#43).
   ///
   /// i18n は **UI 側でここで解決** し、`ExportCaption`（解決済み文字列）として
-  /// pure な [composeExportImage] に渡す（規律2）。保存後はフルパスをテキストとして
+  /// pure な [exportImageComposer] に渡す（規律2）。保存後はフルパスをテキストとして
   /// クリップボードへコピーし、SnackBar で結果を知らせる。画像そのものの
   /// クリップボード書き込みはプラグインを要し環境変更になるため非スコープ。
+  ///
+  /// #85 レビュー S8: caption は [_afterFilterType]/[_afterStrength]（`_after`
+  /// を描画した時点の値）から作る。`widget.filterType`/`widget.intensity`
+  /// （呼び出し時点の *現在* の値）を使うと、export をタップした瞬間までに
+  /// スライダー操作で widget の props が先に進んでいた場合、表示中（＝実際に
+  /// エクスポートされる）画像とは異なる caption を焼き込んでしまう。
   Future<void> _export(AppLocalizations l10n) async {
     final base = _after;
-    if (base == null || _exporting) return;
+    final filterType = _afterFilterType;
+    final strength = _afterStrength;
+    if (base == null || filterType == null || strength == null || _exporting) {
+      return;
+    }
     setState(() => _exporting = true);
 
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final strengthPercent = (widget.intensity.clamp(0.0, 1.0) * 100).round();
+      final strengthPercent = (strength.clamp(0.0, 1.0) * 100).round();
       final date = isoDate(DateTime.now());
       // 色覚特性は urgency=none のため受診喚起は出さない（緊急性のある症状ではない）。
       // 色覚 7 型（このウィジェットが扱う範囲）は urgency=none なので受診喚起は焼かない。
       // sensus advanced フィルタ（緑内障等）の live export に拡張する際は、ここで
       // `consultMessageForUrgency(...)` を解決して `urgencyMessage` に渡せる（拡張ポイント）。
       final caption = ExportCaption(
-        symptomLabel: widget.filterType == ColorVisionType.none
+        symptomLabel: filterType == ColorVisionType.none
             ? l10n.previewPaneOriginal
-            : colorVisionTypeName(l10n, widget.filterType),
+            : colorVisionTypeName(l10n, filterType),
         strengthLabel: l10n.strengthLabel(strengthPercent),
         isoDate: date,
       );
 
-      final composed = await composeExportImage(base, caption);
+      final composed = await exportImageComposer(base, caption);
       Uint8List? bytes;
       try {
         bytes = await encodeImagePng(composed);
@@ -480,11 +545,11 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       }
 
       final filename = exportFilename(
-        symptomId: widget.filterType.id,
+        symptomId: filterType.id,
         strengthPercent: strengthPercent,
         isoDate: date,
       );
-      final path = await savePng(bytes, filename);
+      final path = await pngSaver(bytes, filename);
       await Clipboard.setData(ClipboardData(text: path));
 
       if (!mounted) return;
