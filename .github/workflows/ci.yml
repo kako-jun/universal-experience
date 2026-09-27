@@ -66,7 +66,17 @@ jobs:
         if: steps.cache-frb-codegen.outputs.cache-hit != 'true'
         run: cargo install flutter_rust_bridge_codegen --version 2.11.1 --locked
 
+      # 実測: このステップが CI (macOS runner) で cargo-expand の自動インストール
+      # 完了後（MIR パーサのログ行まで到達した後）74分以上ハングし、手動キャンセル
+      # した実績がある。ローカルでは同じコマンドが2秒未満で完了するため原因は
+      # CI 環境固有（tty/stdin の扱いやサンドボックス差の疑いだが未特定）。
+      # timeout-minutes を安全弁として付け、ハングしても最大10分でジョブ全体を
+      # 道連れにしないようにする。ここでも解消しない場合は #85 のフォロー
+      # アップ Issue の指示どおりステップ自体を外す。
       - name: Verify FRB codegen has no drift
+        timeout-minutes: 10
+        env:
+          CI: true
         run: |
           flutter_rust_bridge_codegen generate
           git diff --exit-code -- lib/src/rust rust/src/frb_generated.rs
