@@ -12,6 +12,8 @@
 // integration_test` 呼び出しに複数ファイルを渡すと2番目以降のアプリ起動が失敗する
 // 既知の制約があるため、CI でも個別コマンドとして実行する。
 
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
@@ -163,6 +165,80 @@ void main() {
       expect(changedRatio, greaterThan(0.3),
           reason: '変化したピクセルの割合が低すぎる（$changedRatio）: '
               'protanopia が一部にしか効いていない疑い');
+    });
+
+    testWidgets(
+        '非正方形（96×64）の画像でも出力サイズが一致し例外が出ない '
+        '(#85 レビュー §3-a)', (tester) async {
+      // canonicalSampleSize は常に正方形だが、CpuVisionRenderer.apply 自体は
+      // 任意のアスペクト比を受け付ける契約（#60 の advanced カタログ結線で
+      // 正方形以外の入力が来ないとは限らない）なので、非正方形でも壊れない
+      // ことを実ブリッジで確かめる。
+      const width = 96;
+      const height = 64;
+      final src = await BeforeAfterView.generateSampleImage(width);
+      addTearDown(src.dispose);
+      // generateSampleImage は正方形しか作れないので、非正方形の入力は
+      // straight RGBA8 バッファを直接組み立てて作る（alpha は全て 255）。
+      final srcPixels = await CpuVisionRenderer.imageToRgba8(src);
+      final nonSquareBytes = Uint8List(width * height * 4);
+      for (var i = 0; i < nonSquareBytes.length; i++) {
+        nonSquareBytes[i] = srcPixels[i % srcPixels.length];
+      }
+      final nonSquareSrc = await CpuVisionRenderer.rgba8ToImage(
+        nonSquareBytes,
+        width,
+        height,
+      );
+      addTearDown(nonSquareSrc.dispose);
+      expect(nonSquareSrc.width, width);
+      expect(nonSquareSrc.height, height);
+
+      final out = await CpuVisionRenderer.apply(
+        nonSquareSrc,
+        const VisionFilter.protanopia(),
+        1.0,
+      );
+      addTearDown(out.dispose);
+
+      expect(out.width, width);
+      expect(out.height, height);
+    });
+
+    testWidgets(
+        '純赤 2×1 を protanopia strength=1.0 で変換すると、Rust 側で1回だけ'
+        '実測した期待 RGBA とバイト一致する (#85 レビュー §3-b)', (tester) async {
+      // 期待値の由来: rust/ で `apply_vision_cpu_rgba8(VisionFilter::Protanopia,
+      // vec![255,0,0,255, 255,0,0,255], 2, 1, 1.0)` を一時的な #[ignore] テスト
+      // （実行後に削除済み、PR #85 のレビュー対応時に1回だけ実行）で直接呼んで
+      // 得た実測値。golden PNG のようなファイル I/O を挟まないため、
+      // integration_test の CWD 問題（§3 冒頭のコメント参照）に影響されない。
+      const width = 2;
+      const height = 1;
+      final straightIn = Uint8List.fromList([
+        255, 0, 0, 255, // 純赤（ピクセル1）
+        255, 0, 0, 255, // 純赤（ピクセル2）
+      ]);
+      final src = await CpuVisionRenderer.rgba8ToImage(
+        straightIn,
+        width,
+        height,
+      );
+      addTearDown(src.dispose);
+
+      final out = await CpuVisionRenderer.apply(
+        src,
+        const VisionFilter.protanopia(),
+        1.0,
+      );
+      addTearDown(out.dispose);
+
+      final outPixels = await CpuVisionRenderer.imageToRgba8(out);
+      const expectedPixels = [
+        109, 95, 0, 255, // ピクセル1
+        109, 95, 0, 255, // ピクセル2
+      ];
+      expect(outPixels, equals(expectedPixels));
     });
 
     // 「strength=1.0 の出力を既存 golden 参照（protanopia_ref.png）と比較する」
