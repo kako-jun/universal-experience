@@ -666,7 +666,8 @@ class RustLibWire implements BaseWire {
   late final _store_dart_post_cobject = _store_dart_post_cobjectPtr
       .asFunction<void Function(DartPostCObjectFnType)>();
 
-  WireSyncRust2DartDco wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
+  void wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
+    int port_,
     ffi.Pointer<wire_cst_vision_filter> filter,
     ffi.Pointer<wire_cst_list_prim_u_8_loose> rgba8,
     int width,
@@ -674,6 +675,7 @@ class RustLibWire implements BaseWire {
     double strength,
   ) {
     return _wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
+      port_,
       filter,
       rgba8,
       width,
@@ -685,7 +687,8 @@ class RustLibWire implements BaseWire {
   late final _wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8Ptr =
       _lookup<
           ffi.NativeFunction<
-              WireSyncRust2DartDco Function(
+              ffi.Void Function(
+                ffi.Int64,
                 ffi.Pointer<wire_cst_vision_filter>,
                 ffi.Pointer<wire_cst_list_prim_u_8_loose>,
                 ffi.Uint32,
@@ -696,7 +699,8 @@ class RustLibWire implements BaseWire {
   );
   late final _wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8 =
       _wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8Ptr.asFunction<
-          WireSyncRust2DartDco Function(
+          void Function(
+            int,
             ffi.Pointer<wire_cst_vision_filter>,
             ffi.Pointer<wire_cst_list_prim_u_8_loose>,
             int,

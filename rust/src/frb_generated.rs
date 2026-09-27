@@ -46,17 +46,18 @@ flutter_rust_bridge::frb_generated_default_handler!();
 // Section: wire_funcs
 
 fn wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
     filter: impl CstDecode<crate::api::sensus_bridge::VisionFilter>,
     rgba8: impl CstDecode<Vec<u8>>,
     width: impl CstDecode<u32>,
     height: impl CstDecode<u32>,
     strength: impl CstDecode<f32>,
-) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::DcoCodec, _>(
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::DcoCodec, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
             debug_name: "apply_vision_cpu_rgba8",
-            port: None,
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
         },
         move || {
             let api_filter = filter.cst_decode();
@@ -64,16 +65,18 @@ fn wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8_impl(
             let api_width = width.cst_decode();
             let api_height = height.cst_decode();
             let api_strength = strength.cst_decode();
-            transform_result_dco::<_, _, String>((move || {
-                let output_ok = crate::api::sensus_bridge::apply_vision_cpu_rgba8(
-                    api_filter,
-                    api_rgba8,
-                    api_width,
-                    api_height,
-                    api_strength,
-                )?;
-                Ok(output_ok)
-            })())
+            move |context| {
+                transform_result_dco::<_, _, String>((move || {
+                    let output_ok = crate::api::sensus_bridge::apply_vision_cpu_rgba8(
+                        api_filter,
+                        api_rgba8,
+                        api_width,
+                        api_height,
+                        api_strength,
+                    )?;
+                    Ok(output_ok)
+                })())
+            }
         },
     )
 }
@@ -1644,14 +1647,15 @@ mod io {
 
     #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_universal_experience_wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
+        port_: i64,
         filter: *mut wire_cst_vision_filter,
         rgba8: *mut wire_cst_list_prim_u_8_loose,
         width: u32,
         height: u32,
         strength: f32,
-    ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+    ) {
         wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8_impl(
-            filter, rgba8, width, height, strength,
+            port_, filter, rgba8, width, height, strength,
         )
     }
 
@@ -2219,14 +2223,15 @@ mod web {
 
     #[wasm_bindgen]
     pub fn wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
+        port_: flutter_rust_bridge::for_generated::MessagePort,
         filter: flutter_rust_bridge::for_generated::wasm_bindgen::JsValue,
         rgba8: Box<[u8]>,
         width: u32,
         height: u32,
         strength: f32,
-    ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+    ) {
         wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8_impl(
-            filter, rgba8, width, height, strength,
+            port_, filter, rgba8, width, height, strength,
         )
     }
 

@@ -79,7 +79,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 }
 
 abstract class RustLibApi extends BaseApi {
-  Uint8List crateApiSensusBridgeApplyVisionCpuRgba8(
+  Future<Uint8List> crateApiSensusBridgeApplyVisionCpuRgba8(
       {required VisionFilter filter,
       required List<int> rgba8,
       required int width,
@@ -110,21 +110,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   });
 
   @override
-  Uint8List crateApiSensusBridgeApplyVisionCpuRgba8(
+  Future<Uint8List> crateApiSensusBridgeApplyVisionCpuRgba8(
       {required VisionFilter filter,
       required List<int> rgba8,
       required int width,
       required int height,
       required double strength}) {
-    return handler.executeSync(SyncTask(
-      callFfi: () {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
         var arg0 = cst_encode_box_autoadd_vision_filter(filter);
         var arg1 = cst_encode_list_prim_u_8_loose(rgba8);
         var arg2 = cst_encode_u_32(width);
         var arg3 = cst_encode_u_32(height);
         var arg4 = cst_encode_f_32(strength);
         return wire.wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
-            arg0, arg1, arg2, arg3, arg4);
+            port_, arg0, arg1, arg2, arg3, arg4);
       },
       codec: DcoCodec(
         decodeSuccessData: dco_decode_list_prim_u_8_strict,

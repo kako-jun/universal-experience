@@ -65,12 +65,17 @@ List<String> visionUniformLayout({required VisionFilter filter}) =>
 /// sensus-core の CPU `apply` を薄く公開する。全 [`VisionFilter`] に対応する
 /// （sensus の `apply` は網羅 match なので payload 付きフィルタも CPU で適用可能）。
 ///
-/// GPU（FragmentProgram）経路が主だが、テストや GPU 非対応環境のフォールバックに使う。
+/// **プレビュー（静止画）描画の正本経路**（#85）。GPU（FragmentProgram）経路が
+/// `VisionFieldLossMode::Blur` のような表現に対応しないのに対し、CPU 経路
+/// （`sensus_core::apply` そのもの）は 30 種すべてを payload 込みで正しく描画できる。
+/// GPU 経路（`lib/rendering/shader_filter.dart`）はルーペのライブ表示専用に残る。
 /// 生 RGBA8（`width * height * 4` バイト）を入力し、同じレイアウトの RGBA8 を返す。
 ///
-/// 注意: これは sensus の `image::DynamicImage` 経路を通すため GPU 経路より遅い。
-/// 大きな画像をリアルタイム処理する用途には使わないこと。
-Uint8List applyVisionCpuRgba8(
+/// `#[frb(sync)]` を外し非同期公開にしている: `image::DynamicImage` 経路（GPU
+/// シェーダより低速）を UI スレッド上で同期実行すると操作がカクつくため、
+/// flutter_rust_bridge の非同期呼び出し（Rust 側スレッドプールで実行）に乗せ、
+/// Dart 側の `await` の間 UI スレッドを塞がないようにする。
+Future<Uint8List> applyVisionCpuRgba8(
         {required VisionFilter filter,
         required List<int> rgba8,
         required int width,
