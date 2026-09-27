@@ -18,13 +18,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:provider/provider.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
+import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/native_bridge_service.dart';
+import 'package:universal_experience/services/preview_selection.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/src/rust/frb_generated.dart';
+import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
 Widget _presetsApp() {
@@ -49,6 +52,63 @@ Widget _presetsApp() {
       ),
     ),
   );
+}
+
+/// home_screen.dart のプレビュー結線（#60）を最小構成で再現したアプリ。
+/// [ExperiencePresets] のタップが実際に [BeforeAfterView] の描画へつながる
+/// ことを、実ブリッジ（CPU `apply()`）込みで確かめる。
+Widget _previewWithPresetsApp() {
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (_) => VisionFilterState()),
+      ChangeNotifierProvider(create: (_) => FilterService()),
+    ],
+    child: const MaterialApp(
+      locale: Locale('en'),
+      localizationsDelegates: [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: Column(
+            children: [
+              _PreviewFromState(),
+              ExperiencePresets(),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// [_previewWithPresetsApp] 専用の配線ウィジェット。home_screen.dart の
+/// `_buildPreviewSection` と同じ判定（`previewStrength`）で
+/// [VisionFilterState] の選択を [BeforeAfterView] に渡す。
+class _PreviewFromState extends StatelessWidget {
+  const _PreviewFromState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer2<VisionFilterState, FilterService>(
+      builder: (context, visionState, filterService, _) {
+        return BeforeAfterView(
+          filter: visionState.build(),
+          filterId: visionState.selectedId,
+          strength: previewStrength(visionState, filterService),
+          // integration_test では実ブリッジの CPU apply() を正準サイズ
+          // （1024px）で 4 回走らせると重いため、実測に十分な小さめサイズで
+          // 描画確認する（描画そのものは cpu_preview_all_filters_test.dart が
+          // 正準サイズで別途カバー済み）。
+          sampleSize: 64,
+        );
+      },
+    );
+  }
 }
 
 void main() {
@@ -103,7 +163,8 @@ void main() {
       expect(find.byType(Card), findsNWidgets(4));
     });
 
-    testWidgets('カードをタップすると選択状態が変わる', (tester) async {
+    testWidgets('カードをタップすると選択状態が変わる（色覚 FilterService は変更しない、#60）',
+        (tester) async {
       await tester.pumpWidget(_presetsApp());
       await tester.pumpAndSettle();
 
@@ -112,7 +173,7 @@ void main() {
       final filterService = context.read<FilterService>();
 
       // タップ前に色覚フィルタを有効化しておき、体験プリセット適用で
-      // none に戻ることも合わせて確認する（widget test と同じ契約）。
+      // 変更されないことも合わせて確認する（widget test と同じ契約、#60）。
       filterService.applyFilter(ColorVisionType.protanopia);
       expect(visionState.selectedId, isNull);
 
@@ -122,7 +183,59 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(visionState.selectedId, 'vertigo');
-      expect(filterService.currentFilter, ColorVisionType.none);
+      expect(visionState.selectedPresetId, 'meniere');
+      expect(filterService.currentFilter, ColorVisionType.protanopia,
+          reason: 'プリセット適用は色覚クイック選択の状態に干渉しない（#60）');
+    });
+  });
+
+  group('プリセット → プレビュー結線（#60）', () {
+    /// [finder] が見つかるまで実時間でポンプし続ける。integration_test は実
+    /// デバイス上で動く（`flutter test` の FakeAsync とは違い実際の非同期）ため、
+    /// `tester.pump(duration)` を繰り返すだけで実ブリッジの CPU apply() 完了を
+    /// 待てる。
+    Future<void> pumpUntilFound(
+      WidgetTester tester,
+      Finder finder, {
+      int maxTries = 100,
+    }) async {
+      for (var i = 0; i < maxTries; i++) {
+        if (finder.evaluate().isNotEmpty) return;
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+    }
+
+    testWidgets('プリセット 4 種すべてが、タップで実ブリッジ CPU apply() まで例外なく描画される',
+        (tester) async {
+      await tester.pumpWidget(_previewWithPresetsApp());
+      await tester.pumpAndSettle();
+
+      final en = lookupAppLocalizations(const Locale('en'));
+      // (プリセットのラベル, 選択後の after ペインに出るはずのフィルタ名) の組。
+      // meniere と labyrinthitis はどちらも vertigo に写るため after ラベルは
+      // 同じになる — それでも構わない（ここでの主張は「例外なく描画される」）。
+      final cases = <(String presetLabel, String afterLabel)>[
+        (en.experienceMeniere, visionFilterName(en, 'vertigo')),
+        (en.experienceBppv, visionFilterName(en, 'bppv_rotation')),
+        (
+          en.experienceVestibularNeuritis,
+          visionFilterName(en, 'vestibular_neuritis'),
+        ),
+        (en.experienceLabyrinthitis, visionFilterName(en, 'vertigo')),
+      ];
+
+      for (final (presetLabel, afterLabel) in cases) {
+        await tester.tap(find.text(presetLabel));
+        await tester.pump();
+        await pumpUntilFound(tester, find.text(afterLabel));
+
+        expect(tester.takeException(), isNull,
+            reason: '$presetLabel 選択後の描画で例外が発生した');
+        expect(find.text(afterLabel), findsOneWidget,
+            reason: '$presetLabel 選択後、after ペインに "$afterLabel" が出ていない');
+        expect(find.text(en.previewFailed), findsNothing,
+            reason: '$presetLabel 選択後にプレビューが失敗表示になっている');
+      }
     });
   });
 

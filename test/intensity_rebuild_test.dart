@@ -21,6 +21,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/main.dart';
 import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/services/settings_service.dart';
+import 'package:universal_experience/ui/widgets/intensity_slider.dart';
 
 void main() {
   testWidgets(
@@ -49,7 +50,14 @@ void main() {
     // scrollUntilVisible で「見つかる かつ 実際に見える」ところまで動かす。
     // ExperiencePresets カードのような、より下の（flutter_rust_bridge 初期化を
     // 要求する）カードまでは踏み込まない範囲で止まる。
-    final sliderFinder = find.byType(Slider);
+    //
+    // #60: 色覚のクイック選択が VisionFilterState にも書かれるようになった
+    // ため、advanced セクションの FilterParamPanel にも strength スライダーが
+    // 現れる（同じ id が selectedEntry になるため）。find.byType(Slider) では
+    // 2 本ヒットしてしまうので、IntensitySlider（色覚セクション側）の内側だけに
+    // 絞る。
+    final sliderFinder =
+        find.descendant(of: find.byType(IntensitySlider), matching: find.byType(Slider));
     await tester.scrollUntilVisible(sliderFinder, 80);
     // scrollUntilVisible が仕込むスクロールはアニメーションのため、実際に位置が
     // 収まるまで数フレーム進める（進めないと直後の drag が off-screen 判定になる）。

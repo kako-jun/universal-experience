@@ -2,11 +2,15 @@
 //
 // 検証:
 // 1. 4 プリセットが i18n 名で描画される。
-// 2. タップで VisionFilterState.selectedId が対応 catalog id になる
-//    （meniere→vertigo / bppv→bppv_rotation）。色覚 FilterService は none に戻る。
+// 2. タップで VisionFilterState.selectedId が対応 catalog id・selectedPresetId が
+//    experience id になる（meniere→vertigo / bppv→bppv_rotation）。色覚
+//    FilterService は変更しない（#60: deactivate() は呼ばない）。
 // 3. urgency=emergency（vestibular_neuritis）で緊急受診、earlyConsultation（meniere）
 //    で早期受診メッセージ、none（bppv）では受診喚起が出ない。
 // 4. hearing を含む体験（meniere/labyrinthitis）で「聴覚も含む」注記が出る。
+// 5. meniere と labyrinthitis はどちらもカタログ id vertigo に写るが、
+//    selectedPresetId による比較で選んだ方だけが点灯する（#60: 2 枚同時点灯の
+//    修正）。
 //
 // bridge の experiences() は native lib（FFI）を要求し flutter test では呼べないため、
 // experiencesProvider seam を fixture で差し替える（音声再生は #19 非スコープ）。
@@ -106,11 +110,14 @@ void main() {
     expect(find.text(ja.experienceVestibularNeuritis), findsOneWidget); // 前庭神経炎
   });
 
-  testWidgets('meniere タップで vision=vertigo を選択し色覚は none に戻る', (tester) async {
+  testWidgets(
+      'meniere タップで vision=vertigo・selectedPresetId=meniere を選択する'
+      '（色覚 FilterService は変更しない、#60）', (tester) async {
     await pumpPresets(tester, const Locale('en'));
     final en = lookupAppLocalizations(const Locale('en'));
 
-    // 事前に色覚フィルタを有効化しておき、適用で解除されることを確認する。
+    // 事前に色覚フィルタを有効化しておく。プリセット適用で解除されないことを
+    // 確認する（#60: FilterService.deactivate() は呼ばない）。
     filterService.applyFilter(ColorVisionType.protanopia);
     expect(filterService.currentFilter, ColorVisionType.protanopia);
 
@@ -118,10 +125,14 @@ void main() {
     await tester.pump();
 
     expect(visionState.selectedId, 'vertigo');
-    expect(filterService.currentFilter, ColorVisionType.none);
+    expect(visionState.selectedPresetId, 'meniere');
+    expect(visionState.isColorQuickSelection, isFalse);
+    expect(filterService.currentFilter, ColorVisionType.protanopia,
+        reason: 'プリセット適用は色覚クイック選択の状態に干渉しない');
   });
 
-  testWidgets('bppv タップで vision=bppv_rotation を選択する', (tester) async {
+  testWidgets('bppv タップで vision=bppv_rotation・selectedPresetId=bppv を選択する',
+      (tester) async {
     await pumpPresets(tester, const Locale('en'));
     final en = lookupAppLocalizations(const Locale('en'));
 
@@ -129,6 +140,29 @@ void main() {
     await tester.pump();
 
     expect(visionState.selectedId, 'bppv_rotation');
+    expect(visionState.selectedPresetId, 'bppv');
+  });
+
+  testWidgets(
+      'meniere と labyrinthitis は同じ catalog id (vertigo) だが、選んだ方だけが '
+      '点灯する（#60: 2 枚同時点灯バグの修正）', (tester) async {
+    await pumpPresets(tester, const Locale('en'));
+    final en = lookupAppLocalizations(const Locale('en'));
+
+    await tester.tap(find.text(en.experienceMeniere));
+    await tester.pump();
+
+    expect(visionState.selectedPresetId, 'meniere');
+    // meniere カードだけにチェックマークが付き、labyrinthitis には付かない。
+    expect(find.byIcon(Icons.check_circle), findsOneWidget);
+
+    await tester.tap(find.text(en.experienceLabyrinthitis));
+    await tester.pump();
+
+    expect(visionState.selectedId, 'vertigo');
+    expect(visionState.selectedPresetId, 'labyrinthitis');
+    expect(find.byIcon(Icons.check_circle), findsOneWidget,
+        reason: '切り替え後も点灯するのは1枚だけであるべき');
   });
 
   testWidgets('vestibular_neuritis は緊急受診メッセージを出す', (tester) async {

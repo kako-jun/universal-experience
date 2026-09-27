@@ -71,14 +71,14 @@ void main() {
     BeforeAfterView currentPreview() =>
         tester.widget<BeforeAfterView>(find.byType(BeforeAfterView));
 
-    expect(currentPreview().intensity, filterService.intensity);
-    expect(currentPreview().intensity, 1.0); // protanopia の recommendedStrength
+    expect(currentPreview().strength, filterService.intensity);
+    expect(currentPreview().strength, 1.0); // protanopia の recommendedStrength
 
     filterService.setIntensity(0.33);
     await tester.pump();
 
-    expect(currentPreview().intensity, 0.33);
-    expect(currentPreview().intensity, filterService.intensity);
+    expect(currentPreview().strength, 0.33);
+    expect(currentPreview().strength, filterService.intensity);
 
     // setIntensity が予約したデバウンス書き込みが pending timer のまま残ると
     // テストバインディングが失敗させる。確定させておく。
