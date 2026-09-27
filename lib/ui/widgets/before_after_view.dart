@@ -8,8 +8,9 @@ import 'package:flutter/services.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/disability_type.dart';
-import '../../rendering/shader_filter.dart';
+import '../../rendering/cpu_vision_renderer.dart';
 import '../../services/export_service.dart';
+import '../../services/filter_service.dart';
 
 /// [_BeforeAfterViewState] が内部で使うサンプル画像生成ステップの型。
 ///
@@ -45,13 +46,15 @@ AfterImageRenderer afterImageRenderer = BeforeAfterView.renderAfter;
 /// visible on saturated reds/greens/blues). The *after* pane shows the same
 /// image with the selected filter applied.
 ///
-/// All eight [ColorVisionType] values render for real (#59): the three -opia
-/// types route through the matching `ShaderFilter.apply*Gpu` (Machado
-/// per-severity matrix, resolved with the same piecewise-linear interpolation
-/// sensus_core uses), the -omaly types reuse their base -opia transform at a
-/// reduced strength ([recommendedStrength]), and achromatopsia uses a
-/// constant BT.709 luma blend. Live *screen* capture (as opposed to this
-/// synthetic sample image) is still tracked by #1/#3/#4.
+/// All eight [ColorVisionType] values render for real. Rendering routes
+/// through sensus's CPU `apply()` (`CpuVisionRenderer`, #85) — the *preview*
+/// (this static image) is the CPU path's canonical consumer; the GPU
+/// `ShaderFilter` path (#59) is reserved for the loupe's *live* display. The
+/// -omaly types reuse their base -opia's [VisionFilter] at a reduced strength
+/// ([recommendedStrength]); see [visionFilterForColorVisionType] for the
+/// single source of the `ColorVisionType` → `VisionFilter` mapping. Live
+/// *screen* capture (as opposed to this synthetic sample image) is still
+/// tracked by #1/#3/#4.
 class BeforeAfterView extends StatefulWidget {
   const BeforeAfterView({
     super.key,
@@ -134,36 +137,27 @@ class BeforeAfterView extends StatefulWidget {
   }
 
   /// Produces the *after* image for [type] from [source]. Returns null only
-  /// if [type] has no real renderer yet — none of today's eight values does
-  /// (#59), but the nullable return stays so a future `ColorVisionType`
-  /// addition without a renderer degrades to [_ImageView]'s own null-safe
-  /// placeholder instead of a hard error.
+  /// if [type] has no real renderer yet — none of today's eight values does,
+  /// but the nullable return stays so a future `ColorVisionType` addition
+  /// without a renderer degrades to [_ImageView]'s own null-safe placeholder
+  /// instead of a hard error.
   ///
-  /// [ColorVisionType.none] returns [source] unchanged (clone via the shader
-  /// is unnecessary). Each -opia/achromatopsia type routes through its
-  /// matching `ShaderFilter.apply*Gpu`; each -omaly type shares its base
-  /// -opia's renderer (the reduced [strength] is what distinguishes them —
-  /// see [recommendedStrength]).
+  /// [ColorVisionType.none] returns [source] unchanged (no filter to apply).
+  /// Every other type maps to a sensus [VisionFilter] via
+  /// [visionFilterForColorVisionType] (the single source shared with
+  /// [FilterService.sensusFilter]) and renders through
+  /// [CpuVisionRenderer.applier] — CPU `apply()`, not the GPU shader path
+  /// (#85; GPU is reserved for the loupe's live display). Each -omaly type
+  /// maps to the same [VisionFilter] as its base -opia; the reduced
+  /// [strength] is what distinguishes them (see [recommendedStrength]).
   static Future<ui.Image?> renderAfter(
     ui.Image source,
     ColorVisionType type,
     double strength,
   ) async {
-    switch (type) {
-      case ColorVisionType.none:
-        return source;
-      case ColorVisionType.protanopia:
-      case ColorVisionType.protanomaly:
-        return ShaderFilter.applyProtanopiaGpu(source, strength);
-      case ColorVisionType.deuteranopia:
-      case ColorVisionType.deuteranomaly:
-        return ShaderFilter.applyDeuteranopiaGpu(source, strength);
-      case ColorVisionType.tritanopia:
-      case ColorVisionType.tritanomaly:
-        return ShaderFilter.applyTritanopiaGpu(source, strength);
-      case ColorVisionType.achromatopsia:
-        return ShaderFilter.applyAchromatopsiaGpu(source, strength);
-    }
+    final filter = visionFilterForColorVisionType(type);
+    if (filter == null) return source;
+    return CpuVisionRenderer.applier(source, filter, strength);
   }
 
   @override
@@ -630,8 +624,9 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         );
         // #58 レビュー SHOULD-1: 最新世代が失敗した場合は _failed が立ち、
         // _after は null にされている。stale/不整合な画像を出し続けるより
-        // 失敗を明示する。全 ColorVisionType が実描画対応済み（#59）なので、
-        // 失敗以外で `_after` が null のまま安定することはない（一度も成功して
+        // 失敗を明示する。全 ColorVisionType が実描画対応済み（#59、#85 で CPU
+        // 経路に切替）なので、失敗以外で `_after` が null のまま安定することは
+        // ない（一度も成功して
         // いなければこの分岐に来る前に上の `_loading` ガードで preparing 表示に
         // なる）。それでも [_ImageView] 自身が null を安全に扱うため、二分岐で
         // 十分（「描画は近日対応」プレースホルダは #86 レビューで YAGNI 判定・撤去）。
