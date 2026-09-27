@@ -10,7 +10,7 @@
 
   "aboutTooltip": "このアプリについて",
   "aboutBody": "Universal Experience は、さまざまな障害への理解と共感を助けるアクセシビリティ・シミュレーションツールです。",
-  "aboutPhases": "Phase 1：色覚特性のシミュレーション\nPhase 2：聴覚障害のシミュレーション（準備中）\nPhase 3：視野の欠け・ぼやけなど色覚以外の見え方（アドバンストから選択・調整できます。実際の画面描画は順次拡充中）",
+  "aboutPhases": "Phase 1：色覚特性のシミュレーション\nPhase 2：聴覚障害のシミュレーション（準備中）\nPhase 3：視野の欠け・ぼやけなど色覚以外の見え方（アドバンストから選択でき、プレビューにも反映されます）",
 
   "themeTooltipSystem": "テーマ：システムに従う",
   "themeTooltipLight": "テーマ：ライト",
@@ -33,9 +33,10 @@
   "previewPaneOriginal": "元の画像",
   "previewPreparing": "プレビューを準備中…",
   "previewFailed": "プレビューの描画に失敗しました",
+  "previewStaticFrameNote": "時間の経過で変化する見え方です。プレビューは動きのない1コマの静止画で表示しています。",
 
   "advancedSectionTitle": "アドバンスト（sensus の全フィルタ）",
-  "advancedSectionNote": "sensus が公開する全 30 種の見え方を、カテゴリ別に選んでパラメータを調整できます。選んだフィルタの画面への描画は順次対応していきます。",
+  "advancedSectionNote": "sensus が公開する全 30 種の見え方を、カテゴリ別に選んでパラメータを調整できます。選んだ内容は上のプレビューに反映されます。",
   "advancedParamPanelHint": "フィルタを選ぶとパラメータを調整できます。",
   "randomize": "ランダム生成",
 

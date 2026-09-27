@@ -7,10 +7,10 @@ import 'package:flutter/services.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
-import '../../models/disability_type.dart';
+import '../../models/vision_filter_catalog.dart';
 import '../../rendering/cpu_vision_renderer.dart';
 import '../../services/export_service.dart';
-import '../../services/filter_service.dart';
+import '../../src/rust/api/sensus_bridge.dart';
 
 /// [_BeforeAfterViewState] が内部で使うサンプル画像生成ステップの型。
 ///
@@ -28,9 +28,12 @@ SampleImageGenerator sampleImageGenerator = BeforeAfterView.generateSampleImage;
 /// [_BeforeAfterViewState] が内部で使う after 画像描画ステップの型。
 ///
 /// 実体は [BeforeAfterView.renderAfter]。用途は [sampleImageGenerator] と同じ（#58）。
+/// [filter] は `VisionFilterState.build`（#60）が組み立てた、payload 込みの
+/// sensus [VisionFilter]。null は「何も選択されていない」を表し、[source] を
+/// そのまま返す（[BeforeAfterView.renderAfter] 参照）。
 typedef AfterImageRenderer = Future<ui.Image?> Function(
   ui.Image source,
-  ColorVisionType type,
+  VisionFilter? filter,
   double strength,
 );
 
@@ -43,7 +46,7 @@ AfterImageRenderer afterImageRenderer = BeforeAfterView.renderAfter;
 ///
 /// 実体は [composeExportImage]。widget test が実ファイル I/O（[pngSaver]）に
 /// 触れずに export の挙動（#85 レビュー S8: caption が描画時の
-/// `(filterType, strength)` から作られること）を検証できるようにするための
+/// `(filterId, strength)` から作られること）を検証できるようにするための
 /// seam（#58 の `sampleImageGenerator`/`afterImageRenderer` と同じパターン）。
 typedef ExportImageComposer = Future<ui.Image> Function(
   ui.Image base,
@@ -66,35 +69,54 @@ typedef PngSaver = Future<String> Function(Uint8List bytes, String filename);
 @visibleForTesting
 PngSaver pngSaver = savePng;
 
-/// Side-by-side "before / after" preview for a colour-vision filter.
+/// Side-by-side "before / after" preview for the currently selected
+/// `VisionFilterState` selection (#60).
 ///
 /// The *before* pane shows a generated sample image (a smooth hue gradient with
 /// primary colour swatches — chosen because colour-vision deficiencies are most
 /// visible on saturated reds/greens/blues). The *after* pane shows the same
-/// image with the selected filter applied.
+/// image with [filter] applied at [strength].
 ///
-/// All eight [ColorVisionType] values render for real. Rendering routes
-/// through sensus's CPU `apply()` (`CpuVisionRenderer`, #85) — the *preview*
-/// (this static image) is the CPU path's canonical consumer. The GPU
-/// `ShaderFilter` path (#59) is kept for a future *live* screen-capture
-/// display (#1/#3/#4) but isn't called from any production code today. The
-/// -omaly types reuse their base -opia's [VisionFilter] at a reduced strength
-/// ([recommendedStrength]); see [visionFilterForColorVisionType] for the
-/// single source of the `ColorVisionType` → `VisionFilter` mapping.
+/// This widget is presentational: it doesn't read `VisionFilterState` or
+/// `FilterService` itself. The caller (`home_screen.dart`) resolves the
+/// current selection — whichever of the color-vision quick pick, the advanced
+/// catalog, or an experience preset was used last — into a single
+/// `(filter, filterId, strength)` triple via `VisionFilterState.build` and
+/// `lib/services/preview_selection.dart`'s `previewStrength`, and passes it
+/// down. [filter] `null` means nothing is selected; both panes show the
+/// original image.
+///
+/// Rendering routes through sensus's CPU `apply()` (`CpuVisionRenderer`, #85)
+/// — the *preview* (this static image) is the CPU path's canonical consumer,
+/// and (since #60) can render any of sensus's 30 [VisionFilter] variants, not
+/// just the 7 color-vision types. The GPU `ShaderFilter` path (#59) is kept
+/// for a future *live* screen-capture display (#1/#3/#4) but isn't called
+/// from any production code today.
 class BeforeAfterView extends StatefulWidget {
   const BeforeAfterView({
     super.key,
-    required this.filterType,
-    required this.intensity,
+    required this.filter,
+    required this.filterId,
+    required this.strength,
     this.sampleSize,
-  });
+  })  : assert(
+          (filter == null) == (filterId == null),
+          'filter and filterId must both be null or both be set',
+        );
 
-  /// The currently selected colour-vision type. [ColorVisionType.none] shows
-  /// the original image on both sides.
-  final ColorVisionType filterType;
+  /// The sensus filter to render, built from the current
+  /// `VisionFilterState` selection (payload included). `null` shows the
+  /// original image on both sides.
+  final VisionFilter? filter;
 
-  /// Filter strength 0.0..1.0, forwarded to the shader.
-  final double intensity;
+  /// The catalog id (snake_case) [filter] was built from — used to resolve
+  /// the after-pane label / export caption ([visionFilterName]) and whether
+  /// the filter is time-dependent ([VisionFilterEntry.isTimeDependent]).
+  /// Must be non-null iff [filter] is non-null.
+  final String? filterId;
+
+  /// Filter strength 0.0..1.0, forwarded to the renderer.
+  final double strength;
 
   /// Explicit width/height (in pixels) for the generated square sample
   /// image. When `null` (the default, used by real callers), the resolution
@@ -196,27 +218,21 @@ class BeforeAfterView extends StatefulWidget {
     }
   }
 
-  /// Produces the *after* image for [type] from [source]. Returns null only
-  /// if [type] has no real renderer yet — none of today's eight values does,
-  /// but the nullable return stays so a future `ColorVisionType` addition
-  /// without a renderer degrades to [_ImageView]'s own null-safe placeholder
-  /// instead of a hard error.
+  /// Produces the *after* image for [filter] from [source] at [strength].
   ///
-  /// [ColorVisionType.none] returns [source] unchanged (no filter to apply).
-  /// Every other type maps to a sensus [VisionFilter] via
-  /// [visionFilterForColorVisionType] (the single source shared with
-  /// [FilterService.sensusFilter]) and renders through
+  /// `null` [filter] (nothing selected) returns [source] unchanged (no
+  /// filter to apply) without calling the renderer. Otherwise renders through
   /// [CpuVisionRenderer.applier] — CPU `apply()`, not the GPU shader path
   /// (#85; GPU is kept for a future live screen-capture display, unused
-  /// today). Each -omaly type
-  /// maps to the same [VisionFilter] as its base -opia; the reduced
-  /// [strength] is what distinguishes them (see [recommendedStrength]).
+  /// today). The mapping from a UI selection (color-vision quick pick /
+  /// advanced catalog / experience preset) to a [VisionFilter] happens
+  /// upstream, in `VisionFilterState.build` (#60) — this widget never
+  /// constructs a [VisionFilter] itself.
   static Future<ui.Image?> renderAfter(
     ui.Image source,
-    ColorVisionType type,
+    VisionFilter? filter,
     double strength,
   ) async {
-    final filter = visionFilterForColorVisionType(type);
     if (filter == null) return source;
     return CpuVisionRenderer.applier(source, filter, strength);
   }
@@ -246,18 +262,18 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// practice) — production always uses [BeforeAfterView.canonicalSampleSize].
   int? _currentSampleSize;
 
-  /// The `(filterType, strength)` that actually produced the currently-held
-  /// [_after] (#85 レビュー S8). `null` until the first successful render.
+  /// The `(filterId, strength)` that actually produced the currently-held
+  /// [_after] (#85 レビュー S8, #60). `null` until the first successful render.
   ///
   /// [_export] must build its [ExportCaption] from these, **not** from
-  /// `widget.filterType`/`widget.intensity`: those reflect the *live* widget
+  /// `widget.filterId`/`widget.strength`: those reflect the *live* widget
   /// props, which can already have moved on (e.g. the user dragged the
   /// intensity slider again) while `_after` still shows the previous render
   /// — [_scheduleRebuild] (#85 レビュー S3) coalesces the new request instead
   /// of applying it immediately, so there's a real window where the two
   /// diverge. Exporting during that window must burn a caption matching the
   /// pixels actually being exported, not the slider's current position.
-  ColorVisionType? _afterFilterType;
+  String? _afterFilterId;
   double? _afterStrength;
 
   /// Monotonic request id. Bumped on every [_rebuild] call so a slow/late
@@ -300,8 +316,9 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   @override
   void didUpdateWidget(BeforeAfterView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.filterType != widget.filterType ||
-        oldWidget.intensity != widget.intensity ||
+    if (oldWidget.filter != widget.filter ||
+        oldWidget.filterId != widget.filterId ||
+        oldWidget.strength != widget.strength ||
         oldWidget.sampleSize != widget.sampleSize) {
       _scheduleRebuild(_effectiveSampleSize);
     }
@@ -314,8 +331,8 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// letting a rapidly-changing slider spawn one native-bridge call per
   /// frame would waste work and could reorder unpredictably. Once the
   /// in-flight job finishes, [_runRebuild] starts the pending request (if
-  /// any) using whatever [_effectiveSampleSize]/`widget.filterType`/
-  /// `widget.intensity` are current *at that time* — not stale snapshots
+  /// any) using whatever [_effectiveSampleSize]/`widget.filter`/
+  /// `widget.strength` are current *at that time* — not stale snapshots
   /// from when the request was made — so the final result always reflects
   /// the latest inputs. [_rebuild]'s own generation/dispose/failure
   /// bookkeeping (#58) is unchanged; this only gates how many are in flight.
@@ -350,7 +367,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// stay stuck on the "preparing" placeholder, and shows a failure state
   /// instead of the (possibly now-stale) `_after` (SHOULD-1). A permanent
   /// failure doesn't retry itself (no timer, no auto-resize) — only a user
-  /// action (`didUpdateWidget` seeing a filterType/intensity/sampleSize
+  /// action (`didUpdateWidget` seeing a filter/strength/sampleSize
   /// change) calls [_scheduleRebuild] again, so there's no busy-loop risk
   /// (#85 レビュー S4 removed the resize-driven retry path that MUST-1
   /// originally guarded; retrying is now inherently user-driven only). If a
@@ -364,7 +381,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       _failed = true;
       _after = null;
     });
-    // _after may have aliased _before (filterType == none) — don't dispose
+    // _after may have aliased _before (filter == null) — don't dispose
     // the image that's still the current `_before`.
     if (oldAfter != null && !identical(oldAfter, _before)) {
       oldAfter.dispose();
@@ -416,8 +433,8 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     try {
       after = await afterImageRenderer(
         rendererInput,
-        widget.filterType,
-        widget.intensity,
+        widget.filter,
+        widget.strength,
       );
     } catch (e, st) {
       // #58 レビュー nit-1: こちらも同様に報告する。
@@ -442,7 +459,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       // a newer request already owns.
       if (!reuseBefore && !identical(before, _before)) before.dispose();
       // #58 レビュー SHOULD-2: `rendererInput` は clone された時点でこの呼び出し
-      // だけが所有する私有オブジェクト。`after` と同一（filterType == none で
+      // だけが所有する私有オブジェクト。`after` と同一（filter == null で
       // clone がそのまま返った場合）でも無条件に dispose する — 「同一なら
       // どちらかに任せる」という以前の条件分岐は、両方の条件が同時に false に
       // なる組み合わせで dispose 漏れ（リーク）を起こしていた。
@@ -461,8 +478,8 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     setState(() {
       _before = before;
       _after = after;
-      _afterFilterType = widget.filterType; // #85 レビュー S8
-      _afterStrength = widget.intensity; // #85 レビュー S8
+      _afterFilterId = widget.filterId; // #85 レビュー S8, #60
+      _afterStrength = widget.strength; // #85 レビュー S8
       _currentSampleSize = sampleSize;
       _loading = false;
       _failed = false; // #58 レビュー SHOULD-1: 成功したら失敗表示を解除する。
@@ -471,13 +488,13 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     if (clonedInput && !identical(rendererInput, after)) {
       // The clone only exists to protect the renderer call; it never becomes
       // the new `_after` unless the renderer returned it unchanged
-      // (filterType == none), so dispose it now.
+      // (filter == null), so dispose it now.
       rendererInput.dispose();
     }
     if (!identical(oldBefore, before)) {
       oldBefore?.dispose();
     }
-    // _after may alias _before (filterType == none) or the old _before —
+    // _after may alias _before (filter == null) or the old _before —
     // avoid double-disposing either.
     if (oldAfter != null &&
         !identical(oldAfter, oldBefore) &&
@@ -489,7 +506,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   @override
   void dispose() {
     _before?.dispose();
-    // _after may alias _before (when filterType == none); avoid double dispose.
+    // _after may alias _before (when filter == null); avoid double dispose.
     if (!identical(_after, _before)) {
       _after?.dispose();
     }
@@ -503,18 +520,22 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// クリップボードへコピーし、SnackBar で結果を知らせる。画像そのものの
   /// クリップボード書き込みはプラグインを要し環境変更になるため非スコープ。
   ///
-  /// #85 レビュー S8: caption は [_afterFilterType]/[_afterStrength]（`_after`
-  /// を描画した時点の値）から作る。`widget.filterType`/`widget.intensity`
+  /// #85 レビュー S8: caption は [_afterFilterId]/[_afterStrength]（`_after`
+  /// を描画した時点の値）から作る。`widget.filterId`/`widget.strength`
   /// （呼び出し時点の *現在* の値）を使うと、export をタップした瞬間までに
   /// スライダー操作で widget の props が先に進んでいた場合、表示中（＝実際に
   /// エクスポートされる）画像とは異なる caption を焼き込んでしまう。
+  ///
+  /// [_afterFilterId] は「原画（何も選択していない）」を描画したときも
+  /// `null` になり得る（#60）。「まだ一度も描画していない」との区別には
+  /// [_afterStrength]（成功描画のたびに必ず非 null になる）を使う。
   Future<void> _export(AppLocalizations l10n) async {
     final base = _after;
-    final filterType = _afterFilterType;
     final strength = _afterStrength;
-    if (base == null || filterType == null || strength == null || _exporting) {
+    if (base == null || strength == null || _exporting) {
       return;
     }
+    final filterId = _afterFilterId;
     setState(() => _exporting = true);
 
     final messenger = ScaffoldMessenger.of(context);
@@ -526,9 +547,9 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       // sensus advanced フィルタ（緑内障等）の live export に拡張する際は、ここで
       // `consultMessageForUrgency(...)` を解決して `urgencyMessage` に渡せる（拡張ポイント）。
       final caption = ExportCaption(
-        symptomLabel: filterType == ColorVisionType.none
+        symptomLabel: filterId == null
             ? l10n.previewPaneOriginal
-            : colorVisionTypeName(l10n, filterType),
+            : visionFilterName(l10n, filterId),
         strengthLabel: l10n.strengthLabel(strengthPercent),
         isoDate: date,
       );
@@ -545,7 +566,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       }
 
       final filename = exportFilename(
-        symptomId: filterType.id,
+        symptomId: filterId ?? 'none',
         strengthPercent: strengthPercent,
         isoDate: date,
       );
@@ -602,19 +623,24 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         );
         // #58 レビュー SHOULD-1: 最新世代が失敗した場合は _failed が立ち、
         // _after は null にされている。stale/不整合な画像を出し続けるより
-        // 失敗を明示する。全 ColorVisionType が実描画対応済み（#59、#85 で CPU
-        // 経路に切替）なので、失敗以外で `_after` が null のまま安定することは
-        // ない（一度も成功して
+        // 失敗を明示する。全 30 種が実描画対応済み（#59/#85 で CPU 経路に切替、
+        // #60 で advanced カタログ・プリセットも結線）なので、失敗以外で
+        // `_after` が null のまま安定することはない（一度も成功して
         // いなければこの分岐に来る前に上の `_loading` ガードで preparing 表示に
         // なる）。それでも [_ImageView] 自身が null を安全に扱うため、二分岐で
         // 十分（「描画は近日対応」プレースホルダは #86 レビューで YAGNI 判定・撤去）。
         final Widget afterChild = _failed
             ? _ErrorPlaceholder(theme: theme, label: l10n.previewFailed)
             : _ImageView(image: _after);
+        // #60: after ペインの見出し・時間依存の注記は widget.filterId（カタログ
+        // id）からカタログを引いて解決する。カタログの l10n 名が唯一の正本
+        // （色覚クイック選択で選んだ場合も同じ id・同じ名前になる）。
+        final entry =
+            widget.filterId == null ? null : kVisionFilterCatalogById[widget.filterId];
         final afterPane = _Pane(
-          label: widget.filterType == ColorVisionType.none
+          label: entry == null
               ? l10n.previewPaneOriginal
-              : colorVisionTypeName(l10n, widget.filterType),
+              : visionFilterName(l10n, entry.id),
           // Export is only meaningful when a real "after" image exists.
           // The failed state (null _after) gets no button.
           trailing: _after != null
@@ -629,19 +655,40 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
           child: afterChild,
         );
 
-        if (stackVertically) {
+        final Widget panes = stackVertically
+            ? Column(
+                children: [beforePane, const SizedBox(height: 12), afterPane],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: beforePane),
+                  const SizedBox(width: 12),
+                  Expanded(child: afterPane),
+                ],
+              );
+
+        // #60: vertigo / bppv_rotation のような時間依存フィルタは、CPU
+        // プレビュー（時刻を受け取らず常に同じ内部時刻で描画する、
+        // `CpuVisionRenderer` の doc 参照）では静止フレームにしかならない。
+        // その旨を短く注記する。
+        if (entry?.isTimeDependent ?? false) {
           return Column(
-            children: [beforePane, const SizedBox(height: 12), afterPane],
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              panes,
+              const SizedBox(height: 8),
+              Text(
+                l10n.previewStaticFrameNote,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
           );
         }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: beforePane),
-            const SizedBox(width: 12),
-            Expanded(child: afterPane),
-          ],
-        );
+        return panes;
       },
     );
   }

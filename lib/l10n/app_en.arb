@@ -28,7 +28,7 @@
   "@aboutBody": {
     "description": "First paragraph of the About dialog."
   },
-  "aboutPhases": "Phase 1: Color vision deficiency simulation\nPhase 2: Hearing impairment simulation (coming soon)\nPhase 3: Other ways of seeing beyond color — visual field loss, blur, and more (already selectable under Advanced; on-screen rendering is being extended)",
+  "aboutPhases": "Phase 1: Color vision deficiency simulation\nPhase 2: Hearing impairment simulation (coming soon)\nPhase 3: Other ways of seeing beyond color — visual field loss, blur, and more (selectable under Advanced, with a live preview)",
   "@aboutPhases": {
     "description": "Roadmap paragraph of the About dialog. Newline-separated phase list."
   },
@@ -111,12 +111,16 @@
   "@previewFailed": {
     "description": "Shown in the 'after' pane when generating or rendering the latest preview failed (#58)."
   },
+  "previewStaticFrameNote": "This is a time-based effect; the preview shows a single still frame rather than the motion.",
+  "@previewStaticFrameNote": {
+    "description": "Shown under the preview panes when the selected filter is time-dependent (e.g. vertigo, BPPV rotation) and the static preview can't show its motion (#60)."
+  },
 
   "advancedSectionTitle": "Advanced (all sensus filters)",
   "@advancedSectionTitle": {
     "description": "Title of the advanced section listing all 30 sensus filters."
   },
-  "advancedSectionNote": "Pick from all 30 ways of seeing that sensus exposes, grouped by category, and adjust their parameters. Live on-screen rendering for the filter you pick is being rolled out.",
+  "advancedSectionNote": "Pick from all 30 ways of seeing that sensus exposes, grouped by category, and adjust their parameters. What you pick is reflected in the preview above.",
   "@advancedSectionNote": {
     "description": "Explanatory note under the advanced section."
   },
