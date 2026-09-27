@@ -525,11 +525,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 class RustLibWire implements BaseWire {
   RustLibWire.fromExternalLibrary(ExternalLibrary lib);
 
-  JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
-      wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(JSAny filter,
-              JSAny rgba8, int width, int height, double strength) =>
-          wasmModule.wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
-              filter, rgba8, width, height, strength);
+  void wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
+          NativePortType port_,
+          JSAny filter,
+          JSAny rgba8,
+          int width,
+          int height,
+          double strength) =>
+      wasmModule.wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
+          port_, filter, rgba8, width, height, strength);
 
   JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
       wire__crate__api__sensus_bridge__experiences() =>
@@ -558,9 +562,13 @@ external RustLibWasmModule get wasmModule;
 @JS()
 @anonymous
 extension type RustLibWasmModule._(JSObject _) implements JSObject {
-  external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
-      wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
-          JSAny filter, JSAny rgba8, int width, int height, double strength);
+  external void wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
+      NativePortType port_,
+      JSAny filter,
+      JSAny rgba8,
+      int width,
+      int height,
+      double strength);
 
   external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
       wire__crate__api__sensus_bridge__experiences();

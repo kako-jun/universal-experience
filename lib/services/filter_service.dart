@@ -40,6 +40,43 @@ double recommendedStrength(ColorVisionType type) {
   }
 }
 
+/// [ColorVisionType] → sensus [VisionFilter] の対応表（単一の正本）。
+///
+/// [type] が [ColorVisionType.none] なら null。
+///
+/// 契約（anomaly）: anomaly 型（protanomaly / deuteranomaly / tritanomaly）は、
+/// 対応する -opia 型（base）と **同一の** VisionFilter を返す。anomaly と opia の
+/// 違いは、この関数ではなく **レンダリング時の strength（[recommendedStrength]
+/// / [FilterService.intensity]）** でのみ表現される。すなわち anomaly では
+/// strength < 1（推奨値 [kAnomalyDefaultSeverity] = 0.6）を渡す責務が
+/// **呼び出し側** にある。
+///
+/// [FilterService.sensusFilter] と before/after プレビューの CPU レンダラ
+/// （`lib/rendering/cpu_vision_renderer.dart` 経由、#85）の双方がこの対応表を
+/// 参照する。片方だけが対応表を持つと、色覚クイック選択とプレビュー描画で
+/// 別々のフィルタが適用されるバグ（#52 と同種）を起こしうるため、ここ 1 箇所に
+/// 集約する。
+VisionFilter? visionFilterForColorVisionType(ColorVisionType type) {
+  switch (type) {
+    case ColorVisionType.none:
+      return null;
+    // protanopia / protanomaly は同一の変換を返す。強度差は strength（intensity）で表現。
+    case ColorVisionType.protanopia:
+    case ColorVisionType.protanomaly:
+      return const VisionFilter.protanopia();
+    // deuteranopia / deuteranomaly は同一の変換を返す。強度差は strength（intensity）で表現。
+    case ColorVisionType.deuteranopia:
+    case ColorVisionType.deuteranomaly:
+      return const VisionFilter.deuteranopia();
+    // tritanopia / tritanomaly は同一の変換を返す。強度差は strength（intensity）で表現。
+    case ColorVisionType.tritanopia:
+    case ColorVisionType.tritanomaly:
+      return const VisionFilter.tritanopia();
+    case ColorVisionType.achromatopsia:
+      return const VisionFilter.achromatopsia();
+  }
+}
+
 /// 色覚フィルタの選択状態を保持するサービス。
 ///
 /// **アルゴリズムは持たない**。色覚変換の正本は sensus-core crate にあり、ue は
@@ -128,34 +165,12 @@ class FilterService extends ChangeNotifier {
 
   /// 現在選択中のタイプに対応する sensus の [VisionFilter]。
   ///
-  /// none の場合は null。
-  ///
-  /// 契約（anomaly）: anomaly 型（protanomaly / deuteranomaly / tritanomaly）は、
-  /// 対応する -opia 型（base）と **同一の** VisionFilter を返す。anomaly と opia の
-  /// 違いは、この getter ではなく **レンダリング時の strength（[intensity]）** でのみ
-  /// 表現される。すなわち anomaly では intensity < 1（推奨値 [anomalyDefaultSeverity]
-  /// = 0.6）を渡す責務が **呼び出し側** にある。[intensity] は #57 よりタイプごとに
-  /// 記憶されるため、protanomaly を選んだ時点で自動的に 0.6 が使われる。
-  VisionFilter? get sensusFilter {
-    switch (_currentFilter) {
-      case ColorVisionType.none:
-        return null;
-      // protanopia / protanomaly は同一の変換を返す。強度差は strength（intensity）で表現。
-      case ColorVisionType.protanopia:
-      case ColorVisionType.protanomaly:
-        return const VisionFilter.protanopia();
-      // deuteranopia / deuteranomaly は同一の変換を返す。強度差は strength（intensity）で表現。
-      case ColorVisionType.deuteranopia:
-      case ColorVisionType.deuteranomaly:
-        return const VisionFilter.deuteranopia();
-      // tritanopia / tritanomaly は同一の変換を返す。強度差は strength（intensity）で表現。
-      case ColorVisionType.tritanopia:
-      case ColorVisionType.tritanomaly:
-        return const VisionFilter.tritanopia();
-      case ColorVisionType.achromatopsia:
-        return const VisionFilter.achromatopsia();
-    }
-  }
+  /// [visionFilterForColorVisionType] への委譲（#85: before/after プレビュー
+  /// の CPU レンダラ（`lib/rendering/cpu_vision_renderer.dart`）も同じ対応表を
+  /// 使うため、`FilterService` インスタンスを介さず引ける形にトップレベル関数へ
+  /// 切り出してある。対応の中身・契約はそちらの doc を参照）。
+  VisionFilter? get sensusFilter =>
+      visionFilterForColorVisionType(_currentFilter);
 
   /// 永続化されている per-type intensity（[keyIntensityByType]）を読み込む。
   ///

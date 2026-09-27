@@ -49,6 +49,17 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      # FRB codegen のドリフト検証（lib/src/rust/ と rust/src/frb_generated.rs が
+      # rust/src/api/ の Rust コードと同期していること）は #85 レビュー N4 で
+      # 一度追加したが、CI (macOS runner) の `flutter_rust_bridge_codegen
+      # generate` が原因未特定のまま毎回ハングする（cargo-expand の自動
+      # インストール成功後、MIR パーサのログ行まで到達した直後から応答が
+      # 完全に止まる。ローカルでは同じコマンドが2秒未満で完了し再現しない。
+      # `timeout-minutes: 10` を付けても短縮されるだけで解消しなかった）ため、
+      # ステップごと撤去した。詳細な調査結果・再挑戦の方針は #88 を参照。
+      # 現状 CI ではこのドリフトを検知しない（手動での
+      # `flutter_rust_bridge_codegen generate` 実行 + レビューに依存する）。
+
       # shaders/*.frag・pubspec.yaml の shaders: ブロックが tools/sensus_shaders.g.json
       # と同期していることを明示的に確認する（#56）。test/shader_codegen_test.dart
       # も同じ --check を内部で回すが、ドリフトの原因切り分けをしやすくするため
@@ -105,6 +116,11 @@ jobs:
 
       - name: Flutter integration test (macos, app_bootstrap_test)
         run: flutter test integration_test/app_bootstrap_test.dart -d macos
+
+      # プレビューの正本経路になった CPU apply()（#85）が kVisionFilterCatalog
+      # 全 30 種で実ブリッジ経由で例外なく動くことを確認する。
+      - name: Flutter integration test (macos, cpu_preview_all_filters_test)
+        run: flutter test integration_test/cpu_preview_all_filters_test.dart -d macos
 
   # Linux でも cargokit (#55) が rust/ crate を実際にビルドして同梱することを
   # 検証する。macOS の `check` job は golden テスト用に必須だが、Linux 側の
@@ -191,3 +207,8 @@ jobs:
 
       - name: Flutter integration test (linux, app_bootstrap_test)
         run: xvfb-run -a flutter test integration_test/app_bootstrap_test.dart -d linux
+
+      # プレビューの正本経路になった CPU apply()（#85）が kVisionFilterCatalog
+      # 全 30 種で実ブリッジ経由で例外なく動くことを確認する（macOS 側と対）。
+      - name: Flutter integration test (linux, cpu_preview_all_filters_test)
+        run: xvfb-run -a flutter test integration_test/cpu_preview_all_filters_test.dart -d linux

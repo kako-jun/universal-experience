@@ -7,15 +7,38 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
+import 'package:universal_experience/services/export_service.dart';
 import 'package:universal_experience/services/filter_service.dart';
+import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 
 /// BeforeAfterView の before/after 生成ロジックと描画カバレッジのテスト（#17）。
 ///
 /// 静的ヘルパ（generateSampleImage / renderAfter）を直接検証する。全
-/// ColorVisionType が ShaderFilter 経由で実描画される（#59。`canRender` と
-/// 「描画は近日対応」プレースホルダは、到達しなくなったため #86 レビューで
-/// 撤去した）。
+/// ColorVisionType が実描画される（#59 で GPU、#85 で sensus の CPU `apply()`
+/// 経路に切替。`canRender` と「描画は近日対応」プレースホルダは、到達しなくなった
+/// ため #86 レビューで撤去した）。
+///
+/// `renderAfter` は実ブリッジ（`applyVisionCpuRgba8`）を必要とする
+/// [CpuVisionRenderer.applier] へ委譲するため（#85）、`flutter test`（native lib
+/// 未ロード）では実際の CPU 描画は呼べない。`group('renderAfter', ...)` は
+/// [CpuVisionRenderer.applier] をフェイクに差し替え、`ColorVisionType` →
+/// `VisionFilter` のマッピング契約（#57/#59 の不変条件も含む）を検証する。
+/// 実ブリッジでの実描画は `integration_test/cpu_preview_all_filters_test.dart`
+/// （CI）が担う。
+///
+/// #85 レビュー S3/S4 で以下を変更した:
+/// - CPU プレビューは固定の正準サイズ（[BeforeAfterView.canonicalSampleSize]）
+///   で描画し、ペインの論理サイズ・devicePixelRatio には依存しない。旧
+///   `group('自動サイズ調整 (#58: Retina 対策)', ...)`（DPR 連動・リサイズの
+///   デバウンス）はこの仕様変更で丸ごと不要になったため削除した。
+/// - 連続する `_rebuild` 要求は 1 本だけ実行し、後続は最新の 1 件だけ保留する
+///   （[BeforeAfterView] の `_scheduleRebuild`）。これにより、旧
+///   `sampleImageGenerator`/`afterImageRenderer` を使った「複数の要求が本当に
+///   同時に実行中」を前提にしたテスト（追い越し・discard 経路）の一部は、
+///   その状況自体がもう production コードから起こり得なくなったため、
+///   直列化を確認する形に書き換えるか削除した（該当箇所にコメントで残す）。
 
 /// `_rebuild` は例外を `FlutterError.reportError` で報告するようになった
 /// （#58 レビュー nit-1）。意図的に失敗を起こすテストがそれで落ちないよう、
@@ -50,129 +73,124 @@ void main() {
 
   group('renderAfter', () {
     late ui.Image src;
+    late ui.Image fakeOut;
 
     setUp(() async {
-      src = await BeforeAfterView.generateSampleImage(64);
+      src = await BeforeAfterView.generateSampleImage(4);
+      fakeOut = await BeforeAfterView.generateSampleImage(4);
     });
 
     tearDown(() {
       src.dispose();
+      if (!identical(fakeOut, src)) fakeOut.dispose();
+      // #85: renderAfter は CpuVisionRenderer.applier（実ブリッジ必須）へ委譲する
+      // ため、各テストで差し替えたフェイクを既定へ戻す。
+      CpuVisionRenderer.applier = CpuVisionRenderer.apply;
     });
 
-    test('none は元画像をそのまま返す', () async {
+    test('none は CpuVisionRenderer を呼ばず元画像をそのまま返す', () async {
+      var called = false;
+      CpuVisionRenderer.applier = (source, filter, strength) async {
+        called = true;
+        return fakeOut;
+      };
+
       final out = await BeforeAfterView.renderAfter(
         src,
         ColorVisionType.none,
         1.0,
       );
       expect(identical(out, src), isTrue);
-    });
-
-    test('protanopia は GPU 実描画で after 画像を生成する', () async {
-      final out = await BeforeAfterView.renderAfter(
-        src,
-        ColorVisionType.protanopia,
-        1.0,
-      );
-      expect(out, isNotNull);
-      expect(out!.width, 64);
-      expect(out.height, 64);
-
-      // after が原画と異なる（実際にフィルタが効いている）ことを確認。
-      final beforePng = await encodeImagePng(src);
-      final afterPng = await encodeImagePng(out);
-      expect(beforePng, isNotNull);
-      expect(afterPng, isNotNull);
-      expect(afterPng, isNot(equals(beforePng)));
-      out.dispose();
-    });
-
-    test('protanomaly も protanopia 経路で描画できる', () async {
-      final out = await BeforeAfterView.renderAfter(
-        src,
-        ColorVisionType.protanomaly,
-        0.6,
-      );
-      expect(out, isNotNull);
-      out!.dispose();
+      expect(called, isFalse, reason: 'none はフィルタなしなので CPU レンダラを呼ぶ必要がない');
     });
 
     test(
-        'protanomaly は推奨強度（0.6）で描画すると protanopia（1.0）と出力が異なる '
-        '（#57: 以前は両方とも intensity 1.0 で描画され同一の見た目になっていた）', () async {
-      final protanopiaOut = await BeforeAfterView.renderAfter(
+        'protanopia は VisionFilter.protanopia() と指定 strength で '
+        'CpuVisionRenderer.applier を呼ぶ', () async {
+      VisionFilter? capturedFilter;
+      double? capturedStrength;
+      ui.Image? capturedSource;
+      CpuVisionRenderer.applier = (source, filter, strength) async {
+        capturedSource = source;
+        capturedFilter = filter;
+        capturedStrength = strength;
+        return fakeOut;
+      };
+
+      final out = await BeforeAfterView.renderAfter(
         src,
         ColorVisionType.protanopia,
-        recommendedStrength(ColorVisionType.protanopia),
+        0.75,
       );
-      final protanomalyOut = await BeforeAfterView.renderAfter(
-        src,
-        ColorVisionType.protanomaly,
-        recommendedStrength(ColorVisionType.protanomaly),
-      );
-      expect(protanopiaOut, isNotNull);
-      expect(protanomalyOut, isNotNull);
-
-      final protanopiaPng = await encodeImagePng(protanopiaOut!);
-      final protanomalyPng = await encodeImagePng(protanomalyOut!);
-      expect(protanopiaPng, isNotNull);
-      expect(protanomalyPng, isNotNull);
-      expect(protanomalyPng, isNot(equals(protanopiaPng)));
-
-      protanopiaOut.dispose();
-      protanomalyOut.dispose();
+      expect(identical(out, fakeOut), isTrue);
+      expect(identical(capturedSource, src), isTrue);
+      expect(capturedFilter, const VisionFilter.protanopia());
+      expect(capturedStrength, 0.75);
     });
 
-    test('deuteranopia / tritanopia / achromatopsia も GPU 実描画で after 画像を'
-        '生成する（#59）', () async {
-      for (final type in [
-        ColorVisionType.deuteranopia,
-        ColorVisionType.tritanopia,
-        ColorVisionType.achromatopsia,
-      ]) {
-        final out = await BeforeAfterView.renderAfter(src, type, 1.0);
-        expect(out, isNotNull, reason: '$type');
-        expect(out!.width, 64, reason: '$type');
-        expect(out.height, 64, reason: '$type');
+    test(
+        'protanomaly は protanopia と同一の VisionFilter にマップされる '
+        '（#57: 強度差のみで区別する契約。マッピング自体が strength に依存して '
+        '分岐してはいけない）', () async {
+      VisionFilter? capturedFilter;
+      double? capturedStrength;
+      CpuVisionRenderer.applier = (source, filter, strength) async {
+        capturedFilter = filter;
+        capturedStrength = strength;
+        return fakeOut;
+      };
 
-        final beforePng = await encodeImagePng(src);
-        final afterPng = await encodeImagePng(out);
-        expect(afterPng, isNot(equals(beforePng)), reason: '$type');
-        out.dispose();
+      await BeforeAfterView.renderAfter(
+        src,
+        ColorVisionType.protanomaly,
+        kAnomalyDefaultSeverity,
+      );
+      expect(capturedFilter, const VisionFilter.protanopia());
+      expect(capturedStrength, kAnomalyDefaultSeverity);
+    });
+
+    test(
+        'deuteranopia / tritanopia / achromatopsia もそれぞれ対応する '
+        'VisionFilter にマップされる（#59）', () async {
+      final expected = <ColorVisionType, VisionFilter>{
+        ColorVisionType.deuteranopia: const VisionFilter.deuteranopia(),
+        ColorVisionType.tritanopia: const VisionFilter.tritanopia(),
+        ColorVisionType.achromatopsia: const VisionFilter.achromatopsia(),
+      };
+      for (final entry in expected.entries) {
+        VisionFilter? capturedFilter;
+        CpuVisionRenderer.applier = (source, filter, strength) async {
+          capturedFilter = filter;
+          return fakeOut;
+        };
+
+        final out = await BeforeAfterView.renderAfter(src, entry.key, 1.0);
+        expect(identical(out, fakeOut), isTrue, reason: '${entry.key}');
+        expect(capturedFilter, entry.value, reason: '${entry.key}');
       }
     });
 
     test(
-        'deuteranomaly/tritanomaly は推奨強度で描画すると対応する -opia（1.0）と '
-        '出力が異なる（#59。#57 の protanomaly と同じ不変条件を残り2型にも広げる）',
-        () async {
-      final pairs = <ColorVisionType, ColorVisionType>{
-        ColorVisionType.deuteranomaly: ColorVisionType.deuteranopia,
-        ColorVisionType.tritanomaly: ColorVisionType.tritanopia,
+        'deuteranomaly/tritanomaly はそれぞれ対応する -opia と同一の '
+        'VisionFilter にマップされる（#59。#57 の protanomaly と同じ不変条件を '
+        '残り2型にも広げる）', () async {
+      final pairs = <ColorVisionType, VisionFilter>{
+        ColorVisionType.deuteranomaly: const VisionFilter.deuteranopia(),
+        ColorVisionType.tritanomaly: const VisionFilter.tritanopia(),
       };
       for (final entry in pairs.entries) {
-        final anomalyType = entry.key;
-        final opiaType = entry.value;
+        VisionFilter? capturedFilter;
+        CpuVisionRenderer.applier = (source, filter, strength) async {
+          capturedFilter = filter;
+          return fakeOut;
+        };
 
-        final opiaOut = await BeforeAfterView.renderAfter(
+        await BeforeAfterView.renderAfter(
           src,
-          opiaType,
-          recommendedStrength(opiaType),
+          entry.key,
+          recommendedStrength(entry.key),
         );
-        final anomalyOut = await BeforeAfterView.renderAfter(
-          src,
-          anomalyType,
-          recommendedStrength(anomalyType),
-        );
-        expect(opiaOut, isNotNull, reason: '$opiaType');
-        expect(anomalyOut, isNotNull, reason: '$anomalyType');
-
-        final opiaPng = await encodeImagePng(opiaOut!);
-        final anomalyPng = await encodeImagePng(anomalyOut!);
-        expect(anomalyPng, isNot(equals(opiaPng)), reason: '$anomalyType');
-
-        opiaOut.dispose();
-        anomalyOut.dispose();
+        expect(capturedFilter, entry.value, reason: '${entry.key}');
       }
     });
   });
@@ -210,41 +228,55 @@ void main() {
           home: Scaffold(body: child),
         );
 
-    testWidgets('protanopia で原画ラベルとフィルタ名ラベルの両ペインを出す', (tester) async {
-      await tester.pumpWidget(
-        localized(
-          const BeforeAfterView(
-            filterType: ColorVisionType.protanopia,
-            intensity: 1.0,
-            sampleSize: 32,
+    group('ラベル表示', () {
+      // #85: renderAfter の既定実装は実ブリッジ必須の CpuVisionRenderer.applier
+      // へ委譲するため、`flutter test`（native lib 未ロード）ではフェイクに
+      // 差し替える。ここではラベル表示（`_after` が非 null になること）だけを
+      // 見たいので、フェイクは source をそのまま返すだけでよい（実描画・実ブリッジの
+      // 検証は integration_test/cpu_preview_all_filters_test.dart の役割）。
+      setUp(() {
+        CpuVisionRenderer.applier = (source, filter, strength) async => source;
+      });
+      tearDown(() {
+        CpuVisionRenderer.applier = CpuVisionRenderer.apply;
+      });
+
+      testWidgets('protanopia で原画ラベルとフィルタ名ラベルの両ペインを出す', (tester) async {
+        await tester.pumpWidget(
+          localized(
+            const BeforeAfterView(
+              filterType: ColorVisionType.protanopia,
+              intensity: 1.0,
+              sampleSize: 32,
+            ),
           ),
-        ),
-      );
-      final protoName = colorVisionTypeName(en, ColorVisionType.protanopia);
-      await pumpUntilText(tester, protoName);
+        );
+        final protoName = colorVisionTypeName(en, ColorVisionType.protanopia);
+        await pumpUntilText(tester, protoName);
 
-      expect(find.text(en.previewPaneOriginal), findsOneWidget);
-      expect(find.text(protoName), findsOneWidget);
-    });
+        expect(find.text(en.previewPaneOriginal), findsOneWidget);
+        expect(find.text(protoName), findsOneWidget);
+      });
 
-    testWidgets(
-        'deuteranopia でも原画ラベルとフィルタ名ラベルの両ペインを出す'
-        '（#59: renderAfter の対象拡大）', (tester) async {
-      await tester.pumpWidget(
-        localized(
-          const BeforeAfterView(
-            filterType: ColorVisionType.deuteranopia,
-            intensity: 1.0,
-            sampleSize: 32,
+      testWidgets(
+          'deuteranopia でも原画ラベルとフィルタ名ラベルの両ペインを出す'
+          '（#59: renderAfter の対象拡大）', (tester) async {
+        await tester.pumpWidget(
+          localized(
+            const BeforeAfterView(
+              filterType: ColorVisionType.deuteranopia,
+              intensity: 1.0,
+              sampleSize: 32,
+            ),
           ),
-        ),
-      );
-      final deuteranopiaName =
-          colorVisionTypeName(en, ColorVisionType.deuteranopia);
-      await pumpUntilText(tester, deuteranopiaName);
+        );
+        final deuteranopiaName =
+            colorVisionTypeName(en, ColorVisionType.deuteranopia);
+        await pumpUntilText(tester, deuteranopiaName);
 
-      expect(find.text(en.previewPaneOriginal), findsOneWidget);
-      expect(find.text(deuteranopiaName), findsOneWidget);
+        expect(find.text(en.previewPaneOriginal), findsOneWidget);
+        expect(find.text(deuteranopiaName), findsOneWidget);
+      });
     });
 
     // #58: プレビューが GPU 画像をリークする／古い結果で上書きされる／Retina で
@@ -262,19 +294,27 @@ void main() {
         afterImageRenderer = BeforeAfterView.renderAfter;
       });
 
-      testWidgets('連続更新では最新の結果だけが残り、追い越された結果は dispose される', (tester) async {
+      // #85 レビュー S3: `_scheduleRebuild` が実行を直列化する（同時に走る
+      // ジョブは常に1本）ようになったため、以前このテストが前提にしていた
+      // 「3件が本当に同時に in-flight」という状況はもう production コードから
+      // 起こり得ない。2回目・3回目の要求は最新の1件だけが集約され、1回目が
+      // 完了してから走る。
+      testWidgets(
+          '連続更新では中間の要求は集約され、最終的に最新の結果だけが残る '
+          '(#85 レビュー S3)', (tester) async {
         late ui.Image before1;
-        late ui.Image afterOld, afterMid, afterNew;
+        late ui.Image afterA, afterB;
         await tester.runAsync(() async {
           before1 = await BeforeAfterView.generateSampleImage(4);
-          afterOld = await BeforeAfterView.generateSampleImage(4);
-          afterMid = await BeforeAfterView.generateSampleImage(4);
-          afterNew = await BeforeAfterView.generateSampleImage(4);
+          afterA = await BeforeAfterView.generateSampleImage(4);
+          afterB = await BeforeAfterView.generateSampleImage(4);
         });
         sampleImageGenerator = (size) => Future.value(before1);
 
         final completers = <Completer<ui.Image?>>[];
+        final capturedStrengths = <double>[];
         afterImageRenderer = (source, type, strength) {
+          capturedStrengths.add(strength);
           final c = Completer<ui.Image?>();
           completers.add(c);
           return c.future;
@@ -288,32 +328,86 @@ void main() {
               ),
             );
 
-        // 3回連続で更新する（インテンシティのスライダー操作を想定）。まだ
-        // どの要求も解決していない状態を作る。
+        // 3回連続で更新する（インテンシティのスライダー操作を想定）。1回目の
+        // 要求だけが実際に in-flight になり、2・3回目は集約されて1件だけ
+        // 保留される。
         await tester.pumpWidget(build(0.1));
         await tester.pump();
         await tester.pumpWidget(build(0.2));
         await tester.pump();
         await tester.pumpWidget(build(0.3));
         await tester.pump();
-        expect(completers.length, 3);
+        expect(completers.length, 1, reason: '2・3回目は集約され、実際にはまだ呼ばれていない');
 
-        // 遅い結果が後から届く状況を作る: 最新の要求を最初に解決し、
-        // 最も古い要求を最後に解決する。
-        completers[2].complete(afterNew);
+        // 1回目（intensity=0.1）を解決する。集約された保留分（最新の
+        // intensity=0.3 を使う）が続けて自動的に走り始める。
+        completers[0].complete(afterA);
         await tester.pump();
-        completers[0].complete(afterOld);
         await tester.pump();
-        completers[1].complete(afterMid);
+        expect(completers.length, 2, reason: '1回目の完了を受けて保留していた最新の要求が走り始める');
+        expect(capturedStrengths, [0.1, 0.3],
+            reason: '保留分は要求時点(0.2)ではなく実行時点の最新値(0.3)を使う');
+        expect(afterA.debugDisposed, isFalse,
+            reason: '2件目の解決前は1回目の結果が表示されたままになる（集約の許容する遷移）');
+
+        // 2回目（実際には intensity=0.3 用）を解決する。
+        completers[1].complete(afterB);
         await tester.pump();
 
-        expect(afterNew.debugDisposed, isFalse, reason: '最新の結果は表示されたままであるべき');
-        expect(afterOld.debugDisposed, isTrue,
-            reason: '追い越された古い結果は dispose されるべき');
-        expect(afterMid.debugDisposed, isTrue,
-            reason: '追い越された古い結果は dispose されるべき');
+        expect(afterB.debugDisposed, isFalse, reason: '最新の結果は表示されたままであるべき');
+        expect(afterA.debugDisposed, isTrue,
+            reason: '差し替えられた旧結果は dispose されるべき');
         expect(before1.debugDisposed, isFalse,
             reason: '_before はどの更新でも再利用され続けている');
+      });
+
+      testWidgets(
+          'スライダーを連続で変化させても、同時に実行される afterImageRenderer は '
+          '1本を超えない (#85 レビュー S3)', (tester) async {
+        late ui.Image before1;
+        final afterImages = <double, ui.Image>{};
+        await tester.runAsync(() async {
+          before1 = await BeforeAfterView.generateSampleImage(4);
+          for (final v in [0.1, 0.2, 0.3, 0.4, 0.5]) {
+            afterImages[v] = await BeforeAfterView.generateSampleImage(4);
+          }
+        });
+        sampleImageGenerator = (size) => Future.value(before1);
+
+        var activeCount = 0;
+        var maxActiveCount = 0;
+        final calledStrengths = <double>[];
+        afterImageRenderer = (source, type, strength) async {
+          activeCount++;
+          if (activeCount > maxActiveCount) maxActiveCount = activeCount;
+          calledStrengths.add(strength);
+          // 他の要求が（誤って）同時に割り込めるかどうかを検知するため、
+          // 実処理っぽく一度イベントループへ制御を返す。
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+          activeCount--;
+          return afterImages[strength];
+        };
+
+        Widget build(double intensity) => localized(
+              BeforeAfterView(
+                filterType: ColorVisionType.protanopia,
+                intensity: intensity,
+                sampleSize: 16,
+              ),
+            );
+
+        for (final v in [0.1, 0.2, 0.3, 0.4, 0.5]) {
+          await tester.pumpWidget(build(v));
+          await tester.pump();
+        }
+        // 保留中のジョブが順に流れ切るまでポンプする。
+        for (var i = 0; i < 20; i++) {
+          await tester.pump(const Duration(milliseconds: 10));
+        }
+
+        expect(maxActiveCount, lessThanOrEqualTo(1),
+            reason: '同時に実行される afterImageRenderer 呼び出しは1本を超えてはいけない');
+        expect(calledStrengths.last, 0.5, reason: '最終的には最新の intensity が反映される');
       });
 
       testWidgets(
@@ -408,55 +502,16 @@ void main() {
         expect(before1.debugDisposed, isTrue);
       });
 
-      testWidgets(
-          'auto モードで初回生成が完了する前に filterType が変わっても、最新の結果だけが残る '
-          '(#58 レビュー M1)', (tester) async {
-        late ui.Image before1, afterOld, afterNew;
-        await tester.runAsync(() async {
-          before1 = await BeforeAfterView.generateSampleImage(4);
-          afterOld = await BeforeAfterView.generateSampleImage(4);
-          afterNew = await BeforeAfterView.generateSampleImage(4);
-        });
-        sampleImageGenerator = (size) => Future.value(before1);
-
-        final completers = <Completer<ui.Image?>>[];
-        afterImageRenderer = (source, type, strength) {
-          final c = Completer<ui.Image?>();
-          completers.add(c);
-          return c.future;
-        };
-
-        tester.view.physicalSize = const Size(1000, 800);
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.reset);
-
-        // sampleSize 未指定 = auto モード。初回生成の renderer がまだ解決して
-        // いないうちに filterType を変える。
-        await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 1.0,
-        )));
-        await tester.pump();
-        expect(completers.length, 1);
-
-        await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.deuteranopia,
-          intensity: 1.0,
-        )));
-        await tester.pump();
-        expect(completers.length, 2,
-            reason: '修正前は _currentSampleSize が null のため didUpdateWidget が '
-                'size=null で再生成をスキップしていた（古いフィルタの結果が残る）');
-
-        // 遅い方（1つ目）が後から届く。
-        completers[1].complete(afterNew);
-        await tester.pump();
-        completers[0].complete(afterOld);
-        await tester.pump();
-
-        expect(afterNew.debugDisposed, isFalse);
-        expect(afterOld.debugDisposed, isTrue);
-      });
+      // 旧 "auto モードで初回生成が完了する前に filterType が変わっても..."
+      // (#58 レビュー M1) テストは削除した: M1 が守っていたのは「sampleSize
+      // 未指定＝ペインのレイアウトから決まる auto モードで、初回生成が終わる
+      // 前は _currentSampleSize が null のままなので didUpdateWidget が
+      // 再生成をスキップしてしまう」という auto モード特有の不具合で、#85
+      // レビュー S4 で auto モード自体（レイアウト依存のサイズ決定）を撤去した
+      // ため前提が消滅した。「初期生成中に filterType が変わっても最新の結果
+      // だけが残る」という一般的な不変条件自体は、上の
+      // 「連続更新では中間の要求は集約され…」(#85 レビュー S3) テストで
+      // 別の切り口から検証済み。
 
       testWidgets(
           '_before を再利用するとき renderer には複製が渡され、複製は正しく dispose される '
@@ -510,326 +565,77 @@ void main() {
         expect(realAfter.debugDisposed, isFalse);
       });
 
+      // 旧 "捨てられる経路では複製が無条件に dispose される…" (#58 レビュー
+      // SHOULD-2) テストは削除した: このテストは「2件目・3件目の要求が本当に
+      // 同時に in-flight で、3件目が先に解決し2件目（追い越された方）が後から
+      // 解決する」という状況を作って `_rebuild` の discard 分岐（`isLatest ==
+      // false` の経路）を突く内容だった。#85 レビュー S3 で `_scheduleRebuild`
+      // が実行を直列化した結果、production コードからはそもそも2本の
+      // `_rebuild` が同時に in-flight になり得なくなったため、この状況を
+      // widget test から再現できなくなった（`_rebuild` 内の discard 分岐自体は
+      // dispose 安全性の防御として残してあるが、素通しでは踏めない）。
+
       testWidgets(
-          '捨てられる経路では複製が無条件に dispose される'
-          '（after が複製と同一な場合の漏れ回帰） (#58 レビュー SHOULD-2)', (tester) async {
+          '保留中の要求がある状態で dispose したら、renderer は再び呼ばれない '
+          '(#85 レビュー N12)', (tester) async {
         late ui.Image before1;
         await tester.runAsync(() async {
           before1 = await BeforeAfterView.generateSampleImage(4);
         });
         sampleImageGenerator = (size) => Future.value(before1);
 
-        final completers = <Completer<ui.Image?>>[];
-        final capturedInputs = <ui.Image>[];
-        // none 相当: 渡された source（reuse 時は複製）をそのまま返すフェイク。
+        var rendererCallCount = 0;
+        final completer = Completer<ui.Image?>();
         afterImageRenderer = (source, type, strength) {
-          capturedInputs.add(source);
-          final c = Completer<ui.Image?>();
-          completers.add(c);
-          return c.future;
+          rendererCallCount++;
+          return completer.future;
         };
 
-        // 1回目: _before がまだ無いので複製されない。まず確定させ、以後の
-        // reuse を発生させる土台を作る。
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.none,
+          filterType: ColorVisionType.protanopia,
           intensity: 1.0,
           sampleSize: 16,
         )));
         await tester.pump();
-        expect(completers.length, 1);
-        completers[0].complete(capturedInputs[0]);
-        await tester.pump();
-        expect(before1.debugDisposed, isFalse);
+        expect(rendererCallCount, 1);
 
-        // 2回目・3回目: サイズは変わらないので _before(before1) が再利用され、
-        // renderer には複製が渡る。3回目を先に解決し、2回目（追い越された方）
-        // が、渡された複製をそのまま返す形であとから解決する。
+        // intensity を変える → 1回目がまだ in-flight なので集約されて
+        // pending になるだけで、まだ renderer は呼ばれない。
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.none,
-          intensity: 0.4,
-          sampleSize: 16,
-        )));
-        await tester.pump();
-        await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.none,
-          intensity: 0.6,
-          sampleSize: 16,
-        )));
-        await tester.pump();
-        expect(completers.length, 3);
-
-        final staleClone = capturedInputs[1];
-        final freshClone = capturedInputs[2];
-        expect(identical(staleClone, before1), isFalse);
-        expect(identical(freshClone, before1), isFalse);
-
-        completers[2].complete(freshClone); // 最新を先に確定
-        await tester.pump();
-        completers[1].complete(staleClone); // 追い越された方があとから、
-        // 複製をそのまま返す形で解決する。
-        await tester.pump();
-
-        expect(staleClone.debugDisposed, isTrue,
-            reason: '追い越された経路の複製は、after と同一でも無条件に dispose されるべき'
-                '（以前は両方 false になる組み合わせで dispose 漏れが起きていた）');
-        expect(before1.debugDisposed, isFalse);
-        expect(freshClone.debugDisposed, isFalse);
-      });
-    });
-
-    group('自動サイズ調整 (#58: Retina 対策)', () {
-      tearDown(() {
-        sampleImageGenerator = BeforeAfterView.generateSampleImage;
-        // Q2 のテストが afterImageRenderer を「解決しない」フェイクへ差し替える
-        // ため、後続テストへ漏れないよう明示的に戻す。
-        afterImageRenderer = BeforeAfterView.renderAfter;
-      });
-
-      testWidgets('sampleSize 未指定時はペインの論理サイズ×devicePixelRatioで生成する',
-          (tester) async {
-        late ui.Image stub;
-        await tester.runAsync(() async {
-          stub = await BeforeAfterView.generateSampleImage(2);
-        });
-        final requestedSizes = <int>[];
-        sampleImageGenerator = (size) {
-          requestedSizes.add(size);
-          return Future.value(stub);
-        };
-
-        tester.view.physicalSize = const Size(1000, 800);
-        tester.view.devicePixelRatio = 2.0;
-        addTearDown(tester.view.reset);
-
-        await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.none,
-          intensity: 1.0,
-        )));
-        await tester.pump();
-        await tester.pump();
-
-        // 論理サイズ 500x400（物理1000x800 ÷ DPR2.0）、420 以上なので横並び。
-        // ペイン論理幅 = (500-12)/2 = 244 → 244 * 2.0 = 488。
-        expect(requestedSizes, [488]);
-      });
-
-      testWidgets('ペインが大きい場合は上限（2048、#58レビューN5）でクランプされる', (tester) async {
-        late ui.Image stub;
-        await tester.runAsync(() async {
-          stub = await BeforeAfterView.generateSampleImage(2);
-        });
-        final requestedSizes = <int>[];
-        sampleImageGenerator = (size) {
-          requestedSizes.add(size);
-          return Future.value(stub);
-        };
-
-        // 高さも十分に取り、AspectRatio(1) のペインが正方形になっても
-        // オーバーフローしない（テストのレイアウト都合であり、上限判定の本質とは
-        // 無関係）ようにする。
-        tester.view.physicalSize = const Size(4200, 4200);
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.reset);
-
-        await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.none,
-          intensity: 1.0,
-        )));
-        await tester.pump();
-        await tester.pump();
-
-        // ペイン論理幅 = (4200-12)/2 = 2094 → 上限 2048 でクランプ。
-        expect(requestedSizes, [2048]);
-      });
-
-      testWidgets('ペインのリサイズはデバウンスされ、即座には再生成しない', (tester) async {
-        late ui.Image stub;
-        await tester.runAsync(() async {
-          stub = await BeforeAfterView.generateSampleImage(2);
-        });
-        final requestedSizes = <int>[];
-        sampleImageGenerator = (size) {
-          requestedSizes.add(size);
-          return Future.value(stub);
-        };
-
-        tester.view.physicalSize = const Size(1000, 800);
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.reset);
-
-        await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.none,
-          intensity: 1.0,
-        )));
-        await tester.pump();
-        await tester.pump();
-        expect(requestedSizes.length, 1, reason: '初回生成');
-
-        // ペインをリサイズする。
-        tester.view.physicalSize = const Size(1400, 800);
-        await tester.pump();
-        expect(requestedSizes.length, 1, reason: 'デバウンス時間が経つまでは再生成しない');
-
-        // デバウンス時間が経過すると再生成される。
-        await tester.pump(const Duration(milliseconds: 301));
-        expect(requestedSizes.length, 2, reason: 'デバウンス時間経過後に新しいサイズで再生成される');
-      });
-
-      testWidgets(
-          'リサイズで _before を作り直すと旧 before は dispose され、新 before が使われる '
-          '(#58 レビュー S3)', (tester) async {
-        late ui.Image beforeA, beforeB;
-        await tester.runAsync(() async {
-          beforeA = await BeforeAfterView.generateSampleImage(4);
-          beforeB = await BeforeAfterView.generateSampleImage(4);
-        });
-        // サイズごとに別オブジェクトを返すフェイク（本番の generateSampleImage が
-        // 毎回新しいオブジェクトを返すのを模す）。
-        final imagesBySize = {494: beforeA, 694: beforeB};
-        final requestedSizes = <int>[];
-        sampleImageGenerator = (size) {
-          requestedSizes.add(size);
-          return Future.value(imagesBySize[size]!);
-        };
-
-        tester.view.physicalSize = const Size(1000, 800);
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.reset);
-
-        await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.none,
-          intensity: 1.0,
-        )));
-        await tester.pump();
-        await tester.pump();
-        expect(requestedSizes, [494]);
-        expect(beforeA.debugDisposed, isFalse);
-
-        // ペインをリサイズし、デバウンス時間を経過させる。
-        tester.view.physicalSize = const Size(1400, 800);
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 301));
-
-        expect(requestedSizes, [494, 694]);
-        expect(beforeA.debugDisposed, isTrue,
-            reason: '旧 before は作り直し後に dispose される');
-        expect(beforeB.debugDisposed, isFalse, reason: '新しい before は使用中');
-      });
-
-      testWidgets(
-          'リサイズのデバウンス中に intensity が変わっても、リサイズ先のサイズが使われる '
-          '(#58 レビュー S4)', (tester) async {
-        late ui.Image beforeA, beforeB;
-        await tester.runAsync(() async {
-          beforeA = await BeforeAfterView.generateSampleImage(4);
-          beforeB = await BeforeAfterView.generateSampleImage(4);
-        });
-        final imagesBySize = {494: beforeA, 694: beforeB};
-        final requestedSizes = <int>[];
-        sampleImageGenerator = (size) {
-          requestedSizes.add(size);
-          return Future.value(imagesBySize[size]!);
-        };
-
-        tester.view.physicalSize = const Size(1000, 800);
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.reset);
-
-        await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.none,
-          intensity: 1.0,
-        )));
-        await tester.pump();
-        await tester.pump();
-        expect(requestedSizes, [494]);
-
-        // リサイズしてデバウンスタイマーを起動するが、まだ発火させない。
-        tester.view.physicalSize = const Size(1400, 800);
-        await tester.pump();
-        expect(requestedSizes, [494], reason: 'デバウンス中はまだ再生成されない');
-
-        // デバウンスタイマーが発火する前に intensity を変える
-        // （スライダー操作中を想定）。
-        await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.none,
+          filterType: ColorVisionType.protanopia,
           intensity: 0.5,
+          sampleSize: 16,
         )));
         await tester.pump();
+        expect(rendererCallCount, 1, reason: '2回目は集約されているだけでまだ呼ばれていない');
 
-        // #58 レビュー M1/S4: didUpdateWidget は _pendingResizeSampleSize(694) を
-        // 使うべきで、古い _currentSampleSize(494) を使ってはいけない。
-        expect(requestedSizes, [494, 694]);
-        expect(beforeB.debugDisposed, isFalse);
+        // 保留が残ったまま widget を破棄する。
+        await tester.pumpWidget(const SizedBox());
+
+        // 1回目の要求をようやく解決する。_runRebuild は mounted チェックに
+        // より、保留中の要求（intensity=0.5 分）を再スケジュールしないはず。
+        completer.complete(before1);
+        await tester.pump();
+        await tester.pump();
+
+        expect(rendererCallCount, 1,
+            reason: 'dispose 後は保留中の要求があっても renderer が再度呼ばれて'
+                'はいけない');
       });
 
-      testWidgets('制約が無限大のときは論理サイズ256にフォールバックする (#58 レビュー Q2)', (tester) async {
+      testWidgets(
+          'sampleSize 未指定のとき generator は canonicalSampleSize（1024）で'
+          '呼ばれる (#85 レビュー N12)', (tester) async {
         late ui.Image stub;
         await tester.runAsync(() async {
-          stub = await BeforeAfterView.generateSampleImage(2);
+          stub = await BeforeAfterView.generateSampleImage(4);
         });
         final requestedSizes = <int>[];
         sampleImageGenerator = (size) {
           requestedSizes.add(size);
           return Future.value(stub);
         };
-        // afterImageRenderer をあえて解決しないままにして _loading を true に
-        // 固定し、無限大幅では非対応の Row/Expanded 本体レイアウトまで到達
-        // させない（このテストの対象はサンプル生成サイズのフォールバックのみ）。
-        afterImageRenderer =
-            (source, type, strength) => Completer<ui.Image?>().future;
-
-        tester.view.physicalSize = const Size(1000, 800);
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.reset);
-
-        await tester.pumpWidget(MaterialApp(
-          locale: const Locale('en'),
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
-            body: ListView(
-              scrollDirection: Axis.horizontal,
-              children: const [
-                SizedBox(
-                  height: 400,
-                  child: BeforeAfterView(
-                    filterType: ColorVisionType.none,
-                    intensity: 1.0,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ));
-        await tester.pump();
-        await tester.pump();
-
-        // 論理サイズ256（フォールバック）× DPR1.0 = 256。
-        expect(requestedSizes, [256]);
-      });
-
-      testWidgets(
-          'リサイズが A→B→A と元に戻ると、B 用のデバウンスタイマーは破棄され'
-          '再生成されない (#58 レビュー N1)', (tester) async {
-        late ui.Image stub;
-        await tester.runAsync(() async {
-          stub = await BeforeAfterView.generateSampleImage(2);
-        });
-        final requestedSizes = <int>[];
-        sampleImageGenerator = (size) {
-          requestedSizes.add(size);
-          return Future.value(stub);
-        };
-
-        tester.view.physicalSize = const Size(1000, 800); // target A=494
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.reset);
+        afterImageRenderer = (source, type, strength) => Future.value(source);
 
         await tester.pumpWidget(localized(const BeforeAfterView(
           filterType: ColorVisionType.none,
@@ -837,120 +643,8 @@ void main() {
         )));
         await tester.pump();
         await tester.pump();
-        expect(requestedSizes, [494]);
 
-        // A→B: リサイズしてデバウンスタイマーを起動する（まだ発火させない）。
-        tester.view.physicalSize = const Size(1400, 800); // target B=694
-        await tester.pump();
-        expect(requestedSizes, [494]);
-
-        // B→A: タイマー発火前に元のサイズへ戻す。
-        tester.view.physicalSize = const Size(1000, 800);
-        await tester.pump();
-
-        // デバウンス時間を経過させても、694 へは作り直されない。
-        await tester.pump(const Duration(milliseconds: 301));
-        expect(requestedSizes, [494], reason: 'A→B→A で戻ったら B 用のタイマーは破棄されるべき');
-      });
-
-      testWidgets(
-          '明示サイズへ切り替えると、保留中のリサイズタイマーは意味を持たなくなる '
-          '(#58 レビュー N2)', (tester) async {
-        late ui.Image autoStub, explicitStub;
-        await tester.runAsync(() async {
-          autoStub = await BeforeAfterView.generateSampleImage(2);
-          explicitStub = await BeforeAfterView.generateSampleImage(2);
-        });
-        final requestedSizes = <int>[];
-        sampleImageGenerator = (size) {
-          requestedSizes.add(size);
-          return Future.value(size == 999 ? explicitStub : autoStub);
-        };
-
-        tester.view.physicalSize = const Size(1000, 800); // auto target 494
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.reset);
-
-        await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.none,
-          intensity: 1.0,
-        )));
-        await tester.pump();
-        await tester.pump();
-        expect(requestedSizes, [494]);
-
-        // リサイズしてデバウンスタイマーを起動する（まだ発火させない）。
-        tester.view.physicalSize = const Size(1400, 800); // auto target 694
-        await tester.pump();
-        expect(requestedSizes, [494]);
-
-        // 明示サイズへ切り替える。
-        await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.none,
-          intensity: 1.0,
-          sampleSize: 999,
-        )));
-        await tester.pump();
-        expect(requestedSizes, [494, 999]);
-
-        // デバウンス時間を経過させても、694 へは作り直されない
-        // （保留中だった auto 用タイマーはキャンセルされ、発火時にも
-        // sampleSize==null を再確認するため二重に安全）。
-        await tester.pump(const Duration(milliseconds: 301));
-        expect(requestedSizes, [494, 999],
-            reason: '明示サイズへ切り替えたら auto 用タイマーは無効化されるべき');
-      });
-
-      testWidgets(
-          '失敗直後のユーザー操作は、古い成功サイズではなく直近の失敗サイズで'
-          '再試行する（ちらつき防止） (#58 レビュー nit-3)', (tester) async {
-        suppressFlutterErrorReporting();
-
-        late ui.Image goodA;
-        await tester.runAsync(() async {
-          goodA = await BeforeAfterView.generateSampleImage(4);
-        });
-        final requestedSizes = <int>[];
-        sampleImageGenerator = (size) {
-          requestedSizes.add(size);
-          if (size == 494) return Future.value(goodA); // 初回サイズは成功。
-          // リサイズ後のサイズ（694）はアセット欠落等で恒久的に失敗する。
-          return Future<ui.Image>.error(StateError('boom'));
-        };
-
-        tester.view.physicalSize = const Size(1000, 800); // target 494
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.reset);
-
-        await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.none,
-          intensity: 1.0,
-        )));
-        await tester.pump();
-        await tester.pump();
-        expect(requestedSizes, [494]);
-
-        // リサイズすると新サイズ(694)での生成が失敗する
-        // （_currentSampleSize=494 のまま、_failedSampleSize=694 になる）。
-        tester.view.physicalSize = const Size(1400, 800); // target 694
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 301)); // デバウンス発火
-        expect(requestedSizes, [494, 694]);
-
-        // ここでユーザー操作（intensity 変更）が入る。_currentSampleSize
-        // (494、もう画面のサイズに合っていない) ではなく、直近の失敗サイズ
-        // (694、現在のレイアウトに合っているサイズ) で再試行するべき。494 で
-        // 再試行すると、694 用の失敗表示から一瞬 494 の古い画像に戻ってまた
-        // 694 に切り替わる、というちらつきが起きる。
-        await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.none,
-          intensity: 0.5,
-        )));
-        await tester.pump();
-
-        expect(requestedSizes, [494, 694, 694],
-            reason: '494（古い成功サイズ）ではなく694（直近の失敗サイズ）で'
-                '再試行するべき');
+        expect(requestedSizes, [BeforeAfterView.canonicalSampleSize]);
       });
     });
 
@@ -1098,8 +792,12 @@ void main() {
         expect(goodAfter.debugDisposed, isFalse);
       });
 
+      // 旧タイトルの「auto モードで」は #85 レビュー S4 で auto モード
+      // （レイアウト依存のサイズ決定）自体を撤去したため取れたが、検証内容
+      // （恒久的な失敗は busy loop にならず、ユーザー操作でのみ再試行される）
+      // 自体は canonical サイズ描画でもそのまま成り立つ普遍的な不変条件。
       testWidgets(
-          'auto モードで恒久的な失敗が続いても busy loop にならず、'
+          '恒久的な失敗が続いても busy loop にならず、'
           'ユーザー操作（intensity 変更）で再試行して成功する '
           '(#58 レビュー MUST-1)', (tester) async {
         suppressFlutterErrorReporting();
@@ -1121,13 +819,10 @@ void main() {
         afterImageRenderer =
             (source, type, strength) => Future.value(goodAfter);
 
-        tester.view.physicalSize = const Size(1000, 800);
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.reset);
-
         await tester.pumpWidget(localized(const BeforeAfterView(
           filterType: ColorVisionType.protanopia,
           intensity: 1.0,
+          sampleSize: 16,
         )));
         await tester.pump();
         await tester.pump();
@@ -1135,7 +830,9 @@ void main() {
         expect(generatorCallCount, 1);
 
         // 何もしなくても busy loop で再試行し続けない
-        // （1秒分ポンプしても呼び出し回数は変わらない）。
+        // （1秒分ポンプしても呼び出し回数は変わらない。#85 レビュー S4 で
+        // 自動リサイズのタイマー自体が無くなったため、そもそも自動で再試行
+        // する経路が存在しない）。
         await tester.pump(const Duration(seconds: 1));
         expect(generatorCallCount, 1,
             reason: '恒久的な失敗は自動では再試行しない（busy loop 回帰）');
@@ -1144,59 +841,13 @@ void main() {
         await tester.pumpWidget(localized(const BeforeAfterView(
           filterType: ColorVisionType.protanopia,
           intensity: 0.5,
+          sampleSize: 16,
         )));
         await tester.pump();
         await tester.pump();
 
         expect(generatorCallCount, 2);
         expect(goodAfter.debugDisposed, isFalse);
-      });
-
-      testWidgets(
-          'リサイズ後の恒久的な失敗も 300ms 周期の busy loop にならない '
-          '(#58 レビュー MUST-1)', (tester) async {
-        suppressFlutterErrorReporting();
-        late ui.Image goodBefore;
-        await tester.runAsync(() async {
-          goodBefore = await BeforeAfterView.generateSampleImage(4);
-        });
-        var generatorCallCount = 0;
-        final requestedSizes = <int>[];
-        sampleImageGenerator = (size) {
-          generatorCallCount++;
-          requestedSizes.add(size);
-          if (size == 494) {
-            return Future.value(goodBefore); // 初回サイズは成功させる。
-          }
-          // リサイズ後のサイズ（694）はアセット欠落等で恒久的に失敗する。
-          return Future<ui.Image>.error(StateError('boom'));
-        };
-
-        tester.view.physicalSize = const Size(1000, 800); // target 494
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.reset);
-
-        await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.none,
-          intensity: 1.0,
-        )));
-        await tester.pump();
-        await tester.pump();
-        expect(requestedSizes, [494]);
-
-        // リサイズすると新サイズ(694)での生成が失敗する。
-        tester.view.physicalSize = const Size(1400, 800); // target 694
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 301)); // デバウンス発火
-        expect(requestedSizes, [494, 694]);
-
-        final callCountAfterFirstFailure = generatorCallCount;
-        // 300ms 周期を何度分過ぎても、694 への再試行が繰り返されない
-        // （busy loop 回帰）。
-        await tester.pump(const Duration(seconds: 2));
-        expect(generatorCallCount, callCountAfterFirstFailure,
-            reason: '恒久的な失敗は300ms周期で再試行し続けない');
-        expect(requestedSizes, [494, 694]);
       });
     });
 
@@ -1265,6 +916,107 @@ void main() {
 
         expect(find.text(en.previewFailed), findsNothing);
         expect(goodAfter2.debugDisposed, isFalse);
+      });
+    });
+
+    group('export の caption (#85 レビュー S8)', () {
+      tearDown(() {
+        sampleImageGenerator = BeforeAfterView.generateSampleImage;
+        afterImageRenderer = BeforeAfterView.renderAfter;
+        exportImageComposer = composeExportImage;
+        pngSaver = savePng;
+      });
+
+      testWidgets(
+          '1回目の結果を表示中に強度を変えてから export しても、caption は'
+          '描画時の強度になる', (tester) async {
+        late ui.Image before1, after1, composedStub;
+        await tester.runAsync(() async {
+          before1 = await BeforeAfterView.generateSampleImage(4);
+          after1 = await BeforeAfterView.generateSampleImage(4);
+          composedStub = await BeforeAfterView.generateSampleImage(4);
+        });
+        sampleImageGenerator = (size) => Future.value(before1);
+
+        // 1回目（intensity=1.0）はすぐ解決する。2回目（intensity=0.5、
+        // コアレス後に走る）は意図的に未解決のまま止め、「表示中の _after は
+        // まだ1回目のまま」という状況を作る。
+        var rendererCallCount = 0;
+        final pending = Completer<ui.Image?>();
+        afterImageRenderer = (source, type, strength) {
+          rendererCallCount++;
+          if (rendererCallCount == 1) return Future.value(after1);
+          return pending.future;
+        };
+
+        ExportCaption? capturedCaption;
+        exportImageComposer = (base, caption) async {
+          capturedCaption = caption;
+          // 本物の composeExportImage は常に base とは別の新しい ui.Image を
+          // 返す（base を下地に新しいキャンバスへ描き直すため）。_export は
+          // 戻り値を dispose する責務を持つので、base（＝表示中の _after）を
+          // そのまま返すと _after を誤って dispose してしまう。フェイクでも
+          // 別オブジェクトを返して契約を守る。
+          return composedStub;
+        };
+        String? savedFilename;
+        pngSaver = (bytes, filename) async {
+          savedFilename = filename;
+          return '/fake/downloads/$filename';
+        };
+
+        final en = lookupAppLocalizations(const Locale('en'));
+
+        // 1回目: protanopia, intensity=1.0 で描画完了させる。
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filterType: ColorVisionType.protanopia,
+          intensity: 1.0,
+          sampleSize: 16,
+        )));
+        await tester.pump();
+        await tester.pump();
+        expect(rendererCallCount, 1);
+
+        // intensity を 0.5 に変える。_scheduleRebuild は実行中でなければ
+        // 即座に2回目を起動する（#85 レビュー S3）が、その2回目は上の
+        // フェイクで意図的に未解決のまま止めてあるので、_after はまだ
+        // 1回目（after1, strength=1.0）のままになる。
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filterType: ColorVisionType.protanopia,
+          intensity: 0.5,
+          sampleSize: 16,
+        )));
+        await tester.pump();
+        expect(rendererCallCount, 2, reason: '2回目のレンダリングは開始しているが、まだ完了していない');
+
+        // ここで export をタップする。表示されている _after はまだ1回目の
+        // 結果なので、caption も1回目の strength（100%）になるべき——
+        // widget.intensity の現在値（0.5 → 50%）を使ってはいけない
+        // （#85 レビュー S8）。
+        await tester.tap(find.byTooltip(en.exportButtonTooltip));
+        // encodeImagePng は実エンジンの PNG エンコードを行う（フェイクにして
+        // いない）ため、素の pump() だけでは終わらないことがある。他の
+        // テスト（pumpUntilText 参照）と同じく tester.runAsync の中で実時間
+        // ポンプして待つ。
+        await tester.runAsync(() async {
+          for (var i = 0; i < 50; i++) {
+            if (savedFilename != null) return;
+            await tester.pump(const Duration(milliseconds: 20));
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+          }
+        });
+        await tester.pump();
+
+        expect(capturedCaption, isNotNull);
+        expect(capturedCaption!.strengthLabel, en.strengthLabel(100),
+            reason: '描画時（1回目、strength=1.0=100%）の値を使うべき');
+        expect(
+          capturedCaption!.symptomLabel,
+          colorVisionTypeName(en, ColorVisionType.protanopia),
+        );
+        expect(savedFilename, isNotNull);
+        expect(savedFilename, contains('100pct'));
+        expect(savedFilename, isNot(contains('50pct')));
       });
     });
   });
