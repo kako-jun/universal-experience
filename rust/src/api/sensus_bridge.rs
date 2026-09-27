@@ -797,7 +797,9 @@ pub fn vision_uniform_layout(filter: VisionFilter) -> Vec<String> {
 /// **プレビュー（静止画）描画の正本経路**（#85）。GPU（FragmentProgram）経路が
 /// `VisionFieldLossMode::Blur` のような表現に対応しないのに対し、CPU 経路
 /// （`sensus_core::apply` そのもの）は 30 種すべてを payload 込みで正しく描画できる。
-/// GPU 経路（`lib/rendering/shader_filter.dart`）はルーペのライブ表示専用に残る。
+/// GPU 経路（`lib/rendering/shader_filter.dart`）は将来のライブ画面キャプチャ
+/// （ue 側 #1/#3/#4）向けに残置してあるが、現状 production コードからは
+/// 呼ばれない。
 /// 生 RGBA8（`width * height * 4` バイト）を入力し、同じレイアウトの RGBA8 を返す。
 ///
 /// `#[frb(sync)]` を外し非同期公開にしている: `image::DynamicImage` 経路（GPU
