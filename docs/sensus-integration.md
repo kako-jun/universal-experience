@@ -459,7 +459,16 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   `afterImageRenderer` と同じパターンだが、production コード自身が参照するため
   `@visibleForTesting` は付けていない、#85 レビュー N1）へ委譲する形に置き換えた。
   レンダラ自体は任意の `VisionFilter`（payload 込み）を受け取れるため、advanced
-  カタログ 30 種すべてを描画できる（UI からの結線は #60 のスコープ）。
+  カタログ 30 種すべてを描画できる。
+  **#60 での追補**: advanced カタログ・体験プリセットの UI 結線を終えた際、
+  `renderAfter`（延いては `before_after_view.dart` 全体）から `ColorVisionType`
+  → `VisionFilter` の写像を撤去した。マッピングは呼び出し側
+  （`home_screen.dart`）が `VisionFilterState.build()` で行い、`renderAfter` は
+  組み立て済みの `VisionFilter?` をそのまま `CpuVisionRenderer.applier` へ渡す
+  だけになっている。`FilterService.sensusFilter`
+  （`visionFilterForColorVisionType`）自体は変わらず健在だが、色覚のクイック
+  選択を `VisionFilterState` へ写すための入力としてのみ使われる
+  （`home_screen.dart` の `_syncVisionFilterState`）。
 - **alpha の扱い（レビュー S1、初版の誤り）**: Flutter の `ui.Image` は
   premultiplied alpha で GPU テクスチャを保持するが、sensus（`image` crate）は
   straight alpha を前提にした画素処理を行う。初版はこの違いを踏まえず

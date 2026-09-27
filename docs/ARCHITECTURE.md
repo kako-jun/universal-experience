@@ -20,11 +20,14 @@
 > `experiences()` / `Experience` / `Urgency` / `HearingFilter`、ただし音声再生は
 > 未実装）、体験プリセット集 UI（#19・`lib/ui/widgets/experience_presets.dart`）、
 > フィルタ済み画像のメタ焼き込み PNG エクスポート（#43・
-> `lib/services/export_service.dart`）、色覚 7 型すべての CPU 実描画（#85）。
-> advanced カタログ・体験プリセットの選択は `VisionFilterState` に入るだけで
-> プレビューには反映されない（#60。レンダラ自体は任意の `VisionFilter` を
-> 受け取れるので、結線するだけで済む）。プリセットのタップでは `FilterService`
-> が deactivate され、before/after 両ペインとも原画のままになる（#60）。
+> `lib/services/export_service.dart`）、sensus 全 30 種の CPU 実描画（#85）と
+> そのプレビューへの UI 結線（#60）。プレビューの描画対象は `VisionFilterState`
+> の現在の選択を唯一の正本にする（色覚のクイック選択・advanced カタログ・体験
+> プリセットのいずれで選んでも、最終的に `VisionFilterState` に書き込まれる）。
+> プリセットのタップは `FilterService`（色覚のクイック選択の状態）を変更しない
+> — `deactivate()` は呼ばない。選択中のプリセットは体験 id で保持するため、
+> 同じ `vertigo` フィルタに写る 2 つのプリセット（メニエール病・迷路炎）が
+> 同時に選択中と表示されることはない（#60）。
 
 ## ルーペ窓挙動 (#14)
 
@@ -314,9 +317,12 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   アルゴリズムは一切持たない。sensus は straight alpha、Flutter の `ui.Image`
   は premultiplied alpha を前提とするため、境界でこの変換を明示的に行う
   （#85 レビュー S1）。任意の `VisionFilter`（payload 込み）を受け取れるため
-  sensus 全 30 種を描画できる（`before_after_view.dart` の既定
-  `afterImageRenderer` は色覚 7 型のみを配線済み、advanced カタログとの結線は
-  #60）。`applyVisionCpuRgba8` は `#[frb(sync)]` を外し非同期公開にしてあり
+  sensus 全 30 種を描画できる。`before_after_view.dart` はこの `VisionFilter`
+  をそのまま（マッピングせず）中継するだけの presentational widget で、
+  色覚のクイック選択・advanced カタログ・体験プリセットのどれで選んでも
+  `VisionFilterState.build()` が組み立てた `VisionFilter` がここまで届く
+  （#60、`home_screen.dart` の `_buildPreviewSection` がその配線点）。
+  `applyVisionCpuRgba8` は `#[frb(sync)]` を外し非同期公開にしてあり
   （Rust 側スレッドプールで実行）、UI スレッドを塞がない。`before_after_view.dart`
   の `renderAfter` はこれを直接呼ぶ production コードなので、テストで差し替える
   ための `CpuVisionRenderer.applier`（`sampleImageGenerator`/
