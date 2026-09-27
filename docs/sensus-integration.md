@@ -489,7 +489,7 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   実行中なら新しい要求は「最新の1件」だけを `_pendingRebuildSampleSize` に
   記録して待たせ、完了時にそれを走らせる（同時に走るジョブは常に1本）。
   `_rebuild` 自体の世代管理・dispose・失敗表示（#58）は変更していない。
-  `test/before_after_view_test.dart` が、連続更新で中間の要求がコツ合される
+  `test/before_after_view_test.dart` が、連続更新で中間の要求が集約される
   ことと、同時に実行される `afterImageRenderer` が1本を超えないことを検証する。
 - **正準サイズでの描画（レビュー S4）**: 旧 GPU 時代（#58）はプレビューをペインの
   論理サイズ × `devicePixelRatio` に自動で追従させ、リサイズをデバウンスして
@@ -506,7 +506,10 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   余裕があるが、sensus 側の比率定数や canonical サイズ自体を変えるとこの余裕は
   変わる点に注意（`integration_test/cpu_preview_all_filters_test.dart` の
   コメント参照）。ペインサイズ連動の auto-sizing（#58）とそのテスト群は
-  丸ごと撤去した。
+  丸ごと撤去した。トレードオフ（レビュー N11）: HiDPI で大きなペイン
+  （物理ピクセル数が 1024 を超える）では逆に 1024px の画像を拡大表示する
+  ことになり、`FilterQuality.medium` でも旧 auto-sizing 時代よりわずかに
+  ぼやける。
 - **GPU の位置づけ**: `ShaderFilter`（§8）は削除せず、将来のライブ画面キャプチャ
   （#1/#3/#4、ルーペ窓での実描画を想定）向けに残した。ただしその機能自体が
   未実装のため、**現状 production コードから呼ばれることはない**。GPU と CPU
@@ -525,7 +528,7 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   - `CpuVisionRenderer` が追加する Dart 側の往復変換（straight RGBA8 ⇄
     premultiplied RGBA8）は、alpha==255（このアプリの実運用画像はほぼ全て
     不透明）では premultiply が恒等変換になるためゼロ誤差、alpha<255 でも
-    8bit 整数の丸め誤差 1 未満に収まる。`test/cpu_vision_renderer_test.dart` が
+    8bit 整数の丸め誤差 1 以内に収まる。`test/cpu_vision_renderer_test.dart` が
     golden 参照 PNG（alpha==255）でのバイト完全一致と、既知の透過ピクセル
     （alpha=128）での丸め誤差 1 以内の往復を実測で固定した。
   - 既存の GPU vs golden 比較（`test/vision_filter_golden_test.dart`）は
