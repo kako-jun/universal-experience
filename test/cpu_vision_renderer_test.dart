@@ -112,11 +112,25 @@ void main() {
   });
 
   group('premultiplyStraightRgba8 (#85 レビュー S1)', () {
-    test('alpha==255 は恒等変換', () {
+    test('alpha==255 は恒等変換（かつ N5: 新しいバッファを確保しない fast path）', () {
       final straight =
           Uint8List.fromList([255, 255, 255, 255, 10, 20, 30, 255]);
       final out = CpuVisionRenderer.premultiplyStraightRgba8(straight);
       expect(out, equals(straight));
+      expect(identical(out, straight), isTrue,
+          reason: '全ピクセル不透明なら straight をそのまま返す fast path '
+              '（#85 レビュー N5）が働いているはず');
+    });
+
+    test(
+        '1ピクセルでも alpha<255 が混ざっていれば fast path を使わず新しい'
+        'バッファを返す', () {
+      final straight = Uint8List.fromList([
+        255, 255, 255, 255, // 不透明
+        10, 20, 30, 128, // 半透明が1ピクセル混ざる
+      ]);
+      final out = CpuVisionRenderer.premultiplyStraightRgba8(straight);
+      expect(identical(out, straight), isFalse);
     });
 
     test('alpha==0 は RGB がすべて 0 になる', () {
