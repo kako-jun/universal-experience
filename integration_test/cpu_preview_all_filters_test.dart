@@ -12,10 +12,6 @@
 // integration_test` 呼び出しに複数ファイルを渡すと2番目以降のアプリ起動が失敗する
 // 既知の制約があるため、CI でも個別コマンドとして実行する。
 
-import 'dart:io';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
@@ -24,13 +20,6 @@ import 'package:universal_experience/services/native_bridge_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
-
-Future<ui.Image> _decodeFile(String path) async {
-  final Uint8List bytes = await File(path).readAsBytes();
-  final ui.Codec codec = await ui.instantiateImageCodec(bytes);
-  final ui.FrameInfo frame = await codec.getNextFrame();
-  return frame.image;
-}
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -176,41 +165,22 @@ void main() {
               'protanopia が一部にしか効いていない疑い');
     });
 
-    testWidgets(
-        'strength=1.0 の出力は既存 golden 参照（protanopia_ref.png）と'
-        'ほぼバイト一致する', (tester) async {
-      // protanopia_ref.png は rust/src/golden_gen.rs が
-      // apply_vision_cpu_rgba8（= 本テストが呼ぶのと同じ Rust 関数）で
-      // protanopia_input.png から生成した参照。Dart 側の往復変換
-      // （straight RGBA8 の premultiply/un-premultiply、#85 レビュー S1）は
-      // 両画像とも alpha==255 なら恒等変換のはずなので、ここでバイト単位
-      // （小さな丸め誤差のみ許容）の一致を確認する。
-      final input = await _decodeFile('test/golden/protanopia_input.png');
-      addTearDown(input.dispose);
-      final ref = await _decodeFile('test/golden/protanopia_ref.png');
-      addTearDown(ref.dispose);
-      expect(input.width, ref.width);
-      expect(input.height, ref.height);
-
-      final out = await CpuVisionRenderer.apply(
-        input,
-        const VisionFilter.protanopia(),
-        1.0,
-      );
-      addTearDown(out.dispose);
-
-      final outPixels = await CpuVisionRenderer.imageToRgba8(out);
-      final refPixels = await CpuVisionRenderer.imageToRgba8(ref);
-      expect(outPixels.length, refPixels.length);
-
-      var maxDiff = 0;
-      for (var i = 0; i < outPixels.length; i++) {
-        final d = (outPixels[i] - refPixels[i]).abs();
-        if (d > maxDiff) maxDiff = d;
-      }
-      expect(maxDiff, lessThanOrEqualTo(1),
-          reason: 'CpuVisionRenderer 経由の protanopia 出力が golden 参照と'
-              '乖離している（maxDiff=$maxDiff）');
-    });
+    // 「strength=1.0 の出力を既存 golden 参照（protanopia_ref.png）と比較する」
+    // （#85 レビュー S7-d、"可能なら" の依頼）は実装したが、CI で
+    // PathNotFoundException になり撤去した: デスクトップの integration_test は
+    // ビルド済みアプリとして起動するため、`File('test/golden/...')` のような
+    // リポジトリルート相対パスは実行時カレントディレクトリと一致しない
+    // （ローカルの `flutter test integration_test/... -d macos` では手元の
+    // シェルの CWD と一致してたまたま通っていた）。同じ数値的主張は既に
+    // 他2箇所でファイル I/O なしに検証済みなので、この項目のカバレッジは
+    // 失われていない:
+    //   - rust 側 `cargo test`（golden_gen::tests::protanopia_ref_matches_sensus_core）
+    //     が、golden 参照 PNG と `sensus_core::apply()`（= 本テストが呼ぶのと
+    //     同じ関数を薄くラップした `apply_vision_cpu_rgba8`）の出力がバイト
+    //     完全一致することを検証する。
+    //   - test/cpu_vision_renderer_test.dart（plain `flutter test`、CWD が
+    //     リポジトリルートと一致するため file I/O が安全に使える）が、golden
+    //     参照 PNG を CpuVisionRenderer の往復変換（straight⇄premultiplied、
+    //     #85 レビュー S1）にかけてもバイト完全一致することを検証する。
   });
 }

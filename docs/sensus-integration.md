@@ -516,8 +516,12 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   差を調べた。
   - CPU（`apply_vision_cpu_rgba8`）自体は golden 参照 PNG の生成に使われた経路
     そのもの（`rust/src/golden_gen.rs`）なので、strength=1.0 では参照 PNG と
-    **バイト完全一致**する（`integration_test/cpu_preview_all_filters_test.dart`
-    の protanopia 数値テストが実ブリッジで実測確認する）。
+    **バイト完全一致**する（`cargo test` の
+    `golden_gen::tests::protanopia_ref_matches_sensus_core` が実測確認する。
+    `integration_test/cpu_preview_all_filters_test.dart` から実ブリッジ経由で
+    同じ比較をする案は一度実装したが、デスクトップ integration_test 実行時の
+    カレントディレクトリがリポジトリルートと一致せず golden ファイルを
+    読めなかったため撤去した。ファイル末尾のコメント参照）。
   - `CpuVisionRenderer` が追加する Dart 側の往復変換（straight RGBA8 ⇄
     premultiplied RGBA8）は、alpha==255（このアプリの実運用画像はほぼ全て
     不透明）では premultiply が恒等変換になるためゼロ誤差、alpha<255 でも

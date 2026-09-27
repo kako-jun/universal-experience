@@ -412,10 +412,17 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
     一致すること・出力ピクセルが入力と異なること（strength=1.0 で全フィルタが
     視覚的に効果を持つ設計であるため）を検証する。加えて protanopia について、
     strength=0.0 が原画とバイト一致すること・strength による出力の違い・
-    変化したピクセル比率の下限・golden 参照（`protanopia_ref.png`）との
-    ほぼバイト一致（#85 レビュー S7）も検証する。widget test のフェイク注入
-    では検知できない「実際に sensus-core の CPU apply が 30 種すべてで動く」
-    ことを保証するのがこのファイルの役割
+    変化したピクセル比率の下限を検証する（#85 レビュー S7）。golden 参照
+    （`protanopia_ref.png`）とのバイト一致比較も S7 で一度実装したが、
+    デスクトップの integration_test はビルド済みアプリとして起動するため
+    `File('test/golden/...')` のようなリポジトリルート相対パスが実行時
+    カレントディレクトリと一致せず `PathNotFoundException` になり、CI で
+    撤去した（ファイルの末尾コメント参照）。同じ数値的主張は rust 側
+    `cargo test`（`golden_gen::tests::protanopia_ref_matches_sensus_core`）と
+    `test/cpu_vision_renderer_test.dart`（plain `flutter test` は CWD がリポジトリ
+    ルートと一致するため file I/O が安全）で引き続き検証している。widget test の
+    フェイク注入では検知できない「実際に sensus-core の CPU apply が 30 種
+    すべてで動く」ことを保証するのがこのファイルの役割
 - **CI**（#38、完了）: `.github/workflows/ci.yml` は2ジョブ構成。`check`
   （macos-latest）が push/PR で上記に加え `flutter build macos --debug` を
   回す（#54）。cargokit 統合（#55）によりこの build が rust/ crate のビルドも
