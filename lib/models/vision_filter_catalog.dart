@@ -188,6 +188,7 @@ class VisionFilterEntry {
     required this.category,
     required this.urgency,
     this.parameters = const [],
+    this.isTimeDependent = false,
   });
 
   /// snake_case の安定 id（sensus shaders 名と一致。例: `bppv_rotation`）。
@@ -207,6 +208,16 @@ class VisionFilterEntry {
 
   /// payload パラメータ定義（payload を持たないフィルタは空リスト）。
   final List<VisionParam> parameters;
+
+  /// sensus 側が `uTime` に依存する時間依存フィルタか（#60）。
+  ///
+  /// CPU プレビュー（`CpuVisionRenderer` / `applyVisionCpuRgba8`）は時刻を
+  /// 受け取らず常に同じ内部時刻で描画するため、時間依存フィルタも静止画
+  /// （固定フレーム）としてしか見せられない。true のフィルタ（vertigo /
+  /// bppv_rotation。sensus_bridge.dart の `VisionFilter.vertigo` /
+  /// `VisionFilter.bppvRotation` の doc コメント「時間依存」参照）は
+  /// プレビューにその旨の注記を出す（`before_after_view.dart`）。
+  final bool isTimeDependent;
 }
 
 /// 緑内障モードの選択肢（[VisionGlaucomaMode] のミラー）。
@@ -533,6 +544,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     i18nKey: 'filter.vertigo',
     category: VisionFilterCategory.vestibular,
     urgency: VisionFilterUrgency.high,
+    isTimeDependent: true,
   ),
   VisionFilterEntry(
     id: 'bppv_rotation',
@@ -540,6 +552,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     i18nKey: 'filter.bppv_rotation',
     category: VisionFilterCategory.vestibular,
     urgency: VisionFilterUrgency.high,
+    isTimeDependent: true,
   ),
   VisionFilterEntry(
     id: 'vestibular_neuritis',

@@ -9,7 +9,13 @@ import '../../services/vision_filter_state.dart';
 /// sensus 全 30 [VisionFilter] をカテゴリ別にグルーピングして選択させるセレクタ。
 ///
 /// カテゴリ見出し + [Wrap] の [FilterChip] で表示する。選択は
-/// [VisionFilterState] に反映する（既存の色覚 7 種 UI とは別系統）。
+/// [VisionFilterState.select] に反映する。色覚 7 種のクイック選択
+/// （`FilterSelector`/トレイ）も同じ [VisionFilterState] に書き込むため
+/// （`lib/services/color_vision_selection.dart`、#60）、色覚のカタログ 5 種
+/// （protanopia 等）はここと重なるが、色覚クイック選択で選んだときはここの
+/// チップを点灯させない（[state.isColorQuickSelection] が true の間は
+/// [_buildCategory] の `isSelected` が常に false になる、#60）。「advanced
+/// で選んだのか、色覚クイック選択で選んだのか」を UI 上でも区別するため。
 class FilterCatalogSelector extends StatelessWidget {
   const FilterCatalogSelector({super.key});
 
@@ -66,7 +72,10 @@ class FilterCatalogSelector extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: entries.map((entry) {
-              final isSelected = state.selectedId == entry.id;
+              // 色覚クイック選択由来の選択では、対応する advanced チップ
+              // （例: protanopia）を点灯させない（#60）。
+              final isSelected =
+                  state.selectedId == entry.id && !state.isColorQuickSelection;
               return FilterChip(
                 label: Text(visionFilterName(l10n, entry.id)),
                 selected: isSelected,

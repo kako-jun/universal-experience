@@ -1,6 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/services/color_vision_selection.dart';
+import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/tray_service.dart';
+import 'package:universal_experience/services/vision_filter_state.dart';
 
 /// 文言は i18n 解決済みで [buildTrayMenuSpec] に注入する (#18)。純粋層のテストは
 /// app_ja.arb の ja 訳と同じ文字列を渡し、メニュー構造とラベル配線を検証する。
@@ -19,6 +22,12 @@ const _labels = TrayMenuLabels(
 );
 
 void main() {
+  // TrayService.init() は（ネイティブ初期化が失敗する場合も）内部で
+  // `tray_manager` の MethodChannel を触るため、WidgetsFlutterBinding の
+  // 初期化を要する（#60、'TrayService の filterService/visionFilterState
+  // listener' グループ参照）。
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('quickColorVisionFilters', () {
     test('よく使う色覚フィルタを含み none を含まない', () {
       final filters = quickColorVisionFilters();
@@ -187,6 +196,85 @@ void main() {
           TrayMenuEntry(kind: TrayMenuKind.quit, key: kQuitKey, label: '終了');
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
+    });
+  });
+
+  group('TrayService の filterService/visionFilterState listener (#60)', () {
+    // TrayService.init() 自体は tray_manager のネイティブプラグインを叩く
+    // ため、plain `flutter test`（platform channel 未登録）では常に例外に
+    // なる。TrayService はそれを握り潰して `_initialised = false` のまま
+    // 続行する契約なので、init()/dispose() 自体は widget を介さず安全に
+    // 呼べる。`ChangeNotifier.hasListeners` は `@protected` でテストから
+    // 直接見えないため、listener が実際に発火したことは
+    // `TrayService.selectionChangedCallCount`（テスト専用フック）で確認する
+    // （メニューの実際の再構築＝trayManager 呼び出しは別途 refresh() が
+    // `_initialised` を見て no-op にするので、ここでは検証しない）。
+    late FilterService filterService;
+    late VisionFilterState visionFilterState;
+    late TrayService trayService;
+
+    setUp(() {
+      filterService = FilterService();
+      visionFilterState = VisionFilterState();
+      trayService = TrayService(
+        filterService: filterService,
+        visionFilterState: visionFilterState,
+        iconPath: 'assets/tray/tray_icon.png',
+        labels: _labels,
+        tooltip: 'Universal Experience',
+        onShowLoupe: () async {},
+        onHideLoupe: () async {},
+        onOpenSettings: () async {},
+        onQuit: () async {},
+      );
+    });
+
+    test('init() のあと filterService/visionFilterState の変化で listener が発火する',
+        () async {
+      await trayService.init();
+      expect(trayService.selectionChangedCallCount, 0);
+
+      // selectColorVision は filterService と visionFilterState の両方を
+      // 更新する（#60）ため、どちらにも listener を付けている以上 2 回
+      // 発火する。
+      selectColorVision(
+          filterService, visionFilterState, ColorVisionType.protanopia);
+      expect(trayService.selectionChangedCallCount, 2);
+
+      // visionFilterState だけを更新する操作（advanced カタログの選択）は
+      // +1 だけ増える。
+      visionFilterState.select('starbursts');
+      expect(trayService.selectionChangedCallCount, 3);
+
+      await trayService.dispose();
+    });
+
+    test('dispose() のあとは filterService/visionFilterState の変化で listener が発火しない',
+        () async {
+      await trayService.init();
+      await trayService.dispose();
+
+      selectColorVision(
+          filterService, visionFilterState, ColorVisionType.protanopia);
+
+      expect(trayService.selectionChangedCallCount, 0);
+    });
+
+    test('init() 後に選択を変えても例外にならない（refresh() は _initialised を見て no-op）',
+        () async {
+      await trayService.init();
+
+      // ネイティブ初期化はこの環境では必ず失敗するので trayService.isAvailable
+      // は false のまま — refresh() が実際に trayManager を呼ばないことの前提。
+      expect(trayService.isAvailable, isFalse);
+
+      expect(
+        () => selectColorVision(
+            filterService, visionFilterState, ColorVisionType.protanopia),
+        returnsNormally,
+      );
+
+      await trayService.dispose();
     });
   });
 }

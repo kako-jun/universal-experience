@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:tray_manager/tray_manager.dart';
 
 import '../models/disability_type.dart';
+import 'color_vision_selection.dart';
 import 'filter_service.dart';
+import 'vision_filter_state.dart';
 
 /// タスクトレイ常駐 (#15)。
 ///
@@ -266,6 +269,7 @@ CloseAction resolveCloseAction({required bool trayAvailable}) =>
 class TrayService with TrayListener {
   TrayService({
     required this.filterService,
+    required this.visionFilterState,
     required this.iconPath,
     required this.labels,
     required this.tooltip,
@@ -278,6 +282,12 @@ class TrayService with TrayListener {
 
   /// アクティブな色覚フィルタの選択状態 (#14)。
   final FilterService filterService;
+
+  /// プレビューの選択の唯一の正本（#60）。トレイの色覚クイック選択は
+  /// `lib/services/color_vision_selection.dart` の `selectColorVision` /
+  /// `deactivateColorVision` を経由してこれも更新する（#60。FilterSelector
+  /// と同じ入口を通す）。
+  final VisionFilterState visionFilterState;
 
   /// トレイアイコンのアセットパス (PNG)。`assets/tray/` 参照。
   final String iconPath;
@@ -321,10 +331,21 @@ class TrayService with TrayListener {
   /// どのプラットフォームでも安全に呼べる: トレイ非対応では no-op、失敗
   /// (GNOME で AppIndicator 拡張無し / ヘッドレス CI / アイコン欠落など) は
   /// 握り潰してアプリはウィンドウのみで動き続ける。
+  ///
+  /// [filterService]/[visionFilterState] に listener を付け、ウィンドウ内 UI
+  /// （[FilterSelector]・advanced カタログ・体験プリセット）での選択も
+  /// トレイのチェックマークに反映されるようにする（#60。トレイのチェック
+  /// マークは [_rebuildMenu] が `visionFilterState.isColorQuickSelection` から
+  /// 決めるが、これまではトレイ自身の操作でしか再構築が起きなかった）。
+  /// トレイ自体のネイティブ初期化が失敗しても listener は付けたままにする
+  /// （`refresh()` 自身が `_initialised` を見て no-op になるため無害で、
+  /// コードパスを単純に保てる）。listener は [dispose] で外す。
   Future<void> init() async {
     if (!isTraySupportedPlatform) {
       return;
     }
+    filterService.addListener(_onSelectionChanged);
+    visionFilterState.addListener(_onSelectionChanged);
     try {
       trayManager.addListener(this);
       await trayManager.setIcon(iconPath);
@@ -338,6 +359,21 @@ class TrayService with TrayListener {
     }
   }
 
+  /// [_onSelectionChanged] が呼ばれた回数。production では未使用で、
+  /// `ChangeNotifier.hasListeners` が `@protected`（テストから直接見えない）
+  /// ため、listener が実際に発火することを widget を介さず確認するための
+  /// テスト専用フック（#60）。
+  @visibleForTesting
+  int selectionChangedCallCount = 0;
+
+  /// [filterService]/[visionFilterState] のどちらかが変化したときに呼ばれる
+  /// （#60）。トレイのメニュー自体は非同期（`trayManager.setContextMenu`）
+  /// だが listener コールバックは同期なので `unawaited` で発火だけさせる。
+  void _onSelectionChanged() {
+    selectionChangedCallCount++;
+    unawaited(refresh());
+  }
+
   /// 現在の状態からネイティブメニューを再構築する。
   Future<void> refresh() async {
     if (!_initialised) return;
@@ -348,7 +384,11 @@ class TrayService with TrayListener {
     final spec = buildTrayMenuSpec(
       loupeVisible: _loupeVisible,
       labels: labels,
-      activeFilter: filterService.currentFilter,
+      // advanced/プリセットを選んでいる間は、色覚クイック選択のチェックマークを
+      // 出さない（#60。FilterSelector のチップ点灯と同じ判定）。
+      activeFilter: visionFilterState.isColorQuickSelection
+          ? filterService.currentFilter
+          : ColorVisionType.none,
     );
     final menu = Menu(items: spec.map(_toMenuItem).toList());
     try {
@@ -385,12 +425,12 @@ class TrayService with TrayListener {
       case TrayMenuKind.applyColorVisionFilter:
         final type = entry.colorVisionType;
         if (type != null) {
-          filterService.applyFilter(type);
+          selectColorVision(filterService, visionFilterState, type);
           await refresh();
         }
         break;
       case TrayMenuKind.clearFilter:
-        filterService.deactivate();
+        deactivateColorVision(filterService, visionFilterState);
         await refresh();
         break;
       case TrayMenuKind.openSettings:
@@ -437,8 +477,11 @@ class TrayService with TrayListener {
     trayManager.popUpContextMenu();
   }
 
-  /// トレイアイコン・リスナを後始末する。
+  /// トレイアイコン・リスナを後始末する。[init] で付けた
+  /// [filterService]/[visionFilterState] の listener も外す（#60）。
   Future<void> dispose() async {
+    filterService.removeListener(_onSelectionChanged);
+    visionFilterState.removeListener(_onSelectionChanged);
     if (!isTraySupportedPlatform) return;
     try {
       trayManager.removeListener(this);

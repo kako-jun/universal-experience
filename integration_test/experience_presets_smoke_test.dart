@@ -18,13 +18,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:provider/provider.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
+import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/native_bridge_service.dart';
+import 'package:universal_experience/services/preview_selection.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/src/rust/frb_generated.dart';
+import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
 Widget _presetsApp() {
@@ -49,6 +52,75 @@ Widget _presetsApp() {
       ),
     ),
   );
+}
+
+/// home_screen.dart のプレビュー結線（#60）を最小構成で再現したアプリ。
+/// [ExperiencePresets] のタップが実際に [BeforeAfterView] の描画へつながる
+/// ことを、実ブリッジ（CPU `apply()`）込みで確かめる。
+Widget _previewWithPresetsApp() {
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (_) => VisionFilterState()),
+      ChangeNotifierProvider(create: (_) => FilterService()),
+    ],
+    // ConstrainedBox に const コンストラクタが無いため MaterialApp 以下は
+    // const にできない。
+    child: MaterialApp(
+      locale: const Locale('en'),
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(
+        body: SingleChildScrollView(
+          // home_screen.dart の ConstrainedBox(maxWidth: 800) を再現する
+          // （#60）。これが無いと、幅無制限のウィンドウ上で
+          // BeforeAfterView の左右ペインが横幅いっぱい（1000px超）の正方形に
+          // なり、プリセットカードがウィンドウの縦サイズを大きく超えて
+          // 押し出されてしまう。
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: const Column(
+                children: [
+                  _PreviewFromState(),
+                  ExperiencePresets(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// [_previewWithPresetsApp] 専用の配線ウィジェット。home_screen.dart の
+/// `_buildPreviewSection` と同じ判定（`previewStrength`）で
+/// [VisionFilterState] の選択を [BeforeAfterView] に渡す。
+class _PreviewFromState extends StatelessWidget {
+  const _PreviewFromState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer2<VisionFilterState, FilterService>(
+      builder: (context, visionState, filterService, _) {
+        return BeforeAfterView(
+          filter: visionState.build(),
+          filterId: visionState.selectedId,
+          strength: previewStrength(visionState, filterService),
+          // integration_test では実ブリッジの CPU apply() を正準サイズ
+          // （1024px）で 4 回走らせると重いため、実測に十分な小さめサイズで
+          // 描画確認する（描画そのものは cpu_preview_all_filters_test.dart が
+          // 正準サイズで別途カバー済み）。
+          sampleSize: 64,
+        );
+      },
+    );
+  }
 }
 
 void main() {
@@ -103,7 +175,8 @@ void main() {
       expect(find.byType(Card), findsNWidgets(4));
     });
 
-    testWidgets('カードをタップすると選択状態が変わる', (tester) async {
+    testWidgets('カードをタップすると選択状態が変わる（色覚 FilterService は変更しない、#60）',
+        (tester) async {
       await tester.pumpWidget(_presetsApp());
       await tester.pumpAndSettle();
 
@@ -112,7 +185,7 @@ void main() {
       final filterService = context.read<FilterService>();
 
       // タップ前に色覚フィルタを有効化しておき、体験プリセット適用で
-      // none に戻ることも合わせて確認する（widget test と同じ契約）。
+      // 変更されないことも合わせて確認する（widget test と同じ契約、#60）。
       filterService.applyFilter(ColorVisionType.protanopia);
       expect(visionState.selectedId, isNull);
 
@@ -122,7 +195,171 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(visionState.selectedId, 'vertigo');
-      expect(filterService.currentFilter, ColorVisionType.none);
+      expect(visionState.selectedPresetId, 'meniere');
+      expect(filterService.currentFilter, ColorVisionType.protanopia,
+          reason: 'プリセット適用は色覚クイック選択の状態に干渉しない（#60）');
+    });
+  });
+
+  group('プリセット → プレビュー結線（#60）', () {
+    /// [finder] が実際にヒットテストできる位置（ウィンドウの矩形内）に入るまで
+    /// [scrollableFinder] を実ジェスチャでドラッグし続ける（#60）。
+    ///
+    /// `tester.scrollUntilVisible`（内部の `dragUntilVisible`）は
+    /// 「finder が要素ツリー上に見つかるまで」ドラッグする実装で、
+    /// `_previewWithPresetsApp` のようにカードが遅延構築（ListView.builder 等）
+    /// されず常時ビルド済みの場合は最初から見つかってしまい一切ドラッグしない。
+    /// `tester.ensureVisible`（`Scrollable.ensureVisible`）も呼んだが、CI（macOS
+    /// / Linux とも）でスクロールが反映されなかった（原因未特定）。本質的な
+    /// 原因はどちらでもなく、`_previewWithPresetsApp` が home_screen.dart の
+    /// 幅制約（`ConstrainedBox(maxWidth: 800)`）を欠いていてペインが無制限の
+    /// 幅いっぱいの巨大な正方形になり、後続のカードが大きく押し出されていた
+    /// こと（幅制約は追加済み）。このヘルパは実際の描画済み矩形
+    /// （`tester.getRect`）とウィンドウサイズを比較しながら実ジェスチャの
+    /// `drag` を繰り返すため、スクロール手段そのものの実装差に依存しない。
+    /// [maxAttempts] 回ドラッグしても収まらなければ、後続の `tap()` の
+    /// 分かりにくいヒットテスト失敗にする代わりに、ここで明示的に `fail()`
+    /// する（#60）。
+    Future<void> scrollUntilHitTestable(
+      WidgetTester tester,
+      Finder finder,
+      Finder scrollableFinder, {
+      int maxAttempts = 30,
+    }) async {
+      for (var i = 0; i < maxAttempts; i++) {
+        final viewSize =
+            tester.view.physicalSize / tester.view.devicePixelRatio;
+        final rect = tester.getRect(finder);
+        if (rect.top >= 0 && rect.bottom <= viewSize.height) {
+          return; // 完全にウィンドウ内に収まっている。
+        }
+        final delta = rect.top < 0 ? 200.0 : -200.0;
+        await tester.drag(scrollableFinder, Offset(0, delta));
+        await tester.pump();
+      }
+      fail(
+        '$finder を $maxAttempts 回ドラッグしてもウィンドウ内に収まらなかった'
+        '（ヒットテストできない状態でタップすることになる）',
+      );
+    }
+
+    testWidgets('プリセット 4 種すべてが、タップで実ブリッジ CPU apply() まで例外なく描画される',
+        (tester) async {
+      await tester.pumpWidget(_previewWithPresetsApp());
+      await tester.pumpAndSettle();
+
+      final context = tester.element(find.byType(ExperiencePresets));
+      final visionState = context.read<VisionFilterState>();
+
+      // afterImageRenderer（BeforeAfterView が公開する production 供給源、
+      // 実ブリッジの CpuVisionRenderer.applier を最終的に呼ぶ）をラップし、
+      // 実ブリッジの CPU apply() が完了するたびに renderCount を増やし、
+      // 完了した filter を lastCompletedFilter に記録する（#60）。テキストが
+      // 出るまで単純にポーリングするより、実際に何を待っているか（このタップ
+      // が引き起こした描画そのもの）が明確になる。
+      //
+      // Completer ではなく単調カウンタ + 直近の完了 filter にしてあるのは、
+      // 1 回のタップに対して BeforeAfterView 側の再構築が複数回の render
+      // 呼び出しを引き起こすことがあり（CI で実測: "Bad state: Future
+      // already completed"）、Completer だと 2 回目の complete() で例外に
+      // なるため。renderCount が増えただけでは「このタップより前に投げられて
+      // いた古い render がここで完了した」可能性を排除できないので、完了した
+      // filter が現在の BeforeAfterView.filter と一致することまで確認する。
+      var renderCount = 0;
+      VisionFilter? lastCompletedFilter;
+      final productionRenderer = afterImageRenderer;
+      addTearDown(() => afterImageRenderer = productionRenderer);
+      afterImageRenderer = (source, filter, strength) async {
+        final result = await productionRenderer(source, filter, strength);
+        renderCount++;
+        lastCompletedFilter = filter;
+        return result;
+      };
+
+      final en = lookupAppLocalizations(const Locale('en'));
+      // (experience id, 選択後の after ペインに出るはずのフィルタ名) の組。
+      // meniere と labyrinthitis はどちらも vertigo に写るため after ラベルは
+      // 同じになる — それでも構わない（ここでの主張は「例外なく描画される」）。
+      //
+      // カードは experience id ベースの Key（experienceCardKey）で見つける。
+      // 表示名の文字列は「上に積まれたプレビューペインのせいでカードが
+      // ビューポート外に出て tap のヒットテストが外れる」問題には無関係
+      // （原因は off-screen であることそのもの）だが、id ベースの Key の方が
+      // ロケール・レイアウトに依存せず安定して見つけられる。
+      final cases = <(String experienceId, String afterLabel)>[
+        ('meniere', visionFilterName(en, 'vertigo')),
+        ('bppv', visionFilterName(en, 'bppv_rotation')),
+        ('vestibular_neuritis', visionFilterName(en, 'vestibular_neuritis')),
+        ('labyrinthitis', visionFilterName(en, 'vertigo')),
+      ];
+
+      final scrollableFinder = find.byType(Scrollable).first;
+
+      for (final (experienceId, afterLabel) in cases) {
+        final cardFinder = find.byKey(experienceCardKey(experienceId));
+        // プレビューペイン + 他のプリセットカードでスクロールが必要になる
+        // ことがあるため、タップ前に確実にビューポート内へ持ってくる。
+        await scrollUntilHitTestable(tester, cardFinder, scrollableFinder);
+
+        final renderCountBeforeTap = renderCount;
+        await tester.tap(cardFinder);
+        await tester.pump();
+
+        // タップ直後に選択状態そのものも確認する（実描画の結果だけを見て、
+        // 選択が正しく反映されたことを間接的に推測しない、#60）。
+        expect(visionState.selectedPresetId, experienceId,
+            reason: '$experienceId タップ直後に selectedPresetId が反映されていない');
+
+        // 実ブリッジの CPU apply() が「このタップの選択」で完了するまで待つ
+        // （renderCount が増えただけでなく、完了した filter が現在の
+        // BeforeAfterView.filter と一致することまで確認する、#60）。
+        final deadline = DateTime.now().add(const Duration(seconds: 10));
+        VisionFilter? currentWidgetFilter() =>
+            tester.widget<BeforeAfterView>(find.byType(BeforeAfterView)).filter;
+        while ((renderCount <= renderCountBeforeTap ||
+                lastCompletedFilter != currentWidgetFilter()) &&
+            DateTime.now().isBefore(deadline)) {
+          await tester.pump(const Duration(milliseconds: 20));
+        }
+        final rendered = renderCount > renderCountBeforeTap &&
+            lastCompletedFilter == currentWidgetFilter();
+        await tester.pump();
+        await tester.pump();
+        // tester.takeException() は呼ぶと例外キューを消費してしまうため、
+        // ここで一度だけ読み取り、タイムアウト時のメッセージと後段の
+        // 例外なしチェックの両方でこの値を使い回す（#60）。
+        final caughtException = tester.takeException();
+        expect(
+          rendered,
+          isTrue,
+          reason: '$experienceId タップ後、実ブリッジの描画が完了しなかった '
+              '(renderCount=$renderCount, lastCompletedFilter='
+              '$lastCompletedFilter, 例外の有無=${caughtException != null})',
+        );
+
+        // vestibular_neuritis はプリセットカードの見出し
+        // （experienceName、"Vestibular neuritis"）とプレビューの after
+        // ラベル（visionFilterName、こちらも "Vestibular neuritis"）が同じ
+        // 文字列になるため、ページ全体ではなく BeforeAfterView の中だけで
+        // 探す（#60）。
+        final afterLabelFinder = find.descendant(
+          of: find.byType(BeforeAfterView),
+          matching: find.text(afterLabel),
+        );
+
+        expect(caughtException, isNull,
+            reason: '$experienceId 選択後の描画で例外が発生した');
+        expect(afterLabelFinder, findsOneWidget,
+            reason: '$experienceId 選択後、after ペインに "$afterLabel" が出ていない');
+        expect(
+          find.descendant(
+            of: find.byType(BeforeAfterView),
+            matching: find.text(en.previewFailed),
+          ),
+          findsNothing,
+          reason: '$experienceId 選択後にプレビューが失敗表示になっている',
+        );
+      }
     });
   });
 

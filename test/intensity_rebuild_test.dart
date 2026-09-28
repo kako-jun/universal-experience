@@ -20,6 +20,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/main.dart';
 import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/settings_service.dart';
 
 void main() {
@@ -31,13 +32,15 @@ void main() {
     await settings.load();
 
     // スライダーを操作可能にするため、フィルタを選択しておく（IntensitySlider は
-    // currentFilter == none の間 onChanged が null で操作不能）。main() では
-    // buildRootApp() が filterService と settings.filterType を同じ値に揃えて
-    // 起動するので、ここでもテスト対象外の初期同期として揃えておく（揃えないと、
-    // 最初の 1 回だけ HomeScreen._persistFilterState の setFilterType が
-    // 「none → protanopia」の実変更として notify してしまい、これから見たい
-    // 「intensity だけを動かしたとき」の挙動と混ざってしまう）。
-    filterService.applyFilter(ColorVisionType.protanopia);
+    // VisionFilterState.isColorQuickSelection が false の間 onChanged が null で
+    // 操作不能、#60）。main() では buildRootApp() が selectColorVision
+    // （FilterService と VisionFilterState の両方を更新する唯一の
+    // 入口、#60）で filterService/visionFilterState と settings.filterType を
+    // 揃えて起動するので、ここでもテスト対象外の初期同期として揃えておく
+    // （揃えないと、最初の 1 回だけ HomeScreen._persistFilterState の
+    // setFilterType が「none → protanopia」の実変更として notify してしまい、
+    // これから見たい「intensity だけを動かしたとき」の挙動と混ざってしまう）。
+    selectColorVision(filterService, visionFilterState, ColorVisionType.protanopia);
     await settings.setFilterType(ColorVisionType.protanopia);
 
     await tester.pumpWidget(UniversalExperienceApp(settings: settings));
@@ -49,6 +52,10 @@ void main() {
     // scrollUntilVisible で「見つかる かつ 実際に見える」ところまで動かす。
     // ExperiencePresets カードのような、より下の（flutter_rust_bridge 初期化を
     // 要求する）カードまでは踏み込まない範囲で止まる。
+    //
+    // advanced セクションの FilterParamPanel は、色覚クイック選択
+    // 由来のときは strength スライダーを出さないため（showsAdvancedStrengthSlider、#60）、
+    // Slider は IntensitySlider の 1 本だけになる。find.byType(Slider) のままでよい。
     final sliderFinder = find.byType(Slider);
     await tester.scrollUntilVisible(sliderFinder, 80);
     // scrollUntilVisible が仕込むスクロールはアニメーションのため、実際に位置が

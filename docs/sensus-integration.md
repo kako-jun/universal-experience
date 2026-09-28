@@ -459,7 +459,31 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   `afterImageRenderer` と同じパターンだが、production コード自身が参照するため
   `@visibleForTesting` は付けていない、#85 レビュー N1）へ委譲する形に置き換えた。
   レンダラ自体は任意の `VisionFilter`（payload 込み）を受け取れるため、advanced
-  カタログ 30 種すべてを描画できる（UI からの結線は #60 のスコープ）。
+  カタログ 30 種すべてを描画できる。
+  **#60 での追補**: advanced カタログ・体験プリセットの UI 結線を終えた際、
+  `renderAfter`（延いては `before_after_view.dart` 全体）から `ColorVisionType`
+  → `VisionFilter` の写像を撤去した。マッピングは呼び出し側
+  （`home_screen.dart`）が `VisionFilterState.build()` で行い、`renderAfter` は
+  組み立て済みの `VisionFilter?` をそのまま `CpuVisionRenderer.applier` へ渡す
+  だけになっている。`visionFilterForColorVisionType`
+  （トップレベル関数。`FilterService.sensusFilter` はこれに委譲するだけの
+  インスタンス getter）自体は変わらず健在だが、`lib/services/
+  color_vision_selection.dart` の `selectColorVision` が色覚のクイック選択を
+  `VisionFilterState` へ書き込む際、`FilterService` のインスタンス
+  （`filterService.sensusFilter`）は経由せずこの関数を直接呼ぶ — `selectColorVision`
+  は `filterService.applyFilter(type)` と `VisionFilterState` への書き込みを
+  同じ `type` から並行して行う関数なので、インスタンスの現在値
+  （`filterService.currentFilter`）に依存させる必要がないため。
+  **#60 での追補**: 当初は home_screen.dart の listener が `FilterService` の
+  変化を `VisionFilterState` へミラーしていたが、「`currentFilter` が変わった
+  ときだけ」反映する差分検知のせいで、advanced/プリセットを経由したあとに
+  同じ色覚型を再選択しても反映されない穴があった。ミラーはやめ、
+  `FilterSelector`・トレイ・`main.dart` の起動時復元のいずれも
+  `selectColorVision`/`deactivateColorVision`
+  （`lib/services/color_vision_selection.dart`）を直接呼んで、その場で
+  `FilterService` と `VisionFilterState` の両方を更新する形にした。
+  `VisionFilterState` はこれに伴い `filterService` と同じくトップレベル
+  singleton（`main.dart` の `visionFilterState`）に昇格した。
 - **alpha の扱い（レビュー S1、初版の誤り）**: Flutter の `ui.Image` は
   premultiplied alpha で GPU テクスチャを保持するが、sensus（`image` crate）は
   straight alpha を前提にした画素処理を行う。初版はこの違いを踏まえず

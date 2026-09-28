@@ -9,24 +9,27 @@ import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
 import 'package:universal_experience/services/export_service.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 
 /// BeforeAfterView の before/after 生成ロジックと描画カバレッジのテスト（#17）。
 ///
-/// 静的ヘルパ（generateSampleImage / renderAfter）を直接検証する。全
-/// ColorVisionType が実描画される（#59 で GPU、#85 で sensus の CPU `apply()`
-/// 経路に切替。`canRender` と「描画は近日対応」プレースホルダは、到達しなくなった
-/// ため #86 レビューで撤去した）。
+/// 静的ヘルパ（generateSampleImage / renderAfter）を直接検証する。
+///
+/// #60: BeforeAfterView は `VisionFilterState` の選択（[VisionFilter]・payload・
+/// strength）を唯一の正本にするよう配線された（home_screen.dart 側）。この
+/// widget 自身はもう `ColorVisionType` を知らず、[filter]（nullable な
+/// [VisionFilter]）・[filterId]（カタログ id、caption/ラベル解決用）・
+/// [strength] を受け取るだけの presentational widget になった。`ColorVisionType`
+/// → `VisionFilter` のマッピング契約（anomaly は base -opia と同一の
+/// `VisionFilter`、等）は `test/filter_service_test.dart` が検証する
+/// （`visionFilterForColorVisionType`）ので、ここでは重複させない。
 ///
 /// `renderAfter` は実ブリッジ（`applyVisionCpuRgba8`）を必要とする
 /// [CpuVisionRenderer.applier] へ委譲するため（#85）、`flutter test`（native lib
-/// 未ロード）では実際の CPU 描画は呼べない。`group('renderAfter', ...)` は
-/// [CpuVisionRenderer.applier] をフェイクに差し替え、`ColorVisionType` →
-/// `VisionFilter` のマッピング契約（#57/#59 の不変条件も含む）を検証する。
-/// 実ブリッジでの実描画は `integration_test/cpu_preview_all_filters_test.dart`
-/// （CI）が担う。
+/// 未ロード）では実際の CPU 描画は呼べない。widget test 群は
+/// [CpuVisionRenderer.applier] をフェイクに差し替える。実ブリッジでの実描画は
+/// `integration_test/cpu_preview_all_filters_test.dart`（CI）が担う。
 ///
 /// #85 レビュー S3/S4 で以下を変更した:
 /// - CPU プレビューは固定の正準サイズ（[BeforeAfterView.canonicalSampleSize]）
@@ -88,28 +91,23 @@ void main() {
       CpuVisionRenderer.applier = CpuVisionRenderer.apply;
     });
 
-    test('none は CpuVisionRenderer を呼ばず元画像をそのまま返す', () async {
+    test('filter が null なら CpuVisionRenderer を呼ばず元画像をそのまま返す', () async {
       var called = false;
       CpuVisionRenderer.applier = (source, filter, strength) async {
         called = true;
         return fakeOut;
       };
 
-      final out = await BeforeAfterView.renderAfter(
-        src,
-        ColorVisionType.none,
-        1.0,
-      );
+      final out = await BeforeAfterView.renderAfter(src, null, 1.0);
       expect(identical(out, src), isTrue);
-      expect(called, isFalse, reason: 'none はフィルタなしなので CPU レンダラを呼ぶ必要がない');
+      expect(called, isFalse, reason: 'filter なしなので CPU レンダラを呼ぶ必要がない');
     });
 
-    test(
-        'protanopia は VisionFilter.protanopia() と指定 strength で '
-        'CpuVisionRenderer.applier を呼ぶ', () async {
+    test('filter が非 null なら source・filter・strength をそのまま CpuVisionRenderer.applier に渡す',
+        () async {
+      ui.Image? capturedSource;
       VisionFilter? capturedFilter;
       double? capturedStrength;
-      ui.Image? capturedSource;
       CpuVisionRenderer.applier = (source, filter, strength) async {
         capturedSource = source;
         capturedFilter = filter;
@@ -117,81 +115,25 @@ void main() {
         return fakeOut;
       };
 
-      final out = await BeforeAfterView.renderAfter(
-        src,
-        ColorVisionType.protanopia,
-        0.75,
-      );
+      const filter = VisionFilter.protanopia();
+      final out = await BeforeAfterView.renderAfter(src, filter, 0.75);
       expect(identical(out, fakeOut), isTrue);
       expect(identical(capturedSource, src), isTrue);
-      expect(capturedFilter, const VisionFilter.protanopia());
+      expect(capturedFilter, filter);
       expect(capturedStrength, 0.75);
     });
 
-    test(
-        'protanomaly は protanopia と同一の VisionFilter にマップされる '
-        '（#57: 強度差のみで区別する契約。マッピング自体が strength に依存して '
-        '分岐してはいけない）', () async {
+    test('payload 付きフィルタもそのまま渡される（#60: マッピングはこの widget の責務ではない）',
+        () async {
       VisionFilter? capturedFilter;
-      double? capturedStrength;
       CpuVisionRenderer.applier = (source, filter, strength) async {
         capturedFilter = filter;
-        capturedStrength = strength;
         return fakeOut;
       };
 
-      await BeforeAfterView.renderAfter(
-        src,
-        ColorVisionType.protanomaly,
-        kAnomalyDefaultSeverity,
-      );
-      expect(capturedFilter, const VisionFilter.protanopia());
-      expect(capturedStrength, kAnomalyDefaultSeverity);
-    });
-
-    test(
-        'deuteranopia / tritanopia / achromatopsia もそれぞれ対応する '
-        'VisionFilter にマップされる（#59）', () async {
-      final expected = <ColorVisionType, VisionFilter>{
-        ColorVisionType.deuteranopia: const VisionFilter.deuteranopia(),
-        ColorVisionType.tritanopia: const VisionFilter.tritanopia(),
-        ColorVisionType.achromatopsia: const VisionFilter.achromatopsia(),
-      };
-      for (final entry in expected.entries) {
-        VisionFilter? capturedFilter;
-        CpuVisionRenderer.applier = (source, filter, strength) async {
-          capturedFilter = filter;
-          return fakeOut;
-        };
-
-        final out = await BeforeAfterView.renderAfter(src, entry.key, 1.0);
-        expect(identical(out, fakeOut), isTrue, reason: '${entry.key}');
-        expect(capturedFilter, entry.value, reason: '${entry.key}');
-      }
-    });
-
-    test(
-        'deuteranomaly/tritanomaly はそれぞれ対応する -opia と同一の '
-        'VisionFilter にマップされる（#59。#57 の protanomaly と同じ不変条件を '
-        '残り2型にも広げる）', () async {
-      final pairs = <ColorVisionType, VisionFilter>{
-        ColorVisionType.deuteranomaly: const VisionFilter.deuteranopia(),
-        ColorVisionType.tritanomaly: const VisionFilter.tritanopia(),
-      };
-      for (final entry in pairs.entries) {
-        VisionFilter? capturedFilter;
-        CpuVisionRenderer.applier = (source, filter, strength) async {
-          capturedFilter = filter;
-          return fakeOut;
-        };
-
-        await BeforeAfterView.renderAfter(
-          src,
-          entry.key,
-          recommendedStrength(entry.key),
-        );
-        expect(capturedFilter, entry.value, reason: '${entry.key}');
-      }
+      const filter = VisionFilter.astigmatism(axisDeg: 45.0);
+      await BeforeAfterView.renderAfter(src, filter, 1.0);
+      expect(capturedFilter, filter);
     });
   });
 
@@ -245,13 +187,14 @@ void main() {
         await tester.pumpWidget(
           localized(
             const BeforeAfterView(
-              filterType: ColorVisionType.protanopia,
-              intensity: 1.0,
+              filter: VisionFilter.protanopia(),
+              filterId: 'protanopia',
+              strength: 1.0,
               sampleSize: 32,
             ),
           ),
         );
-        final protoName = colorVisionTypeName(en, ColorVisionType.protanopia);
+        final protoName = visionFilterName(en, 'protanopia');
         await pumpUntilText(tester, protoName);
 
         expect(find.text(en.previewPaneOriginal), findsOneWidget);
@@ -264,18 +207,104 @@ void main() {
         await tester.pumpWidget(
           localized(
             const BeforeAfterView(
-              filterType: ColorVisionType.deuteranopia,
-              intensity: 1.0,
+              filter: VisionFilter.deuteranopia(),
+              filterId: 'deuteranopia',
+              strength: 1.0,
               sampleSize: 32,
             ),
           ),
         );
-        final deuteranopiaName =
-            colorVisionTypeName(en, ColorVisionType.deuteranopia);
+        final deuteranopiaName = visionFilterName(en, 'deuteranopia');
         await pumpUntilText(tester, deuteranopiaName);
 
         expect(find.text(en.previewPaneOriginal), findsOneWidget);
         expect(find.text(deuteranopiaName), findsOneWidget);
+      });
+
+      testWidgets('filter が null なら両ペインとも原画ラベルになる（#60）', (tester) async {
+        await tester.pumpWidget(
+          localized(
+            const BeforeAfterView(
+              filter: null,
+              filterId: null,
+              strength: 1.0,
+              sampleSize: 32,
+            ),
+          ),
+        );
+        await pumpUntilText(tester, en.previewPaneOriginal);
+
+        expect(find.text(en.previewPaneOriginal), findsNWidgets(2));
+      });
+
+      testWidgets(
+          'colorVisionType=deuteranomaly なら filterId=deuteranopia でも '
+          '見出しは Deuteranomaly になる（#60）', (tester) async {
+        // カタログは色覚を 5 種しか持たず、-omaly は base の -opia と同じ
+        // catalog id（deuteranopia）に写る（FilterService.sensusFilter の
+        // 対応表）。filterId だけで見出しを解決すると常に "Deuteranopia" に
+        // なってしまうため、colorVisionType を優先する契約を確認する。
+        await tester.pumpWidget(
+          localized(
+            const BeforeAfterView(
+              filter: VisionFilter.deuteranopia(),
+              filterId: 'deuteranopia',
+              colorVisionType: ColorVisionType.deuteranomaly,
+              strength: 0.6,
+              sampleSize: 32,
+            ),
+          ),
+        );
+        final deuteranomalyName = colorVisionTypeName(en, ColorVisionType.deuteranomaly);
+        await pumpUntilText(tester, deuteranomalyName);
+
+        expect(find.text(en.previewPaneOriginal), findsOneWidget);
+        expect(find.text(deuteranomalyName), findsOneWidget);
+        expect(
+          find.text(visionFilterName(en, 'deuteranopia')),
+          findsNothing,
+          reason: 'colorVisionType があるときは filterId 由来の "Deuteranopia" '
+              'を出してはいけない',
+        );
+      });
+    });
+
+    group('時間依存フィルタの注記 (#60)', () {
+      setUp(() {
+        CpuVisionRenderer.applier = (source, filter, strength) async => source;
+      });
+      tearDown(() {
+        CpuVisionRenderer.applier = CpuVisionRenderer.apply;
+      });
+
+      testWidgets('vertigo（時間依存）は静止フレームの注記を出す', (tester) async {
+        await tester.pumpWidget(
+          localized(
+            const BeforeAfterView(
+              filter: VisionFilter.vertigo(),
+              filterId: 'vertigo',
+              strength: 1.0,
+              sampleSize: 32,
+            ),
+          ),
+        );
+        await pumpUntilText(tester, en.previewStaticFrameNote);
+        expect(find.text(en.previewStaticFrameNote), findsOneWidget);
+      });
+
+      testWidgets('protanopia（時間依存でない）は静止フレームの注記を出さない', (tester) async {
+        await tester.pumpWidget(
+          localized(
+            const BeforeAfterView(
+              filter: VisionFilter.protanopia(),
+              filterId: 'protanopia',
+              strength: 1.0,
+              sampleSize: 32,
+            ),
+          ),
+        );
+        await pumpUntilText(tester, visionFilterName(en, 'protanopia'));
+        expect(find.text(en.previewStaticFrameNote), findsNothing);
       });
     });
 
@@ -313,17 +342,18 @@ void main() {
 
         final completers = <Completer<ui.Image?>>[];
         final capturedStrengths = <double>[];
-        afterImageRenderer = (source, type, strength) {
+        afterImageRenderer = (source, filter, strength) {
           capturedStrengths.add(strength);
           final c = Completer<ui.Image?>();
           completers.add(c);
           return c.future;
         };
 
-        Widget build(double intensity) => localized(
+        Widget build(double strength) => localized(
               BeforeAfterView(
-                filterType: ColorVisionType.protanopia,
-                intensity: intensity,
+                filter: const VisionFilter.protanopia(),
+                filterId: 'protanopia',
+                strength: strength,
                 sampleSize: 16,
               ),
             );
@@ -377,7 +407,7 @@ void main() {
         var activeCount = 0;
         var maxActiveCount = 0;
         final calledStrengths = <double>[];
-        afterImageRenderer = (source, type, strength) async {
+        afterImageRenderer = (source, filter, strength) async {
           activeCount++;
           if (activeCount > maxActiveCount) maxActiveCount = activeCount;
           calledStrengths.add(strength);
@@ -388,10 +418,11 @@ void main() {
           return afterImages[strength];
         };
 
-        Widget build(double intensity) => localized(
+        Widget build(double strength) => localized(
               BeforeAfterView(
-                filterType: ColorVisionType.protanopia,
-                intensity: intensity,
+                filter: const VisionFilter.protanopia(),
+                filterId: 'protanopia',
+                strength: strength,
                 sampleSize: 16,
               ),
             );
@@ -423,31 +454,33 @@ void main() {
 
         final responses = <Future<ui.Image?> Function(ui.Image)>[
           (source) =>
-              Future.value(source), // phase1: none → _after は _before と同一
+              Future.value(source), // phase1: filter=null → _after は _before と同一
           (source) => Future.value(after1), // phase2: 実描画（_before とは別物）
           (source) => Future.value(after2), // phase3: 再度差し替え
         ];
         var callIndex = 0;
-        afterImageRenderer = (source, type, strength) {
+        afterImageRenderer = (source, filter, strength) {
           final response = responses[callIndex];
           callIndex++;
           return response(source);
         };
 
-        // phase1: filterType=none → _after は _before(before1) のエイリアス。
+        // phase1: filter=null → _after は _before(before1) のエイリアス。
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.none,
-          intensity: 1.0,
+          filter: null,
+          filterId: null,
+          strength: 1.0,
           sampleSize: 16,
         )));
         await tester.pump();
         await tester.pump();
 
-        // phase2: none → protanopia。旧 _after(=before1) は _before と同一なので
+        // phase2: null → protanopia。旧 _after(=before1) は _before と同一なので
         // dispose されてはいけない（_before として使われ続けている）。
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 1.0,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 1.0,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -459,8 +492,9 @@ void main() {
         // phase3: intensity だけ変更。旧 _after(after1) は _before と別物なので
         // 今度こそ dispose されるべき。
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 0.5,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 0.5,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -481,11 +515,12 @@ void main() {
         sampleImageGenerator = (size) => Future.value(before1);
 
         final completer = Completer<ui.Image?>();
-        afterImageRenderer = (source, type, strength) => completer.future;
+        afterImageRenderer = (source, filter, strength) => completer.future;
 
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 1.0,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 1.0,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -508,7 +543,7 @@ void main() {
       // 前は _currentSampleSize が null のままなので didUpdateWidget が
       // 再生成をスキップしてしまう」という auto モード特有の不具合で、#85
       // レビュー S4 で auto モード自体（レイアウト依存のサイズ決定）を撤去した
-      // ため前提が消滅した。「初期生成中に filterType が変わっても最新の結果
+      // ため前提が消滅した。「初期生成中に filter が変わっても最新の結果
       // だけが残る」という一般的な不変条件自体は、上の
       // 「連続更新では中間の要求は集約され…」(#85 レビュー S3) テストで
       // 別の切り口から検証済み。
@@ -525,19 +560,20 @@ void main() {
 
         ui.Image? capturedRendererInput;
         var callIndex = 0;
-        afterImageRenderer = (source, type, strength) {
+        afterImageRenderer = (source, filter, strength) {
           callIndex++;
           if (callIndex == 1) {
-            return Future.value(source); // none 相当: そのまま返す
+            return Future.value(source); // filter=null 相当: そのまま返す
           }
           capturedRendererInput = source;
           return Future.value(realAfter);
         };
 
-        // 1回目: filterType=none で _before=_after=before1 を確定させる。
+        // 1回目: filter=null で _before=_after=before1 を確定させる。
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.none,
-          intensity: 1.0,
+          filter: null,
+          filterId: null,
+          strength: 1.0,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -547,8 +583,9 @@ void main() {
         // renderer に渡されるのは before1 そのものではなく複製であるべき
         // （await 中に他の更新で _before が dispose される可能性があるため）。
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 1.0,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 1.0,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -586,14 +623,15 @@ void main() {
 
         var rendererCallCount = 0;
         final completer = Completer<ui.Image?>();
-        afterImageRenderer = (source, type, strength) {
+        afterImageRenderer = (source, filter, strength) {
           rendererCallCount++;
           return completer.future;
         };
 
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 1.0,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 1.0,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -602,8 +640,9 @@ void main() {
         // intensity を変える → 1回目がまだ in-flight なので集約されて
         // pending になるだけで、まだ renderer は呼ばれない。
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 0.5,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 0.5,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -635,11 +674,12 @@ void main() {
           requestedSizes.add(size);
           return Future.value(stub);
         };
-        afterImageRenderer = (source, type, strength) => Future.value(source);
+        afterImageRenderer = (source, filter, strength) => Future.value(source);
 
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.none,
-          intensity: 1.0,
+          filter: null,
+          filterId: null,
+          strength: 1.0,
         )));
         await tester.pump();
         await tester.pump();
@@ -664,8 +704,9 @@ void main() {
             );
 
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 1.0,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 1.0,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -681,12 +722,13 @@ void main() {
           goodBefore = await BeforeAfterView.generateSampleImage(4);
         });
         sampleImageGenerator = (size) => Future.value(goodBefore);
-        afterImageRenderer = (source, type, strength) =>
+        afterImageRenderer = (source, filter, strength) =>
             Future<ui.Image?>.error(StateError('boom: renderer'));
 
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 0.5,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 0.5,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -714,13 +756,14 @@ void main() {
           return Future.value(goodBefore);
         };
         afterImageRenderer =
-            (source, type, strength) => Future.value(goodAfter);
+            (source, filter, strength) => Future.value(goodAfter);
 
         final en = lookupAppLocalizations(const Locale('en'));
 
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 1.0,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 1.0,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -731,8 +774,9 @@ void main() {
 
         // 次の更新（intensity 変更）で再試行され、今度は成功する。
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 0.5,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 0.5,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -757,7 +801,7 @@ void main() {
             (size) => Future.value(generatedBefores[generatorCallCount++]);
 
         var rendererCallCount = 0;
-        afterImageRenderer = (source, type, strength) {
+        afterImageRenderer = (source, filter, strength) {
           rendererCallCount++;
           if (rendererCallCount == 1) {
             return Future<ui.Image?>.error(StateError('boom'));
@@ -768,8 +812,9 @@ void main() {
         final en = lookupAppLocalizations(const Locale('en'));
 
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 1.0,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 1.0,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -781,8 +826,9 @@ void main() {
         expect(find.text(en.previewPreparing), findsNothing);
 
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 0.5,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 0.5,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -817,11 +863,12 @@ void main() {
           return Future.value(goodBefore);
         };
         afterImageRenderer =
-            (source, type, strength) => Future.value(goodAfter);
+            (source, filter, strength) => Future.value(goodAfter);
 
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 1.0,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 1.0,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -839,8 +886,9 @@ void main() {
 
         // ユーザー操作（intensity 変更）で再試行され、今度は成功する。
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 0.5,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 0.5,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -870,7 +918,7 @@ void main() {
         sampleImageGenerator = (size) => Future.value(goodBefore);
 
         var rendererCallCount = 0;
-        afterImageRenderer = (source, type, strength) {
+        afterImageRenderer = (source, filter, strength) {
           rendererCallCount++;
           if (rendererCallCount == 1) return Future.value(goodAfter1);
           if (rendererCallCount == 2) {
@@ -883,8 +931,9 @@ void main() {
 
         // 1回目: 成功して goodAfter1 が表示される。
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 1.0,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 1.0,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -893,8 +942,9 @@ void main() {
 
         // 2回目: renderer が失敗する。
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 0.5,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 0.5,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -907,8 +957,9 @@ void main() {
 
         // 3回目: 成功して復帰する。
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 0.6,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 0.6,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -943,7 +994,7 @@ void main() {
         // まだ1回目のまま」という状況を作る。
         var rendererCallCount = 0;
         final pending = Completer<ui.Image?>();
-        afterImageRenderer = (source, type, strength) {
+        afterImageRenderer = (source, filter, strength) {
           rendererCallCount++;
           if (rendererCallCount == 1) return Future.value(after1);
           return pending.future;
@@ -969,8 +1020,9 @@ void main() {
 
         // 1回目: protanopia, intensity=1.0 で描画完了させる。
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 1.0,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 1.0,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -982,8 +1034,9 @@ void main() {
         // フェイクで意図的に未解決のまま止めてあるので、_after はまだ
         // 1回目（after1, strength=1.0）のままになる。
         await tester.pumpWidget(localized(const BeforeAfterView(
-          filterType: ColorVisionType.protanopia,
-          intensity: 0.5,
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 0.5,
           sampleSize: 16,
         )));
         await tester.pump();
@@ -991,7 +1044,7 @@ void main() {
 
         // ここで export をタップする。表示されている _after はまだ1回目の
         // 結果なので、caption も1回目の strength（100%）になるべき——
-        // widget.intensity の現在値（0.5 → 50%）を使ってはいけない
+        // widget.strength の現在値（0.5 → 50%）を使ってはいけない
         // （#85 レビュー S8）。
         await tester.tap(find.byTooltip(en.exportButtonTooltip));
         // encodeImagePng は実エンジンの PNG エンコードを行う（フェイクにして
@@ -1012,11 +1065,117 @@ void main() {
             reason: '描画時（1回目、strength=1.0=100%）の値を使うべき');
         expect(
           capturedCaption!.symptomLabel,
-          colorVisionTypeName(en, ColorVisionType.protanopia),
+          visionFilterName(en, 'protanopia'),
         );
         expect(savedFilename, isNotNull);
         expect(savedFilename, contains('100pct'));
         expect(savedFilename, isNot(contains('50pct')));
+      });
+
+      testWidgets('filter=null（原画）で export すると symptomLabel が previewPaneOriginal になる '
+          '(#60)', (tester) async {
+        late ui.Image before1, composedStub;
+        await tester.runAsync(() async {
+          before1 = await BeforeAfterView.generateSampleImage(4);
+          composedStub = await BeforeAfterView.generateSampleImage(4);
+        });
+        sampleImageGenerator = (size) => Future.value(before1);
+        afterImageRenderer = (source, filter, strength) =>
+            Future.value(source); // filter=null: そのまま返す
+
+        ExportCaption? capturedCaption;
+        exportImageComposer = (base, caption) async {
+          capturedCaption = caption;
+          return composedStub;
+        };
+        String? savedFilename;
+        pngSaver = (bytes, filename) async {
+          savedFilename = filename;
+          return '/fake/downloads/$filename';
+        };
+
+        final en = lookupAppLocalizations(const Locale('en'));
+
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filter: null,
+          filterId: null,
+          strength: 1.0,
+          sampleSize: 16,
+        )));
+        await tester.pump();
+        await tester.pump();
+
+        await tester.tap(find.byTooltip(en.exportButtonTooltip));
+        await tester.runAsync(() async {
+          for (var i = 0; i < 50; i++) {
+            if (savedFilename != null) return;
+            await tester.pump(const Duration(milliseconds: 20));
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+          }
+        });
+        await tester.pump();
+
+        expect(capturedCaption, isNotNull);
+        expect(capturedCaption!.symptomLabel, en.previewPaneOriginal);
+        expect(savedFilename, contains('-none-'));
+      });
+
+      testWidgets(
+          'colorVisionType=deuteranomaly で export すると symptomLabel・'
+          'ファイル名とも deuteranomaly になる（#60）', (tester) async {
+        late ui.Image before1, after1, composedStub;
+        await tester.runAsync(() async {
+          before1 = await BeforeAfterView.generateSampleImage(4);
+          after1 = await BeforeAfterView.generateSampleImage(4);
+          composedStub = await BeforeAfterView.generateSampleImage(4);
+        });
+        sampleImageGenerator = (size) => Future.value(before1);
+        afterImageRenderer = (source, filter, strength) => Future.value(after1);
+
+        ExportCaption? capturedCaption;
+        exportImageComposer = (base, caption) async {
+          capturedCaption = caption;
+          return composedStub;
+        };
+        String? savedFilename;
+        pngSaver = (bytes, filename) async {
+          savedFilename = filename;
+          return '/fake/downloads/$filename';
+        };
+
+        final en = lookupAppLocalizations(const Locale('en'));
+
+        // filterId は deuteranopia（カタログの色覚 5 種は -omaly を持たず、
+        // base の -opia に写るため）だが、colorVisionType=deuteranomaly を
+        // 渡す（home_screen.dart が VisionFilterState.colorVisionType から
+        // 渡すのと同じ形）。
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filter: VisionFilter.deuteranopia(),
+          filterId: 'deuteranopia',
+          colorVisionType: ColorVisionType.deuteranomaly,
+          strength: 0.6,
+          sampleSize: 16,
+        )));
+        await tester.pump();
+        await tester.pump();
+
+        await tester.tap(find.byTooltip(en.exportButtonTooltip));
+        await tester.runAsync(() async {
+          for (var i = 0; i < 50; i++) {
+            if (savedFilename != null) return;
+            await tester.pump(const Duration(milliseconds: 20));
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+          }
+        });
+        await tester.pump();
+
+        expect(capturedCaption, isNotNull);
+        expect(
+          capturedCaption!.symptomLabel,
+          colorVisionTypeName(en, ColorVisionType.deuteranomaly),
+        );
+        expect(savedFilename, contains('-deuteranomaly-'));
+        expect(savedFilename, isNot(contains('deuteranopia')));
       });
     });
   });
