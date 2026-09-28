@@ -21,6 +21,15 @@ typedef ExperiencesProvider = List<Experience> Function();
 @visibleForTesting
 ExperiencesProvider experiencesProvider = experiences;
 
+/// 体験プリセットのカード（[_ExperienceCard]）を一意に指す [Key]。
+///
+/// テストが表示名の文字列（ロケール依存・レイアウト変更で位置がずれる）ではなく
+/// experience id で安定してカードを見つけ、タップ前に
+/// `WidgetController.scrollUntilVisible` でスクロールできるようにするための
+/// 公開ヘルパ（#60 レビュー）。
+Key experienceCardKey(String experienceId) =>
+    ValueKey('experience_card_$experienceId');
+
 /// 体験プリセット集 (#19)。
 ///
 /// sensus の [experiences]（meniere / bppv / vestibular_neuritis / labyrinthitis の
@@ -86,6 +95,7 @@ class _ExperienceCard extends StatelessWidget {
     final includesHearing = experience.hearing != null;
 
     return Card(
+      key: experienceCardKey(experience.id),
       // 選択中のプリセットを縁取りで示す。
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),

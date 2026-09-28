@@ -211,30 +211,38 @@ void main() {
       await tester.pumpAndSettle();
 
       final en = lookupAppLocalizations(const Locale('en'));
-      // (プリセットのラベル, 選択後の after ペインに出るはずのフィルタ名) の組。
+      // (experience id, 選択後の after ペインに出るはずのフィルタ名) の組。
       // meniere と labyrinthitis はどちらも vertigo に写るため after ラベルは
       // 同じになる — それでも構わない（ここでの主張は「例外なく描画される」）。
-      final cases = <(String presetLabel, String afterLabel)>[
-        (en.experienceMeniere, visionFilterName(en, 'vertigo')),
-        (en.experienceBppv, visionFilterName(en, 'bppv_rotation')),
-        (
-          en.experienceVestibularNeuritis,
-          visionFilterName(en, 'vestibular_neuritis'),
-        ),
-        (en.experienceLabyrinthitis, visionFilterName(en, 'vertigo')),
+      //
+      // カードは experience id ベースの Key（experienceCardKey）で見つける。
+      // 表示名の文字列は「上に積まれたプレビューペインのせいでカードが
+      // ビューポート外に出て tap のヒットテストが外れる」問題（#60 レビュー）
+      // には無関係（原因は off-screen であることそのもの）だが、id ベースの
+      // Key の方がロケール・レイアウトに依存せず安定して見つけられる。
+      final cases = <(String experienceId, String afterLabel)>[
+        ('meniere', visionFilterName(en, 'vertigo')),
+        ('bppv', visionFilterName(en, 'bppv_rotation')),
+        ('vestibular_neuritis', visionFilterName(en, 'vestibular_neuritis')),
+        ('labyrinthitis', visionFilterName(en, 'vertigo')),
       ];
 
-      for (final (presetLabel, afterLabel) in cases) {
-        await tester.tap(find.text(presetLabel));
+      for (final (experienceId, afterLabel) in cases) {
+        final cardFinder = find.byKey(experienceCardKey(experienceId));
+        // プレビューペイン + 他のプリセットカードでスクロールが必要になる
+        // ことがあるため、タップ前に確実にビューポート内へ持ってくる。
+        await tester.scrollUntilVisible(cardFinder, 200);
+        await tester.pump();
+        await tester.tap(cardFinder);
         await tester.pump();
         await pumpUntilFound(tester, find.text(afterLabel));
 
         expect(tester.takeException(), isNull,
-            reason: '$presetLabel 選択後の描画で例外が発生した');
+            reason: '$experienceId 選択後の描画で例外が発生した');
         expect(find.text(afterLabel), findsOneWidget,
-            reason: '$presetLabel 選択後、after ペインに "$afterLabel" が出ていない');
+            reason: '$experienceId 選択後、after ペインに "$afterLabel" が出ていない');
         expect(find.text(en.previewFailed), findsNothing,
-            reason: '$presetLabel 選択後にプレビューが失敗表示になっている');
+            reason: '$experienceId 選択後にプレビューが失敗表示になっている');
       }
     });
   });
