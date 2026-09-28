@@ -12,8 +12,6 @@
 // まとめて渡すと、デスクトップでは 2 番目に起動する側のアプリ起動待ちが失敗する
 // 既知の制約があるため、別コマンドとして実行する。
 
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -255,15 +253,21 @@ void main() {
 
       // #60 S1: afterImageRenderer（BeforeAfterView が公開する production
       // 供給源、実ブリッジの CpuVisionRenderer.applier を最終的に呼ぶ）を
-      // ラップし、実ブリッジの CPU apply() が完了した瞬間を Completer で
-      // 検知する。テキストが出るまで単純にポーリングするより、実際に何を
+      // ラップし、実ブリッジの CPU apply() が完了するたびに renderCount を
+      // 増やす。テキストが出るまで単純にポーリングするより、実際に何を
       // 待っているか（このタップが引き起こした描画そのもの）が明確になる。
+      //
+      // Completer ではなく単調カウンタにしてあるのは、1 回のタップに対して
+      // BeforeAfterView 側の再構築が複数回の render 呼び出しを引き起こす
+      // ことがあり（CI で実測: "Bad state: Future already completed"）、
+      // Completer だと 2 回目の complete() で例外になるため。カウンタなら
+      // 呼ばれた回数によらず安全に「増えたこと」を待てる。
+      var renderCount = 0;
       final productionRenderer = afterImageRenderer;
       addTearDown(() => afterImageRenderer = productionRenderer);
-      Completer<void>? renderCompleter;
       afterImageRenderer = (source, filter, strength) async {
         final result = await productionRenderer(source, filter, strength);
-        renderCompleter?.complete();
+        renderCount++;
         return result;
       };
 
@@ -292,7 +296,7 @@ void main() {
         // ことがあるため、タップ前に確実にビューポート内へ持ってくる。
         await scrollUntilHitTestable(tester, cardFinder, scrollableFinder);
 
-        renderCompleter = Completer<void>();
+        final renderCountBeforeTap = renderCount;
         await tester.tap(cardFinder);
         await tester.pump();
 
@@ -302,7 +306,13 @@ void main() {
             reason: '$experienceId タップ直後に selectedPresetId が反映されていない');
 
         // 実ブリッジの CPU apply() が完了するまで待つ（#60 S1）。
-        await renderCompleter.future.timeout(const Duration(seconds: 10));
+        final deadline = DateTime.now().add(const Duration(seconds: 10));
+        while (renderCount <= renderCountBeforeTap &&
+            DateTime.now().isBefore(deadline)) {
+          await tester.pump(const Duration(milliseconds: 20));
+        }
+        expect(renderCount, greaterThan(renderCountBeforeTap),
+            reason: '$experienceId タップ後、実ブリッジの描画が完了しなかった');
         await tester.pump();
         await tester.pump();
 
