@@ -1,8 +1,9 @@
 // VisionFilterState の単体テスト。#60 で追加した挙動のうち、他のテスト
 // ファイルで直接カバーされていないものに絞る:
-// - selectPreset は strength を 1.0 に戻す（#60 S5。推奨値の導入は #77）。
-// - プリセット選択中に setParam/setStrength を呼ぶと、プリセットの選択表示
-//   （selectedPresetId）だけが解除され、フィルタ自体の選択は残る（#60 S5）。
+// - selectPreset は strength を 1.0 に戻す（#60。推奨値の導入は #77）。
+// - プリセット選択中に setParam/setStrength/randomizeSeed を呼ぶと、
+//   プリセットの選択表示（selectedPresetId）だけが解除され、フィルタ自体の
+//   選択は残る（#60）。
 // - selectColorVisionType(type, catalogId) は catalogId が必須（none を除く）。
 //
 // 選択の起源（isColorQuickSelection/colorVisionType）まわりの契約は
@@ -20,7 +21,7 @@ void main() {
     state = VisionFilterState();
   });
 
-  group('selectPreset の strength リセット (#60 S5)', () {
+  group('selectPreset の strength リセット (#60)', () {
     test('advanced で strength を変えたあとにプリセットを選ぶと 1.0 に戻る', () {
       state.select('starbursts');
       state.setStrength(0.3);
@@ -32,7 +33,7 @@ void main() {
     });
   });
 
-  group('プリセット選択中の customize (#60 S5)', () {
+  group('プリセット選択中の customize (#60)', () {
     test('setParam を呼ぶと selectedPresetId は解除されるが selectedId は残る', () {
       state.selectPreset('bppv', 'bppv_rotation');
       expect(state.selectedPresetId, 'bppv');
@@ -67,6 +68,19 @@ void main() {
 
       expect(state.selectedPresetId, isNull);
       expect(state.selectedId, 'starbursts');
+    });
+
+    test('randomizeSeed を呼んでも selectedPresetId は解除されるが selectedId は残る', () {
+      // meniere/bppv/vestibular_neuritis のプリセットはどれも seed パラメータを
+      // 持たないため、seed を持つカタログエントリ（cataract）を使って
+      // プリセット経由の選択を模す。
+      state.selectPreset('dummy-preset', 'cataract');
+      expect(state.selectedPresetId, 'dummy-preset');
+
+      state.randomizeSeed('seed');
+
+      expect(state.selectedPresetId, isNull);
+      expect(state.selectedId, 'cataract');
     });
   });
 
