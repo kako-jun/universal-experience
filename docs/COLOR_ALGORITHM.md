@@ -339,6 +339,10 @@ MAGCOLOREFFECT CreateColorVisionEffect(const char* type, float intensity) {
 
 ## Daltonization（色覚補正）
 
+> **非目標**: ue は色の補正（Daltonization）を、現時点では行いません（シミュレーション
+> 専用のアプリです）。以下は #13 以前に検討していた実装方針の記録であり、現行のスコープ
+> には含まれません。詳細は `README.md`「やらないこと（非目標）」を参照。
+
 Daltonizationは、色覚異常の人でも色の区別がしやすくなるように画像を補正する技術です。
 
 ### 基本アルゴリズム
@@ -398,6 +402,10 @@ static List<List<double>> getAnomalyMatrix(String type, double severity) {
 ## 検証とテスト
 
 ### Ishihara色覚検査プレート
+
+> **非目標**: ue は診断・スクリーニング・色覚検査を行いません。以下は #13 以前に
+> 検討していた検証手段の記録であり、現行のスコープには含まれません。詳細は
+> `README.md`「やらないこと（非目標）」を参照。
 
 実装の正確性を検証するため、石原式色覚検査表を使用：
 

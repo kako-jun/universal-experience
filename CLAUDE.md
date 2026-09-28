@@ -78,13 +78,18 @@ sensus-core (Rust, アルゴリズム正本) + FragmentProgram シェーダ (GPU
 
 ## 色覚アルゴリズム
 
-### LMS色空間変換
+### 色空間変換
 
 ```
-RGB → LMS → CVD Simulation → LMS → RGB
+linear sRGB → Machado 2009 per-severity 行列 → simulated linear sRGB
 ```
 
-- 人間の視覚システムに基づく科学的手法
+正本は sensus-core の `vision/color.rs`。LMS 色空間は経由しない
+（旧 LMS 実装は #13 で撤去済み、`docs/COLOR_ALGORITHM.md` 参照）。
+Machado, Oliveira, Fernandes (2009) がプリ計算した severity=0.0〜1.0 の
+11 段テーブルを linear sRGB 空間へ直接適用し、中間 strength はテーブルを
+区分線形補間する。
+
 - 事前計算された変換行列で高速処理
 - 強度補間による柔軟な調整
 
@@ -107,8 +112,10 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 `docs/adr/2026-05-31-sensus-core-consolidation.md` を参照。各 API の調査自体は
 歴史的記録として `docs/PLATFORM_APIS.md` に残す。
 
-現在は sensus 由来の GPU シェーダでルーペ窓内の画像にフィルタを適用する方式を採る
-（`docs/adr/2026-09-26-loupe-as-single-render-unit.md`）。
+現在の before/after プレビューは sensus の CPU `apply()`（`CpuVisionRenderer`、#85）が
+描画する。GPU シェーダ（`ShaderFilter`）はライブ画面キャプチャ（他アプリ含む全画面。
+未実装、`docs/adr/2026-09-26-loupe-as-single-render-unit.md`）向けに残置してあるが、
+現状 production コードからは呼ばれない。
 
 ## 設計判断
 
@@ -128,7 +135,9 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 
 ### iOS非対応
 
-Appleのサンドボックス制約により、システム全体へのフィルタ適用が技術的に困難。
+他アプリの画面をキャプチャできない（Apple のサンドボックス制約）ため、ルーペ窓に
+他アプリの映像を映してフィルタをかける現行方式が成立しない。詳細は
+`docs/adr/2025-11-17-no-ios-support.md` を参照。
 
 ## ビルド
 
@@ -169,4 +178,7 @@ build より前に置く。rust 依存は crates.io のみ（sensus-core）な�
   キャプチャ向けに残置してあるが現状未使用）
 - **Phase 2**: 聴覚障害シミュレーション — 複合体験の型定義（FRB, `HearingFilter`）は
   公開済みだが、音声の加工・再生は未実装
-- **Phase 3**: 視野欠損、視覚ぼやけ、運動障害 — 未着手
+- **Phase 3**: 視野欠損・視覚ぼやけなど色覚以外の見え方 — sensus のカタログには
+  既に含まれ、advanced カタログから選択・プレビュー反映まで動作する（ARB の
+  `aboutPhases` 参照）。専用 UI・ライブ GPU 描画は個別 Issue で拡張中。sensus に
+  運動障害のカテゴリは存在しないため、Phase 3 の対象に含めない

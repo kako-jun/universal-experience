@@ -45,11 +45,15 @@ ue のプラットフォーム対象は Android / Windows / macOS / Linux とし
 - 対象 OS から iOS を外したことで、ue は当初 Android/Windows/macOS/Linux の
   ネイティブ機構（`docs/PLATFORM_APIS.md`）に集中できた。
 - **その後の変化（#13）**: system-wide 適用を担っていた `color_vision_filter` プラグインは
-  撤去され、現状の ue は sensus-core 由来の GPU シェーダで**画像（ルーペ窓内）**に
-  フィルタを適用する形に変わった（→ ADR `2026-05-31-sensus-core-consolidation.md`）。
-  「画像へのフィルタ」だけなら iOS でも技術的成立の余地はあるが、本 ADR の決定
-  （iOS 非対応）は維持している。iOS 対応を再検討する場合は本 ADR を Superseded にして
-  新たに起こす。
+  撤去され、現状の ue はルーペ窓に映した**画面（他アプリ含む）**へ sensus-core 由来の
+  シェーダでフィルタを適用する形に変わった（→ ADR `2026-05-31-sensus-core-consolidation.md`）。
+  この方式は「他アプリの画面をキャプチャする」ことが前提だが、iOS のサンドボックスは
+  サードパーティアプリへ他アプリの画面をキャプチャする API を与えていないため、
+  現行方式は iOS では成立しない。これが iOS 非対応を維持する**現行の**理由であり、
+  当初の理由（system-wide 適用そのものの困難さ）とは異なる。単なる「画像 1 枚への
+  フィルタ適用」（キャプチャを伴わない）なら iOS でも技術的成立の余地はあるが、
+  本 ADR の決定（iOS 非対応）は維持している。iOS 対応を再検討する場合は本 ADR を
+  Superseded にして新たに起こす。
 - **未記録**: iOS 対応を将来再開する条件・優先度は現時点で文書化されていない。
 
 ## 関連 Issue・PR・docs
