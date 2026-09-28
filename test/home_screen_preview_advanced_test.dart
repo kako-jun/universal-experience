@@ -184,7 +184,7 @@ void main() {
 
     // 1. protanomaly を色覚クイック選択で選び、強度を独自の値に変える
     //    （#57 のタイプ別記憶）。selectColorVision は FilterSelector・トレイ
-    //    共通の入口（#60 M1）。
+    //    共通の入口（#60）。
     selectColorVision(filterService, visionState, ColorVisionType.protanomaly);
     await tester.pump();
     expect(visionState.isColorQuickSelection, isTrue);
@@ -222,7 +222,7 @@ void main() {
 
   testWidgets(
       'protanopia → プリセット → protanopia に戻すと、プレビューに反映されチップも正しく点灯する '
-      '（#60 M1 回帰テスト）', (WidgetTester tester) async {
+      '（#60 回帰テスト）', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 4000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -288,19 +288,19 @@ void main() {
 
     // 2. プリセット（meniere）をタップする。色覚クイック選択の記憶は
     //    FilterService 側に残るが、プレビュー・チップの点灯は advanced/
-    //    プリセット側に切り替わる（#60 M1: isColorQuickSelection から導く）。
+    //    プリセット側に切り替わる（#60: isColorQuickSelection から導く）。
     await tester.tap(find.text(en.experienceMeniere));
     await tester.pump();
 
     expect(currentPreview().filterId, 'vertigo');
     expect(visionState.isColorQuickSelection, isFalse);
     expect(protanopiaChipSelected(), isFalse,
-        reason: 'advanced/プリセットを見ている間は色覚チップを点灯させない（#60 M1）');
+        reason: 'advanced/プリセットを見ている間は色覚チップを点灯させない（#60）');
 
     // 3. protanopia チップに戻す。以前の実装（listener ミラー + 直前の型との
     //    差分検知）は、FilterService.currentFilter がプリセット遷移中も
     //    ずっと protanopia のままだったため、この再タップに反応せず
-    //    VisionFilterState が更新されなかった（#60 M1 の穴）。
+    //    VisionFilterState が更新されなかった（#60）。
     //    selectColorVision はタップの都度、無条件に両方のサービスを更新する
     //    ため、この再タップでも正しく反映される。
     await tester.tap(protanopiaChip());

@@ -33,7 +33,7 @@ final FilterService filterService = FilterService();
 /// 唯一の正本、#60）。[filterService] と同じ理由でアプリ最上位に 1 つだけ
 /// 生成する — 色覚のクイック選択はトレイ・ウィンドウ内どちらから行っても
 /// `lib/services/color_vision_selection.dart` の `selectColorVision` を経由して
-/// 同じインスタンスを更新する必要があるため（#60 M1）。
+/// 同じインスタンスを更新する必要があるため（#60）。
 final VisionFilterState visionFilterState = VisionFilterState();
 
 /// トレイアイコンの Flutter アセットパス。`tray_manager` の `setIcon` が
@@ -143,7 +143,7 @@ Locale _resolveStartupLocale(Locale? preferred) {
 /// - 成功時は [settings]（未指定なら新規 `SettingsService()`）を読み込み、
 ///   トップレベル共有の `filterService`（#15、トレイとウィンドウ内 UI が同じ
 ///   インスタンスを見る）に永続化済みの per-type 強度（#57）を読み込んでから、
-///   復元済みのフィルタ種別を `selectColorVision`（#60 M1）で一度だけ適用して
+///   復元済みのフィルタ種別を `selectColorVision`（#60）で一度だけ適用して
 ///   `bridgeReady: true` と [UniversalExperienceApp] を返す。`filterService`
 ///   と `visionFilterState` の両方が同じ値になる。intensity 自体は
 ///   `filterService.load()` が
@@ -175,7 +175,7 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
 
   // Seed the shared FilterService and VisionFilterState (#15/#60) from the
   // restored settings (#17) so the previously selected filter is reflected on
-  // startup — through selectColorVision (#60 M1), the single entry point that
+  // startup — through selectColorVision (#60), the single entry point that
   // keeps both services in sync, same as FilterSelector/tray. No explicit
   // intensity override here (#57): the type's own remembered/recommended
   // strength (just loaded above) is used instead of resetting it.
@@ -338,7 +338,7 @@ class UniversalExperienceApp extends StatelessWidget {
         // and is the preview's single source of truth (#60). Same top-level
         // singleton reasoning as filterService above — provide the existing
         // instance, not a fresh one, so it stays the same one the tray and
-        // selectColorVision (#60 M1) update.
+        // selectColorVision (#60) update.
         ChangeNotifierProvider<VisionFilterState>.value(
           value: visionFilterState,
         ),

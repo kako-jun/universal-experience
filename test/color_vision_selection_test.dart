@@ -1,4 +1,4 @@
-// `lib/services/color_vision_selection.dart` の単体テスト（#60 M1）。
+// `lib/services/color_vision_selection.dart` の単体テスト（#60）。
 //
 // `selectColorVision`/`deactivateColorVision` は FilterSelector・トレイ（両方
 // とも `TrayService._handleClick` から同じ関数を呼ぶ、`lib/services/
@@ -82,7 +82,7 @@ void main() {
 
     test(
         '回帰: advanced を経由したあとに同じ色覚型を再選択しても正しく反映される '
-        '（#60 M1。以前の listener ミラーは currentFilter が変わらないため反応しなかった）',
+        '（#60。以前の listener ミラーは currentFilter が変わらないため反応しなかった）',
         () {
       // 1. protanopia を選ぶ（FilterSelector のチップ、またはトレイのメニュー
       //    どちらも selectColorVision を呼ぶだけなので区別なく再現できる）。

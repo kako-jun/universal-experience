@@ -46,7 +46,7 @@ void main() {
     await settings.load();
     final filterService = FilterService();
     final visionState = VisionFilterState();
-    // #60 M1: home_screen はもう FilterService の変化を VisionFilterState へ
+    // #60: home_screen はもう FilterService の変化を VisionFilterState へ
     // ミラーしない。selectColorVision が両方を明示的に更新する唯一の入口。
     selectColorVision(filterService, visionState, ColorVisionType.protanopia);
 

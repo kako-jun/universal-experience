@@ -30,7 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // Bridge FilterService selection changes into SettingsService so the last
     // filter type is persisted (#17). Subscribe once.
     //
-    // #60 M1: this used to also mirror FilterService.currentFilter into
+    // #60: this used to also mirror FilterService.currentFilter into
     // VisionFilterState (the preview's single source of truth) via a
     // listener here. That mirroring is gone — color-vision selection now
     // updates both services directly, at the point of the user action
@@ -212,7 +212,8 @@ class _HomeScreenState extends State<HomeScreen> {
   /// `previewStrength`（`lib/services/preview_selection.dart`）で 1 か所に
   /// 集約した判定に従う。[VisionFilterState.colorVisionType] も渡し、色覚
   /// クイック選択のときは見出し・export の caption・ファイル名に -omaly の
-  /// 名前を正しく出す（#60 M3）。
+  /// 名前を正しく出す（#60。カタログは色覚を 5 種しか持たず、-omaly は
+  /// base の -opia と同じカタログ id に写るため id だけでは区別できない）。
   Widget _buildPreviewSection() {
     return Consumer2<VisionFilterState, FilterService>(
       builder: (context, visionState, filterService, _) {

@@ -130,7 +130,7 @@ class BeforeAfterView extends StatefulWidget {
   /// -omaly (anomaly) types map to the same catalog id as their base -opia
   /// (`FilterService.sensusFilter`'s contract). Without this field, the
   /// after-pane label / export caption / filename would always say
-  /// "Protanopia" even when the user picked "Protanomaly" (#60 M3). When
+  /// "Protanopia" even when the user picked "Protanomaly" (#60). When
   /// non-null, this overrides [filterId]-based name resolution for display
   /// purposes only — it never affects what's rendered (that's entirely
   /// [filter]/[strength]).
@@ -281,7 +281,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   int? _currentSampleSize;
 
   /// The `(filterId, colorVisionType, strength)` that actually produced the
-  /// currently-held [_after] (#85 レビュー S8, #60, #60 M3). `null` until the
+  /// currently-held [_after] (#85 レビュー S8, #60). `null` until the
   /// first successful render.
   ///
   /// [_export] must build its [ExportCaption] from these, **not** from
@@ -501,7 +501,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       _before = before;
       _after = after;
       _afterFilterId = widget.filterId; // #85 レビュー S8, #60
-      _afterColorVisionType = widget.colorVisionType; // #60 M3
+      _afterColorVisionType = widget.colorVisionType; // #60
       _afterStrength = widget.strength; // #85 レビュー S8
       _currentSampleSize = sampleSize;
       _loading = false;
@@ -537,7 +537,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   }
 
   /// after ペインの見出し・export の caption に出す表示名を解決する
-  /// （#60 M3）。
+  /// （#60）。
   ///
   /// [colorVisionType] が非 null なら常にそれを優先する
   /// （[colorVisionTypeName]、-omaly の名前も正しく出る）。カタログ
@@ -608,7 +608,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       }
 
       final filename = exportFilename(
-        // #60 M3: colorVisionType があればその id（-omaly を含む）を使う。
+        // colorVisionType があればその id（-omaly を含む）を使う（#60）。
         // filterId は -omaly を base の -opia と区別できないため。
         symptomId: colorVisionType?.id ?? filterId ?? 'none',
         strengthPercent: strengthPercent,
@@ -678,7 +678,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
             : _ImageView(image: _after);
         // #60: 時間依存の注記は widget.filterId（カタログ id）からカタログを
         // 引いて解決する。after ペインの見出しは widget.colorVisionType が
-        // あればそちらを優先する（#60 M3: -omaly の名前を正しく出すため、
+        // あればそちらを優先する（#60: -omaly の名前を正しく出すため、
         // [_displayName] 参照）。
         final entry =
             widget.filterId == null ? null : kVisionFilterCatalogById[widget.filterId];

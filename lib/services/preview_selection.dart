@@ -24,7 +24,7 @@ double previewStrength(
 }
 
 /// advanced カタログの strength スライダー（`FilterParamPanel`）を表示すべきか
-/// （#60 M2）。
+/// （#60）。
 ///
 /// 色覚クイック選択が起点の選択では、強度は [previewStrength] が使うとおり
 /// `FilterService` のタイプ別記憶（#57）で決まり、[VisionFilterState.strength]

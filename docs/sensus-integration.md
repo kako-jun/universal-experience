@@ -465,16 +465,21 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   → `VisionFilter` の写像を撤去した。マッピングは呼び出し側
   （`home_screen.dart`）が `VisionFilterState.build()` で行い、`renderAfter` は
   組み立て済みの `VisionFilter?` をそのまま `CpuVisionRenderer.applier` へ渡す
-  だけになっている。`FilterService.sensusFilter`
-  （`visionFilterForColorVisionType`）自体は変わらず健在だが、色覚のクイック
-  選択を `VisionFilterState` へ書き込む入力としてのみ使われる
-  （`lib/services/color_vision_selection.dart` の `selectColorVision`）。
-  **#60 レビュー1巡目での追補（M1）**: 当初は home_screen.dart の listener が
-  `FilterService` の変化を `VisionFilterState` へミラーしていたが、
-  「`currentFilter` が変わったときだけ」反映する差分検知のせいで、
-  advanced/プリセットを経由したあとに同じ色覚型を再選択しても反映されない
-  穴があった。ミラーはやめ、`FilterSelector`・トレイ・`main.dart` の起動時
-  復元のいずれも `selectColorVision`/`deactivateColorVision`
+  だけになっている。`visionFilterForColorVisionType`
+  （トップレベル関数。`FilterService.sensusFilter` はこれに委譲するだけの
+  インスタンス getter）自体は変わらず健在だが、`lib/services/
+  color_vision_selection.dart` の `selectColorVision` が色覚のクイック選択を
+  `VisionFilterState` へ書き込む際、`FilterService` のインスタンス
+  （`filterService.sensusFilter`）は経由せずこの関数を直接呼ぶ — `selectColorVision`
+  は `filterService.applyFilter(type)` と `VisionFilterState` への書き込みを
+  同じ `type` から並行して行う関数なので、インスタンスの現在値
+  （`filterService.currentFilter`）に依存させる必要がないため。
+  **#60 での追補**: 当初は home_screen.dart の listener が `FilterService` の
+  変化を `VisionFilterState` へミラーしていたが、「`currentFilter` が変わった
+  ときだけ」反映する差分検知のせいで、advanced/プリセットを経由したあとに
+  同じ色覚型を再選択しても反映されない穴があった。ミラーはやめ、
+  `FilterSelector`・トレイ・`main.dart` の起動時復元のいずれも
+  `selectColorVision`/`deactivateColorVision`
   （`lib/services/color_vision_selection.dart`）を直接呼んで、その場で
   `FilterService` と `VisionFilterState` の両方を更新する形にした。
   `VisionFilterState` はこれに伴い `filterService` と同じくトップレベル

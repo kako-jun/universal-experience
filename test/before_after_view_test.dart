@@ -239,7 +239,7 @@ void main() {
 
       testWidgets(
           'colorVisionType=deuteranomaly なら filterId=deuteranopia でも '
-          '見出しは Deuteranomaly になる（#60 M3）', (tester) async {
+          '見出しは Deuteranomaly になる（#60）', (tester) async {
         // カタログは色覚を 5 種しか持たず、-omaly は base の -opia と同じ
         // catalog id（deuteranopia）に写る（FilterService.sensusFilter の
         // 対応表）。filterId だけで見出しを解決すると常に "Deuteranopia" に
@@ -1122,7 +1122,7 @@ void main() {
 
       testWidgets(
           'colorVisionType=deuteranomaly で export すると symptomLabel・'
-          'ファイル名とも deuteranomaly になる（#60 M3）', (tester) async {
+          'ファイル名とも deuteranomaly になる（#60）', (tester) async {
         late ui.Image before1, after1, composedStub;
         await tester.runAsync(() async {
           before1 = await BeforeAfterView.generateSampleImage(4);

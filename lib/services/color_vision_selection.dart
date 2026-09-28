@@ -4,7 +4,7 @@ import 'filter_service.dart';
 import 'vision_filter_state.dart';
 
 /// 色覚のクイック選択（`FilterSelector`・トレイ・起動時の復元）が [FilterService]
-/// と [VisionFilterState] の両方を更新する、唯一の入口（#60 M1）。
+/// と [VisionFilterState] の両方を更新する、唯一の入口（#60）。
 ///
 /// 以前は home_screen.dart が [FilterService] の変化を listener で
 /// [VisionFilterState] へミラーしていたが、`didChangeDependencies` が最初の
@@ -47,7 +47,7 @@ void selectColorVision(
   visionState.selectColorVisionType(type, catalogId);
 }
 
-/// 色覚のクイック選択を解除する（#60 M1）。[selectColorVision] に
+/// 色覚のクイック選択を解除する（#60）。[selectColorVision] に
 /// [ColorVisionType.none] を渡すのと同じ。
 void deactivateColorVision(
   FilterService filterService,

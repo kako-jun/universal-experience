@@ -33,9 +33,9 @@ void main() {
 
     // スライダーを操作可能にするため、フィルタを選択しておく（IntensitySlider は
     // VisionFilterState.isColorQuickSelection が false の間 onChanged が null で
-    // 操作不能、#60 M1）。main() では buildRootApp() が selectColorVision
-    // （#60 M1、FilterService と VisionFilterState の両方を更新する唯一の
-    // 入口）で filterService/visionFilterState と settings.filterType を
+    // 操作不能、#60）。main() では buildRootApp() が selectColorVision
+    // （FilterService と VisionFilterState の両方を更新する唯一の
+    // 入口、#60）で filterService/visionFilterState と settings.filterType を
     // 揃えて起動するので、ここでもテスト対象外の初期同期として揃えておく
     // （揃えないと、最初の 1 回だけ HomeScreen._persistFilterState の
     // setFilterType が「none → protanopia」の実変更として notify してしまい、
@@ -53,8 +53,8 @@ void main() {
     // ExperiencePresets カードのような、より下の（flutter_rust_bridge 初期化を
     // 要求する）カードまでは踏み込まない範囲で止まる。
     //
-    // #60 M2: advanced セクションの FilterParamPanel は、色覚クイック選択
-    // 由来のときは strength スライダーを出さないため（showsAdvancedStrengthSlider）、
+    // advanced セクションの FilterParamPanel は、色覚クイック選択
+    // 由来のときは strength スライダーを出さないため（showsAdvancedStrengthSlider、#60）、
     // Slider は IntensitySlider の 1 本だけになる。find.byType(Slider) のままでよい。
     final sliderFinder = find.byType(Slider);
     await tester.scrollUntilVisible(sliderFinder, 80);
