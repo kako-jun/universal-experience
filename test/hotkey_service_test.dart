@@ -191,13 +191,88 @@ void main() {
     });
   });
 
-  group('describeHotkey', () {
-    test('既定バインディングを人間可読な文字列にする', () {
-      final description = describeHotkey(AppHotkeyAction.toggleClickThrough);
-      expect(description, contains('Ctrl'));
-      expect(description, contains('Alt'));
-      expect(description, contains('Shift'));
-      expect(description, contains('C'));
+  group('describeHotkey (#63)', () {
+    test('既定バインディングを人間可読な文字列にする（useMacSymbols 省略、既定 false）',
+        () {
+      final bindings = defaultHotkeyBindings();
+      expect(
+        describeHotkey(bindings[AppHotkeyAction.toggleClickThrough]!),
+        'Ctrl+Alt+Shift+C',
+      );
+      expect(
+        describeHotkey(bindings[AppHotkeyAction.holdOriginal]!),
+        'Ctrl+Alt+Shift+O',
+      );
+      expect(
+        describeHotkey(bindings[AppHotkeyAction.emergencyExit]!),
+        'Ctrl+Alt+Shift+Esc',
+      );
+      expect(
+        describeHotkey(bindings[AppHotkeyAction.toggleLoupeVisibility]!),
+        'Ctrl+Alt+Shift+L',
+      );
+    });
+
+    test('useMacSymbols: true では macOS の記号表記になる', () {
+      final bindings = defaultHotkeyBindings();
+      expect(
+        describeHotkey(
+          bindings[AppHotkeyAction.toggleClickThrough]!,
+          useMacSymbols: true,
+        ),
+        '⌃⌥⇧C',
+      );
+      expect(
+        describeHotkey(
+          bindings[AppHotkeyAction.emergencyExit]!,
+          useMacSymbols: true,
+        ),
+        '⌃⌥⇧Esc',
+      );
+    });
+  });
+
+  group('HotkeyService.activeBindings (#63)', () {
+    test('init() 後、登録を試みた全アクション（失敗分も含む）のバインディングを保持する',
+        () async {
+      final gateway = _FakeHotkeyGateway();
+      final bindings = _testBindings();
+      gateway.identifierToAction = {
+        for (final entry in bindings.entries) entry.value.identifier: entry.key,
+      };
+      gateway.failFor = {AppHotkeyAction.toggleClickThrough};
+      final service = HotkeyService(gateway: gateway);
+
+      await service.init(
+        {
+          for (final action in AppHotkeyAction.values)
+            action: HotkeyHandlers(onKeyDown: () {}),
+        },
+        bindings: bindings,
+      );
+
+      expect(service.activeBindings, bindings,
+          reason: '登録に失敗した toggleClickThrough のぶんも含め、試みた全バインディングを保持する');
+    });
+
+    test('dispose() で activeBindings もクリアされる', () async {
+      final gateway = _FakeHotkeyGateway();
+      final bindings = _testBindings();
+      gateway.identifierToAction = {
+        for (final entry in bindings.entries) entry.value.identifier: entry.key,
+      };
+      final service = HotkeyService(gateway: gateway);
+      await service.init(
+        {
+          AppHotkeyAction.toggleClickThrough: HotkeyHandlers(onKeyDown: () {}),
+        },
+        bindings: bindings,
+      );
+      expect(service.activeBindings, isNotEmpty);
+
+      await service.dispose();
+
+      expect(service.activeBindings, isEmpty);
     });
   });
 }
