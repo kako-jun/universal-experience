@@ -473,6 +473,7 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   入れるか／サンプル音源デモか／system audio リアルタイム加工かは #20 で検討中
   （旧計画にあった `AudioFilterService` + `audio_filter` プラグインという構成は
   この検討を経ていないため前提としない）
-- **視野欠損・視覚ぼやけ・運動障害等**: sensus-core のカタログには既に含まれ、
+- **視野欠損・視覚ぼやけ等**: sensus-core のカタログには既に含まれ、
   advanced フィルタとして選択・パラメータ調整はできる。live GPU 描画・専用 UI の
-  拡張は個別 Issue（#59 等）で順次対応する
+  拡張は個別 Issue（#59 等）で順次対応する。運動障害・認知障害は非目標
+  （`README.md`「やらないこと（非目標）」参照）

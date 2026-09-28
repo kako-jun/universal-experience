@@ -233,7 +233,9 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
    描画、を実装。当初 protanopia のみだったハードコード行列（`_protanopiaMatrix`）
    は撤去し、sensus 由来の Machado テーブル生成物（§8）を使う形に置き換えた。
    汎用 `applyColorFilterGpu` を通じて色覚 4 型（+各 -omaly）全部が home 画面へ
-   配線済み。
+   配線済み（**追記**: この GPU 配線はその後 §9（#85）で CPU `apply()` 経路に
+   置き換わった。GPU 経路自体はライブ画面キャプチャ向けに残置してあるが、
+   現状 production からは呼ばれない）。
 3. 未完了: **実機検証**。macOS/Linux で実際に画面へ 1 フィルタを適用し、
    sensus の CPU 出力（または既知の見え方）と目視一致を確認する（CLAUDE.md の
    完了判定: 実機 golden path）。現状は `flutter test`（ヘッドレス）の GPU golden
@@ -242,7 +244,10 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
    `sensus_core::Filter` の全 30 種を選択・パラメータ調整できる状態まで広がった
    （#16）が、プレビューの GPU 描画が配線されているのは上記のとおり一部のみ。
    payload 付きフィルタ（cataract/floaters の seed、glaucoma の mode、astigmatism
-   の axis_deg、時間依存の vertigo/bppv 等）の描画配線は個別 Issue（#59 等）で継続中。
+   の axis_deg、時間依存の vertigo/bppv 等）の描画配線は個別 Issue（#59 等）で継続中
+   （**追記**: §9（#85）以降はプレビュー自体が CPU `apply()` 経路になり、全 30 種が
+   配線済み。本項目が指す「GPU 描画の配線」自体は #60 で advanced カタログ・体験
+   プリセットの UI 結線が完了した後もライブ画面キャプチャ向けの将来課題として残る）。
 5. 完了（#13）: 既存 `lib/core/color_vision_simulator.dart`（ue 内の LMS 実装）の
    撤去。詳細は下記 §5。
 

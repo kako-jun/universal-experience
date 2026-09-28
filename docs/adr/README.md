@@ -29,7 +29,7 @@ Universal Experience（ue）の主要な設計判断を記録する正本ディ�
 7. **結果・トレードオフ** — 決定がもたらした影響・残課題
 8. **関連 Issue・PR・docs** — 出典
 
-> 注: 本リポジトリのドクトリン guideline は freeza 側が正本のため、ue には
+> 注: 本リポジトリのドクトリン guideline はリポジトリ外で管理しているため、ue には
 > `docs/guidelines/` を置かない。ADR はそれとは別物として `docs/adr/` に置く。
 
 ## 一覧
