@@ -45,16 +45,34 @@ ue のプラットフォーム対象は Android / Windows / macOS / Linux とし
 - 対象 OS から iOS を外したことで、ue は当初 Android/Windows/macOS/Linux の
   ネイティブ機構（`docs/PLATFORM_APIS.md`）に集中できた。
 - **その後の変化（#13）**: system-wide 適用を担っていた `color_vision_filter` プラグインは
-  撤去され、現状の ue はルーペ窓に映した**画面（他アプリ含む）**へ sensus-core 由来の
-  シェーダでフィルタを適用する形に変わった（→ ADR `2026-05-31-sensus-core-consolidation.md`）。
-  この方式は「他アプリの画面をキャプチャする」ことが前提だが、iOS のサンドボックスは
-  サードパーティアプリへ他アプリの画面をキャプチャする API を与えていないため、
-  現行方式は iOS では成立しない。これが iOS 非対応を維持する**現行の**理由であり、
-  当初の理由（system-wide 適用そのものの困難さ）とは異なる。単なる「画像 1 枚への
-  フィルタ適用」（キャプチャを伴わない）なら iOS でも技術的成立の余地はあるが、
-  本 ADR の決定（iOS 非対応）は維持している。iOS 対応を再検討する場合は本 ADR を
-  Superseded にして新たに起こす。
+  撤去され、現状の ue は sensus-core 由来の GPU シェーダで**画像（ルーペ窓内）**に
+  フィルタを適用する形に変わった（→ ADR `2026-05-31-sensus-core-consolidation.md`）。
+  「画像へのフィルタ」だけなら iOS でも技術的成立の余地はあるが、本 ADR の決定
+  （iOS 非対応）は維持している。iOS 対応を再検討する場合は本 ADR を Superseded にして
+  新たに起こす。
 - **未記録**: iOS 対応を将来再開する条件・優先度は現時点で文書化されていない。
+
+### 追記（2026-09-28, #83）
+
+上記「その後の変化」の記述を、プロダクトの目標に照らして精緻化する。
+
+ue が**目標とする方式**は、ルーペ窓に他アプリ含む画面をライブキャプチャして
+フィルタをかける方式（`docs/adr/2026-09-26-loupe-as-single-render-unit.md`、
+Issue #1）である。現状はこのライブキャプチャが未実装のため、合成したデモ画像への
+静止プレビューのみで代替している（`docs/ARCHITECTURE.md`「システムアーキテクチャ
+（現行）」参照）。
+
+iOS 非対応を維持する現行の理由は、この目標方式が iOS では成立しないため:
+
+- iOS はサードパーティアプリに、他アプリの上へオーバーレイ表示する公開 API を
+  与えていない。
+- 画面キャプチャ自体も ReplayKit の Broadcast Upload Extension 経由に限られ、
+  加工結果をリアルタイムで他アプリの上に描画する手段がない。
+
+これは当初（2025-11-17 決定時点）の理由だった「system-wide 適用そのものの技術的
+困難さ」とは異なる、現行の目標方式に基づく理由である。「画像 1 枚へのフィルタ適用」
+（ライブキャプチャを伴わない）だけなら iOS でも技術的成立の余地はあるが、本 ADR の
+決定（iOS 非対応）は維持している。
 
 ## 関連 Issue・PR・docs
 
@@ -62,3 +80,5 @@ ue のプラットフォーム対象は Android / Windows / macOS / Linux とし
 - `docs/PLATFORM_APIS.md`（各 OS の system-wide 適用 API 調査）
 - `docs/ARCHITECTURE.md`（Native Implementation Layer の歴史的記述）
 - 関連 ADR: `2026-05-31-sensus-core-consolidation.md`（system-wide → 画像フィルタへの転換）
+- 関連 ADR: `2026-09-26-loupe-as-single-render-unit.md`（ライブキャプチャ＝プロダクトの
+  目標方式）、Issue #1（ライブ画面キャプチャ）

@@ -25,11 +25,14 @@ ue はそれを flutter_rust_bridge 経由で消費する薄いブリッジで�
 
 > 色覚 3 型（protanopia/deuteranopia/tritanopia）の中間 strength は、sensus 0.6 の
 > Machado 2009 11 段 severity テーブルをグリッド間で区分線形補間した正本値と一致
-> します（#59）。`rust/src/color_matrix_gen.rs` が sensus-core の公開関数から 11
-> グリッド点を汲み出して `tools/color_matrices.g.json` に書き出し、
-> `tools/generate_color_matrices.dart` が `lib/rendering/color_matrices.g.dart`
-> （Dart 定数）へ変換、`ShaderFilter.resolveSeverityMatrix()` が sensus と同じ
-> 補間式でグリッド間を解決します。手書きの行列値は持ちません。
+> します。現行のプレビュー描画経路（sensus の CPU `apply()`、#85）は sensus-core の
+> 公開関数をそのまま呼ぶため、この一致は自動的に保証されます。GPU 経路
+> （`ShaderFilter`。ライブ画面キャプチャ向けに残置、現状 production 未使用）は
+> sensus と別に Dart 側で行列を再現する必要があり、`rust/src/color_matrix_gen.rs`
+> が sensus-core の公開関数から 11 グリッド点を汲み出して `tools/color_matrices.g.json`
+> に書き出し、`tools/generate_color_matrices.dart` が `lib/rendering/
+> color_matrices.g.dart`（Dart 定数）へ変換、`ShaderFilter.resolveSeverityMatrix()`
+> が sensus と同じ補間式でグリッド間を解決します（#59）。手書きの行列値は持ちません。
 
 > 旧バージョンは OS 全体へ system-wide フィルタを適用する独自プラグイン
 > （`plugins/color_vision_filter`）と ue 内 LMS 実装を持っていましたが、
@@ -108,17 +111,14 @@ UI は **日本語 / 英語** に対応しています（`flutter_localizations`
 
 - **聴覚障害シミュレーションの音声再生** — 聴覚フィルタの型（14 種）は
   sensus から FRB で公開済みだが、実際に音を加工・再生する経路は未実装
-- **ライブ画面キャプチャ** — 他アプリを含む全画面への適用。現状は合成した
-  デモ画像に対してのみフィルタを適用する
-- **視覚フィルタのプレビュー描画** — sensus 全 30 種（色覚のクイック選択・
-  advanced カタログ・体験プリセットのいずれの選び方でも）が実描画済み
-  （#59/#85 で CPU の `apply()` に置き換え、#60 で UI 結線を完了。GPU は
-  将来のライブ画面キャプチャ向けに残してあるが現状は未使用）
+- **ライブ画面キャプチャ** — 他アプリを含む全画面への適用（プロダクトの目標方式。
+  Issue #1）。現状は合成したデモ画像に対してのみフィルタを適用する
 - **アプリ内の言語ピッカー UI**
 
 ## やらないこと（非目標）
 
-- ue は診断・スクリーニング・色覚検査を行いません。
+- ue は診断・スクリーニング・色覚検査を行いません（体験プリセットの受診喚起は
+  一般的な案内であり、診断ではありません）。
 - 色の補正（Daltonization）は、現時点ではしません（シミュレーション専用です）。
 - 画像や画面を端末の外に送りません。テレメトリも持ちません。
 - 動画のエクスポートはしません。

@@ -20,11 +20,18 @@ lib/
 │   ├── disability_type.dart
 │   └── vision_filter_catalog.dart   # sensus カタログ（30種）の Dart 側定義
 ├── rendering/
+│   ├── cpu_vision_renderer.dart     # sensus CPU apply() 経由、プレビュー描画の正本（#85）
+│   ├── color_matrices.g.dart        # sensus 由来 Machado 11段テーブルの生成物（GPU 経路専用）
 │   └── shader_filter.dart           # sensus 由来 GLSL → Impeller FragmentProgram 適用
+│                                     # （ライブ画面キャプチャ向けに残置、現状 production 未使用）
 ├── services/
+│   ├── color_vision_selection.dart  # 色覚クイック選択の唯一の入口（FilterService/
+│   │                                 # VisionFilterState を同時更新、#60）
 │   ├── export_service.dart          # PNG エクスポート（メタ焼き込み）
 │   ├── filter_service.dart          # 選択状態モデル（sensus VisionFilter へのマッピング）
 │   ├── loupe_window_controller.dart # ルーペ窓のモード/透過/最前面
+│   ├── native_bridge_service.dart   # flutter_rust_bridge（sensus-core）の bootstrap 初期化
+│   ├── preview_selection.dart       # プレビュー強度の出どころを一本化する判定（#60）
 │   ├── settings_service.dart
 │   ├── tray_service.dart            # タスクトレイ
 │   └── vision_filter_state.dart
@@ -84,24 +91,28 @@ sensus-core (Rust, アルゴリズム正本) + FragmentProgram シェーダ (GPU
 linear sRGB → Machado 2009 per-severity 行列 → simulated linear sRGB
 ```
 
-正本は sensus-core の `vision/color.rs`。LMS 色空間は経由しない
-（旧 LMS 実装は #13 で撤去済み、`docs/COLOR_ALGORITHM.md` 参照）。
-Machado, Oliveira, Fernandes (2009) がプリ計算した severity=0.0〜1.0 の
-11 段テーブルを linear sRGB 空間へ直接適用し、中間 strength はテーブルを
-区分線形補間する。
+正本は sensus-core の `vision/color.rs`。色覚 3 型（protanopia/deuteranopia/
+tritanopia）は LMS 色空間を経由しない（旧 LMS 実装は #13 で撤去済み、
+`docs/COLOR_ALGORITHM.md` 参照）。Machado, Oliveira, Fernandes (2009) が
+プリ計算した severity=0.0〜1.0 の 11 段テーブルを linear sRGB 空間へ直接適用し、
+中間 strength はテーブルを区分線形補間する。例外: achromatopsia は BT.709
+輝度への変換、tetrachromacy は HPE（Hunt-Pointer-Estévez）行列を linear RGB に
+流用した疑似 LMS ヒューリスティックを使う（どちらも Machado 行列とは別経路）。
 
 - 事前計算された変換行列で高速処理
 - 強度補間による柔軟な調整
 
-### 対応色覚異常
+### 対応色覚異常（7 型）
 
 | タイプ | 有病率（男性） |
 |--------|--------------|
-| Deuteranopia | 約1% |
 | Protanopia | 約1% |
-| Deuteranomaly | 約5% |
-| Protanomaly | 約1% |
+| Deuteranopia | 約1% |
 | Tritanopia | 0.001% |
+| Achromatopsia | 0.003% |
+| Protanomaly | 約1% |
+| Deuteranomaly | 約5% |
+| Tritanomaly | 0.01% |
 
 ## プラットフォーム実装
 
@@ -135,8 +146,12 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 
 ### iOS非対応
 
-他アプリの画面をキャプチャできない（Apple のサンドボックス制約）ため、ルーペ窓に
-他アプリの映像を映してフィルタをかける現行方式が成立しない。詳細は
+目標とする方式（ルーペ窓のライブキャプチャ。`docs/adr/2026-09-26-loupe-as-single-render-unit.md`、
+Issue #1）は、他アプリの画面をキャプチャしてフィルタをかけ、その結果を他アプリの上に
+重ねて表示する。iOS はサードパーティアプリに他アプリの上へオーバーレイ表示する API を
+与えておらず、画面キャプチャも ReplayKit 拡張経由に限られる（加工結果を他アプリの上に
+出す手段がない）ため、この方式は成立しない。現状は合成したデモ画像へのプレビューのみ
+だが、プロダクトの目標がライブのルーペである以上、iOS は対象外のまま。詳細は
 `docs/adr/2025-11-17-no-ios-support.md` を参照。
 
 ## ビルド
@@ -170,15 +185,25 @@ build より前に置く。rust 依存は crates.io のみ（sensus-core）な�
 
 ## ロードマップ
 
-- **Phase 1**: 色覚障害シミュレーション — sensus 全 30 種（色覚 7 型・advanced
-  カタログ・体験プリセット）が before/after プレビューの実描画まで配線済み
-  （#34/#59 で GPU、#85 で sensus の CPU `apply()` 経路に置き換え、#60 で
-  advanced カタログ・体験プリセットの UI 結線を完了。プレビューの描画対象は
-  `VisionFilterState` の現在の選択を唯一の正本にする。GPU は将来のライブ画面
-  キャプチャ向けに残置してあるが現状未使用）
+- **Phase 1**: 色覚障害シミュレーション（色覚 7 型: protanopia/deuteranopia/
+  tritanopia/achromatopsia + 各 -omaly）— before/after プレビューの実描画まで
+  配線済み（#34/#59 で GPU、#85 で sensus の CPU `apply()` 経路に置き換え）
 - **Phase 2**: 聴覚障害シミュレーション — 複合体験の型定義（FRB, `HearingFilter`）は
   公開済みだが、音声の加工・再生は未実装
 - **Phase 3**: 視野欠損・視覚ぼやけなど色覚以外の見え方 — sensus のカタログには
   既に含まれ、advanced カタログから選択・プレビュー反映まで動作する（ARB の
   `aboutPhases` 参照）。専用 UI・ライブ GPU 描画は個別 Issue で拡張中。sensus に
-  運動障害のカテゴリは存在しないため、Phase 3 の対象に含めない
+  運動障害（motor。前庭・めまい系の motion カテゴリとは別物）のカテゴリは存在
+  しないため、Phase 3 の対象に含めない
+
+> **共通**: sensus 全 30 種（色覚 7 型・advanced カタログ・体験プリセットは、この
+> 同じ 30 種への 3 つの選び方に過ぎない）は #60 で advanced カタログ・体験
+> プリセットの UI 結線が完了し、いずれの選び方でも before/after プレビューが
+> 実描画される。プレビューの描画対象は `VisionFilterState` の現在の選択を
+> 唯一の正本にする。GPU は将来のライブ画面キャプチャ向けに残置してあるが
+> 現状未使用。
+
+## やらないこと
+
+非目標は `README.md`「やらないこと（非目標）」を正本とする。個別 docs 側での
+重複記載はしない。

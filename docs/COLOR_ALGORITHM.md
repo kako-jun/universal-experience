@@ -1,7 +1,8 @@
 # Color Vision Deficiency Simulation Algorithm
 
 > **注記（#13 以降）:** この文書は **#13 以前の ue 内実装の記録** です。
-> 現行アルゴリズムの正本は **sensus-core crate**（`shaders/*.frag` + `*_uniforms`）に
+> 現行アルゴリズムの正本は **sensus-core crate**（`vision/color.rs`。CPU 版。ue が
+> 呼ぶのはこちら。GPU 版は同じ行列を `shaders/*.frag` + `*_uniforms` として提供）に
 > あり、ue は flutter_rust_bridge 経由でそれを消費します。本文に登場する
 > `ColorVisionSimulator`（`getTransformMatrix` / `toColorMatrix` 等）は ue から
 > **撤去済みで現存しません**。以下のコード例・行列値は歴史的記録であり、現行 API
@@ -11,7 +12,9 @@
 
 ## 概要
 
-（以下は ue 内に LMS 実装があった当時の記述。現行では sensus-core が同等の変換を担う。）
+sensus-core は LMS を経由せず、Machado 2009 の linear sRGB 行列で変換します
+（色覚 3 型の場合。詳細は `CLAUDE.md`「色覚アルゴリズム」参照）。以下は ue 内に
+LMS 実装があった当時（#13 以前）の記述です。
 
 色覚障害（CVD: Color Vision Deficiency）のシミュレーションは、LMS色空間での変換に基づいていました。
 
@@ -403,9 +406,10 @@ static List<List<double>> getAnomalyMatrix(String type, double severity) {
 
 ### Ishihara色覚検査プレート
 
-> **非目標**: ue は診断・スクリーニング・色覚検査を行いません。以下は #13 以前に
-> 検討していた検証手段の記録であり、現行のスコープには含まれません。詳細は
-> `README.md`「やらないこと（非目標）」を参照。
+> **非目標**: 色覚検査機能は提供しません（診断・スクリーニングは行いません）。
+> 石原表は本記録が #13 以前に検証手段として挙げていたものです。アルゴリズムの
+> 妥当性検証は ue の機能としては提供せず、sensus-core 側のテスト・golden 参照に
+> 委ねます。詳細は `README.md`「やらないこと（非目標）」を参照。
 
 実装の正確性を検証するため、石原式色覚検査表を使用：
 
@@ -455,6 +459,9 @@ class ColorLUT {
 ```
 
 ## 今後の改善
+
+> #13 以前の計画リストの記録です。Daltonization（4番目の項目）は現時点で非目標
+> です（`README.md`「やらないこと（非目標）」参照）。
 
 1. ✅ 基本的なLMS変換実装
 2. ⬜ Brettelアルゴリズムの実装（より正確）
