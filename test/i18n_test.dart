@@ -17,8 +17,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/main.dart' show WindowModeUiContext;
 import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/filter_service.dart';
+import 'package:universal_experience/services/hotkey_service.dart';
+import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
@@ -217,6 +220,14 @@ void main() {
                 create: (_) => FilterService()),
             ChangeNotifierProvider<VisionFilterState>(
                 create: (_) => VisionFilterState()),
+            ChangeNotifierProvider<LoupeWindowController>(
+                create: (_) => LoupeWindowController()),
+            Provider<WindowModeUiContext>.value(
+              value: const WindowModeUiContext(
+                trayAvailable: false,
+                hotkeyStatus: HotkeyStatus(),
+              ),
+            ),
           ],
           child: MaterialApp(
             locale: locale,

@@ -17,31 +17,39 @@ import '../../services/vision_filter_state.dart';
 /// [_buildCategory] の `isSelected` が常に false になる、#60）。「advanced
 /// で選んだのか、色覚クイック選択で選んだのか」を UI 上でも区別するため。
 class FilterCatalogSelector extends StatelessWidget {
-  const FilterCatalogSelector({super.key});
+  const FilterCatalogSelector({super.key, this.focusNode});
+
+  /// `/`（アプリ内ショートカット、#63）でこのカタログへフォーカスを移すための
+  /// 外部注入 FocusNode。未指定なら通常の（フォーカス移動対象にならない）
+  /// ウィジェットとして振る舞う。
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Consumer<VisionFilterState>(
       builder: (context, state, _) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (final category in VisionFilterCategory.values)
-              _buildCategory(l10n, state, category),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton.icon(
-                  onPressed:
-                      state.selectedId != null ? () => state.clear() : null,
-                  icon: const Icon(Icons.clear),
-                  label: Text(l10n.clear),
-                ),
-              ],
-            ),
-          ],
+        return Focus(
+          focusNode: focusNode,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final category in VisionFilterCategory.values)
+                _buildCategory(l10n, state, category),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton.icon(
+                    onPressed:
+                        state.selectedId != null ? () => state.clear() : null,
+                    icon: const Icon(Icons.clear),
+                    label: Text(l10n.clear),
+                  ),
+                ],
+              ),
+            ],
+          ),
         );
       },
     );

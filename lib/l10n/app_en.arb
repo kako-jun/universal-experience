@@ -370,5 +370,61 @@
   "paramMetamorphopsiaFreq": "Frequency",
   "paramMetamorphopsiaSeed": "Distortion seed",
   "paramDetailLossCellSize": "Cell size (px)",
-  "paramFlickeringStarsSeed": "Seed"
+  "paramFlickeringStarsSeed": "Seed",
+
+  "windowModeSectionTitle": "Startup Mode",
+  "@windowModeSectionTitle": {
+    "description": "Title of the window-mode section (app mode switch, always-on-top, click-through, hotkeys, #63)."
+  },
+  "windowModeSettings": "Settings window",
+  "@windowModeSettings": {
+    "description": "Label for the settings app mode (normal window, opaque) in the mode switch."
+  },
+  "windowModeLoupe": "Loupe window",
+  "@windowModeLoupe": {
+    "description": "Label for the loupe app mode (transparent, held up to the screen) in the mode switch."
+  },
+  "alwaysOnTopLabel": "Always on top",
+  "@alwaysOnTopLabel": {
+    "description": "Label for the always-on-top toggle."
+  },
+  "clickThroughLabel": "Click-through",
+  "@clickThroughLabel": {
+    "description": "Label for the click-through toggle."
+  },
+  "clickThroughDisabledHint": "Use this hotkey to get back: {hotkey}",
+  "@clickThroughDisabledHint": {
+    "description": "Shown next to the click-through toggle when there is no tray to fall back on, so the hotkey is the only way back.",
+    "placeholders": {
+      "hotkey": { "type": "String" }
+    }
+  },
+  "clickThroughNoReturnPathHint": "Click-through is disabled because neither the tray nor a hotkey is available to undo it",
+  "@clickThroughNoReturnPathHint": {
+    "description": "Shown next to the click-through toggle when it is disabled entirely: no tray and no hotkey can undo it, so enabling it would make the UI unrecoverable."
+  },
+  "hotkeySectionTitle": "Global Hotkeys",
+  "@hotkeySectionTitle": {
+    "description": "Title of the global-hotkeys list within the window-mode section."
+  },
+  "hotkeyToggleClickThrough": "Toggle click-through",
+  "@hotkeyToggleClickThrough": {
+    "description": "Display name for the toggle-click-through hotkey action."
+  },
+  "hotkeyHoldOriginal": "Hold to show original",
+  "@hotkeyHoldOriginal": {
+    "description": "Display name for the hold-to-show-original hotkey action."
+  },
+  "hotkeyEmergencyExit": "Emergency exit",
+  "@hotkeyEmergencyExit": {
+    "description": "Display name for the emergency-exit hotkey action (clears filters, click-through and always-on-top)."
+  },
+  "hotkeyToggleLoupeVisibility": "Show/hide loupe window",
+  "@hotkeyToggleLoupeVisibility": {
+    "description": "Display name for the toggle-loupe-visibility hotkey action."
+  },
+  "hotkeyRegistrationFailed": "Registration failed",
+  "@hotkeyRegistrationFailed": {
+    "description": "Shown next to a hotkey action whose global registration failed (e.g. unsupported on this platform/session)."
+  }
 }
