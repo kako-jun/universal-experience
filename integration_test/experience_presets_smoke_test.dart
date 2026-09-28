@@ -278,14 +278,30 @@ void main() {
         await scrollUntilHitTestable(tester, cardFinder, scrollableFinder);
         await tester.tap(cardFinder);
         await tester.pump();
-        await pumpUntilFound(tester, find.text(afterLabel));
+
+        // vestibular_neuritis はプリセットカードの見出し
+        // （experienceName、"Vestibular neuritis"）とプレビューの after
+        // ラベル（visionFilterName、こちらも "Vestibular neuritis"）が同じ
+        // 文字列になるため、ページ全体ではなく BeforeAfterView の中だけで
+        // 探す（#60 レビュー）。
+        final afterLabelFinder = find.descendant(
+          of: find.byType(BeforeAfterView),
+          matching: find.text(afterLabel),
+        );
+        await pumpUntilFound(tester, afterLabelFinder);
 
         expect(tester.takeException(), isNull,
             reason: '$experienceId 選択後の描画で例外が発生した');
-        expect(find.text(afterLabel), findsOneWidget,
+        expect(afterLabelFinder, findsOneWidget,
             reason: '$experienceId 選択後、after ペインに "$afterLabel" が出ていない');
-        expect(find.text(en.previewFailed), findsNothing,
-            reason: '$experienceId 選択後にプレビューが失敗表示になっている');
+        expect(
+          find.descendant(
+            of: find.byType(BeforeAfterView),
+            matching: find.text(en.previewFailed),
+          ),
+          findsNothing,
+          reason: '$experienceId 選択後にプレビューが失敗表示になっている',
+        );
       }
     });
   });
