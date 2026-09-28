@@ -27,7 +27,21 @@
 > プリセットのタップは `FilterService`（色覚のクイック選択の状態）を変更しない
 > — `deactivate()` は呼ばない。選択中のプリセットは体験 id で保持するため、
 > 同じ `vertigo` フィルタに写る 2 つのプリセット（メニエール病・迷路炎）が
-> 同時に選択中と表示されることはない（#60）。
+> 同時に選択中と表示されることはない（#60）。色覚のクイック選択
+> （`FilterSelector`/トレイ）は `lib/services/color_vision_selection.dart` の
+> `selectColorVision`/`deactivateColorVision` を唯一の入口とし、呼ばれた
+> その場で `FilterService` と `VisionFilterState` の両方を更新する（listener
+> によるミラーはしない）。これに伴い `VisionFilterState` も `filterService`
+> と同じくトップレベル singleton（`main.dart` の `visionFilterState`）に昇格
+> した。色覚チップの点灯・`IntensitySlider` の有効/無効・解除ボタンの有効/
+> 無効は、すべて `VisionFilterState.isColorQuickSelection` から導く（advanced/
+> プリセットを見ている間はいずれも無効）。advanced カタログの strength
+> スライダー（`FilterParamPanel`）も、色覚クイック選択が起点のときは出さない
+> （動かしても実際の強度は #57 のタイプ別記憶が決めるため）。-omaly
+> （protanomaly 等）は `VisionFilterState.colorVisionType` に実際の型を保持し、
+> 見出し・export の caption・ファイル名で正しい -omaly の名前を出す（#60。
+> カタログは色覚を 5 種しか持たず、-omaly は base の -opia と同じカタログ id
+> に写るため、id だけでは区別できない）。
 
 ## ルーペ窓挙動 (#14)
 

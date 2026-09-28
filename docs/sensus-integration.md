@@ -467,8 +467,18 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   組み立て済みの `VisionFilter?` をそのまま `CpuVisionRenderer.applier` へ渡す
   だけになっている。`FilterService.sensusFilter`
   （`visionFilterForColorVisionType`）自体は変わらず健在だが、色覚のクイック
-  選択を `VisionFilterState` へ写すための入力としてのみ使われる
-  （`home_screen.dart` の `_syncVisionFilterState`）。
+  選択を `VisionFilterState` へ書き込む入力としてのみ使われる
+  （`lib/services/color_vision_selection.dart` の `selectColorVision`）。
+  **#60 レビュー1巡目での追補（M1）**: 当初は home_screen.dart の listener が
+  `FilterService` の変化を `VisionFilterState` へミラーしていたが、
+  「`currentFilter` が変わったときだけ」反映する差分検知のせいで、
+  advanced/プリセットを経由したあとに同じ色覚型を再選択しても反映されない
+  穴があった。ミラーはやめ、`FilterSelector`・トレイ・`main.dart` の起動時
+  復元のいずれも `selectColorVision`/`deactivateColorVision`
+  （`lib/services/color_vision_selection.dart`）を直接呼んで、その場で
+  `FilterService` と `VisionFilterState` の両方を更新する形にした。
+  `VisionFilterState` はこれに伴い `filterService` と同じくトップレベル
+  singleton（`main.dart` の `visionFilterState`）に昇格した。
 - **alpha の扱い（レビュー S1、初版の誤り）**: Flutter の `ui.Image` は
   premultiplied alpha で GPU テクスチャを保持するが、sensus（`image` crate）は
   straight alpha を前提にした画素処理を行う。初版はこの違いを踏まえず
