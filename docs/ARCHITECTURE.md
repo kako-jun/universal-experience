@@ -35,13 +35,23 @@
 > と同じくトップレベル singleton（`main.dart` の `visionFilterState`）に昇格
 > した。色覚チップの点灯・`IntensitySlider` の有効/無効・解除ボタンの有効/
 > 無効は、すべて `VisionFilterState.isColorQuickSelection` から導く（advanced/
-> プリセットを見ている間はいずれも無効）。advanced カタログの strength
-> スライダー（`FilterParamPanel`）も、色覚クイック選択が起点のときは出さない
-> （動かしても実際の強度は #57 のタイプ別記憶が決めるため）。-omaly
-> （protanomaly 等）は `VisionFilterState.colorVisionType` に実際の型を保持し、
-> 見出し・export の caption・ファイル名で正しい -omaly の名前を出す（#60。
-> カタログは色覚を 5 種しか持たず、-omaly は base の -opia と同じカタログ id
-> に写るため、id だけでは区別できない）。
+> プリセットを見ている間はいずれも無効）。ただし「Normal vision」
+> （`ColorVisionType.none`）チップだけは `VisionFilterState.selectedId == null`
+> （＝何も選択されていない）で点灯を判定する — `isColorQuickSelection` は
+> none を「選択中」扱いにしないため。**advanced/プリセットを選択中に
+> 「Normal vision」を押すと、それらの選択もすべて消える**（`selectColorVisionType`
+> は既存の選択を常に上書きするため）。これは意図した挙動で、「Normal vision」
+> は色覚セクション内の一操作ではなく、プレビュー全体を原画に戻す操作として
+> 扱う。advanced カタログの strength スライダー（`FilterParamPanel`）も、
+> 色覚クイック選択が起点のときは出さない（動かしても実際の強度は #57 の
+> タイプ別記憶が決めるため）。-omaly（protanomaly 等）は
+> `VisionFilterState.colorVisionType` に実際の型を保持し、見出し・export の
+> caption・ファイル名で正しい -omaly の名前を出す（#60。カタログは色覚を
+> 5 種しか持たず、-omaly は base の -opia と同じカタログ id に写るため、id
+> だけでは区別できない）。トレイのメニューも `filterService`/
+> `visionFilterState` の変化を listener で受けて `refresh()` する（#60。
+> ウィンドウ内 UI での選択もトレイのチェックマークに反映されるようにする
+> ため。listener は `TrayService.dispose()` で外す）。
 
 ## ルーペ窓挙動 (#14)
 
