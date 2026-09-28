@@ -25,13 +25,17 @@ lib/
 │   └── shader_filter.dart           # sensus 由来 GLSL → Impeller FragmentProgram 適用
 │                                     # （ライブ画面キャプチャ向けに残置、現状 production 未使用）
 ├── services/
+│   ├── app_shortcuts.dart           # アプリ内キー操作（/, ↑↓, ←→）の Intent 定義（#63）
 │   ├── color_vision_selection.dart  # 色覚クイック選択の唯一の入口（FilterService/
 │   │                                 # VisionFilterState を同時更新、#60）
 │   ├── export_service.dart          # PNG エクスポート（メタ焼き込み）
 │   ├── filter_service.dart          # 選択状態モデル（sensus VisionFilter へのマッピング）
-│   ├── loupe_window_controller.dart # ルーペ窓のモード/透過/最前面
+│   ├── hotkey_actions.dart          # グローバルホットキー4アクションの実処理（#63）
+│   ├── hotkey_service.dart          # hotkey_manager 登録の副作用層（#63）
+│   ├── loupe_rect_source.dart       # ルーペ矩形決定元のインターフェース（#44 向け seam、#63）
+│   ├── loupe_window_controller.dart # ルーペ窓のモード/透過/最前面/クリックスルー（#63）
 │   ├── native_bridge_service.dart   # flutter_rust_bridge（sensus-core）の bootstrap 初期化
-│   ├── preview_selection.dart       # プレビュー強度の出どころを一本化する判定（#60）
+│   ├── preview_selection.dart       # プレビュー強度の出どころを一本化する判定（#60/#63）
 │   ├── settings_service.dart
 │   ├── tray_service.dart            # タスクトレイ
 │   └── vision_filter_state.dart
@@ -39,7 +43,9 @@ lib/
 └── ui/
     ├── screens/home_screen.dart
     ├── widgets/                     # filter_selector, intensity_slider, before_after_view,
-    │                                 # experience_presets, filter_catalog_selector, filter_param_panel
+    │                                 # experience_presets, filter_catalog_selector, filter_param_panel,
+    │                                 # window_mode_panel（起動モード・最前面・クリックスルー・
+    │                                 # ホットキー一覧、#63）
     └── theme/app_theme.dart
 
 rust/                        # sensus-core を FRB で公開する Rust crate

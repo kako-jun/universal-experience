@@ -94,18 +94,38 @@
 
 ### リサイズ追従
 
-`WindowListener.onWindowResize` でサイズを取得し state 更新 -> `onChanged`
-コールバックで UI に伝える (中身がウィンドウに貼り付く責務)。
+`WindowListener.onWindowResize` でサイズを取得し state 更新 -> `notifyListeners()`
+（`LoupeWindowController` は `ChangeNotifier`、#63）で UI に伝える (中身が
+ウィンドウに貼り付く責務)。
 
-### 透過・最前面・クリックスルー (既定方針)
+### 透過・最前面・クリックスルー (既定方針、#63 で更新)
 
-- **透明背景**: 既定 ON。枠の外は完全透過、枠の中だけ描画 (VIP-Sim / Sim Daltonism 型, #6)。
-  `WindowOptions.backgroundColor = transparent`。
-- **最前面**: 既定 ON (`setAlwaysOnTop(true)`)。下のアプリより手前にいないと
-  「かざして見る」が成立しない。
+- **透明背景**: 起動モード (#63、後述の「アプリモード切替」参照) に連動する。
+  設定モードは常に不透明 (フィルタ選択 UI を見やすくするため)、ルーペモードは
+  透明 (枠の外は完全透過、枠の中だけ描画。VIP-Sim / Sim Daltonism 型, #6)。
+  `LoupeWindowPolicy.transparentForMode(mode)` が単一の判定。起動時の
+  `WindowOptions.backgroundColor` はこれで決め、以降は
+  `LoupeWindowController.setAppMode()` が `windowManager.setBackgroundColor()`
+  で反映する。
+- **最前面**: **既定 OFF**、切替式 (#63 で ON→OFF に変更)。起動は設定モードから
+  始まるため、まずフィルタ選択 UI を操作したい。常に最前面だと設定 UI が
+  他アプリの上に居座って操作しづらいため、実際にかざして見たいときにユーザーが
+  `LoupeWindowController.setAlwaysOnTop()` で ON にする運用にした。
 - **クリックスルー**: 既定 **OFF**、切替式。起動直後は窓を掴んで移動・リサイズ
   したいのでイベントを受け取り、下のアプリを操作したいときユーザーが ON する。
-  実装は `setIgnoreMouseEvents(true, forward: true)`。
+  実装は `setIgnoreMouseEvents(true, forward: true)`。**ON にする操作自体を
+  ガードする (#63)**: `LoupeWindowPolicy.canEnableClickThrough()` は、トレイ・
+  クリックスルー解除ホットキー・非常口ホットキーのいずれも使えない場合に false
+  を返す。全て使えない状態で一度 ON にすると UI 操作が一切できなくなり復帰
+  不能になるため、その場合は `WindowModePanel` の該当スイッチ自体を無効化する
+  (`onChanged: null`)。OFF への変更はいつでも許可する。
+- **起動モード・最前面・クリックスルーは独立して永続化する (#63)**:
+  `LoupeWindowController` 自身が `SharedPreferences`
+  (`loupeWindow.appMode` / `loupeWindow.alwaysOnTop` / `loupeWindow.clickThrough`)
+  に即時書き込みする (`FilterService` の per-type intensity のようなデバウンスは
+  不要な、頻度の低いトグルのため)。`main()` は `windowManager.ensureInitialized()`
+  の直後、`WindowOptions` を組み立てる前に `loupeWindow.load()` を呼んで復元し、
+  `loupeWindow.initialize()` が実際の window_manager へ反映する。
 - **クリックスルーの `forward` はプラットフォーム差あり**: `forward` 引数は
   **macOS 専用**で、Linux/Windows では window_manager 側で無視される。Linux では
   「自ウィンドウがイベントを無視する」までは効くが、「下のアプリへ転送する」挙動は
@@ -145,16 +165,22 @@ main.dart が `windowManager.show()` / `hide()` を `onShowLoupe` / `onHideLoupe
 1. **ルーペ窓を表示 / 隠す** — トグル (注入された `windowManager.show()` /
    `hide()` を呼ぶ。ラベルは現在の表示状態で切替)
 2. (区切り線)
-3. **即切替フィルタ** (`quickColorVisionFilters()`) — よく使う色覚シミュレーションを
+3. **起動モード切替** — `LoupeWindowController.setAppMode()`（settings/loupe をトグル、#63）
+4. **最前面固定** — `LoupeWindowController.setAlwaysOnTop()`（#63）
+5. **クリックスルー** — `LoupeWindowController.setClickThrough()`（#63。settings
+   モード中の ON 拒否は `setClickThrough` 自身のガードに任せる。トレイ自体が
+   復帰手段のため `canEnableClickThrough` のチェックは不要）
+6. (区切り線)
+7. **即切替フィルタ** (`quickColorVisionFilters()`) — よく使う色覚シミュレーションを
    直接適用: Protanopia / Deuteranopia / Tritanopia / Achromatopsia。
    `FilterService.applyFilter()` を呼び、アクティブなものにチェックが付く。全フィルタ
    catalogue は設定 UI (#16) にあり、トレイは短く保つため代表のみ出す。
-4. **フィルタを解除** — `FilterService.deactivate()`
-5. (区切り線)
-6. **設定を開く…** — フィルタ選択 UI はメインウィンドウ内にあるため
+8. **フィルタを解除** — `FilterService.deactivate()`
+9. (区切り線)
+10. **設定を開く…** — フィルタ選択 UI はメインウィンドウ内にあるため
    `windowManager.show()` + `focus()` でウィンドウを表示する
-7. (区切り線)
-8. **終了** — 先頭で `FilterService.flush()`（#57、保留中の intensity
+11. (区切り線)
+12. **終了** — 先頭で `FilterService.flush()`（#57、保留中の intensity
    デバウンス書き込みを取りこぼさない）した上で、トレイを破棄し
    `setPreventClose(false)` の上で `windowManager.destroy()`
 
@@ -214,24 +240,138 @@ Linux debug ビルド成功で代替している:
 トレイアイコンが実際に表示されるか・メニュークリックの挙動は、トレイ対応環境
 (KDE 等、または GNOME + AppIndicator 拡張) での実機確認が別途必要。
 
-## フォロー事項: アプリモード切替 (#14/#16)
+## アプリモード切替 (#63、実装済み)
 
-現状は起動直後から「透明背景 ON・最前面 ON」を常時適用している。しかしフィルタ
-選択 UI (#16) を操作するときは、最前面・透明だと UI が背後のアプリと重なって
-操作しづらく、他ウィンドウへも移りにくい。
+起動直後は「設定モード (settings)」から始まる。通常ウィンドウ・不透明で、
+まずフィルタ選択 UI を操作しやすくする。実際にかざして見たいときはユーザーが
+「ルーペモード (loupe)」へ切り替える。
 
-将来は次の2モードを切り替える想定:
+| モード | 透明 | ウィンドウ | 用途 |
+|---|---|---|---|
+| 設定モード (settings) | OFF (不透明) | 通常 | フィルタ選択など UI 操作。**起動既定** |
+| ルーペモード (loupe) | ON | 透明 | 実際に画面へかざして見る |
 
-| モード | 透明 | 最前面 | ウィンドウ | 用途 |
-|---|---|---|---|---|
-| 設定モード (settings) | OFF | OFF | 通常 | フィルタ選択など UI 操作。**起動既定にしたい** |
-| ルーペモード (loupe) | ON | ON | 透明・最前面 | 実際に画面へかざして見る |
+最前面固定・クリックスルーはモードとは**独立したトグル**として別に持つ
+（モード切り替えはこれらを自動で変更しない。ただしルーペ→設定モードへの
+切り替え時だけは、クリックスルーが ON のままだと設定 UI が操作不能になるため
+`LoupeWindowController.setAppMode()` が強制的に OFF へ戻す）。
 
-実装時は `LoupeWindowController` に `setSettingsMode(bool)` / `setLoupeMode(bool)`
-の口を用意し、`main` の起動既定を「設定モード=通常ウィンドウ」にする。
-**本 PR (#14) ではスコープ外**のため、起動既定 (透明・最前面 ON) は現状維持。
-該当箇所には `lib/services/loupe_window_controller.dart` と `lib/main.dart` に
-TODO コメントを残してある。
+実装は `LoupeWindowController.appMode` / `AppMode` enum / `setAppMode()`
+（`lib/services/loupe_window_controller.dart`）と、設定画面の
+`WindowModePanel`（`lib/ui/widgets/window_mode_panel.dart`、`SegmentedButton<AppMode>`）、
+およびタスクトレイ（`lib/services/tray_service.dart`、下記「メニュー構成」節）の
+3 経路。起動モード・最前面・クリックスルーはいずれも `LoupeWindowController` 自身が
+`SharedPreferences` へ即時永続化し、次回起動時に復元する（詳細は上記
+「透過・最前面・クリックスルー」節）。永続化されたクリックスルーの起動時復元は
+`LoupeWindowController.restorePersistedClickThrough()` が担い、トレイ/ホットキーの
+初期化が終わったあとに `main()` が呼ぶ（`initialize()` 自体はトレイ/ホットキー
+初期化より前に走るため、そこでは適用しない。復帰手段の有無を確認せずに ON を
+復元すると、前回使えたトレイ拡張が今回は無効といったケースで復帰不能になるため）。
+
+## グローバルホットキー (#63)
+
+デスクトップ全体で効くグローバルホットキーを 4 種類提供する。実装は
+`hotkey_manager` パッケージ経由（`lib/services/hotkey_service.dart` /
+`lib/services/hotkey_actions.dart`）。
+
+| アクション | 既定キー | 効果 |
+|---|---|---|
+| `toggleClickThrough` | Ctrl+Alt+Shift+C | クリックスルーの ON/OFF |
+| `holdOriginal` | Ctrl+Alt+Shift+O | 押している間だけ原画を表示 |
+| `emergencyExit` | Ctrl+Alt+Shift+Esc | 非常口: 全フィルタ停止 + クリックスルー解除 + 最前面解除 + ルーペ窓表示/前面化 |
+| `toggleLoupeVisibility` | Ctrl+Alt+Shift+L | ルーペ窓の表示/非表示 |
+
+既定キーはすべて Ctrl+Alt+Shift の 3 修飾（`defaultHotkeyBindings()`）。主要
+アプリ・OS 標準ショートカットと衝突しにくくするため。
+
+### 構成 (純粋ロジックと副作用の分離)
+
+`tray_service.dart` と同じ 2 層構成に倣う。
+
+- **`HotkeyActions`**（`lib/services/hotkey_actions.dart`）— 4 アクションの
+  実処理。すべて注入されたコールバック（`setClickThrough` / `setAlwaysOnTop` /
+  `setBypassed` / `showAndFocusLoupe` / `toggleLoupeVisible` 等）経由で副作用を
+  起こすため、実 OS のホットキー/window_manager 無しでフェイクにより単体
+  テストできる（`test/hotkey_actions_test.dart`）。
+- **`HotkeyService`**（`lib/services/hotkey_service.dart`）— `hotkey_manager`
+  への実際の登録を担う副作用層。登録処理は `HotkeyGateway` インターフェース
+  越しに行い、テストではフェイクゲートウェイに差し替える
+  （`test/hotkey_service_test.dart`）。登録失敗（Wayland 等でグローバル
+  ホットキーが使えない環境）はアクションごとに個別に catch し、他のアクション
+  の登録は続行する。結果は `registeredActions` / `failedActions` に残り、
+  `main()` が `HotkeyStatus` として `UniversalExperienceApp` へ渡し、
+  `WindowModePanel` が失敗したアクションをエラー色で表示する。
+
+### `holdOriginal` の keyUp フォールバック設計
+
+「押している間だけ原画を表示」は理想的には keyDown で ON・keyUp で OFF にする
+hold ジェスチャだが、一部 OS のグローバルホットキーでは keyUp イベントが
+配送されないことがある。`HotkeyActions.holdOriginalKeyDown()` は常に
+**トグル**し（`setBypassed(!getBypassed())`）、`holdOriginalKeyUp()` は
+bypassed が true なら強制的に false にする。この 2 つのハンドラの組み合わせ
+だけで、タイマー等の環境判定なしに両方の環境に自然にフォールバックする:
+
+- keyUp が届く環境: 押す→ON、離す→OFF という正しい hold 挙動になる。
+- keyUp が届かない環境: 毎回の押下が単純なトグルとして機能する。
+
+原画表示自体は `VisionFilterState.bypassed`（`lib/services/vision_filter_state.dart`）
+が担い、選択中のフィルタ・strength・params は一切変更しない。判定は
+`preview_selection.dart` の `previewStrength()` に集約する（bypassed なら
+`isColorQuickSelection` に関わらず常に 0.0 を返す）。
+
+> **実機未検証の注意**: OS のキーリピート挙動（特に Linux/X11 で、グローバルホットキーを
+> 押し続けたときに keyDown が連続発火する場合がある）や、Wayland での登録失敗の検出可能性
+> （登録 API 自体は成功を返すが実際にはキーが発火しない環境がありうる）は、この実装段階
+> では実機確認していない。前者は holdOriginal のトグル挙動がちらつく可能性、後者は
+> クリックスルーの復帰不能ガード（`canEnableClickThrough`）が実際には使えないホットキー
+> を「使える」と誤判定するリスクにつながる。実機（macOS/Linux）での目視確認が必要。
+
+### クリックスルーの復帰不能ガード
+
+トレイもクリックスルー解除ホットキーも非常口ホットキーも使えない環境で
+クリックスルーを ON にすると、UI 操作が一切できなくなり復帰不能になる。
+`LoupeWindowPolicy.canEnableClickThrough()`（純粋関数）がこれを判定し、
+`WindowModePanel` は該当する場合クリックスルーのスイッチ自体を無効化する
+（ON にする操作だけを塞ぐ。既に ON のものを OFF に戻す操作は常に許可する）。
+トレイが無い環境では、ON にした後の復帰手段としてホットキーの組み合わせを
+ヒント文言（`clickThroughDisabledHint` ARB）で案内する。
+
+## アプリ内キー操作 (#63)
+
+ウィンドウにフォーカスがある間だけ効くショートカット 3 種。実装は
+`lib/services/app_shortcuts.dart`（`Intent` 定義）+
+`lib/services/preview_selection.dart`（実処理: `cycleAdvancedFilter()` /
+`adjustPreviewStrength()`）+ `lib/ui/screens/home_screen.dart`
+（標準 Flutter `Shortcuts`/`Actions`/`Focus` で配線。`hotkey_manager` の
+`GlobalShortcuts` は使わない — こちらはウィンドウ内フォーカス時だけの
+アプリ内ショートカットで、OS 全体に効くグローバルホットキーとは別物）。
+
+| キー | 効果 |
+|---|---|
+| `/` | advanced カタログ（`kVisionFilterCatalog`、30 件）にフォーカスを移す |
+| `↑` / `↓` | advanced カタログを逆送り/順送り（wraparound） |
+| `←` / `→` | 選択中フィルタの強度を `kKeyboardStrengthStep`（5%）刻みで増減 |
+
+- **`/` は「検索欄が無ければ advanced のカタログにフォーカス」という Issue の
+  要求を字義どおり実装したもの**。現状アプリ内に検索欄は存在しないため、常に
+  advanced カタログへフォーカスする。将来検索欄が追加されたら、まず検索欄へ
+  フォーカスするよう分岐を足す。
+- **↑↓ の対象を advanced カタログ 30 件に固定した理由**: `/` が同じカタログに
+  フォーカスするため、↑↓ が動かす対象と一致させた。色覚クイック選択チップ
+  （7 種）は対象外 — Tab/マウスで十分に少なく選びやすいため、わざわざ
+  キーボードショートカットの対象に含める必要がないと判断した。
+- ←→ の強度調整は `previewStrength` と同じ判定（`isColorQuickSelection`）に
+  従う: 色覚クイック選択中は `FilterService.intensity`、advanced/プリセット
+  選択中は `VisionFilterState.strength` を動かす。
+
+## `LoupeRectSource` (#63、#44 向けの差し替え可能な seam)
+
+`lib/services/loupe_rect_source.dart` は、ルーペ矩形の決定元をインターフェース
+（`LoupeRectSource`）として切り出したもの。現状の唯一の実装
+`ManualLoupeRectSource` はルーペ窓自身の矩形（ユーザーが手動で動かす）を返す。
+将来 #44（対象アプリのウィンドウに自動追従するモード）が実装されたら、この
+インターフェースの別実装に差し替える想定。#44 自体の実装（自動追従ロジック）は
+この Issue のスコープ外で、seam を用意しただけ。
 
 ### マルチモニタ
 
