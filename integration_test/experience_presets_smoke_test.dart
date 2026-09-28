@@ -12,6 +12,8 @@
 // まとめて渡すと、デスクトップでは 2 番目に起動する側のアプリ起動待ちが失敗する
 // 既知の制約があるため、別コマンドとして実行する。
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -77,7 +79,7 @@ Widget _previewWithPresetsApp() {
       home: Scaffold(
         body: SingleChildScrollView(
           // home_screen.dart の ConstrainedBox(maxWidth: 800) を再現する
-          // （#60 レビュー）。これが無いと、幅無制限のウィンドウ上で
+          // （#60）。これが無いと、幅無制限のウィンドウ上で
           // BeforeAfterView の左右ペインが横幅いっぱい（1000px超）の正方形に
           // なり、プリセットカードがウィンドウの縦サイズを大きく超えて
           // 押し出されてしまう。
@@ -202,32 +204,24 @@ void main() {
   });
 
   group('プリセット → プレビュー結線（#60）', () {
-    /// [finder] が見つかるまで実時間でポンプし続ける。integration_test は実
-    /// デバイス上で動く（`flutter test` の FakeAsync とは違い実際の非同期）ため、
-    /// `tester.pump(duration)` を繰り返すだけで実ブリッジの CPU apply() 完了を
-    /// 待てる。
-    Future<void> pumpUntilFound(
-      WidgetTester tester,
-      Finder finder, {
-      int maxTries = 100,
-    }) async {
-      for (var i = 0; i < maxTries; i++) {
-        if (finder.evaluate().isNotEmpty) return;
-        await tester.pump(const Duration(milliseconds: 50));
-      }
-    }
-
     /// [finder] が実際にヒットテストできる位置（ウィンドウの矩形内）に入るまで
-    /// [scrollableFinder] を実ジェスチャでドラッグし続ける（#60 レビュー）。
+    /// [scrollableFinder] を実ジェスチャでドラッグし続ける（#60）。
     ///
     /// `tester.scrollUntilVisible`（内部の `dragUntilVisible`）は
     /// 「finder が要素ツリー上に見つかるまで」ドラッグする実装で、
     /// `_previewWithPresetsApp` のようにカードが遅延構築（ListView.builder 等）
     /// されず常時ビルド済みの場合は最初から見つかってしまい一切ドラッグしない。
-    /// `tester.ensureVisible`（`Scrollable.ensureVisible`、`duration: Duration.
-    /// zero` のプログラム的ジャンプ）も同じ問題を踏んだ（CI で実測、原因未特定）。
-    /// このヘルパは実際の描画済み矩形（`tester.getRect`）とウィンドウサイズを
-    /// 比較しながら実ジェスチャの `drag` を繰り返すため、両方の問題を回避できる。
+    /// `tester.ensureVisible`（`Scrollable.ensureVisible`）も呼んだが、CI（macOS
+    /// / Linux とも）でスクロールが反映されなかった（原因未特定）。本質的な
+    /// 原因はどちらでもなく、`_previewWithPresetsApp` が home_screen.dart の
+    /// 幅制約（`ConstrainedBox(maxWidth: 800)`）を欠いていてペインが無制限の
+    /// 幅いっぱいの巨大な正方形になり、後続のカードが大きく押し出されていた
+    /// こと（幅制約は追加済み）。このヘルパは実際の描画済み矩形
+    /// （`tester.getRect`）とウィンドウサイズを比較しながら実ジェスチャの
+    /// `drag` を繰り返すため、スクロール手段そのものの実装差に依存しない。
+    /// [maxAttempts] 回ドラッグしても収まらなければ、後続の `tap()` の
+    /// 分かりにくいヒットテスト失敗にする代わりに、ここで明示的に `fail()`
+    /// する（#60 S2）。
     Future<void> scrollUntilHitTestable(
       WidgetTester tester,
       Finder finder,
@@ -245,12 +239,33 @@ void main() {
         await tester.drag(scrollableFinder, Offset(0, delta));
         await tester.pump();
       }
+      fail(
+        '$finder を $maxAttempts 回ドラッグしてもウィンドウ内に収まらなかった'
+        '（ヒットテストできない状態でタップすることになる）',
+      );
     }
 
     testWidgets('プリセット 4 種すべてが、タップで実ブリッジ CPU apply() まで例外なく描画される',
         (tester) async {
       await tester.pumpWidget(_previewWithPresetsApp());
       await tester.pumpAndSettle();
+
+      final context = tester.element(find.byType(ExperiencePresets));
+      final visionState = context.read<VisionFilterState>();
+
+      // #60 S1: afterImageRenderer（BeforeAfterView が公開する production
+      // 供給源、実ブリッジの CpuVisionRenderer.applier を最終的に呼ぶ）を
+      // ラップし、実ブリッジの CPU apply() が完了した瞬間を Completer で
+      // 検知する。テキストが出るまで単純にポーリングするより、実際に何を
+      // 待っているか（このタップが引き起こした描画そのもの）が明確になる。
+      final productionRenderer = afterImageRenderer;
+      addTearDown(() => afterImageRenderer = productionRenderer);
+      Completer<void>? renderCompleter;
+      afterImageRenderer = (source, filter, strength) async {
+        final result = await productionRenderer(source, filter, strength);
+        renderCompleter?.complete();
+        return result;
+      };
 
       final en = lookupAppLocalizations(const Locale('en'));
       // (experience id, 選択後の after ペインに出るはずのフィルタ名) の組。
@@ -259,9 +274,9 @@ void main() {
       //
       // カードは experience id ベースの Key（experienceCardKey）で見つける。
       // 表示名の文字列は「上に積まれたプレビューペインのせいでカードが
-      // ビューポート外に出て tap のヒットテストが外れる」問題（#60 レビュー）
-      // には無関係（原因は off-screen であることそのもの）だが、id ベースの
-      // Key の方がロケール・レイアウトに依存せず安定して見つけられる。
+      // ビューポート外に出て tap のヒットテストが外れる」問題には無関係
+      // （原因は off-screen であることそのもの）だが、id ベースの Key の方が
+      // ロケール・レイアウトに依存せず安定して見つけられる。
       final cases = <(String experienceId, String afterLabel)>[
         ('meniere', visionFilterName(en, 'vertigo')),
         ('bppv', visionFilterName(en, 'bppv_rotation')),
@@ -276,19 +291,30 @@ void main() {
         // プレビューペイン + 他のプリセットカードでスクロールが必要になる
         // ことがあるため、タップ前に確実にビューポート内へ持ってくる。
         await scrollUntilHitTestable(tester, cardFinder, scrollableFinder);
+
+        renderCompleter = Completer<void>();
         await tester.tap(cardFinder);
+        await tester.pump();
+
+        // #60 S2: タップ直後に選択状態そのものも確認する（実描画の結果だけを
+        // 見て、選択が正しく反映されたことを間接的に推測しない）。
+        expect(visionState.selectedPresetId, experienceId,
+            reason: '$experienceId タップ直後に selectedPresetId が反映されていない');
+
+        // 実ブリッジの CPU apply() が完了するまで待つ（#60 S1）。
+        await renderCompleter.future.timeout(const Duration(seconds: 10));
+        await tester.pump();
         await tester.pump();
 
         // vestibular_neuritis はプリセットカードの見出し
         // （experienceName、"Vestibular neuritis"）とプレビューの after
         // ラベル（visionFilterName、こちらも "Vestibular neuritis"）が同じ
         // 文字列になるため、ページ全体ではなく BeforeAfterView の中だけで
-        // 探す（#60 レビュー）。
+        // 探す（#60）。
         final afterLabelFinder = find.descendant(
           of: find.byType(BeforeAfterView),
           matching: find.text(afterLabel),
         );
-        await pumpUntilFound(tester, afterLabelFinder);
 
         expect(tester.takeException(), isNull,
             reason: '$experienceId 選択後の描画で例外が発生した');
