@@ -17,7 +17,7 @@ import '../../services/vision_filter_state.dart';
 /// strength スライダは、選択が色覚クイック選択（`FilterSelector`/トレイ）
 /// 由来のときは出さない（`lib/services/preview_selection.dart` の
 /// `showsAdvancedStrengthSlider` を参照。その場合の強度は #57 のタイプ別
-/// 記憶が決め、このスライダーを動かしても反映されないため、#60 M2）。
+/// 記憶が決め、このスライダーを動かしても反映されないため、#60）。
 /// 文言はすべて i18n で解決する（カタログは識別子/enum のみ持つ: #18）。
 class FilterParamPanel extends StatelessWidget {
   const FilterParamPanel({super.key});
@@ -40,10 +40,10 @@ class FilterParamPanel extends StatelessWidget {
         }
 
         final consult = consultMessageForUrgency(l10n, entry.urgency);
-        // #60 M2: 色覚クイック選択由来の選択では、強度は previewStrength が
+        // 色覚クイック選択由来の選択では、強度は previewStrength が
         // FilterService のタイプ別記憶（#57）から決める — この strength
         // スライダーを動かしても実際のプレビューには反映されないので出さない
-        // （判定は showsAdvancedStrengthSlider に集約）。
+        // （判定は showsAdvancedStrengthSlider に集約、#60）。
         final showStrength = showsAdvancedStrengthSlider(state);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
