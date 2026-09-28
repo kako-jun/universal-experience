@@ -20,8 +20,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/main.dart';
 import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/settings_service.dart';
-import 'package:universal_experience/ui/widgets/intensity_slider.dart';
 
 void main() {
   testWidgets(
@@ -32,13 +32,15 @@ void main() {
     await settings.load();
 
     // スライダーを操作可能にするため、フィルタを選択しておく（IntensitySlider は
-    // currentFilter == none の間 onChanged が null で操作不能）。main() では
-    // buildRootApp() が filterService と settings.filterType を同じ値に揃えて
-    // 起動するので、ここでもテスト対象外の初期同期として揃えておく（揃えないと、
-    // 最初の 1 回だけ HomeScreen._persistFilterState の setFilterType が
-    // 「none → protanopia」の実変更として notify してしまい、これから見たい
-    // 「intensity だけを動かしたとき」の挙動と混ざってしまう）。
-    filterService.applyFilter(ColorVisionType.protanopia);
+    // VisionFilterState.isColorQuickSelection が false の間 onChanged が null で
+    // 操作不能、#60 M1）。main() では buildRootApp() が selectColorVision
+    // （#60 M1、FilterService と VisionFilterState の両方を更新する唯一の
+    // 入口）で filterService/visionFilterState と settings.filterType を
+    // 揃えて起動するので、ここでもテスト対象外の初期同期として揃えておく
+    // （揃えないと、最初の 1 回だけ HomeScreen._persistFilterState の
+    // setFilterType が「none → protanopia」の実変更として notify してしまい、
+    // これから見たい「intensity だけを動かしたとき」の挙動と混ざってしまう）。
+    selectColorVision(filterService, visionFilterState, ColorVisionType.protanopia);
     await settings.setFilterType(ColorVisionType.protanopia);
 
     await tester.pumpWidget(UniversalExperienceApp(settings: settings));
@@ -51,13 +53,10 @@ void main() {
     // ExperiencePresets カードのような、より下の（flutter_rust_bridge 初期化を
     // 要求する）カードまでは踏み込まない範囲で止まる。
     //
-    // #60: 色覚のクイック選択が VisionFilterState にも書かれるようになった
-    // ため、advanced セクションの FilterParamPanel にも strength スライダーが
-    // 現れる（同じ id が selectedEntry になるため）。find.byType(Slider) では
-    // 2 本ヒットしてしまうので、IntensitySlider（色覚セクション側）の内側だけに
-    // 絞る。
-    final sliderFinder =
-        find.descendant(of: find.byType(IntensitySlider), matching: find.byType(Slider));
+    // #60 M2: advanced セクションの FilterParamPanel は、色覚クイック選択
+    // 由来のときは strength スライダーを出さないため（showsAdvancedStrengthSlider）、
+    // Slider は IntensitySlider の 1 本だけになる。find.byType(Slider) のままでよい。
+    final sliderFinder = find.byType(Slider);
     await tester.scrollUntilVisible(sliderFinder, 80);
     // scrollUntilVisible が仕込むスクロールはアニメーションのため、実際に位置が
     // 収まるまで数フレーム進める（進めないと直後の drag が off-screen 判定になる）。

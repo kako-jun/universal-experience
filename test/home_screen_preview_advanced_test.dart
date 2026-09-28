@@ -15,7 +15,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
+import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
@@ -23,6 +25,7 @@ import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
+import 'package:universal_experience/ui/widgets/filter_selector.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -180,8 +183,9 @@ void main() {
         tester.widget<BeforeAfterView>(find.byType(BeforeAfterView));
 
     // 1. protanomaly を色覚クイック選択で選び、強度を独自の値に変える
-    //    （#57 のタイプ別記憶）。
-    filterService.applyFilter(ColorVisionType.protanomaly);
+    //    （#57 のタイプ別記憶）。selectColorVision は FilterSelector・トレイ
+    //    共通の入口（#60 M1）。
+    selectColorVision(filterService, visionState, ColorVisionType.protanomaly);
     await tester.pump();
     expect(visionState.isColorQuickSelection, isTrue);
     expect(currentPreview().strength, filterService.intensity);
@@ -200,7 +204,7 @@ void main() {
     // 3. 別の色覚クイック選択（deuteranomaly）に切り替える。プレビューは
     //    deuteranomaly の色覚フィルタに戻り、protanomaly で覚えた強度
     //    （0.25）はそのまま残っている（#57 の記憶がここで巻き戻らない）はず。
-    filterService.applyFilter(ColorVisionType.deuteranomaly);
+    selectColorVision(filterService, visionState, ColorVisionType.deuteranomaly);
     await tester.pump();
     expect(visionState.isColorQuickSelection, isTrue);
     expect(currentPreview().filterId, 'deuteranopia');
@@ -209,10 +213,101 @@ void main() {
     expect(currentPreview().strength, kAnomalyDefaultSeverity);
 
     // 4. protanomaly に戻ると、advanced を経由しても 0.25 の記憶は壊れていない。
-    filterService.applyFilter(ColorVisionType.protanomaly);
+    selectColorVision(filterService, visionState, ColorVisionType.protanomaly);
     await tester.pump();
     expect(currentPreview().strength, 0.25);
 
     await filterService.flush();
+  });
+
+  testWidgets(
+      'protanopia → プリセット → protanopia に戻すと、プレビューに反映されチップも正しく点灯する '
+      '（#60 M1 回帰テスト）', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1200, 4000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    // meniere（vision=vertigo）を含む fixture に差し替える（実ブリッジ不要）。
+    experiencesProvider = () => const [
+          Experience(
+            id: 'meniere',
+            vision: VisionFilter.vertigo(),
+            urgency: Urgency.earlyConsultation,
+          ),
+        ];
+
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final settings = SettingsService();
+    await settings.load();
+    final filterService = FilterService();
+    final visionState = VisionFilterState();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsService>.value(value: settings),
+          ChangeNotifierProvider<FilterService>.value(value: filterService),
+          ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
+        ],
+        child: const MaterialApp(
+          locale: Locale('en'),
+          localizationsDelegates: [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: HomeScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final en = lookupAppLocalizations(const Locale('en'));
+    BeforeAfterView currentPreview() =>
+        tester.widget<BeforeAfterView>(find.byType(BeforeAfterView));
+    // advanced カタログ（FilterCatalogSelector）にも "Protanopia" チップが
+    // あるため、FilterSelector（色覚クイック選択）の中だけに絞って探す。
+    Finder protanopiaChip() => find.descendant(
+          of: find.byType(FilterSelector),
+          matching: find.text(colorVisionTypeName(en, ColorVisionType.protanopia)),
+        );
+    bool protanopiaChipSelected() =>
+        tester.widget<FilterChip>(find.ancestor(
+          of: protanopiaChip(),
+          matching: find.byType(FilterChip),
+        )).selected;
+
+    // 1. protanopia チップをタップする。
+    await tester.tap(protanopiaChip());
+    await tester.pump();
+
+    expect(currentPreview().filterId, 'protanopia');
+    expect(protanopiaChipSelected(), isTrue);
+
+    // 2. プリセット（meniere）をタップする。色覚クイック選択の記憶は
+    //    FilterService 側に残るが、プレビュー・チップの点灯は advanced/
+    //    プリセット側に切り替わる（#60 M1: isColorQuickSelection から導く）。
+    await tester.tap(find.text(en.experienceMeniere));
+    await tester.pump();
+
+    expect(currentPreview().filterId, 'vertigo');
+    expect(visionState.isColorQuickSelection, isFalse);
+    expect(protanopiaChipSelected(), isFalse,
+        reason: 'advanced/プリセットを見ている間は色覚チップを点灯させない（#60 M1）');
+
+    // 3. protanopia チップに戻す。以前の実装（listener ミラー + 直前の型との
+    //    差分検知）は、FilterService.currentFilter がプリセット遷移中も
+    //    ずっと protanopia のままだったため、この再タップに反応せず
+    //    VisionFilterState が更新されなかった（#60 M1 の穴）。
+    //    selectColorVision はタップの都度、無条件に両方のサービスを更新する
+    //    ため、この再タップでも正しく反映される。
+    await tester.tap(protanopiaChip());
+    await tester.pump();
+
+    expect(currentPreview().filterId, 'protanopia');
+    expect(visionState.isColorQuickSelection, isTrue);
+    expect(protanopiaChipSelected(), isTrue);
   });
 }

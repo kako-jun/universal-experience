@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
+import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
 import 'package:universal_experience/services/export_service.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
@@ -234,6 +235,37 @@ void main() {
         await pumpUntilText(tester, en.previewPaneOriginal);
 
         expect(find.text(en.previewPaneOriginal), findsNWidgets(2));
+      });
+
+      testWidgets(
+          'colorVisionType=deuteranomaly なら filterId=deuteranopia でも '
+          '見出しは Deuteranomaly になる（#60 M3）', (tester) async {
+        // カタログは色覚を 5 種しか持たず、-omaly は base の -opia と同じ
+        // catalog id（deuteranopia）に写る（FilterService.sensusFilter の
+        // 対応表）。filterId だけで見出しを解決すると常に "Deuteranopia" に
+        // なってしまうため、colorVisionType を優先する契約を確認する。
+        await tester.pumpWidget(
+          localized(
+            const BeforeAfterView(
+              filter: VisionFilter.deuteranopia(),
+              filterId: 'deuteranopia',
+              colorVisionType: ColorVisionType.deuteranomaly,
+              strength: 0.6,
+              sampleSize: 32,
+            ),
+          ),
+        );
+        final deuteranomalyName = colorVisionTypeName(en, ColorVisionType.deuteranomaly);
+        await pumpUntilText(tester, deuteranomalyName);
+
+        expect(find.text(en.previewPaneOriginal), findsOneWidget);
+        expect(find.text(deuteranomalyName), findsOneWidget);
+        expect(
+          find.text(visionFilterName(en, 'deuteranopia')),
+          findsNothing,
+          reason: 'colorVisionType があるときは filterId 由来の "Deuteranopia" '
+              'を出してはいけない',
+        );
       });
     });
 
@@ -1086,6 +1118,64 @@ void main() {
         expect(capturedCaption, isNotNull);
         expect(capturedCaption!.symptomLabel, en.previewPaneOriginal);
         expect(savedFilename, contains('-none-'));
+      });
+
+      testWidgets(
+          'colorVisionType=deuteranomaly で export すると symptomLabel・'
+          'ファイル名とも deuteranomaly になる（#60 M3）', (tester) async {
+        late ui.Image before1, after1, composedStub;
+        await tester.runAsync(() async {
+          before1 = await BeforeAfterView.generateSampleImage(4);
+          after1 = await BeforeAfterView.generateSampleImage(4);
+          composedStub = await BeforeAfterView.generateSampleImage(4);
+        });
+        sampleImageGenerator = (size) => Future.value(before1);
+        afterImageRenderer = (source, filter, strength) => Future.value(after1);
+
+        ExportCaption? capturedCaption;
+        exportImageComposer = (base, caption) async {
+          capturedCaption = caption;
+          return composedStub;
+        };
+        String? savedFilename;
+        pngSaver = (bytes, filename) async {
+          savedFilename = filename;
+          return '/fake/downloads/$filename';
+        };
+
+        final en = lookupAppLocalizations(const Locale('en'));
+
+        // filterId は deuteranopia（カタログの色覚 5 種は -omaly を持たず、
+        // base の -opia に写るため）だが、colorVisionType=deuteranomaly を
+        // 渡す（home_screen.dart が VisionFilterState.colorVisionType から
+        // 渡すのと同じ形）。
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filter: VisionFilter.deuteranopia(),
+          filterId: 'deuteranopia',
+          colorVisionType: ColorVisionType.deuteranomaly,
+          strength: 0.6,
+          sampleSize: 16,
+        )));
+        await tester.pump();
+        await tester.pump();
+
+        await tester.tap(find.byTooltip(en.exportButtonTooltip));
+        await tester.runAsync(() async {
+          for (var i = 0; i < 50; i++) {
+            if (savedFilename != null) return;
+            await tester.pump(const Duration(milliseconds: 20));
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+          }
+        });
+        await tester.pump();
+
+        expect(capturedCaption, isNotNull);
+        expect(
+          capturedCaption!.symptomLabel,
+          colorVisionTypeName(en, ColorVisionType.deuteranomaly),
+        );
+        expect(savedFilename, contains('-deuteranomaly-'));
+        expect(savedFilename, isNot(contains('deuteranopia')));
       });
     });
   });

@@ -1,11 +1,11 @@
-// HomeScreen のプレビュー（_buildPreviewSection の Consumer<FilterService> →
-// BeforeAfterView）が、FilterService.setIntensity に追従することの回帰テスト
-// （#57 レビュー S4）。
+// HomeScreen のプレビュー（_buildPreviewSection の Consumer2<VisionFilterState,
+// FilterService> → BeforeAfterView）が、FilterService.setIntensity に追従する
+// ことの回帰テスト（#57 レビュー S4）。
 //
 // #57 修正の要点は「intensity の通知経路を FilterService 自身に閉じ込め、
 // SettingsService（延いては MaterialApp）には伝播させない」こと
-// （intensity_rebuild_test.dart 参照）。その副作用で「Consumer<FilterService>
-// を使う場所には従来通り正しく伝わる」ことを別途確認しておく。
+// （intensity_rebuild_test.dart 参照）。その副作用で「Consumer2 を使う場所には
+// 従来通り正しく伝わる」ことを別途確認しておく。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -14,6 +14,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
@@ -43,16 +44,18 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final settings = SettingsService();
     await settings.load();
-    final filterService = FilterService()
-      ..applyFilter(ColorVisionType.protanopia);
+    final filterService = FilterService();
+    final visionState = VisionFilterState();
+    // #60 M1: home_screen はもう FilterService の変化を VisionFilterState へ
+    // ミラーしない。selectColorVision が両方を明示的に更新する唯一の入口。
+    selectColorVision(filterService, visionState, ColorVisionType.protanopia);
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider<SettingsService>.value(value: settings),
           ChangeNotifierProvider<FilterService>.value(value: filterService),
-          ChangeNotifierProvider<VisionFilterState>(
-              create: (_) => VisionFilterState()),
+          ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
         ],
         child: const MaterialApp(
           localizationsDelegates: [
