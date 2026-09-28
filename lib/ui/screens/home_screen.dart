@@ -6,6 +6,7 @@ import '../../l10n/l10n_extensions.dart';
 import '../../models/disability_type.dart';
 import '../../services/app_shortcuts.dart';
 import '../../services/filter_service.dart';
+import '../../services/loupe_window_controller.dart';
 import '../../services/preview_selection.dart';
 import '../../services/settings_service.dart';
 import '../../services/vision_filter_state.dart';
@@ -85,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final l10n = AppLocalizations.of(context)!;
     return Shortcuts(
       shortcuts: const <ShortcutActivator, Intent>{
-        // キー配列非依存にするため物理キーではなく文字で判定する（#63 レビュー）。
+        // キー配列非依存にするため物理キーではなく文字で判定する (#63)。
         CharacterActivator('/'): FocusFilterSearchIntent(),
         SingleActivator(LogicalKeyboardKey.arrowUp):
             CycleFilterIntent(forward: false),
@@ -95,16 +96,19 @@ class _HomeScreenState extends State<HomeScreen> {
             AdjustStrengthIntent(delta: -kKeyboardStrengthStep),
         SingleActivator(LogicalKeyboardKey.arrowRight):
             AdjustStrengthIntent(delta: kKeyboardStrengthStep),
+        SingleActivator(LogicalKeyboardKey.escape): ReleaseClickThroughIntent(),
       },
       child: Actions(
         actions: <Type, Action<Intent>>{
-          FocusFilterSearchIntent: CallbackAction<FocusFilterSearchIntent>(
+          FocusFilterSearchIntent:
+              InteractiveFocusAwareCallbackAction<FocusFilterSearchIntent>(
             onInvoke: (_) {
               _catalogFocusNode.requestFocus();
               return null;
             },
           ),
-          CycleFilterIntent: CallbackAction<CycleFilterIntent>(
+          CycleFilterIntent:
+              InteractiveFocusAwareCallbackAction<CycleFilterIntent>(
             onInvoke: (intent) {
               cycleAdvancedFilter(
                 context.read<VisionFilterState>(),
@@ -113,13 +117,21 @@ class _HomeScreenState extends State<HomeScreen> {
               return null;
             },
           ),
-          AdjustStrengthIntent: CallbackAction<AdjustStrengthIntent>(
+          AdjustStrengthIntent:
+              InteractiveFocusAwareCallbackAction<AdjustStrengthIntent>(
             onInvoke: (intent) {
               adjustPreviewStrength(
                 context.read<VisionFilterState>(),
                 context.read<FilterService>(),
                 intent.delta,
               );
+              return null;
+            },
+          ),
+          ReleaseClickThroughIntent:
+              CallbackAction<ReleaseClickThroughIntent>(
+            onInvoke: (_) {
+              context.read<LoupeWindowController>().setClickThrough(false);
               return null;
             },
           ),
@@ -291,6 +303,17 @@ class _HomeScreenState extends State<HomeScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+                    if (visionState.bypassed) ...[
+                      const SizedBox(width: 12),
+                      Chip(
+                        label: Text(l10n.bypassedBadgeLabel),
+                        backgroundColor: theme.colorScheme.secondaryContainer,
+                        labelStyle: TextStyle(
+                          color: theme.colorScheme.onSecondaryContainer,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 16),

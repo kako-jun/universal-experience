@@ -1,7 +1,11 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/foundation.dart';
-import 'package:flutter/widgets.dart' show Color, Size;
+import 'package:flutter/widgets.dart' show Color, Rect, Size;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
+
+import 'loupe_rect_source.dart';
 
 /// ルーペ窓の表示状態。
 ///
@@ -108,15 +112,32 @@ class LoupeWindowPolicy {
     }
   }
 
-  /// クリックスルーを ON にしてよいか (#63 受け入れ条件)。
-  /// トレイもホットキー（クリックスルー解除 or 非常口）による復帰手段も無い場合、
-  /// 一度 ON にすると UI 操作が一切できなくなり復帰不能になるため禁止する。
-  static bool canEnableClickThrough({
-    required bool trayAvailable,
-    required bool clickThroughHotkeyAvailable,
-    required bool emergencyExitHotkeyAvailable,
-  }) =>
-      trayAvailable || clickThroughHotkeyAvailable || emergencyExitHotkeyAvailable;
+  /// クリックスルーを ON にしてよいか (#63)。
+  ///
+  /// フォーカス復帰時の自動 OFF（[LoupeWindowController.onWindowFocus]）と
+  /// アプリ内 Esc ショートカット（`ReleaseClickThroughIntent`）は、ネイティブ
+  /// プラグイン（hotkey_manager/tray_manager）の登録・作成「成功」表明を信用せず
+  /// アプリ自身が保証できる復帰経路であり、常に有効。この 2 つだけで既に復帰
+  /// 経路は保証されているため、この関数は常に true を返す
+  /// （トレイ・ホットキーは「追加の便利な手段」という位置づけになる。実際に
+  /// どの追加手段が使えるかは UI ヒントの表示判定 — `WindowModePanel` — に
+  /// 個別に使う）。
+  static bool canEnableClickThrough() => true;
+
+  /// Linux で、グローバルホットキー（keybinder、X11 依存）が実際には発火しなそうな
+  /// セッションかを判定する (#63)。Wayland ネイティブセッションでは hotkey_manager の
+  /// 登録が「成功」を返しても実際には発火しないことがあるため、UI ヒントからホット
+  /// キーの案内を除外する判定に使う（トレイ/ホットキー自体の可否判定には使わない
+  /// — [canEnableClickThrough] は常に true）。GDK_BACKEND=x11 が明示されていれば
+  /// （XWayland 経由の互換動作）使えるとみなす。[environment] は呼び出し側が
+  /// `Platform.environment` を渡す想定（テストではフェイクの Map を渡せる）。
+  static bool isLikelyWaylandNativeSession(Map<String, String> environment) {
+    if (environment['GDK_BACKEND'] == 'x11') return false;
+    final sessionType = environment['XDG_SESSION_TYPE'];
+    final waylandDisplay = environment['WAYLAND_DISPLAY'];
+    return sessionType == 'wayland' ||
+        (waylandDisplay != null && waylandDisplay.isNotEmpty);
+  }
 }
 
 /// window_manager の薄いラッパ。
@@ -129,7 +150,10 @@ class LoupeWindowPolicy {
 /// Linux/macOS/Windows で挙動差・未対応がある。利用不能でも落ちないよう
 /// 全 I/O を try/catch + ログで握る。
 class LoupeWindowController extends ChangeNotifier with WindowListener {
-  LoupeWindowController();
+  LoupeWindowController({LoupeRectSource rectSource = const ManualLoupeRectSource()})
+      : _rectSource = rectSource;
+
+  final LoupeRectSource _rectSource;
 
   LoupeWindowMode _mode = LoupeWindowMode.normal;
   bool _clickThrough = LoupeWindowPolicy.defaultClickThrough;
@@ -157,6 +181,12 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
   /// 現在のウィンドウサイズ (リサイズ追従で更新)。null は未取得。
   Size? get currentSize => _currentSize;
 
+  /// ルーペ矩形の決定元 (#63、#44 向けの差し替え可能な seam) から現在の矩形を
+  /// 取得する。#44 実装時にこのコントローラへ対象アプリ追従の `LoupeRectSource`
+  /// を注入できる。現状どこからも消費されない（ライブ画面キャプチャ未実装の
+  /// ため）が、注入口だけは用意しておく。
+  Future<Rect?> currentLoupeRect() => _rectSource.currentRect();
+
   /// 永続化されたアプリモード・最前面固定・クリックスルーの状態を読み込む
   /// (#63)。`main()` が [initialize] より先に呼ぶ責務を持つ — ここは
   /// `_appMode`/`_alwaysOnTop`/`_clickThrough` を復元するだけで、実際の
@@ -172,8 +202,16 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
     }
     _alwaysOnTop =
         prefs.getBool(_prefsAlwaysOnTop) ?? LoupeWindowPolicy.defaultAlwaysOnTop;
-    _clickThrough =
+    final storedClickThrough =
         prefs.getBool(_prefsClickThrough) ?? LoupeWindowPolicy.defaultClickThrough;
+    if (_appMode == AppMode.settings && storedClickThrough) {
+      // 保存値が不変条件（設定窓モードはクリックスルー禁止）と矛盾していた
+      // 場合は正しい値へ正規化し、書き直す (#63)。
+      _clickThrough = false;
+      await _persist();
+    } else {
+      _clickThrough = storedClickThrough;
+    }
   }
 
   Future<void> _persist() async {
@@ -189,9 +227,9 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
   /// 背景色 (transparent/black) は `main.dart` の `WindowOptions` 構築時に別途
   /// 反映するため、ここでは触らない。
   ///
-  /// クリックスルーは適用しない。理由は [restorePersistedClickThrough] 参照
-  /// — この [initialize] はトレイ/ホットキーの初期化より前に呼ばれるため、
-  /// 復帰手段が使えるかがまだ分からない。
+  /// クリックスルーは適用しない。実際の適用は [restorePersistedClickThrough]
+  /// が担う（`main()` がトレイ・ホットキー初期化の後に呼ぶ構成は診断ログの
+  /// タイミングを揃えるため変えていないが、ゲート自体はもう無い）。
   Future<void> initialize() async {
     windowManager.addListener(this);
     await _guard('setMinimumSize', () async {
@@ -202,26 +240,14 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
     await _applyFramePolicy();
   }
 
-  /// 永続化されたクリックスルーを、復帰手段（トレイ/ホットキー）が実際に使える
-  /// ことを確認してから window_manager へ適用する (#63)。[initialize] はトレイ/
-  /// ホットキーの初期化より前に呼ばれるため、そこではクリックスルーを適用しない
-  /// — 今回のセッションで復帰手段が使えるとは限らないため（例: 前回は使えた
-  /// トレイ拡張が今回は無効化されている）。`main()` がトレイ・ホットキーの
-  /// 初期化が終わった後にこれを呼ぶ。settings モードでは常に false になる
-  /// （[setClickThrough] 自身のガードにより、許可されていても実際には
-  /// 適用されない）。
-  Future<void> restorePersistedClickThrough({
-    required bool trayAvailable,
-    required bool clickThroughHotkeyAvailable,
-    required bool emergencyExitHotkeyAvailable,
-  }) async {
-    if (!_clickThrough) return;
-    final allowed = LoupeWindowPolicy.canEnableClickThrough(
-      trayAvailable: trayAvailable,
-      clickThroughHotkeyAvailable: clickThroughHotkeyAvailable,
-      emergencyExitHotkeyAvailable: emergencyExitHotkeyAvailable,
-    );
-    await setClickThrough(allowed);
+  /// 永続化されたクリックスルーを window_manager へ適用する (#63)。
+  /// [canEnableClickThrough] が常に true になったため、復帰手段の可用性を待つ
+  /// 必要はもう無い。main() がトレイ・ホットキー初期化の後に呼ぶ構成は
+  /// 変えていないが（診断ログのタイミングを揃えるため）、ゲート自体は無い。
+  Future<void> restorePersistedClickThrough() async {
+    if (_clickThrough) {
+      await setClickThrough(true);
+    }
   }
 
   /// 後始末。
@@ -274,7 +300,14 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
     if (value && _appMode == AppMode.settings) {
       // 安全策 (#63): 設定窓モードは UI 操作が前提の通常ウィンドウなので、
       // クリックスルーを ON にはできない。呼び出し元（UI パネル/トレイ/
-      // ホットキー）を問わずここで一括して拒否する。
+      // ホットキー）を問わずここで一括して拒否する。ここに来た時点で true の
+      // 余地は無いはずだが、念のため false を確定させて persist/notify する
+      // （拒否するだけで状態確定をサボらない）。
+      if (_clickThrough) {
+        _clickThrough = false;
+        await _persist();
+        _notify();
+      }
       return;
     }
     _clickThrough = value;
@@ -361,6 +394,19 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
   }
 
   // --- WindowListener: リサイズ追従とモード同期 ---
+
+  @override
+  void onWindowFocus() {
+    if (_clickThrough) {
+      // 復帰経路 (#63): クリックスルー ON のままフォーカスを得たら (Alt+Tab や
+      // タスクバー/Dock クリックでユーザーがこのウィンドウへ戻ってきた)、
+      // OS/プラグインの「登録成功」表明を信用せず、アプリ自身が保証できる
+      // 復帰経路として自動で OFF に戻す。マウスイベントはクリックスルーで
+      // 下へ抜けるが、Alt+Tab 等キーボード操作によるフォーカス移動はクリック
+      // スルーの影響を受けないため、これは OS を問わず常に機能する。
+      unawaited(setClickThrough(false));
+    }
+  }
 
   @override
   void onWindowResize() {

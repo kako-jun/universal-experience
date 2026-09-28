@@ -1,7 +1,16 @@
-import 'package:flutter/widgets.dart' show Size;
+import 'package:flutter/widgets.dart' show Rect, Size;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:universal_experience/services/loupe_rect_source.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
+
+class _FakeLoupeRectSource implements LoupeRectSource {
+  const _FakeLoupeRectSource(this.rect);
+  final Rect rect;
+
+  @override
+  Future<Rect?> currentRect() async => rect;
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -57,48 +66,52 @@ void main() {
   });
 
   group('LoupeWindowPolicy.canEnableClickThrough (#63)', () {
-    test('tray available alone is enough', () {
+    test('常に true を返す（フォーカス復帰と Esc が常に使える復帰経路のため）', () {
+      expect(LoupeWindowPolicy.canEnableClickThrough(), isTrue);
+    });
+  });
+
+  group('LoupeWindowPolicy.isLikelyWaylandNativeSession (#63)', () {
+    test('XDG_SESSION_TYPE=wayland なら true', () {
       expect(
-        LoupeWindowPolicy.canEnableClickThrough(
-          trayAvailable: true,
-          clickThroughHotkeyAvailable: false,
-          emergencyExitHotkeyAvailable: false,
+        LoupeWindowPolicy.isLikelyWaylandNativeSession(
+          {'XDG_SESSION_TYPE': 'wayland'},
         ),
         isTrue,
       );
     });
 
-    test('click-through hotkey alone is enough', () {
+    test('WAYLAND_DISPLAY が非空なら true', () {
       expect(
-        LoupeWindowPolicy.canEnableClickThrough(
-          trayAvailable: false,
-          clickThroughHotkeyAvailable: true,
-          emergencyExitHotkeyAvailable: false,
+        LoupeWindowPolicy.isLikelyWaylandNativeSession(
+          {'WAYLAND_DISPLAY': 'wayland-0'},
         ),
         isTrue,
       );
     });
 
-    test('emergency-exit hotkey alone is enough', () {
+    test('GDK_BACKEND=x11 が明示されていれば false（XWayland 経由とみなす）', () {
       expect(
-        LoupeWindowPolicy.canEnableClickThrough(
-          trayAvailable: false,
-          clickThroughHotkeyAvailable: false,
-          emergencyExitHotkeyAvailable: true,
-        ),
-        isTrue,
+        LoupeWindowPolicy.isLikelyWaylandNativeSession({
+          'XDG_SESSION_TYPE': 'wayland',
+          'WAYLAND_DISPLAY': 'wayland-0',
+          'GDK_BACKEND': 'x11',
+        }),
+        isFalse,
       );
     });
 
-    test('none available forbids enabling', () {
+    test('X11 セッション（環境変数が無い）なら false', () {
       expect(
-        LoupeWindowPolicy.canEnableClickThrough(
-          trayAvailable: false,
-          clickThroughHotkeyAvailable: false,
-          emergencyExitHotkeyAvailable: false,
+        LoupeWindowPolicy.isLikelyWaylandNativeSession(
+          {'XDG_SESSION_TYPE': 'x11'},
         ),
         isFalse,
       );
+    });
+
+    test('環境変数が一切無ければ false', () {
+      expect(LoupeWindowPolicy.isLikelyWaylandNativeSession({}), isFalse);
     });
   });
 
@@ -268,64 +281,16 @@ void main() {
   });
 
   group('LoupeWindowController.restorePersistedClickThrough (#63)', () {
-    Future<LoupeWindowController> loadedWithClickThroughOn() async {
+    test('永続化された clickThrough=true をそのまま適用する（復帰手段の可用性を問わない）',
+        () async {
       SharedPreferences.setMockInitialValues({});
       final controller = LoupeWindowController();
       await controller.load();
-      // loupe モードでないと setClickThrough(true) 自体が拒否されるため、
-      // 先にモードを切り替えてから ON にし、改めて保存値だけを model 化する
-      // （実運用では前回セッションの永続化値をそのまま load() で復元する形）。
       await controller.setAppMode(AppMode.loupe);
       await controller.setClickThrough(true);
-      return controller;
-    }
-
-    test('復帰手段が1つも無ければ clickThrough は false になる', () async {
-      final controller = await loadedWithClickThroughOn();
       expect(controller.clickThrough, isTrue);
 
-      await controller.restorePersistedClickThrough(
-        trayAvailable: false,
-        clickThroughHotkeyAvailable: false,
-        emergencyExitHotkeyAvailable: false,
-      );
-
-      expect(controller.clickThrough, isFalse);
-    });
-
-    test('トレイが使えるなら clickThrough は true のまま', () async {
-      final controller = await loadedWithClickThroughOn();
-
-      await controller.restorePersistedClickThrough(
-        trayAvailable: true,
-        clickThroughHotkeyAvailable: false,
-        emergencyExitHotkeyAvailable: false,
-      );
-
-      expect(controller.clickThrough, isTrue);
-    });
-
-    test('クリックスルー解除ホットキーが使えるなら clickThrough は true のまま',
-        () async {
-      final controller = await loadedWithClickThroughOn();
-
-      await controller.restorePersistedClickThrough(
-        trayAvailable: false,
-        clickThroughHotkeyAvailable: true,
-        emergencyExitHotkeyAvailable: false,
-      );
-
-      expect(controller.clickThrough, isTrue);
-    });
-
-    test('非常口ホットキーが使えるなら clickThrough は true のまま', () async {
-      final controller = await loadedWithClickThroughOn();
-
-      await controller.restorePersistedClickThrough(
-        trayAvailable: false,
-        clickThroughHotkeyAvailable: false,
-        emergencyExitHotkeyAvailable: true,
-      );
+      await controller.restorePersistedClickThrough();
 
       expect(controller.clickThrough, isTrue);
     });
@@ -336,13 +301,54 @@ void main() {
       await controller.load();
       expect(controller.clickThrough, isFalse);
 
-      await controller.restorePersistedClickThrough(
-        trayAvailable: false,
-        clickThroughHotkeyAvailable: false,
-        emergencyExitHotkeyAvailable: false,
-      );
+      await controller.restorePersistedClickThrough();
 
       expect(controller.clickThrough, isFalse);
+    });
+  });
+
+  group('LoupeWindowController.load() 正規化 (#63 S3)', () {
+    test('settings モードで clickThrough=true が保存されていたら false へ正規化し、'
+        '書き直す', () async {
+      SharedPreferences.setMockInitialValues({
+        'loupeWindow.appMode': 'settings',
+        'loupeWindow.clickThrough': true,
+      });
+      final controller = LoupeWindowController();
+      await controller.load();
+
+      expect(controller.appMode, AppMode.settings);
+      expect(controller.clickThrough, isFalse);
+
+      // 正規化した値が実際に persist されていることを、別インスタンスの
+      // load() で確認する。
+      final other = LoupeWindowController();
+      await other.load();
+      expect(other.clickThrough, isFalse);
+    });
+
+    test('loupe モードで clickThrough=true が保存されていたらそのまま復元する',
+        () async {
+      SharedPreferences.setMockInitialValues({
+        'loupeWindow.appMode': 'loupe',
+        'loupeWindow.clickThrough': true,
+      });
+      final controller = LoupeWindowController();
+      await controller.load();
+
+      expect(controller.appMode, AppMode.loupe);
+      expect(controller.clickThrough, isTrue);
+    });
+  });
+
+  group('LoupeWindowController.currentLoupeRect (#63 nit)', () {
+    test('注入した LoupeRectSource の値を返す', () async {
+      const rect = Rect.fromLTWH(10, 20, 300, 200);
+      final controller = LoupeWindowController(
+        rectSource: const _FakeLoupeRectSource(rect),
+      );
+
+      expect(await controller.currentLoupeRect(), rect);
     });
   });
 }
