@@ -231,8 +231,17 @@ void main() {
         final cardFinder = find.byKey(experienceCardKey(experienceId));
         // プレビューペイン + 他のプリセットカードでスクロールが必要になる
         // ことがあるため、タップ前に確実にビューポート内へ持ってくる。
-        await tester.scrollUntilVisible(cardFinder, 200);
-        await tester.pump();
+        //
+        // scrollUntilVisible（dragUntilVisible）は「finder が見つかるまで」
+        // スクロールする実装で、`_previewWithPresetsApp` は
+        // ListView.builder のような遅延構築ではなく Column（全カード常時
+        // ビルド済み）を使っているため、カードは最初から finder に
+        // ヒットしてしまい一切スクロールしない（#60 レビュー再発）。
+        // Scrollable.ensureVisible（tester.ensureVisible）は「見つかった
+        // 要素の実際の位置」からスクロール量を計算するため、遅延構築か
+        // どうかに関係なく正しく動く。
+        await tester.ensureVisible(cardFinder);
+        await tester.pumpAndSettle();
         await tester.tap(cardFinder);
         await tester.pump();
         await pumpUntilFound(tester, find.text(afterLabel));
