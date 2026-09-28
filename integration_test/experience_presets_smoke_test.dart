@@ -219,7 +219,7 @@ void main() {
     /// `drag` を繰り返すため、スクロール手段そのものの実装差に依存しない。
     /// [maxAttempts] 回ドラッグしても収まらなければ、後続の `tap()` の
     /// 分かりにくいヒットテスト失敗にする代わりに、ここで明示的に `fail()`
-    /// する（#60 S2）。
+    /// する（#60）。
     Future<void> scrollUntilHitTestable(
       WidgetTester tester,
       Finder finder,
@@ -251,23 +251,28 @@ void main() {
       final context = tester.element(find.byType(ExperiencePresets));
       final visionState = context.read<VisionFilterState>();
 
-      // #60 S1: afterImageRenderer（BeforeAfterView が公開する production
-      // 供給源、実ブリッジの CpuVisionRenderer.applier を最終的に呼ぶ）を
-      // ラップし、実ブリッジの CPU apply() が完了するたびに renderCount を
-      // 増やす。テキストが出るまで単純にポーリングするより、実際に何を
-      // 待っているか（このタップが引き起こした描画そのもの）が明確になる。
+      // afterImageRenderer（BeforeAfterView が公開する production 供給源、
+      // 実ブリッジの CpuVisionRenderer.applier を最終的に呼ぶ）をラップし、
+      // 実ブリッジの CPU apply() が完了するたびに renderCount を増やし、
+      // 完了した filter を lastCompletedFilter に記録する（#60）。テキストが
+      // 出るまで単純にポーリングするより、実際に何を待っているか（このタップ
+      // が引き起こした描画そのもの）が明確になる。
       //
-      // Completer ではなく単調カウンタにしてあるのは、1 回のタップに対して
-      // BeforeAfterView 側の再構築が複数回の render 呼び出しを引き起こす
-      // ことがあり（CI で実測: "Bad state: Future already completed"）、
-      // Completer だと 2 回目の complete() で例外になるため。カウンタなら
-      // 呼ばれた回数によらず安全に「増えたこと」を待てる。
+      // Completer ではなく単調カウンタ + 直近の完了 filter にしてあるのは、
+      // 1 回のタップに対して BeforeAfterView 側の再構築が複数回の render
+      // 呼び出しを引き起こすことがあり（CI で実測: "Bad state: Future
+      // already completed"）、Completer だと 2 回目の complete() で例外に
+      // なるため。renderCount が増えただけでは「このタップより前に投げられて
+      // いた古い render がここで完了した」可能性を排除できないので、完了した
+      // filter が現在の BeforeAfterView.filter と一致することまで確認する。
       var renderCount = 0;
+      VisionFilter? lastCompletedFilter;
       final productionRenderer = afterImageRenderer;
       addTearDown(() => afterImageRenderer = productionRenderer);
       afterImageRenderer = (source, filter, strength) async {
         final result = await productionRenderer(source, filter, strength);
         renderCount++;
+        lastCompletedFilter = filter;
         return result;
       };
 
@@ -300,21 +305,37 @@ void main() {
         await tester.tap(cardFinder);
         await tester.pump();
 
-        // #60 S2: タップ直後に選択状態そのものも確認する（実描画の結果だけを
-        // 見て、選択が正しく反映されたことを間接的に推測しない）。
+        // タップ直後に選択状態そのものも確認する（実描画の結果だけを見て、
+        // 選択が正しく反映されたことを間接的に推測しない、#60）。
         expect(visionState.selectedPresetId, experienceId,
             reason: '$experienceId タップ直後に selectedPresetId が反映されていない');
 
-        // 実ブリッジの CPU apply() が完了するまで待つ（#60 S1）。
+        // 実ブリッジの CPU apply() が「このタップの選択」で完了するまで待つ
+        // （renderCount が増えただけでなく、完了した filter が現在の
+        // BeforeAfterView.filter と一致することまで確認する、#60）。
         final deadline = DateTime.now().add(const Duration(seconds: 10));
-        while (renderCount <= renderCountBeforeTap &&
+        VisionFilter? currentWidgetFilter() =>
+            tester.widget<BeforeAfterView>(find.byType(BeforeAfterView)).filter;
+        while ((renderCount <= renderCountBeforeTap ||
+                lastCompletedFilter != currentWidgetFilter()) &&
             DateTime.now().isBefore(deadline)) {
           await tester.pump(const Duration(milliseconds: 20));
         }
-        expect(renderCount, greaterThan(renderCountBeforeTap),
-            reason: '$experienceId タップ後、実ブリッジの描画が完了しなかった');
+        final rendered = renderCount > renderCountBeforeTap &&
+            lastCompletedFilter == currentWidgetFilter();
         await tester.pump();
         await tester.pump();
+        // tester.takeException() は呼ぶと例外キューを消費してしまうため、
+        // ここで一度だけ読み取り、タイムアウト時のメッセージと後段の
+        // 例外なしチェックの両方でこの値を使い回す（#60）。
+        final caughtException = tester.takeException();
+        expect(
+          rendered,
+          isTrue,
+          reason: '$experienceId タップ後、実ブリッジの描画が完了しなかった '
+              '(renderCount=$renderCount, lastCompletedFilter='
+              '$lastCompletedFilter, 例外の有無=${caughtException != null})',
+        );
 
         // vestibular_neuritis はプリセットカードの見出し
         // （experienceName、"Vestibular neuritis"）とプレビューの after
@@ -326,7 +347,7 @@ void main() {
           matching: find.text(afterLabel),
         );
 
-        expect(tester.takeException(), isNull,
+        expect(caughtException, isNull,
             reason: '$experienceId 選択後の描画で例外が発生した');
         expect(afterLabelFinder, findsOneWidget,
             reason: '$experienceId 選択後、after ペインに "$afterLabel" が出ていない');
