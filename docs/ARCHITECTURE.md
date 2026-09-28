@@ -113,12 +113,16 @@
   `LoupeWindowController.setAlwaysOnTop()` で ON にする運用にした。
 - **クリックスルー**: 既定 **OFF**、切替式。起動直後は窓を掴んで移動・リサイズ
   したいのでイベントを受け取り、下のアプリを操作したいときユーザーが ON する。
-  実装は `setIgnoreMouseEvents(true, forward: true)`。**ON にする操作自体を
-  ガードする (#63)**: `LoupeWindowPolicy.canEnableClickThrough()` は、トレイ・
-  クリックスルー解除ホットキー・非常口ホットキーのいずれも使えない場合に false
-  を返す。全て使えない状態で一度 ON にすると UI 操作が一切できなくなり復帰
-  不能になるため、その場合は `WindowModePanel` の該当スイッチ自体を無効化する
-  (`onChanged: null`)。OFF への変更はいつでも許可する。
+  実装は `setIgnoreMouseEvents(true, forward: true)`。**ON にする操作は常に許可
+  する (#63)**: `LoupeWindowPolicy.canEnableClickThrough()` は常に true を返す。
+  トレイ・ホットキーというネイティブプラグイン依存の手段は「登録・作成成功」が
+  実際にユーザーが復帰操作できることを保証しないため、アプリ自身が保証できる
+  2 つの復帰経路を常に用意している: (a) クリックスルー ON のままウィンドウが
+  フォーカスを得たら自動で OFF にする（`LoupeWindowController.onWindowFocus`）、
+  (b) アプリ内で Esc を押したら解除する（`ReleaseClickThroughIntent`、
+  `app_shortcuts.dart`）。トレイ・ホットキーはこの上に乗る追加の便利な手段という
+  位置づけで、`WindowModePanel` はクリックスルーのスイッチ横に利用可能な復帰
+  手段をすべて併記する。
 - **起動モード・最前面・クリックスルーは独立して永続化する (#63)**:
   `LoupeWindowController` 自身が `SharedPreferences`
   (`loupeWindow.appMode` / `loupeWindow.alwaysOnTop` / `loupeWindow.clickThrough`)
@@ -168,8 +172,8 @@ main.dart が `windowManager.show()` / `hide()` を `onShowLoupe` / `onHideLoupe
 3. **起動モード切替** — `LoupeWindowController.setAppMode()`（settings/loupe をトグル、#63）
 4. **最前面固定** — `LoupeWindowController.setAlwaysOnTop()`（#63）
 5. **クリックスルー** — `LoupeWindowController.setClickThrough()`（#63。settings
-   モード中の ON 拒否は `setClickThrough` 自身のガードに任せる。トレイ自体が
-   復帰手段のため `canEnableClickThrough` のチェックは不要）
+   モード中の ON 拒否は `setClickThrough` 自身のガードに任せる。`canEnableClickThrough`
+   は常に true なので可否チェックは不要）
 6. (区切り線)
 7. **即切替フィルタ** (`quickColorVisionFilters()`) — よく使う色覚シミュレーションを
    直接適用: Protanopia / Deuteranopia / Tritanopia / Achromatopsia。
@@ -263,10 +267,10 @@ Linux debug ビルド成功で代替している:
 3 経路。起動モード・最前面・クリックスルーはいずれも `LoupeWindowController` 自身が
 `SharedPreferences` へ即時永続化し、次回起動時に復元する（詳細は上記
 「透過・最前面・クリックスルー」節）。永続化されたクリックスルーの起動時復元は
-`LoupeWindowController.restorePersistedClickThrough()` が担い、トレイ/ホットキーの
-初期化が終わったあとに `main()` が呼ぶ（`initialize()` 自体はトレイ/ホットキー
-初期化より前に走るため、そこでは適用しない。復帰手段の有無を確認せずに ON を
-復元すると、前回使えたトレイ拡張が今回は無効といったケースで復帰不能になるため）。
+`LoupeWindowController.restorePersistedClickThrough()` が担う。`canEnableClickThrough`
+が常に true になったため復帰手段の可用性を待つ必要はもう無いが、`main()` は
+診断ログのタイミングを揃えるため、引き続きトレイ/ホットキーの初期化が終わった
+あとにこれを呼ぶ構成のままにしている。
 
 ## グローバルホットキー (#63)
 
@@ -278,7 +282,7 @@ Linux debug ビルド成功で代替している:
 |---|---|---|
 | `toggleClickThrough` | Ctrl+Alt+Shift+C | クリックスルーの ON/OFF |
 | `holdOriginal` | Ctrl+Alt+Shift+O | 押している間だけ原画を表示 |
-| `emergencyExit` | Ctrl+Alt+Shift+Esc | 非常口: 全フィルタ停止 + クリックスルー解除 + 最前面解除 + ルーペ窓表示/前面化 |
+| `emergencyExit` | Ctrl+Alt+Shift+Esc | 非常口: 全フィルタ停止 + 原画表示解除 + クリックスルー解除 + 最前面解除 + ルーペ窓表示/前面化 |
 | `toggleLoupeVisibility` | Ctrl+Alt+Shift+L | ルーペ窓の表示/非表示 |
 
 既定キーはすべて Ctrl+Alt+Shift の 3 修飾（`defaultHotkeyBindings()`）。主要
@@ -306,44 +310,52 @@ Linux debug ビルド成功で代替している:
 
 「押している間だけ原画を表示」は理想的には keyDown で ON・keyUp で OFF にする
 hold ジェスチャだが、一部 OS のグローバルホットキーでは keyUp イベントが
-配送されないことがある。`HotkeyActions.holdOriginalKeyDown()` は常に
-**トグル**し（`setBypassed(!getBypassed())`）、`holdOriginalKeyUp()` は
-bypassed が true なら強制的に false にする。この 2 つのハンドラの組み合わせ
-だけで、タイマー等の環境判定なしに両方の環境に自然にフォールバックする:
+配送されないことがある。`HotkeyActions.holdOriginalKeyDown()` /
+`holdOriginalKeyUp()` はタイマー等の環境判定なしに両方の環境に自然に
+フォールバックする:
 
-- keyUp が届く環境: 押す→ON、離す→OFF という正しい hold 挙動になる。
-- keyUp が届かない環境: 毎回の押下が単純なトグルとして機能する。
+- **keyUp が届く環境（macOS）**: 押す→ON、離す→OFF という正しい hold 挙動になる。
+- **keyUp が届かない環境（Windows・Linux）**: 毎回の押下が単純なトグルとして機能する。OS の
+  キーリピートで keyDown が連続送出されても、直前の keyDown から 400ms 未満の keyDown は
+  リピートとみなして無視するため、1 回の押下（連打）につき 1 回のトグルになる
+  （`HotkeyActions._repeatDebounce`、#63）。
 
 原画表示自体は `VisionFilterState.bypassed`（`lib/services/vision_filter_state.dart`）
 が担い、選択中のフィルタ・strength・params は一切変更しない。判定は
 `preview_selection.dart` の `previewStrength()` に集約する（bypassed なら
 `isColorQuickSelection` に関わらず常に 0.0 を返す）。
 
-> **実機未検証の注意**: OS のキーリピート挙動（特に Linux/X11 で、グローバルホットキーを
-> 押し続けたときに keyDown が連続発火する場合がある）や、Wayland での登録失敗の検出可能性
-> （登録 API 自体は成功を返すが実際にはキーが発火しない環境がありうる）は、この実装段階
-> では実機確認していない。前者は holdOriginal のトグル挙動がちらつく可能性、後者は
-> クリックスルーの復帰不能ガード（`canEnableClickThrough`）が実際には使えないホットキー
-> を「使える」と誤判定するリスクにつながる。実機（macOS/Linux）での目視確認が必要。
+> **未配線の注意**: `VisionFilterState.bypassed` は before/after プレビュー（`previewStrength()`
+> 経由）には配線済みだが、ルーペ窓のライブ画面キャプチャ描画（#1 以降、未実装）には
+> まだ配線先が無い。ライブ描画が実装されたら、そちらでも bypassed を見て原画へフォール
+> バックする必要がある。
 
-### クリックスルーの復帰不能ガード
+> **実機未検証の注意**: Windows で `Ctrl+Alt+Shift+Esc`（`emergencyExit` の既定キー）が
+> OS 標準や他アプリのショートカットと衝突しないかは、Windows ランナー未着手のため実機
+> 確認できていない。Windows 対応時に確認が必要。
 
-トレイもクリックスルー解除ホットキーも非常口ホットキーも使えない環境で
-クリックスルーを ON にすると、UI 操作が一切できなくなり復帰不能になる。
-`LoupeWindowPolicy.canEnableClickThrough()`（純粋関数）がこれを判定し、
-`WindowModePanel` は該当する場合クリックスルーのスイッチ自体を無効化する
-（ON にする操作だけを塞ぐ。既に ON のものを OFF に戻す操作は常に許可する）。
-トレイが無い環境では、ON にした後の復帰手段としてホットキーの組み合わせを
-ヒント文言（`clickThroughDisabledHint` ARB）で案内する。
+### クリックスルーの復帰経路
+
+ネイティブプラグイン（hotkey_manager/tray_manager）の「登録・作成成功」は実際に
+ユーザーが復帰操作できることを保証しない。そのため、アプリ自身が保証できる
+2 つの復帰経路を常に実装し、これを「常に使える」ベースラインとする: (a) クリック
+スルー ON のままウィンドウがフォーカスを得たら自動で OFF にする
+（`LoupeWindowController.onWindowFocus`）、(b) アプリ内で Esc を押したら解除する
+（`ReleaseClickThroughIntent`、`app_shortcuts.dart`）。この 2 つが常に有効なため、
+`LoupeWindowPolicy.canEnableClickThrough()` は常に true を返し、クリックスルーを
+ON にする操作を禁止する必要はもう無い。トレイ・ホットキーは追加の便利な手段という
+位置づけで、`WindowModePanel` はクリックスルーのスイッチ横に、そのとき実際に使える
+復帰手段（フォーカス復帰・Esc は常時、トレイ・ホットキーは可用性に応じて）を
+すべて併記する。
 
 ## アプリ内キー操作 (#63)
 
-ウィンドウにフォーカスがある間だけ効くショートカット 3 種。実装は
-`lib/services/app_shortcuts.dart`（`Intent` 定義）+
-`lib/services/preview_selection.dart`（実処理: `cycleAdvancedFilter()` /
-`adjustPreviewStrength()`）+ `lib/ui/screens/home_screen.dart`
-（標準 Flutter `Shortcuts`/`Actions`/`Focus` で配線。`hotkey_manager` の
-`GlobalShortcuts` は使わない — こちらはウィンドウ内フォーカス時だけの
+ウィンドウにフォーカスがある間だけ効くショートカット 4 種。実装は
+`lib/services/app_shortcuts.dart`（`Intent` 定義 + `isFocusOnInteractiveControl()` /
+`InteractiveFocusAwareCallbackAction`）+ `lib/services/preview_selection.dart`
+（実処理: `cycleAdvancedFilter()` / `adjustPreviewStrength()`）+
+`lib/ui/screens/home_screen.dart`（標準 Flutter `Shortcuts`/`Actions`/`Focus` で配線。
+`hotkey_manager` の `GlobalShortcuts` は使わない — こちらはウィンドウ内フォーカス時だけの
 アプリ内ショートカットで、OS 全体に効くグローバルホットキーとは別物）。
 
 | キー | 効果 |
@@ -351,6 +363,7 @@ bypassed が true なら強制的に false にする。この 2 つのハンド�
 | `/` | advanced カタログ（`kVisionFilterCatalog`、30 件）にフォーカスを移す |
 | `↑` / `↓` | advanced カタログを逆送り/順送り（wraparound） |
 | `←` / `→` | 選択中フィルタの強度を `kKeyboardStrengthStep`（5%）刻みで増減 |
+| `Esc` | クリックスルーが ON のとき解除する（クリックスルーの復帰経路。上記「クリックスルーの復帰経路」参照） |
 
 - **`/` は「検索欄が無ければ advanced のカタログにフォーカス」という Issue の
   要求を字義どおり実装したもの**。現状アプリ内に検索欄は存在しないため、常に
@@ -360,6 +373,9 @@ bypassed が true なら強制的に false にする。この 2 つのハンド�
   フォーカスするため、↑↓ が動かす対象と一致させた。色覚クイック選択チップ
   （7 種）は対象外 — Tab/マウスで十分に少なく選びやすいため、わざわざ
   キーボードショートカットの対象に含める必要がないと判断した。
+- **`/`・↑↓・←→ はテキスト入力・ボタン・スイッチ等にフォーカスがある間は無効化される**
+  （`isFocusOnInteractiveControl()` による `isEnabled` ガード、#63）。`Esc` だけは
+  このガードの対象外 — クリックスルーからの復帰は常に効く必要があるため。
 - ←→ の強度調整は `previewStrength` と同じ判定（`isColorQuickSelection`）に
   従う: 色覚クイック選択中は `FilterService.intensity`、advanced/プリセット
   選択中は `VisionFilterState.strength` を動かす。
@@ -371,7 +387,10 @@ bypassed が true なら強制的に false にする。この 2 つのハンド�
 `ManualLoupeRectSource` はルーペ窓自身の矩形（ユーザーが手動で動かす）を返す。
 将来 #44（対象アプリのウィンドウに自動追従するモード）が実装されたら、この
 インターフェースの別実装に差し替える想定。#44 自体の実装（自動追従ロジック）は
-この Issue のスコープ外で、seam を用意しただけ。
+この Issue のスコープ外で、seam を用意しただけ。`LoupeWindowController` は
+コンストラクタ引数（既定 `ManualLoupeRectSource`）でこれを受け取り、
+`currentLoupeRect()` 経由で公開する（#63。#44 実装時はここへ対象アプリ追従の
+実装を注入できる）。
 
 ### マルチモニタ
 

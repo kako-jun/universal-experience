@@ -160,6 +160,9 @@ UI は **日本語 / 英語** に対応しています（`flutter_localizations`
 
 ※ iOS は技術的制約により非対応（`docs/adr/2025-11-17-no-ios-support.md`）
 
+※ Linux ではタスクトレイ・グローバルホットキーに追加の system パッケージが要ります
+（`docs/GETTING_STARTED.md` の Linux 開発要件を参照）。
+
 ## セットアップ
 
 ```bash
