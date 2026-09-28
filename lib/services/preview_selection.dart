@@ -22,3 +22,15 @@ double previewStrength(
   }
   return visionState.strength;
 }
+
+/// advanced カタログの strength スライダー（`FilterParamPanel`）を表示すべきか
+/// （#60 M2）。
+///
+/// 色覚クイック選択が起点の選択では、強度は [previewStrength] が使うとおり
+/// `FilterService` のタイプ別記憶（#57）で決まり、[VisionFilterState.strength]
+/// は使われない。にもかかわらず `FilterParamPanel` が strength スライダーを
+/// 出すと、動かしても実際には何も変わらない（#57 の記憶の方が優先される）
+/// スライダーになってしまう。[previewStrength] と対になる判定として、ここに
+/// 集約する。
+bool showsAdvancedStrengthSlider(VisionFilterState visionState) =>
+    !visionState.isColorQuickSelection;

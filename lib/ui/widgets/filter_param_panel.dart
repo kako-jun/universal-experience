@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_catalog.dart';
+import '../../services/preview_selection.dart';
 import '../../services/vision_filter_state.dart';
 
 /// 選択中フィルタの [VisionParam] 定義から動的にパラメータ UI を生成するパネル。
@@ -13,6 +14,10 @@ import '../../services/vision_filter_state.dart';
 /// - seed → 表示 + 乱数再生成ボタン
 ///
 /// 加えて urgency 注記・受診喚起メッセージ・strength スライダを表示する。
+/// strength スライダは、選択が色覚クイック選択（`FilterSelector`/トレイ）
+/// 由来のときは出さない（`lib/services/preview_selection.dart` の
+/// `showsAdvancedStrengthSlider` を参照。その場合の強度は #57 のタイプ別
+/// 記憶が決め、このスライダーを動かしても反映されないため、#60 M2）。
 /// 文言はすべて i18n で解決する（カタログは識別子/enum のみ持つ: #18）。
 class FilterParamPanel extends StatelessWidget {
   const FilterParamPanel({super.key});
@@ -35,6 +40,11 @@ class FilterParamPanel extends StatelessWidget {
         }
 
         final consult = consultMessageForUrgency(l10n, entry.urgency);
+        // #60 M2: 色覚クイック選択由来の選択では、強度は previewStrength が
+        // FilterService のタイプ別記憶（#57）から決める — この strength
+        // スライダーを動かしても実際のプレビューには反映されないので出さない
+        // （判定は showsAdvancedStrengthSlider に集約）。
+        final showStrength = showsAdvancedStrengthSlider(state);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -43,8 +53,10 @@ class FilterParamPanel extends StatelessWidget {
               const SizedBox(height: 8),
               _buildConsultNote(consult),
             ],
-            const SizedBox(height: 16),
-            _buildStrength(l10n, state),
+            if (showStrength) ...[
+              const SizedBox(height: 16),
+              _buildStrength(l10n, state),
+            ],
             for (final param in entry.parameters) ...[
               const SizedBox(height: 16),
               _buildParam(l10n, state, param),
