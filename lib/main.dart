@@ -309,16 +309,9 @@ void main() async {
     });
 
     // 永続化されたクリックスルー ON を、トレイ・ホットキーの初期化が終わった
-    // 今の時点で復帰手段が実際に使えるか確認してから適用する (#63)。
-    // `loupeWindow.initialize()` はトレイ/ホットキーの初期化より前に呼ばれる
-    // ため、そこでは適用していない。
-    await loupeWindow.restorePersistedClickThrough(
-      trayAvailable: trayService.isAvailable,
-      clickThroughHotkeyAvailable:
-          hotkeyService.isRegistered(AppHotkeyAction.toggleClickThrough),
-      emergencyExitHotkeyAvailable:
-          hotkeyService.isRegistered(AppHotkeyAction.emergencyExit),
-    );
+    // 今の時点で適用する (#63)。診断ログのタイミングを揃えるため、この順序
+    // 自体は変えていない。
+    await loupeWindow.restorePersistedClickThrough();
 
     runApp(UniversalExperienceApp(
       settings: settings,
@@ -326,6 +319,7 @@ void main() async {
       hotkeyStatus: HotkeyStatus(
         registered: hotkeyService.registeredActions,
         failed: hotkeyService.failedActions,
+        bindings: hotkeyService.activeBindings,
       ),
     ));
     return;

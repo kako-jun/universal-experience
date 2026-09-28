@@ -170,12 +170,16 @@
   "windowModeLoupe": "ルーペ窓",
   "alwaysOnTopLabel": "最前面に固定",
   "clickThroughLabel": "クリックスルー",
-  "clickThroughDisabledHint": "戻るにはこのホットキー: {hotkey}",
-  "clickThroughNoReturnPathHint": "トレイもホットキーも使えないため、クリックスルーは無効です",
+  "clickThroughRecoveryFocusHint": "フォーカスを外して戻ると自動的に解除されます（Alt+Tab など）",
+  "clickThroughRecoveryEscapeHint": "アプリ内で Esc キーを押しても解除できます",
+  "clickThroughRecoveryTrayHint": "トレイのメニューからも解除できます",
+  "clickThroughRecoveryHotkeyHint": "ホットキー {hotkey} でも解除できます",
   "hotkeySectionTitle": "グローバルホットキー",
   "hotkeyToggleClickThrough": "クリックスルーの切替",
   "hotkeyHoldOriginal": "押している間だけ原画を表示",
   "hotkeyEmergencyExit": "非常口",
   "hotkeyToggleLoupeVisibility": "ルーペ窓の表示/非表示",
-  "hotkeyRegistrationFailed": "登録に失敗しました"
+  "hotkeyRegistrationFailed": "登録に失敗しました",
+  "hotkeyRegistrationCaveat": "登録に成功したと表示されていても、OS のセッションによっては実際には発火しないことがあります（一部の Linux Wayland セッションなど）。",
+  "bypassedBadgeLabel": "原画表示中"
 }

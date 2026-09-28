@@ -392,16 +392,24 @@
   "@clickThroughLabel": {
     "description": "Label for the click-through toggle."
   },
-  "clickThroughDisabledHint": "Use this hotkey to get back: {hotkey}",
-  "@clickThroughDisabledHint": {
-    "description": "Shown next to the click-through toggle when there is no tray to fall back on, so the hotkey is the only way back.",
+  "clickThroughRecoveryFocusHint": "It turns off automatically when this window regains focus (e.g. Alt+Tab)",
+  "@clickThroughRecoveryFocusHint": {
+    "description": "Recovery-path hint shown under the click-through toggle: focusing back to this window always turns it off."
+  },
+  "clickThroughRecoveryEscapeHint": "You can also press Esc inside the app to turn it off",
+  "@clickThroughRecoveryEscapeHint": {
+    "description": "Recovery-path hint shown under the click-through toggle: pressing Esc inside the app always turns it off."
+  },
+  "clickThroughRecoveryTrayHint": "You can also turn it off from the tray menu",
+  "@clickThroughRecoveryTrayHint": {
+    "description": "Recovery-path hint shown under the click-through toggle, only when the tray is available."
+  },
+  "clickThroughRecoveryHotkeyHint": "You can also turn it off with the {hotkey} hotkey",
+  "@clickThroughRecoveryHotkeyHint": {
+    "description": "Recovery-path hint shown under the click-through toggle, only when a hotkey that can undo it is actually registered.",
     "placeholders": {
       "hotkey": { "type": "String" }
     }
-  },
-  "clickThroughNoReturnPathHint": "Click-through is disabled because neither the tray nor a hotkey is available to undo it",
-  "@clickThroughNoReturnPathHint": {
-    "description": "Shown next to the click-through toggle when it is disabled entirely: no tray and no hotkey can undo it, so enabling it would make the UI unrecoverable."
   },
   "hotkeySectionTitle": "Global Hotkeys",
   "@hotkeySectionTitle": {
@@ -426,5 +434,13 @@
   "hotkeyRegistrationFailed": "Registration failed",
   "@hotkeyRegistrationFailed": {
     "description": "Shown next to a hotkey action whose global registration failed (e.g. unsupported on this platform/session)."
+  },
+  "hotkeyRegistrationCaveat": "A hotkey shown as registered may still not fire in every OS session (e.g. some Linux Wayland sessions).",
+  "@hotkeyRegistrationCaveat": {
+    "description": "Caveat note shown under the global-hotkeys list: successful registration does not guarantee the hotkey actually fires."
+  },
+  "bypassedBadgeLabel": "Showing original",
+  "@bypassedBadgeLabel": {
+    "description": "Badge shown next to the preview section title while the hold-to-show-original bypass is active."
   }
 }
