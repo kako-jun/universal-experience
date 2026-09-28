@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
+import '../../models/disability_type.dart';
 import '../../models/vision_filter_catalog.dart';
 import '../../rendering/cpu_vision_renderer.dart';
 import '../../services/export_service.dart';
@@ -98,6 +99,7 @@ class BeforeAfterView extends StatefulWidget {
     required this.filter,
     required this.filterId,
     required this.strength,
+    this.colorVisionType,
     this.sampleSize,
   })  : assert(
           (filter == null) == (filterId == null),
@@ -117,6 +119,22 @@ class BeforeAfterView extends StatefulWidget {
 
   /// Filter strength 0.0..1.0, forwarded to the renderer.
   final double strength;
+
+  /// The actual [ColorVisionType] behind the current selection, when it came
+  /// from the color-vision quick pick (`FilterSelector`/tray via
+  /// `lib/services/color_vision_selection.dart`). `null` for advanced-catalog
+  /// or preset selections (and for the quick pick's own "none"/original).
+  ///
+  /// The catalog (and therefore [filterId]) only has 5 color-vision entries
+  /// (protanopia/deuteranopia/tritanopia/achromatopsia/tetrachromacy) —
+  /// -omaly (anomaly) types map to the same catalog id as their base -opia
+  /// (`FilterService.sensusFilter`'s contract). Without this field, the
+  /// after-pane label / export caption / filename would always say
+  /// "Protanopia" even when the user picked "Protanomaly" (#60 M3). When
+  /// non-null, this overrides [filterId]-based name resolution for display
+  /// purposes only — it never affects what's rendered (that's entirely
+  /// [filter]/[strength]).
+  final ColorVisionType? colorVisionType;
 
   /// Explicit width/height (in pixels) for the generated square sample
   /// image. When `null` (the default, used by real callers), the resolution
@@ -262,18 +280,21 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// practice) — production always uses [BeforeAfterView.canonicalSampleSize].
   int? _currentSampleSize;
 
-  /// The `(filterId, strength)` that actually produced the currently-held
-  /// [_after] (#85 レビュー S8, #60). `null` until the first successful render.
+  /// The `(filterId, colorVisionType, strength)` that actually produced the
+  /// currently-held [_after] (#85 レビュー S8, #60, #60 M3). `null` until the
+  /// first successful render.
   ///
   /// [_export] must build its [ExportCaption] from these, **not** from
-  /// `widget.filterId`/`widget.strength`: those reflect the *live* widget
-  /// props, which can already have moved on (e.g. the user dragged the
-  /// intensity slider again) while `_after` still shows the previous render
-  /// — [_scheduleRebuild] (#85 レビュー S3) coalesces the new request instead
-  /// of applying it immediately, so there's a real window where the two
-  /// diverge. Exporting during that window must burn a caption matching the
-  /// pixels actually being exported, not the slider's current position.
+  /// `widget.filterId`/`widget.colorVisionType`/`widget.strength`: those
+  /// reflect the *live* widget props, which can already have moved on (e.g.
+  /// the user dragged the intensity slider again) while `_after` still shows
+  /// the previous render — [_scheduleRebuild] (#85 レビュー S3) coalesces the
+  /// new request instead of applying it immediately, so there's a real
+  /// window where the two diverge. Exporting during that window must burn a
+  /// caption matching the pixels actually being exported, not the slider's
+  /// current position.
   String? _afterFilterId;
+  ColorVisionType? _afterColorVisionType;
   double? _afterStrength;
 
   /// Monotonic request id. Bumped on every [_rebuild] call so a slow/late
@@ -318,6 +339,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.filter != widget.filter ||
         oldWidget.filterId != widget.filterId ||
+        oldWidget.colorVisionType != widget.colorVisionType ||
         oldWidget.strength != widget.strength ||
         oldWidget.sampleSize != widget.sampleSize) {
       _scheduleRebuild(_effectiveSampleSize);
@@ -479,6 +501,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       _before = before;
       _after = after;
       _afterFilterId = widget.filterId; // #85 レビュー S8, #60
+      _afterColorVisionType = widget.colorVisionType; // #60 M3
       _afterStrength = widget.strength; // #85 レビュー S8
       _currentSampleSize = sampleSize;
       _loading = false;
@@ -513,6 +536,25 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     super.dispose();
   }
 
+  /// after ペインの見出し・export の caption に出す表示名を解決する
+  /// （#60 M3）。
+  ///
+  /// [colorVisionType] が非 null なら常にそれを優先する
+  /// （[colorVisionTypeName]、-omaly の名前も正しく出る）。カタログ
+  /// （[filterId]）は色覚を 5 種しか持たず、-omaly は対応する base の -opia
+  /// と同じ id に写るため、[filterId] だけで解決すると常に -opia の名前に
+  /// なってしまう。[colorVisionType] が null なら [filterId] からカタログの
+  /// l10n 名（[visionFilterName]）を引く。どちらも null なら「原画」。
+  static String _displayName(
+    AppLocalizations l10n,
+    ColorVisionType? colorVisionType,
+    String? filterId,
+  ) {
+    if (colorVisionType != null) return colorVisionTypeName(l10n, colorVisionType);
+    if (filterId == null) return l10n.previewPaneOriginal;
+    return visionFilterName(l10n, filterId);
+  }
+
   /// Exports the current "after" image as a PNG with burned-in metadata (#43).
   ///
   /// i18n は **UI 側でここで解決** し、`ExportCaption`（解決済み文字列）として
@@ -520,8 +562,9 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// クリップボードへコピーし、SnackBar で結果を知らせる。画像そのものの
   /// クリップボード書き込みはプラグインを要し環境変更になるため非スコープ。
   ///
-  /// #85 レビュー S8: caption は [_afterFilterId]/[_afterStrength]（`_after`
-  /// を描画した時点の値）から作る。`widget.filterId`/`widget.strength`
+  /// #85 レビュー S8: caption は [_afterFilterId]/[_afterColorVisionType]/
+  /// [_afterStrength]（`_after` を描画した時点の値）から作る。
+  /// `widget.filterId`/`widget.colorVisionType`/`widget.strength`
   /// （呼び出し時点の *現在* の値）を使うと、export をタップした瞬間までに
   /// スライダー操作で widget の props が先に進んでいた場合、表示中（＝実際に
   /// エクスポートされる）画像とは異なる caption を焼き込んでしまう。
@@ -536,6 +579,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       return;
     }
     final filterId = _afterFilterId;
+    final colorVisionType = _afterColorVisionType;
     setState(() => _exporting = true);
 
     final messenger = ScaffoldMessenger.of(context);
@@ -547,9 +591,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       // sensus advanced フィルタ（緑内障等）の live export に拡張する際は、ここで
       // `consultMessageForUrgency(...)` を解決して `urgencyMessage` に渡せる（拡張ポイント）。
       final caption = ExportCaption(
-        symptomLabel: filterId == null
-            ? l10n.previewPaneOriginal
-            : visionFilterName(l10n, filterId),
+        symptomLabel: _displayName(l10n, colorVisionType, filterId),
         strengthLabel: l10n.strengthLabel(strengthPercent),
         isoDate: date,
       );
@@ -566,7 +608,9 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       }
 
       final filename = exportFilename(
-        symptomId: filterId ?? 'none',
+        // #60 M3: colorVisionType があればその id（-omaly を含む）を使う。
+        // filterId は -omaly を base の -opia と区別できないため。
+        symptomId: colorVisionType?.id ?? filterId ?? 'none',
         strengthPercent: strengthPercent,
         isoDate: date,
       );
@@ -632,15 +676,14 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         final Widget afterChild = _failed
             ? _ErrorPlaceholder(theme: theme, label: l10n.previewFailed)
             : _ImageView(image: _after);
-        // #60: after ペインの見出し・時間依存の注記は widget.filterId（カタログ
-        // id）からカタログを引いて解決する。カタログの l10n 名が唯一の正本
-        // （色覚クイック選択で選んだ場合も同じ id・同じ名前になる）。
+        // #60: 時間依存の注記は widget.filterId（カタログ id）からカタログを
+        // 引いて解決する。after ペインの見出しは widget.colorVisionType が
+        // あればそちらを優先する（#60 M3: -omaly の名前を正しく出すため、
+        // [_displayName] 参照）。
         final entry =
             widget.filterId == null ? null : kVisionFilterCatalogById[widget.filterId];
         final afterPane = _Pane(
-          label: entry == null
-              ? l10n.previewPaneOriginal
-              : visionFilterName(l10n, entry.id),
+          label: _displayName(l10n, widget.colorVisionType, widget.filterId),
           // Export is only meaningful when a real "after" image exists.
           // The failed state (null _after) gets no button.
           trailing: _after != null

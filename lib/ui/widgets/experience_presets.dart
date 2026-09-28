@@ -24,9 +24,8 @@ ExperiencesProvider experiencesProvider = experiences;
 /// 体験プリセットのカード（[_ExperienceCard]）を一意に指す [Key]。
 ///
 /// テストが表示名の文字列（ロケール依存・レイアウト変更で位置がずれる）ではなく
-/// experience id で安定してカードを見つけ、タップ前に
-/// `WidgetController.scrollUntilVisible` でスクロールできるようにするための
-/// 公開ヘルパ（#60 レビュー）。
+/// experience id で安定してカードを見つけ、タップ前にスクロールできるように
+/// するための公開ヘルパ（#60）。
 Key experienceCardKey(String experienceId) =>
     ValueKey('experience_card_$experienceId');
 
