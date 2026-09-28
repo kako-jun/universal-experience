@@ -111,6 +111,7 @@ class VisionFilterState extends ChangeNotifier {
     _selectedPresetId = null;
     _isColorQuickSelection = false;
     _colorVisionType = null;
+    _bypassed = false;
     _selectInternal(id);
   }
 
@@ -137,6 +138,7 @@ class VisionFilterState extends ChangeNotifier {
   /// 操作として）常に上書きする。プリセットの選択は解除する。
   void selectColorVisionType(ColorVisionType type, [String? catalogId]) {
     _selectedPresetId = null;
+    _bypassed = false;
     if (type == ColorVisionType.none) {
       _isColorQuickSelection = false;
       _colorVisionType = null;
@@ -165,6 +167,7 @@ class VisionFilterState extends ChangeNotifier {
     _isColorQuickSelection = false;
     _colorVisionType = null;
     _strength = 1.0;
+    _bypassed = false;
     _selectInternal(catalogId);
   }
 
@@ -194,6 +197,7 @@ class VisionFilterState extends ChangeNotifier {
     _selectedPresetId = null;
     _isColorQuickSelection = false;
     _colorVisionType = null;
+    _bypassed = false;
     _params.clear();
     notifyListeners();
   }
@@ -203,6 +207,7 @@ class VisionFilterState extends ChangeNotifier {
   /// プリセットそのもの」ではなくなるため）。
   void setStrength(double value) {
     _strength = value.clamp(0.0, 1.0);
+    _bypassed = false;
     _clearPresetSelectionOnCustomize();
     notifyListeners();
   }
@@ -212,6 +217,7 @@ class VisionFilterState extends ChangeNotifier {
   /// プリセットの選択表示は解除する（#60、[setStrength] と同じ理由）。
   void setParam(String name, Object value) {
     _params[name] = value;
+    _bypassed = false;
     _clearPresetSelectionOnCustomize();
     notifyListeners();
   }
@@ -235,6 +241,7 @@ class VisionFilterState extends ChangeNotifier {
   /// 扱う。
   void randomizeSeed(String name) {
     _params[name] = _nextSeed();
+    _bypassed = false;
     _clearPresetSelectionOnCustomize();
     notifyListeners();
   }

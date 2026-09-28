@@ -1,6 +1,7 @@
 // VisionFilterState.bypassed（#63、「押している間だけ原画」ホットキー用）の単体テスト。
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 
 void main() {
@@ -49,6 +50,64 @@ void main() {
       state.setBypassed(false);
       expect(state.selectedId, 'cataract');
       expect(state.strength, 0.42);
+    });
+  });
+
+  group('明示的な選択操作は bypassed を解除する (#63 S1)', () {
+    test('select() は bypassed を false にする', () {
+      final state = VisionFilterState()..setBypassed(true);
+      state.select('cataract');
+      expect(state.bypassed, isFalse);
+    });
+
+    test('selectColorVisionType() (非 none) は bypassed を false にする', () {
+      final state = VisionFilterState()..setBypassed(true);
+      state.selectColorVisionType(ColorVisionType.protanopia, 'protanopia');
+      expect(state.bypassed, isFalse);
+    });
+
+    test('selectColorVisionType(none) は bypassed を false にする', () {
+      final state = VisionFilterState()..setBypassed(true);
+      state.selectColorVisionType(ColorVisionType.none);
+      expect(state.bypassed, isFalse);
+    });
+
+    test('selectPreset() は bypassed を false にする', () {
+      final state = VisionFilterState()..setBypassed(true);
+      state.selectPreset('meniere', 'vertigo');
+      expect(state.bypassed, isFalse);
+    });
+
+    test('clear() は bypassed を false にする', () {
+      final state = VisionFilterState()
+        ..select('cataract')
+        ..setBypassed(true);
+      state.clear();
+      expect(state.bypassed, isFalse);
+    });
+
+    test('setStrength() は bypassed を false にする', () {
+      final state = VisionFilterState()
+        ..select('cataract')
+        ..setBypassed(true);
+      state.setStrength(0.5);
+      expect(state.bypassed, isFalse);
+    });
+
+    test('setParam() は bypassed を false にする', () {
+      final state = VisionFilterState()
+        ..select('cataract')
+        ..setBypassed(true);
+      state.setParam('seed', BigInt.from(42));
+      expect(state.bypassed, isFalse);
+    });
+
+    test('randomizeSeed() は bypassed を false にする', () {
+      final state = VisionFilterState()
+        ..select('cataract')
+        ..setBypassed(true);
+      state.randomizeSeed('seed');
+      expect(state.bypassed, isFalse);
     });
   });
 }

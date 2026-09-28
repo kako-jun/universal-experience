@@ -349,4 +349,58 @@ void main() {
     expect(visionState.isColorQuickSelection, isTrue);
     expect(protanopiaChipSelected(), isTrue);
   });
+
+  testWidgets(
+      'VisionFilterState.bypassed が true の間、プレビューに「原画表示中」バッジが出る (#63 S1)',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1200, 4000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final settings = SettingsService();
+    await settings.load();
+    final filterService = FilterService();
+    final visionState = VisionFilterState();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsService>.value(value: settings),
+          ChangeNotifierProvider<FilterService>.value(value: filterService),
+          ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
+          ChangeNotifierProvider<LoupeWindowController>.value(
+            value: LoupeWindowController(),
+          ),
+          Provider<WindowModeUiContext>.value(
+            value: const WindowModeUiContext(
+              trayAvailable: false,
+              hotkeyStatus: HotkeyStatus(),
+            ),
+          ),
+        ],
+        child: const MaterialApp(
+          localizationsDelegates: [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: HomeScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Showing original'), findsNothing);
+
+    visionState.setBypassed(true);
+    await tester.pump();
+    expect(find.text('Showing original'), findsOneWidget);
+
+    visionState.setBypassed(false);
+    await tester.pump();
+    expect(find.text('Showing original'), findsNothing);
+  });
 }
