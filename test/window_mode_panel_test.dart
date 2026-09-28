@@ -1,8 +1,11 @@
 // WindowModePanel（#63）の widget test。
 //
-// 受け入れ条件「トレイもホットキーもない場合は、クリックスルーを ON にできない
-// こと」を、`UniversalExperienceApp` の既定コンストラクタ（trayAvailable: false,
-// hotkeyStatus: 空、= もっとも安全側の既定）で検証する。
+// M1（クリックスルーは常に ON にできる。復帰経路はフォーカス復帰 + アプリ内 Esc
+// が常時有効なベースライン）を受けて、クリックスルーのスイッチは settings
+// モードでない限り常に有効であること、および復帰手段のヒントが常に表示される
+// ことを検証する。
+
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -35,13 +38,17 @@ void main() {
   }
 
   testWidgets(
-      'トレイもホットキーも無い既定状態ではクリックスルーを ON にできない (#63)',
+      'トレイもホットキーも無い既定状態でもクリックスルーを ON にでき、'
+      'フォーカス復帰・Esc の復帰手段ヒントが常に表示される (#63)',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 4000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
     final settings = await preparedSettings();
+    // クリックスルーは settings モード中は ON にできない
+    // (setClickThrough 自身のガード、#63)。loupe モードへ切り替えておく。
+    await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
 
     // 引数省略 = 既定コンストラクタ（trayAvailable: false, hotkeyStatus: 空）。
     await tester.pumpWidget(UniversalExperienceApp(settings: settings));
@@ -50,37 +57,56 @@ void main() {
     final clickThroughTile = tester.widget<SwitchListTile>(
       find.widgetWithText(SwitchListTile, 'Click-through'),
     );
-    expect(clickThroughTile.value, isFalse);
-    expect(clickThroughTile.onChanged, isNull,
-        reason: '復帰手段（トレイ/ホットキー）が無いので ON にする操作自体を塞ぐべき');
+    expect(clickThroughTile.onChanged, isNotNull,
+        reason: 'フォーカス復帰・Esc が常に使えるので、トレイ/ホットキーが無くても '
+            'ON にする操作自体を塞ぐ必要は無い');
 
-    // タップしても実際に状態が変わらないことも確認する（保険）。
-    await tester.tap(find.widgetWithText(SwitchListTile, 'Click-through'));
-    await tester.pump();
-    expect(loupeWindow.clickThrough, isFalse);
-
-    expect(find.text('Click-through is disabled because neither the tray '
-        'nor a hotkey is available to undo it'), findsOneWidget);
+    expect(
+      find.text(
+        'It turns off automatically when this window regains focus '
+        '(e.g. Alt+Tab)',
+      ),
+      findsOneWidget,
+      reason: 'フォーカス復帰は常に使える復帰経路なので常時表示する',
+    );
+    expect(
+      find.text('You can also press Esc inside the app to turn it off'),
+      findsOneWidget,
+      reason: 'アプリ内 Esc は常に使える復帰経路なので常時表示する',
+    );
+    // トレイもホットキーも無いので、その 2 つのヒントは出ない。
+    expect(
+      find.text('You can also turn it off from the tray menu'),
+      findsNothing,
+    );
   });
 
-  testWidgets('トレイが使える環境ではクリックスルーを ON にできる (#63)',
+  testWidgets('settings モード中はクリックスルーのスイッチが無効化される (#63)',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 4000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
     final settings = await preparedSettings();
-    // クリックスルーは settings モード中は ON にできない
-    // (setClickThrough 自身のガード、#63)。スイッチ自体も settings モードでは
-    // 無効化されるため、このテストの前提（トレイがあれば ON にできる）を
-    // 成立させるには loupe モードへ切り替えておく必要がある。
-    //
-    // tester.runAsync 経由で呼ぶ必要がある: testWidgets は FakeAsync ゾーンで
-    // 動くため、window_manager のプラットフォームチャンネル呼び出し
-    // （未登録ハンドラで最終的に MissingPluginException になる）の解決が
-    // 実イベントループを必要とし、pump() 無しに直接 await すると
-    // テストがハングする（setAppMode 自体は本番では問題ない — この待避は
-    // テスト環境固有）。
+
+    await tester.pumpWidget(UniversalExperienceApp(settings: settings));
+    await tester.pump();
+
+    final clickThroughTile = tester.widget<SwitchListTile>(
+      find.widgetWithText(SwitchListTile, 'Click-through'),
+    );
+    expect(clickThroughTile.value, isFalse);
+    expect(clickThroughTile.onChanged, isNull,
+        reason: '設定窓モードは UI 操作が前提のため、クリックスルーは ON にできない');
+  });
+
+  testWidgets('トレイが使える環境ではトレイの復帰手段ヒントも表示される (#63)',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1200, 4000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final settings = await preparedSettings();
     await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
 
     await tester.pumpWidget(UniversalExperienceApp(
@@ -90,25 +116,22 @@ void main() {
     ));
     await tester.pump();
 
-    final clickThroughTile = tester.widget<SwitchListTile>(
-      find.widgetWithText(SwitchListTile, 'Click-through'),
+    expect(
+      find.text('You can also turn it off from the tray menu'),
+      findsOneWidget,
     );
-    expect(clickThroughTile.onChanged, isNotNull);
   });
 
   testWidgets(
-      'toggleClickThrough が失敗し emergencyExit だけ登録された環境では '
-      'ヒントに emergencyExit のキーを表示する (#63)',
-      (WidgetTester tester) async {
+      '登録されているホットキーの復帰手段ヒントが表示される（toggleClickThrough 優先） '
+      '(#63)', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 4000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
     final settings = await preparedSettings();
+    await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
 
-    // トレイは無し。toggleClickThrough は登録失敗、emergencyExit だけ登録成功
-    // = canEnableClickThrough は true（emergencyExit 経由）だが、ヒントが
-    // 決め打ちの toggleClickThrough キーを案内してしまうと実際には戻れない。
     await tester.pumpWidget(UniversalExperienceApp(
       settings: settings,
       trayAvailable: false,
@@ -119,21 +142,23 @@ void main() {
     ));
     await tester.pump();
 
+    final hotkeyText = describeHotkey(
+      defaultHotkeyBindings()[AppHotkeyAction.emergencyExit]!,
+      useMacSymbols: Platform.isMacOS,
+    );
     expect(
-      find.text(
-        'Use this hotkey to get back: '
-        '${describeHotkey(AppHotkeyAction.emergencyExit)}',
-      ),
+      find.text('You can also turn it off with the $hotkeyText hotkey'),
       findsOneWidget,
       reason: '実際に登録されている emergencyExit のキーを案内すべき',
     );
-    // 下部のホットキー一覧セクションには全アクションの既定キーが登録状況に
-    // 関わらず並ぶため、ヒント文言そのもの（登録失敗の toggleClickThrough の
-    // キーを案内していないこと）をピンポイントで確認する。
+
+    final failedHotkeyText = describeHotkey(
+      defaultHotkeyBindings()[AppHotkeyAction.toggleClickThrough]!,
+      useMacSymbols: Platform.isMacOS,
+    );
     expect(
       find.text(
-        'Use this hotkey to get back: '
-        '${describeHotkey(AppHotkeyAction.toggleClickThrough)}',
+        'You can also turn it off with the $failedHotkeyText hotkey',
       ),
       findsNothing,
       reason: '登録に失敗した toggleClickThrough のキーをヒントに案内してはいけない',

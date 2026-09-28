@@ -1,4 +1,7 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
+import 'package:hotkey_manager/hotkey_manager.dart' show HotKey;
 import 'package:provider/provider.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -23,31 +26,38 @@ class WindowModePanel extends StatelessWidget {
 
     return Consumer<LoupeWindowController>(
       builder: (context, loupeWindow, _) {
-        final canEnableClickThrough = LoupeWindowPolicy.canEnableClickThrough(
-          trayAvailable: uiContext.trayAvailable,
-          clickThroughHotkeyAvailable: uiContext.hotkeyStatus
-              .isRegistered(AppHotkeyAction.toggleClickThrough),
-          emergencyExitHotkeyAvailable: uiContext.hotkeyStatus
-              .isRegistered(AppHotkeyAction.emergencyExit),
-        );
-        // ON にする操作だけを禁止する。既に ON なら OFF へはいつでも戻せる
-        // （#63 受け入れ条件: 復帰手段が無い状態で ON にはできないが、既に ON の
-        // ものを OFF にする操作を塞いではいけない）。
-        final clickThroughDisabled =
-            !loupeWindow.clickThrough && !canEnableClickThrough;
-        final showClickThroughHint =
-            clickThroughDisabled || !uiContext.trayAvailable;
-        // 「戻るにはこのホットキー」ヒントに表示する、実際に登録されているホットキー。
-        // clickThroughDisabled が false のときに showClickThroughHint が true になるのは
-        // tray が無く、かつ toggleClickThrough か emergencyExit のどちらかが登録されている
-        // 場合に限られる（canEnableClickThrough の判定と対応）。toggleClickThrough の方が
-        // クリックスルーを直接解除できて分かりやすいため優先する。
-        final returnPathHotkeyAction = uiContext.hotkeyStatus
-                .isRegistered(AppHotkeyAction.toggleClickThrough)
-            ? AppHotkeyAction.toggleClickThrough
-            : (uiContext.hotkeyStatus.isRegistered(AppHotkeyAction.emergencyExit)
-                ? AppHotkeyAction.emergencyExit
-                : null);
+        // 実際に登録されている toggleClickThrough/emergencyExit ホットキーを、
+        // 「戻るにはこのホットキー」ヒントに使う (#63)。toggleClickThrough の
+        // 方がクリックスルーを直接解除できて分かりやすいため優先する。Wayland
+        // ネイティブセッションでは登録「成功」が実発火を保証しないため、その
+        // 判定に該当する Linux では常にヒントから除外する。
+        final isLikelyUnreliableHotkeyEnvironment = Platform.isLinux &&
+            LoupeWindowPolicy.isLikelyWaylandNativeSession(Platform.environment);
+        AppHotkeyAction? hotkeyRecoveryAction;
+        if (!isLikelyUnreliableHotkeyEnvironment) {
+          if (uiContext.hotkeyStatus
+              .isRegistered(AppHotkeyAction.toggleClickThrough)) {
+            hotkeyRecoveryAction = AppHotkeyAction.toggleClickThrough;
+          } else if (uiContext.hotkeyStatus
+              .isRegistered(AppHotkeyAction.emergencyExit)) {
+            hotkeyRecoveryAction = AppHotkeyAction.emergencyExit;
+          }
+        }
+        final hotkeyRecoveryText = hotkeyRecoveryAction == null
+            ? null
+            : describeHotkey(
+                uiContext.hotkeyStatus.bindings[hotkeyRecoveryAction] ??
+                    defaultHotkeyBindings()[hotkeyRecoveryAction]!,
+                useMacSymbols: Platform.isMacOS,
+              );
+
+        final recoveryLines = <String>[
+          l10n.clickThroughRecoveryFocusHint,
+          l10n.clickThroughRecoveryEscapeHint,
+          if (uiContext.trayAvailable) l10n.clickThroughRecoveryTrayHint,
+          if (hotkeyRecoveryText != null)
+            l10n.clickThroughRecoveryHotkeyHint(hotkeyRecoveryText),
+        ];
 
         return Card(
           child: Padding(
@@ -97,29 +107,28 @@ class WindowModePanel extends StatelessWidget {
                   contentPadding: EdgeInsets.zero,
                   title: Text(l10n.clickThroughLabel),
                   value: loupeWindow.clickThrough,
-                  // settings モードでは setClickThrough 自身が ON をガードする
-                  // ため機能的には安全だが、拒否されて何も起きないより先に
-                  // スイッチ自体を無効化したほうが分かりやすい（#63）。
-                  onChanged: (clickThroughDisabled ||
-                          loupeWindow.appMode == AppMode.settings)
+                  // 設定窓モードは UI 操作が前提の通常ウィンドウなので、
+                  // クリックスルーを ON にはできない。setClickThrough 自身が
+                  // 拒否するため機能的には安全だが、拒否されて何も起きないより
+                  // 先にスイッチ自体を無効化したほうが分かりやすい (#63)。
+                  onChanged: loupeWindow.appMode == AppMode.settings
                       ? null
                       : (value) => loupeWindow.setClickThrough(value),
                 ),
-                if (showClickThroughHint)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4, bottom: 8),
-                    child: Text(
-                      (clickThroughDisabled || returnPathHotkeyAction == null)
-                          ? l10n.clickThroughNoReturnPathHint
-                          : l10n.clickThroughDisabledHint(
-                              describeHotkey(returnPathHotkeyAction),
-                            ),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final line in recoveryLines)
+                        Text(
+                          line,
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
+                        ),
+                    ],
                   ),
+                ),
                 const SizedBox(height: 16),
                 Text(
                   l10n.hotkeySectionTitle,
@@ -129,10 +138,17 @@ class WindowModePanel extends StatelessWidget {
                 const SizedBox(height: 8),
                 for (final action in AppHotkeyAction.values)
                   _HotkeyRow(
-                    action: action,
+                    hotKey: uiContext.hotkeyStatus.bindings[action] ??
+                        defaultHotkeyBindings()[action]!,
                     label: _hotkeyLabel(l10n, action),
                     failed: uiContext.hotkeyStatus.failed.contains(action),
                   ),
+                const SizedBox(height: 4),
+                Text(
+                  l10n.hotkeyRegistrationCaveat,
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: colorScheme.onSurfaceVariant),
+                ),
               ],
             ),
           ),
@@ -157,12 +173,12 @@ class WindowModePanel extends StatelessWidget {
 
 class _HotkeyRow extends StatelessWidget {
   const _HotkeyRow({
-    required this.action,
+    required this.hotKey,
     required this.label,
     required this.failed,
   });
 
-  final AppHotkeyAction action;
+  final HotKey hotKey;
   final String label;
   final bool failed;
 
@@ -184,7 +200,7 @@ class _HotkeyRow extends StatelessWidget {
             ),
           ),
           Text(
-            describeHotkey(action),
+            describeHotkey(hotKey, useMacSymbols: Platform.isMacOS),
             style: theme.textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
               fontFamily: 'monospace',
