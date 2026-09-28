@@ -13,7 +13,22 @@ class HotkeyActions {
     required this.showAndFocusLoupe,
     required this.toggleLoupeVisible,
     required this.setLoupeVisible,
-  });
+    DateTime Function() now = DateTime.now,
+  }) : _now = now;
+
+  final DateTime Function() _now;
+
+  /// keyUp を一度でも受け取ったか。一度受け取れば、この環境は hold ジェスチャを
+  /// 正しく配送すると分かる (#63)。
+  bool _keyUpSeen = false;
+
+  /// keyUp が一度も届いていない環境で、OS のキーリピートによる keyDown 連打を
+  /// トグルとして誤検知しないための直近 keyDown 時刻。
+  DateTime? _lastKeyDownAt;
+
+  /// [_lastKeyDownAt] からこの時間内の keyDown はリピートとみなして無視する
+  /// (#63)。
+  static const Duration _repeatDebounce = Duration(milliseconds: 400);
 
   /// filterService.deactivate() + visionFilterState.clear() 相当。
   final void Function() deactivateFilters;
@@ -40,29 +55,57 @@ class HotkeyActions {
 
   /// 押している間だけ原画を表示 (#63)。
   ///
-  /// keyDown は常にトグルする。keyUp が届けば強制的に OFF にする。
-  /// これにより:
-  /// - keyUp が届く環境（通常の hold ジェスチャ）: 押す→ON、離す→OFF という
-  ///   正しい「押している間だけ」の挙動になる。
-  /// - keyUp が届かない環境（一部 OS のグローバルホットキーで keyUp が配送されない）:
-  ///   毎回の押下が単純なトグルとして機能する（1 回目の押下で ON のまま残り、
-  ///   2 回目の押下で OFF に戻る）。
-  /// タイマー等での環境判定は不要で、この 2 つのハンドラの組み合わせだけで
-  /// 両方の環境に自然にフォールバックする。
-  void holdOriginalKeyDown() => setBypassed(!getBypassed());
+  /// - keyUp が一度でも届いた環境（[_keyUpSeen]）: 以降の keyDown は常に
+  ///   bypassed を true にするだけ（冪等）。keyUp が常に false にするので、
+  ///   正しい hold 挙動になる。
+  /// - keyUp が一度も届いていない環境: keyDown のたびにトグルするが、直前の
+  ///   keyDown から [_repeatDebounce]（400ms）以内の keyDown は OS のキー
+  ///   リピートとみなして無視する（押しっぱなしで OS が keyDown を連続送出する
+  ///   環境でも 1 回のトグルにしかならないようにする、#63）。
+  void holdOriginalKeyDown() {
+    if (_keyUpSeen) {
+      setBypassed(true);
+      return;
+    }
+    final now = _now();
+    if (_lastKeyDownAt != null &&
+        now.difference(_lastKeyDownAt!) < _repeatDebounce) {
+      _lastKeyDownAt = now;
+      return;
+    }
+    _lastKeyDownAt = now;
+    setBypassed(!getBypassed());
+  }
 
   void holdOriginalKeyUp() {
+    _keyUpSeen = true;
+    _lastKeyDownAt = null;
     if (getBypassed()) setBypassed(false);
   }
 
-  /// 非常口: 全フィルタ停止 + クリックスルー解除 + 最前面解除 + ウィンドウ表示/前面化
-  /// + bypassed 解除 + トレイの表示状態同期。
+  /// 非常口: 全フィルタ停止 + 原画表示解除 + クリックスルー解除 + 最前面解除 +
+  /// ウィンドウ表示/前面化 (#63)。
+  ///
+  /// メモリ上の状態変更（[deactivateFilters]/[setBypassed]）を先に行い、以降の
+  /// I/O を伴うステップは 1 つずつ個別に try/catch する。どれか 1 ステップが
+  /// 失敗しても（例: window_manager の呼び出しが例外を投げる）、残りのステップ
+  /// は実行される — 非常口は「できるところまで全部やる」ことが要件のため、
+  /// 1 つの失敗で他まで巻き添えにしない。
   Future<void> emergencyExit() async {
     deactivateFilters();
-    await setClickThrough(false);
-    await setAlwaysOnTop(false);
-    await showAndFocusLoupe();
     setBypassed(false);
-    await setLoupeVisible(true);
+
+    await _runStep(() => setClickThrough(false));
+    await _runStep(() => setAlwaysOnTop(false));
+    await _runStep(showAndFocusLoupe);
+    await _runStep(() => setLoupeVisible(true));
+  }
+
+  Future<void> _runStep(Future<void> Function() step) async {
+    try {
+      await step();
+    } catch (_) {
+      // 個別ステップの失敗は無視して残りを続行する (#63)。
+    }
   }
 }
