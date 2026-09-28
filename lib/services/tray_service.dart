@@ -7,6 +7,7 @@ import 'package:tray_manager/tray_manager.dart';
 import '../models/disability_type.dart';
 import 'color_vision_selection.dart';
 import 'filter_service.dart';
+import 'loupe_window_controller.dart';
 import 'vision_filter_state.dart';
 
 /// タスクトレイ常駐 (#15)。
@@ -67,6 +68,15 @@ import 'vision_filter_state.dart';
 enum TrayMenuKind {
   /// ルーペ窓の表示/非表示トグル。
   toggleLoupe,
+
+  /// 起動モード（設定窓/ルーペ窓）の切替 (#63)。
+  toggleAppMode,
+
+  /// 最前面固定の切替 (#63)。
+  toggleAlwaysOnTop,
+
+  /// クリックスルーの切替 (#63)。
+  toggleClickThrough,
 
   /// 特定の色覚フィルタを即適用する。
   applyColorVisionFilter,
@@ -165,6 +175,9 @@ class TrayMenuLabels {
     required this.openSettings,
     required this.quit,
     required this.filterLabels,
+    required this.appModeLoupeLabel,
+    required this.alwaysOnTopLabel,
+    required this.clickThroughLabel,
   });
 
   /// ルーペ窓を表示する項目のラベル（非表示状態のトグルに使う）。
@@ -175,6 +188,16 @@ class TrayMenuLabels {
 
   /// フィルタ解除項目のラベル。
   final String clearFilter;
+
+  /// 起動モード切替項目のラベル（`WindowModePanel` の「ルーペモード」表記を
+  /// 再利用、#63）。
+  final String appModeLoupeLabel;
+
+  /// 最前面固定切替項目のラベル（`WindowModePanel` と同じ ARB キーを再利用、#63）。
+  final String alwaysOnTopLabel;
+
+  /// クリックスルー切替項目のラベル（`WindowModePanel` と同じ ARB キーを再利用、#63）。
+  final String clickThroughLabel;
 
   /// 設定を開く項目のラベル。
   final String openSettings;
@@ -198,6 +221,9 @@ String colorVisionEntryKey(ColorVisionType type) => 'filter_${type.id}';
 
 // フィルタ以外の項目の安定キー。
 const String kToggleLoupeKey = 'toggle_loupe';
+const String kToggleAppModeKey = 'toggle_app_mode';
+const String kToggleAlwaysOnTopKey = 'toggle_always_on_top';
+const String kToggleClickThroughKey = 'toggle_click_through';
 const String kClearFilterKey = 'clear_filter';
 const String kOpenSettingsKey = 'open_settings';
 const String kQuitKey = 'quit';
@@ -205,11 +231,16 @@ const String kQuitKey = 'quit';
 /// トレイメニュー全体を純粋データとして組み立てる。
 ///
 /// [loupeVisible] がトグルのラベルを、[activeFilter] がアクティブな
-/// クイックフィルタへのチェック表示を制御する。表示文言は呼び出し側が i18n
-/// 解決して [labels] で渡す（純粋層は文言を持たない: #18）。
+/// クイックフィルタへのチェック表示を制御する。[appMode]/[alwaysOnTop]/
+/// [clickThrough] は起動モード・最前面・クリックスルーのチェック表示を制御する
+/// （#63、UI とトレイの両方から切り替えられる受け入れ条件）。表示文言は
+/// 呼び出し側が i18n 解決して [labels] で渡す（純粋層は文言を持たない: #18）。
 List<TrayMenuEntry> buildTrayMenuSpec({
   required bool loupeVisible,
   required TrayMenuLabels labels,
+  required AppMode appMode,
+  required bool alwaysOnTop,
+  required bool clickThrough,
   ColorVisionType activeFilter = ColorVisionType.none,
 }) {
   return <TrayMenuEntry>[
@@ -218,6 +249,25 @@ List<TrayMenuEntry> buildTrayMenuSpec({
       key: kToggleLoupeKey,
       label: labels.toggleLabel(loupeVisible: loupeVisible),
       checked: loupeVisible,
+    ),
+    const TrayMenuEntry.separator(),
+    TrayMenuEntry(
+      kind: TrayMenuKind.toggleAppMode,
+      key: kToggleAppModeKey,
+      label: labels.appModeLoupeLabel,
+      checked: appMode == AppMode.loupe,
+    ),
+    TrayMenuEntry(
+      kind: TrayMenuKind.toggleAlwaysOnTop,
+      key: kToggleAlwaysOnTopKey,
+      label: labels.alwaysOnTopLabel,
+      checked: alwaysOnTop,
+    ),
+    TrayMenuEntry(
+      kind: TrayMenuKind.toggleClickThrough,
+      key: kToggleClickThroughKey,
+      label: labels.clickThroughLabel,
+      checked: clickThrough,
     ),
     const TrayMenuEntry.separator(),
     for (final f in quickColorVisionFilters())
@@ -270,6 +320,7 @@ class TrayService with TrayListener {
   TrayService({
     required this.filterService,
     required this.visionFilterState,
+    required this.loupeWindow,
     required this.iconPath,
     required this.labels,
     required this.tooltip,
@@ -288,6 +339,13 @@ class TrayService with TrayListener {
   /// `deactivateColorVision` を経由してこれも更新する（#60。FilterSelector
   /// と同じ入口を通す）。
   final VisionFilterState visionFilterState;
+
+  /// ルーペ窓のモード/最前面/クリックスルー (#63)。トレイからもこれらを
+  /// 切り替えられるようにする（UI とトレイの両方から操作できる、という受け入れ
+  /// 条件）。listener を付けてウィンドウ内 UI（`WindowModePanel`）での変更も
+  /// トレイのチェックマークへ反映する（[filterService]/[visionFilterState] と
+  /// 同じ理由、#60 に倣う）。
+  final LoupeWindowController loupeWindow;
 
   /// トレイアイコンのアセットパス (PNG)。`assets/tray/` 参照。
   final String iconPath;
@@ -332,10 +390,11 @@ class TrayService with TrayListener {
   /// (GNOME で AppIndicator 拡張無し / ヘッドレス CI / アイコン欠落など) は
   /// 握り潰してアプリはウィンドウのみで動き続ける。
   ///
-  /// [filterService]/[visionFilterState] に listener を付け、ウィンドウ内 UI
-  /// （[FilterSelector]・advanced カタログ・体験プリセット）での選択も
-  /// トレイのチェックマークに反映されるようにする（#60。トレイのチェック
-  /// マークは [_rebuildMenu] が `visionFilterState.isColorQuickSelection` から
+  /// [filterService]/[visionFilterState]/[loupeWindow] に listener を付け、
+  /// ウィンドウ内 UI（[FilterSelector]・advanced カタログ・体験プリセット・
+  /// `WindowModePanel`）での選択・切替もトレイのチェックマークに反映される
+  /// ようにする（#60/#63。トレイのチェックマークは [_rebuildMenu] が
+  /// `visionFilterState.isColorQuickSelection` や `loupeWindow.appMode` 等から
   /// 決めるが、これまではトレイ自身の操作でしか再構築が起きなかった）。
   /// トレイ自体のネイティブ初期化が失敗しても listener は付けたままにする
   /// （`refresh()` 自身が `_initialised` を見て no-op になるため無害で、
@@ -346,6 +405,7 @@ class TrayService with TrayListener {
     }
     filterService.addListener(_onSelectionChanged);
     visionFilterState.addListener(_onSelectionChanged);
+    loupeWindow.addListener(_onSelectionChanged);
     try {
       trayManager.addListener(this);
       await trayManager.setIcon(iconPath);
@@ -384,6 +444,9 @@ class TrayService with TrayListener {
     final spec = buildTrayMenuSpec(
       loupeVisible: _loupeVisible,
       labels: labels,
+      appMode: loupeWindow.appMode,
+      alwaysOnTop: loupeWindow.alwaysOnTop,
+      clickThrough: loupeWindow.clickThrough,
       // advanced/プリセットを選んでいる間は、色覚クイック選択のチェックマークを
       // 出さない（#60。FilterSelector のチップ点灯と同じ判定）。
       activeFilter: visionFilterState.isColorQuickSelection
@@ -422,6 +485,25 @@ class TrayService with TrayListener {
       case TrayMenuKind.toggleLoupe:
         await _toggleLoupe();
         break;
+      case TrayMenuKind.toggleAppMode:
+        await loupeWindow.setAppMode(
+          loupeWindow.appMode == AppMode.loupe
+              ? AppMode.settings
+              : AppMode.loupe,
+        );
+        await refresh();
+        break;
+      case TrayMenuKind.toggleAlwaysOnTop:
+        await loupeWindow.setAlwaysOnTop(!loupeWindow.alwaysOnTop);
+        await refresh();
+        break;
+      case TrayMenuKind.toggleClickThrough:
+        // settings モード中の ON 拒否は setClickThrough 自身のガードに任せる
+        // （#63）。トレイ自体が復帰手段なので canEnableClickThrough のチェックは
+        // 不要 — トレイ経由のクリックは常に許可してよい。
+        await loupeWindow.setClickThrough(!loupeWindow.clickThrough);
+        await refresh();
+        break;
       case TrayMenuKind.applyColorVisionFilter:
         final type = entry.colorVisionType;
         if (type != null) {
@@ -445,6 +527,9 @@ class TrayService with TrayListener {
         break;
     }
   }
+
+  /// トレイの「ルーペ窓を表示/隠す」と同じロジックをホットキーからも呼べるようにする (#63)。
+  Future<void> toggleLoupeVisible() => _toggleLoupe();
 
   Future<void> _toggleLoupe() async {
     if (_loupeVisible) {
@@ -478,10 +563,12 @@ class TrayService with TrayListener {
   }
 
   /// トレイアイコン・リスナを後始末する。[init] で付けた
-  /// [filterService]/[visionFilterState] の listener も外す（#60）。
+  /// [filterService]/[visionFilterState]/[loupeWindow] の listener も外す
+  /// （#60/#63）。
   Future<void> dispose() async {
     filterService.removeListener(_onSelectionChanged);
     visionFilterState.removeListener(_onSelectionChanged);
+    loupeWindow.removeListener(_onSelectionChanged);
     if (!isTraySupportedPlatform) return;
     try {
       trayManager.removeListener(this);
