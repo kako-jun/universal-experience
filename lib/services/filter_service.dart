@@ -51,11 +51,11 @@ double recommendedStrength(ColorVisionType type) {
 /// strength < 1（推奨値 [kAnomalyDefaultSeverity] = 0.6）を渡す責務が
 /// **呼び出し側** にある。
 ///
-/// [FilterService.sensusFilter] と before/after プレビューの CPU レンダラ
-/// （`lib/rendering/cpu_vision_renderer.dart` 経由、#85）の双方がこの対応表を
-/// 参照する。片方だけが対応表を持つと、色覚クイック選択とプレビュー描画で
-/// 別々のフィルタが適用されるバグ（#52 と同種）を起こしうるため、ここ 1 箇所に
-/// 集約する。
+/// [FilterService.sensusFilter] と、`lib/services/color_vision_selection.dart`
+/// の `selectColorVision`（色覚クイック選択を [VisionFilterState] へ写す、
+/// #60）の双方がこの対応表を参照する。片方だけが対応表を持つと、色覚クイック
+/// 選択とプレビュー描画で別々のフィルタが適用されるバグ（#52 と同種）を
+/// 起こしうるため、ここ 1 箇所に集約する。
 VisionFilter? visionFilterForColorVisionType(ColorVisionType type) {
   switch (type) {
     case ColorVisionType.none:
@@ -85,11 +85,15 @@ VisionFilter? visionFilterForColorVisionType(ColorVisionType type) {
 /// `color_vision_simulator.dart`（ue 内 LMS 再実装）は #13 で撤去した。
 ///
 /// このサービスは UI の選択状態（どのフィルタを・どの強度で選んでいるか）だけを
-/// 管理する。選んだフィルタを実際の画像へ適用するのは sensus 経路
-/// （`lib/rendering/shader_filter.dart` の GPU シェーダ）の役割。before/after
-/// プレビュー（`before_after_view.dart`）は protanopia/protanomaly について
-/// [intensity] をそのまま描画 strength として使う。それ以外の型はまだ
-/// 「描画は近日対応」のプレースホルダ（#59）。
+/// 管理する。実描画のフィルタ適用は sensus 経路（`lib/rendering/
+/// cpu_vision_renderer.dart` の CPU `apply()`、#85）の役割で、このサービス
+/// 自身は呼ばない。色覚のクイック選択（`FilterSelector`/トレイ）は
+/// `lib/services/color_vision_selection.dart` の `selectColorVision` を経由
+/// してこのサービスと [VisionFilterState] の両方を明示的に更新し、before/after
+/// プレビュー（`before_after_view.dart`）は常に [VisionFilterState] だけを
+/// 描画対象にする（#60）。このサービス自身の [currentFilter]/[intensity] は、
+/// 色覚のクイック選択 UI（チップの点灯・強度スライダー）の表示状態と、
+/// 色覚タイプごとの強度の記憶（下記）のために存在する。
 ///
 /// ## 強度はタイプごとに記憶する（#57）
 ///

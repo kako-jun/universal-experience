@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/disability_type.dart';
-import '../../models/vision_filter_catalog.dart';
 import '../../services/filter_service.dart';
 import '../../services/preview_selection.dart';
 import '../../services/settings_service.dart';
@@ -25,44 +24,32 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   FilterService? _filterService;
 
-  /// The [FilterService.currentFilter] value last mirrored into
-  /// [VisionFilterState] by [_syncVisionFilterState] (#60). `null` before the
-  /// first sync. Guards the mirroring to the *edges* of `currentFilter`
-  /// changing — not every [FilterService] notification (e.g. `setIntensity`
-  /// dragging the color-vision slider also notifies) — so an advanced/preset
-  /// selection made in the meantime isn't clobbered by an unrelated intensity
-  /// tick.
-  ColorVisionType? _syncedColorType;
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Bridge FilterService selection changes into SettingsService (#17) and
-    // into VisionFilterState (#60, the preview's single source of truth).
-    // Subscribe once.
+    // Bridge FilterService selection changes into SettingsService so the last
+    // filter type is persisted (#17). Subscribe once.
+    //
+    // #60 M1: this used to also mirror FilterService.currentFilter into
+    // VisionFilterState (the preview's single source of truth) via a
+    // listener here. That mirroring is gone — color-vision selection now
+    // updates both services directly, at the point of the user action
+    // (`lib/services/color_vision_selection.dart`'s `selectColorVision`/
+    // `deactivateColorVision`, called from `FilterSelector`, the tray, and
+    // `main.dart`'s startup restore). A listener-based mirror needs a
+    // postFrameCallback to avoid "setState() called during build" on first
+    // subscribe, and a "did the type actually change" guard to avoid
+    // clobbering an advanced/preset selection on every unrelated
+    // notification (e.g. dragging the intensity slider) — and even with
+    // that guard, re-tapping an already-current color chip after visiting
+    // advanced wouldn't resync, since the type itself hadn't changed. Direct
+    // updates at the call site need neither workaround.
     final filterService = context.read<FilterService>();
     if (!identical(filterService, _filterService)) {
-      _filterService?.removeListener(_onFilterServiceChanged);
+      _filterService?.removeListener(_persistFilterState);
       _filterService = filterService;
-      _filterService!.addListener(_onFilterServiceChanged);
-      // Reflect the already-seeded startup filter (main.dart restores it
-      // before HomeScreen is built, so no notification fires for it) into
-      // the preview. Can't call _onFilterServiceChanged() synchronously here:
-      // didChangeDependencies runs during the first build
-      // (StatefulElement._firstBuild), and _persistFilterState /
-      // _syncVisionFilterState notify other ChangeNotifiers
-      // (SettingsService / VisionFilterState) — triggering
-      // "setState() or markNeedsBuild() called during build". Defer to right
-      // after the first frame instead.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _onFilterServiceChanged();
-      });
+      _filterService!.addListener(_persistFilterState);
     }
-  }
-
-  void _onFilterServiceChanged() {
-    _persistFilterState();
-    _syncVisionFilterState();
   }
 
   // Only filterType is persisted through SettingsService. Intensity is owned
@@ -79,39 +66,9 @@ class _HomeScreenState extends State<HomeScreen> {
     settings.setFilterType(filterService.currentFilter);
   }
 
-  /// Mirrors the color-vision quick selection (`FilterSelector`/tray, both
-  /// funnel through the single shared [FilterService]) into
-  /// [VisionFilterState] (#60) — the preview's single source of truth. Only
-  /// touches [VisionFilterState] when [FilterService.currentFilter] itself
-  /// changed (see [_syncedColorType]), so it never overrides an advanced
-  /// catalog or experience-preset selection made independently of the
-  /// color-vision section.
-  void _syncVisionFilterState() {
-    final filterService = _filterService;
-    if (filterService == null) return;
-    final type = filterService.currentFilter;
-    if (type == _syncedColorType) return;
-    _syncedColorType = type;
-
-    final visionState = context.read<VisionFilterState>();
-    if (type == ColorVisionType.none) {
-      // Only clear if the current selection is itself a color-vision quick
-      // pick — an unrelated advanced/preset selection must stay untouched.
-      if (visionState.isColorQuickSelection) visionState.clear();
-      return;
-    }
-    // type != ColorVisionType.none here (excluded above), so
-    // visionFilterForColorVisionType always returns non-null.
-    final catalogId =
-        visionFilterCatalogId(visionFilterForColorVisionType(type)!);
-    if (catalogId != null) {
-      visionState.selectColorVisionType(catalogId);
-    }
-  }
-
   @override
   void dispose() {
-    _filterService?.removeListener(_onFilterServiceChanged);
+    _filterService?.removeListener(_persistFilterState);
     super.dispose();
   }
 
@@ -249,9 +206,13 @@ class _HomeScreenState extends State<HomeScreen> {
   ///
   /// 描画対象は常に [VisionFilterState] の現在の選択（色覚クイック選択・
   /// advanced カタログ・体験プリセットのいずれで選んでも、最終的にここへ
-  /// 書き込まれる — [_syncVisionFilterState] / `ExperiencePresets` /
-  /// `FilterCatalogSelector` 参照）。strength は `previewStrength`
-  /// （`lib/services/preview_selection.dart`）で 1 か所に集約した判定に従う。
+  /// 書き込まれる — 色覚クイック選択は `lib/services/color_vision_selection.dart`
+  /// の `selectColorVision`/`deactivateColorVision` 経由、それ以外は
+  /// `ExperiencePresets` / `FilterCatalogSelector` 参照）。strength は
+  /// `previewStrength`（`lib/services/preview_selection.dart`）で 1 か所に
+  /// 集約した判定に従う。[VisionFilterState.colorVisionType] も渡し、色覚
+  /// クイック選択のときは見出し・export の caption・ファイル名に -omaly の
+  /// 名前を正しく出す（#60 M3）。
   Widget _buildPreviewSection() {
     return Consumer2<VisionFilterState, FilterService>(
       builder: (context, visionState, filterService, _) {
@@ -280,6 +241,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   filter: visionState.build(),
                   filterId: visionState.selectedId,
                   strength: previewStrength(visionState, filterService),
+                  colorVisionType: visionState.colorVisionType,
                 ),
               ],
             ),

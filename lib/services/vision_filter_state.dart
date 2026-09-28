@@ -2,25 +2,28 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
+import '../models/disability_type.dart';
 import '../models/vision_filter_catalog.dart';
 import '../src/rust/api/sensus_bridge.dart';
 
 /// フィルタ選択状態を保持する ChangeNotifier。**プレビュー（before/after）の
 /// 描画対象の唯一の正本**（#60）。
 ///
-/// 色覚 7 種のクイック選択（`FilterSelector`/トレイ、内部的には
-/// `FilterService` が担う）・advanced カタログ全 30 種・体験プリセットの
-/// いずれで選んでも、最終的にここへ書き込まれる（[selectColorVisionType] /
-/// [select] / [selectPreset]）。プレビュー（`before_after_view.dart`）は
-/// `FilterService` を直接見ず、常にこの state の [build] / [strength] /
-/// [selectedId] だけを描画対象にする。`FilterService` は色覚タイプごとの
-/// 強度の記憶（#57）としては引き続き使う（どちらの強度を使うかの判定は
-/// `lib/services/preview_selection.dart` に集約）。
+/// 色覚 7 種のクイック選択（`FilterSelector`/トレイ、どちらも
+/// `lib/services/color_vision_selection.dart` の `selectColorVision` を経由
+/// して [selectColorVisionType] を呼ぶ）・advanced カタログ全 30 種・体験
+/// プリセットのいずれで選んでも、最終的にここへ書き込まれる
+/// （[selectColorVisionType] / [select] / [selectPreset]）。プレビュー
+/// （`before_after_view.dart`）は `FilterService` を直接見ず、常にこの state
+/// の [build] / [strength] / [selectedId] だけを描画対象にする。
+/// `FilterService` は色覚タイプごとの強度の記憶（#57）としては引き続き使う
+/// （どちらの強度を使うかの判定は `lib/services/preview_selection.dart` に
+/// 集約）。
 ///
 /// 保持するのは「どのフィルタ id を・どの payload パラメータ値で・どの strength で
-/// 選んでいるか」（+ 選択の起源: [selectedPresetId] / [isColorQuickSelection]）
-/// だけ。アルゴリズムは持たず、選択 + パラメータから sensus の [VisionFilter]
-/// インスタンスを組み立てる [build] を提供する。
+/// 選んでいるか」（+ 選択の起源: [selectedPresetId] / [isColorQuickSelection] /
+/// [colorVisionType]）だけ。アルゴリズムは持たず、選択 + パラメータから
+/// sensus の [VisionFilter] インスタンスを組み立てる [build] を提供する。
 class VisionFilterState extends ChangeNotifier {
   String? _selectedId;
   double _strength = 1.0;
@@ -48,6 +51,19 @@ class VisionFilterState extends ChangeNotifier {
   /// 1 か所集約する（呼び出し側で個別に分岐させない）。
   bool _isColorQuickSelection = false;
 
+  /// 色覚クイック選択で選ばれた実際の [ColorVisionType]（#60 M3）。
+  ///
+  /// カタログ（[selectedId]）は色覚を 5 種（protanopia/deuteranopia/
+  /// tritanopia/achromatopsia/tetrachromacy）しか持たず、-omaly（anomaly）
+  /// 型は対応する base の -opia と同じカタログ id に写る（`FilterService` の
+  /// 対応表と同じ規約）。そのため `selectedId` だけでは「protanopia を選んだ
+  /// のか protanomaly を選んだのか」を区別できず、見出し・export の caption・
+  /// ファイル名で常に -opia の名前が出てしまう（#60 M3 の指摘）。この値は
+  /// その区別を保持するためだけにあり、[build] のフィルタ構築には使わない
+  /// （構築は [selectedId] 経由の [_selectInternal] が単一の正本のまま）。
+  /// 色覚クイック選択でなければ null。
+  ColorVisionType? _colorVisionType;
+
   /// 選択中のフィルタ id（snake_case）。未選択なら null。
   String? get selectedId => _selectedId;
 
@@ -56,6 +72,10 @@ class VisionFilterState extends ChangeNotifier {
 
   /// 現在の選択が色覚クイック選択（`FilterSelector`/トレイ）由来か（#60）。
   bool get isColorQuickSelection => _isColorQuickSelection;
+
+  /// 色覚クイック選択で選ばれた実際の [ColorVisionType]。色覚クイック選択で
+  /// なければ null（#60 M3）。
+  ColorVisionType? get colorVisionType => _colorVisionType;
 
   /// 選択中のカタログエントリ。未選択なら null。
   VisionFilterEntry? get selectedEntry =>
@@ -78,24 +98,60 @@ class VisionFilterState extends ChangeNotifier {
   void select(String id) {
     _selectedPresetId = null;
     _isColorQuickSelection = false;
+    _colorVisionType = null;
     _selectInternal(id);
   }
 
-  /// 色覚のクイック選択（`FilterSelector`/トレイ）からフィルタを選択する
-  /// （#60）。[id] は色覚型に対応するカタログ id（`visionFilterCatalogId` /
-  /// `visionFilterForColorVisionType` 経由で得る）。プリセットの選択は解除する。
-  void selectColorVisionType(String id) {
+  /// 色覚のクイック選択（`FilterSelector`/トレイ、
+  /// `lib/services/color_vision_selection.dart` の `selectColorVision`/
+  /// `deactivateColorVision` 経由）からフィルタを選択・解除する（#60 M1）。
+  ///
+  /// [type] は選択された色覚型そのもの。[ColorVisionType.none] は「何も
+  /// シミュレーションしない」ことを表し、解除（[deactivateColorVision]）と
+  /// 同じ効果になる — この場合 [isColorQuickSelection] は **false** のまま
+  /// になる（[FilterSelector] の「Normal vision」チップ・`IntensitySlider`・
+  /// 解除ボタンのいずれも、[isColorQuickSelection] だけを見て点灯/有効化を
+  /// 決めるため、none を「選択中」扱いにすると強度スライダーだけが宙に浮いて
+  /// 有効化されてしまう。none はカタログにも強度概念にも対応しない）。
+  ///
+  /// [type] が非 none のときは [isColorQuickSelection] を true にし、
+  /// [colorVisionType] として保持する（-omaly の名前を見出し・export の
+  /// caption・ファイル名に正しく出すため、#60 M3）。[catalogId] は [type] に
+  /// 対応するカタログ id（`visionFilterCatalogId` / `visionFilterForColorVisionType`
+  /// 経由で呼び出し側が解決する）— [type] が [ColorVisionType.none] のときは
+  /// 無視されるので省略できる。
+  ///
+  /// advanced/プリセットの選択中に呼ばれても（＝「別のフィルタを手動で選ぶ」
+  /// 操作として）常に上書きする。プリセットの選択は解除する。
+  void selectColorVisionType(ColorVisionType type, [String? catalogId]) {
     _selectedPresetId = null;
+    if (type == ColorVisionType.none) {
+      _isColorQuickSelection = false;
+      _colorVisionType = null;
+      _selectedId = null;
+      _params.clear();
+      notifyListeners();
+      return;
+    }
+    if (catalogId == null) {
+      throw ArgumentError(
+        'catalogId is required when type != ColorVisionType.none',
+      );
+    }
     _isColorQuickSelection = true;
-    _selectInternal(id);
+    _colorVisionType = type;
+    _selectInternal(catalogId);
   }
 
   /// 体験プリセット（`ExperiencePresets`）からフィルタを選択する（#60）。
   /// [presetId] は `Experience.id`、[catalogId] はその体験の視覚フィルタに
-  /// 対応するカタログ id。色覚クイック選択の記録は解除する。
+  /// 対応するカタログ id。色覚クイック選択の記録は解除する。強度は 1.0 に
+  /// 戻す（#60 S5。推奨値の導入は #77）。
   void selectPreset(String presetId, String catalogId) {
     _selectedPresetId = presetId;
     _isColorQuickSelection = false;
+    _colorVisionType = null;
+    _strength = 1.0;
     _selectInternal(catalogId);
   }
 
@@ -124,21 +180,38 @@ class VisionFilterState extends ChangeNotifier {
     _selectedId = null;
     _selectedPresetId = null;
     _isColorQuickSelection = false;
+    _colorVisionType = null;
     _params.clear();
     notifyListeners();
   }
 
-  /// strength を 0.0..1.0 に clamp して更新する。
+  /// strength を 0.0..1.0 に clamp して更新する。プリセット選択中に呼ばれたら
+  /// プリセットの選択表示は解除する（#60 S5: strength を弄った時点で「その
+  /// プリセットそのもの」ではなくなるため）。
   void setStrength(double value) {
     _strength = value.clamp(0.0, 1.0);
+    _clearPresetSelectionOnCustomize();
     notifyListeners();
   }
 
   /// パラメータ値を更新する（型は呼び出し側責務: float→double / int→int /
-  /// enum→String value / seed→[BigInt]）。
+  /// enum→String value / seed→[BigInt]）。プリセット選択中に呼ばれたら
+  /// プリセットの選択表示は解除する（#60 S5、[setStrength] と同じ理由）。
   void setParam(String name, Object value) {
     _params[name] = value;
+    _clearPresetSelectionOnCustomize();
     notifyListeners();
+  }
+
+  /// プリセット選択中に strength/param が手動で変更されたら、プリセットの
+  /// 選択表示（[selectedPresetId]）だけを解除する（#60 S5）。フィルタ自体の
+  /// 選択（[selectedId]）・payload はそのまま残す — ユーザーはプリセットの
+  /// フィルタを起点にカスタマイズしているだけで、選択を丸ごと解除したい
+  /// わけではない。
+  void _clearPresetSelectionOnCustomize() {
+    if (_selectedPresetId != null) {
+      _selectedPresetId = null;
+    }
   }
 
   /// seed パラメータを乱数で再生成する。

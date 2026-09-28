@@ -9,6 +9,7 @@ import 'dart:ui' show AppExitResponse;
 
 import 'l10n/app_localizations.dart';
 import 'l10n/l10n_extensions.dart';
+import 'services/color_vision_selection.dart';
 import 'services/filter_service.dart';
 import 'services/vision_filter_state.dart';
 import 'services/loupe_window_controller.dart';
@@ -27,6 +28,13 @@ final LoupeWindowController loupeWindow = LoupeWindowController();
 /// トレイのクイックフィルタとウィンドウ内のドロップダウンが同じ状態を見るよう、
 /// アプリ最上位で 1 つだけ生成する (#15)。
 final FilterService filterService = FilterService();
+
+/// トレイとウィンドウ UI で共有する VisionFilterState（プレビューの選択の
+/// 唯一の正本、#60）。[filterService] と同じ理由でアプリ最上位に 1 つだけ
+/// 生成する — 色覚のクイック選択はトレイ・ウィンドウ内どちらから行っても
+/// `lib/services/color_vision_selection.dart` の `selectColorVision` を経由して
+/// 同じインスタンスを更新する必要があるため（#60 M1）。
+final VisionFilterState visionFilterState = VisionFilterState();
 
 /// トレイアイコンの Flutter アセットパス。`tray_manager` の `setIcon` が
 /// `data/flutter_assets/` 配下のこのパスを解決する。Windows でより精細に
@@ -62,6 +70,7 @@ TrayService _buildTrayService(SettingsService settings) {
   final l10n = lookupAppLocalizations(locale);
   return TrayService(
     filterService: filterService,
+    visionFilterState: visionFilterState,
     iconPath: _trayIconPath,
     labels: trayMenuLabelsFrom(l10n),
     tooltip: l10n.trayTooltip,
@@ -115,9 +124,10 @@ Locale _resolveStartupLocale(Locale? preferred) {
 }
 
 /// アプリのルート Widget を組み立てる (#55)。Rust ブリッジ初期化・設定復元・
-/// 共有 `filterService` のシードまでを担い、`main()` と（実プロセスで
-/// `main()` 相当の起動経路を踏みたい）`integration_test/app_bootstrap_test.dart`
-/// の両方から呼ばれる唯一の bootstrap 関数。
+/// 共有 `filterService`/`visionFilterState` のシードまでを担い、`main()` と
+/// （実プロセスで `main()` 相当の起動経路を踏みたい）
+/// `integration_test/app_bootstrap_test.dart` の両方から呼ばれる唯一の
+/// bootstrap 関数。
 ///
 /// 戻り値は `({Widget app, bool bridgeReady})` レコード。呼び出し側は
 /// `bridgeReady` を見て分岐する（Widget のランタイム型 `is NativeBridgeErrorApp`
@@ -133,8 +143,10 @@ Locale _resolveStartupLocale(Locale? preferred) {
 /// - 成功時は [settings]（未指定なら新規 `SettingsService()`）を読み込み、
 ///   トップレベル共有の `filterService`（#15、トレイとウィンドウ内 UI が同じ
 ///   インスタンスを見る）に永続化済みの per-type 強度（#57）を読み込んでから、
-///   復元済みのフィルタ種別を一度だけ適用して `bridgeReady: true` と
-///   [UniversalExperienceApp] を返す。intensity 自体は `filterService.load()` が
+///   復元済みのフィルタ種別を `selectColorVision`（#60 M1）で一度だけ適用して
+///   `bridgeReady: true` と [UniversalExperienceApp] を返す。`filterService`
+///   と `visionFilterState` の両方が同じ値になる。intensity 自体は
+///   `filterService.load()` が
 ///   `FilterService` 自身の永続化ストアから復元する（`settings.intensity` は
 ///   #57 で撤去済み。旧キーからの移行はしない）。
 ///
@@ -161,12 +173,13 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
   // for; load() just deletes it.
   await filterService.load();
 
-  // Seed the shared FilterService (#15) from the restored settings (#17) so the
-  // previously selected filter is reflected on startup, on the single
-  // instance shared by the tray and the in-window UI. No `intensity:` override
-  // here (#57): the type's own remembered/recommended strength (just loaded
-  // above) is used instead of resetting it.
-  filterService.applyFilter(s.filterType);
+  // Seed the shared FilterService and VisionFilterState (#15/#60) from the
+  // restored settings (#17) so the previously selected filter is reflected on
+  // startup — through selectColorVision (#60 M1), the single entry point that
+  // keeps both services in sync, same as FilterSelector/tray. No explicit
+  // intensity override here (#57): the type's own remembered/recommended
+  // strength (just loaded above) is used instead of resetting it.
+  selectColorVision(filterService, visionFilterState, s.filterType);
 
   return (app: UniversalExperienceApp(settings: s), bridgeReady: true);
 }
@@ -321,8 +334,14 @@ class UniversalExperienceApp extends StatelessWidget {
         // ドロップダウンが同じ状態を見るようトップレベルの 1 個を使い回す。
         // 復元した設定 (#17) によるシードは main() 内で適用済み。
         ChangeNotifierProvider<FilterService>.value(value: filterService),
-        // VisionFilterState (#16) drives the filter-selection / parameter UI.
-        ChangeNotifierProvider(create: (_) => VisionFilterState()),
+        // VisionFilterState (#16) drives the filter-selection / parameter UI,
+        // and is the preview's single source of truth (#60). Same top-level
+        // singleton reasoning as filterService above — provide the existing
+        // instance, not a fresh one, so it stays the same one the tray and
+        // selectColorVision (#60 M1) update.
+        ChangeNotifierProvider<VisionFilterState>.value(
+          value: visionFilterState,
+        ),
       ],
       // Rebuild MaterialApp when the persisted theme mode changes.
       child: Consumer<SettingsService>(

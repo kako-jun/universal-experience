@@ -4,7 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:tray_manager/tray_manager.dart';
 
 import '../models/disability_type.dart';
+import 'color_vision_selection.dart';
 import 'filter_service.dart';
+import 'vision_filter_state.dart';
 
 /// タスクトレイ常駐 (#15)。
 ///
@@ -266,6 +268,7 @@ CloseAction resolveCloseAction({required bool trayAvailable}) =>
 class TrayService with TrayListener {
   TrayService({
     required this.filterService,
+    required this.visionFilterState,
     required this.iconPath,
     required this.labels,
     required this.tooltip,
@@ -278,6 +281,12 @@ class TrayService with TrayListener {
 
   /// アクティブな色覚フィルタの選択状態 (#14)。
   final FilterService filterService;
+
+  /// プレビューの選択の唯一の正本（#60）。トレイの色覚クイック選択は
+  /// `lib/services/color_vision_selection.dart` の `selectColorVision` /
+  /// `deactivateColorVision` を経由してこれも更新する（#60 M1: FilterSelector
+  /// と同じ入口を通す）。
+  final VisionFilterState visionFilterState;
 
   /// トレイアイコンのアセットパス (PNG)。`assets/tray/` 参照。
   final String iconPath;
@@ -348,7 +357,11 @@ class TrayService with TrayListener {
     final spec = buildTrayMenuSpec(
       loupeVisible: _loupeVisible,
       labels: labels,
-      activeFilter: filterService.currentFilter,
+      // advanced/プリセットを選んでいる間は、色覚クイック選択のチェックマークを
+      // 出さない（#60 M1、FilterSelector のチップ点灯と同じ判定）。
+      activeFilter: visionFilterState.isColorQuickSelection
+          ? filterService.currentFilter
+          : ColorVisionType.none,
     );
     final menu = Menu(items: spec.map(_toMenuItem).toList());
     try {
@@ -385,12 +398,12 @@ class TrayService with TrayListener {
       case TrayMenuKind.applyColorVisionFilter:
         final type = entry.colorVisionType;
         if (type != null) {
-          filterService.applyFilter(type);
+          selectColorVision(filterService, visionFilterState, type);
           await refresh();
         }
         break;
       case TrayMenuKind.clearFilter:
-        filterService.deactivate();
+        deactivateColorVision(filterService, visionFilterState);
         await refresh();
         break;
       case TrayMenuKind.openSettings:
