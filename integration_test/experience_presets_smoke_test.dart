@@ -63,9 +63,11 @@ Widget _previewWithPresetsApp() {
       ChangeNotifierProvider(create: (_) => VisionFilterState()),
       ChangeNotifierProvider(create: (_) => FilterService()),
     ],
-    child: const MaterialApp(
-      locale: Locale('en'),
-      localizationsDelegates: [
+    // ConstrainedBox に const コンストラクタが無いため MaterialApp 以下は
+    // const にできない。
+    child: MaterialApp(
+      locale: const Locale('en'),
+      localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -74,11 +76,21 @@ Widget _previewWithPresetsApp() {
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: SingleChildScrollView(
-          child: Column(
-            children: [
-              _PreviewFromState(),
-              ExperiencePresets(),
-            ],
+          // home_screen.dart の ConstrainedBox(maxWidth: 800) を再現する
+          // （#60 レビュー）。これが無いと、幅無制限のウィンドウ上で
+          // BeforeAfterView の左右ペインが横幅いっぱい（1000px超）の正方形に
+          // なり、プリセットカードがウィンドウの縦サイズを大きく超えて
+          // 押し出されてしまう。
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: const Column(
+                children: [
+                  _PreviewFromState(),
+                  ExperiencePresets(),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -205,6 +217,36 @@ void main() {
       }
     }
 
+    /// [finder] が実際にヒットテストできる位置（ウィンドウの矩形内）に入るまで
+    /// [scrollableFinder] を実ジェスチャでドラッグし続ける（#60 レビュー）。
+    ///
+    /// `tester.scrollUntilVisible`（内部の `dragUntilVisible`）は
+    /// 「finder が要素ツリー上に見つかるまで」ドラッグする実装で、
+    /// `_previewWithPresetsApp` のようにカードが遅延構築（ListView.builder 等）
+    /// されず常時ビルド済みの場合は最初から見つかってしまい一切ドラッグしない。
+    /// `tester.ensureVisible`（`Scrollable.ensureVisible`、`duration: Duration.
+    /// zero` のプログラム的ジャンプ）も同じ問題を踏んだ（CI で実測、原因未特定）。
+    /// このヘルパは実際の描画済み矩形（`tester.getRect`）とウィンドウサイズを
+    /// 比較しながら実ジェスチャの `drag` を繰り返すため、両方の問題を回避できる。
+    Future<void> scrollUntilHitTestable(
+      WidgetTester tester,
+      Finder finder,
+      Finder scrollableFinder, {
+      int maxAttempts = 30,
+    }) async {
+      for (var i = 0; i < maxAttempts; i++) {
+        final viewSize =
+            tester.view.physicalSize / tester.view.devicePixelRatio;
+        final rect = tester.getRect(finder);
+        if (rect.top >= 0 && rect.bottom <= viewSize.height) {
+          return; // 完全にウィンドウ内に収まっている。
+        }
+        final delta = rect.top < 0 ? 200.0 : -200.0;
+        await tester.drag(scrollableFinder, Offset(0, delta));
+        await tester.pump();
+      }
+    }
+
     testWidgets('プリセット 4 種すべてが、タップで実ブリッジ CPU apply() まで例外なく描画される',
         (tester) async {
       await tester.pumpWidget(_previewWithPresetsApp());
@@ -227,21 +269,13 @@ void main() {
         ('labyrinthitis', visionFilterName(en, 'vertigo')),
       ];
 
+      final scrollableFinder = find.byType(Scrollable).first;
+
       for (final (experienceId, afterLabel) in cases) {
         final cardFinder = find.byKey(experienceCardKey(experienceId));
         // プレビューペイン + 他のプリセットカードでスクロールが必要になる
         // ことがあるため、タップ前に確実にビューポート内へ持ってくる。
-        //
-        // scrollUntilVisible（dragUntilVisible）は「finder が見つかるまで」
-        // スクロールする実装で、`_previewWithPresetsApp` は
-        // ListView.builder のような遅延構築ではなく Column（全カード常時
-        // ビルド済み）を使っているため、カードは最初から finder に
-        // ヒットしてしまい一切スクロールしない（#60 レビュー再発）。
-        // Scrollable.ensureVisible（tester.ensureVisible）は「見つかった
-        // 要素の実際の位置」からスクロール量を計算するため、遅延構築か
-        // どうかに関係なく正しく動く。
-        await tester.ensureVisible(cardFinder);
-        await tester.pumpAndSettle();
+        await scrollUntilHitTestable(tester, cardFinder, scrollableFinder);
         await tester.tap(cardFinder);
         await tester.pump();
         await pumpUntilFound(tester, find.text(afterLabel));
