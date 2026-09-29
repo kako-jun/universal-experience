@@ -53,7 +53,7 @@ void main() {
     });
   });
 
-  group('明示的な選択操作は bypassed を解除する (#63 S1)', () {
+  group('明示的な選択操作は bypassed を解除する (#63)', () {
     test('select() は bypassed を false にする', () {
       final state = VisionFilterState()..setBypassed(true);
       state.select('cataract');

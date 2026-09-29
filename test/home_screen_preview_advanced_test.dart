@@ -351,7 +351,7 @@ void main() {
   });
 
   testWidgets(
-      'VisionFilterState.bypassed が true の間、プレビューに「原画表示中」バッジが出る (#63 S1)',
+      'VisionFilterState.bypassed が true の間、プレビューに「原画表示中」バッジが出る (#63)',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 4000);
     tester.view.devicePixelRatio = 1.0;

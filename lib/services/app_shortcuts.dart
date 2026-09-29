@@ -20,8 +20,8 @@ class AdjustStrengthIntent extends Intent {
 }
 
 /// Esc（#63）: クリックスルーが ON のとき、OS/プラグインに依存しないアプリ内の
-/// 復帰経路としてこれを解除する。S4 の isEnabled ガード対象外
-/// （復帰用ショートカットは常に効く必要があるため）。
+/// 復帰経路としてこれを解除する。[isFocusOnInteractiveControl] によるガード
+/// の対象外（復帰用ショートカットは常に効く必要があるため）。
 class ReleaseClickThroughIntent extends Intent {
   const ReleaseClickThroughIntent();
 }
@@ -44,7 +44,9 @@ bool isFocusOnInteractiveControl() {
         widget is Checkbox ||
         widget is Radio ||
         widget is Slider ||
-        widget is SegmentedButton) {
+        widget is SegmentedButton ||
+        widget is RawChip ||
+        widget is InkResponse) {
       found = true;
       return false;
     }

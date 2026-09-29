@@ -20,8 +20,8 @@ import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
-/// S4 のテスト専用ダミー Intent（本番の 3 Intent の代わりに、ガードのロジック
-/// だけを最小構成で検証するために使う）。
+/// isFocusOnInteractiveControl のテスト専用ダミー Intent（本番の 3 Intent の
+/// 代わりに、ガードのロジックだけを最小構成で検証するために使う）。
 class _ProbeIntent extends Intent {
   const _ProbeIntent();
 }
@@ -139,7 +139,7 @@ void main() {
     await filterService.flush();
   });
 
-  testWidgets('Esc でクリックスルーが解除される (#63 M1b)',
+  testWidgets('Esc でクリックスルーが解除される (#63)',
       (WidgetTester tester) async {
     await pumpApp(tester);
     // loupe モードでないと setClickThrough(true) 自体が拒否されるため、先に
@@ -157,7 +157,7 @@ void main() {
     expect(loupeWindow.clickThrough, isFalse);
   });
 
-  group('isFocusOnInteractiveControl / InteractiveFocusAwareCallbackAction (#63 S4)',
+  group('isFocusOnInteractiveControl / InteractiveFocusAwareCallbackAction (#63)',
       () {
     Widget buildProbe(Widget child, {required void Function() onInvoke}) {
       return MaterialApp(
@@ -227,6 +227,32 @@ void main() {
 
       expect(invoked, 0,
           reason: 'Switch にフォーカスがある間はショートカットが無効化される');
+    });
+
+    testWidgets('FilterChip にフォーカスがある間はショートカットが無効化される',
+        (WidgetTester tester) async {
+      var invoked = 0;
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+
+      await tester.pumpWidget(buildProbe(
+        FilterChip(
+          label: const Text('test'),
+          selected: false,
+          onSelected: (_) {},
+          focusNode: focusNode,
+          autofocus: true,
+        ),
+        onInvoke: () => invoked++,
+      ));
+      await tester.pump();
+      expect(focusNode.hasFocus, isTrue);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+
+      expect(invoked, 0,
+          reason: 'FilterChip にフォーカスがある間はショートカットが無効化される');
     });
 
     testWidgets('インタラクティブでないウィジェットにフォーカスがある間は通常どおり発火する',
