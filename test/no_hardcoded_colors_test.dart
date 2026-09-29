@@ -1,4 +1,5 @@
-// lib/ の UI コードにハードコード色（`Colors.*` / `Color(0x..)` / `.shade`）を
+// lib/ の UI コードにハードコード色（`Colors.*` / `Color(0x..)` /
+// `Color.fromARGB` / `Color.fromRGBO` / `.shade`）を
 // 増やさないためのガード（#62 / #72、DESIGN.md「カラートークン」）。
 //
 // 色は `Theme.of(context).colorScheme` のロールだけを使う。例外は DESIGN.md の
@@ -19,9 +20,32 @@ const Set<String> _allowedFiles = <String>{
   'rendering/image_fit.dart', // 画像内容（レターボックス色）
 };
 
+/// ハードコード色の検出パターン。
+final RegExp _hardcodedColor = RegExp(
+  r'\bColors\.[a-zA-Z]|\bColor\(\s*0x|\bColor\.from(?:ARGB|RGBO)\b|\.shade\d',
+);
+
 void main() {
+  test('検出パターンは Color.fromARGB / fromRGBO も拾い、ロール参照は拾わない', () {
+    for (final bad in <String>[
+      'final c = Colors.red;',
+      'final c = Color(0xFF112233);',
+      'final c = Color.fromARGB(255, 1, 2, 3);',
+      'final c = const Color.fromRGBO(1, 2, 3, 0.5);',
+      'final c = scheme.primary.shade100;',
+    ]) {
+      expect(_hardcodedColor.hasMatch(bad), isTrue, reason: bad);
+    }
+    for (final ok in <String>[
+      'final c = scheme.primary;',
+      'final c = scheme.surface.withValues(alpha: 0.5);',
+      'final c = Color.lerp(a, b, 0.5);',
+    ]) {
+      expect(_hardcodedColor.hasMatch(ok), isFalse, reason: ok);
+    }
+  });
+
   test('lib/ にロール化できるハードコード色が無い（例外表のファイルを除く）', () {
-    final pattern = RegExp(r'\bColors\.[a-zA-Z]|\bColor\(\s*0x|\.shade\d');
     final offenders = <String>[];
     for (final entity in Directory('lib').listSync(recursive: true)) {
       if (entity is! File || !entity.path.endsWith('.dart')) continue;
@@ -32,7 +56,7 @@ void main() {
       for (var i = 0; i < lines.length; i++) {
         final line = lines[i].trimLeft();
         if (line.startsWith('//')) continue; // コメント内の言及は対象外
-        if (pattern.hasMatch(line)) offenders.add('$rel:${i + 1}: $line');
+        if (_hardcodedColor.hasMatch(line)) offenders.add('$rel:${i + 1}: $line');
       }
     }
     expect(offenders, isEmpty, reason: offenders.join('\n'));
