@@ -147,21 +147,45 @@
       "percent": { "type": "int" }
     }
   },
-  "urgencyLabel": "Urgency: {level}",
-  "@urgencyLabel": {
-    "description": "Urgency line shown for the selected advanced filter.",
-    "placeholders": {
-      "level": { "type": "String" }
-    }
+  "resetToRecommendedStrength": "Reset to recommended",
+  "@resetToRecommendedStrength": {
+    "description": "Button that resets the selected filter's strength and parameters back to sensus's recommended_strength and the catalog's default parameter values (#77)."
   },
-
   "consultEarly": "If this is how you see, consider getting your eyes checked.",
   "@consultEarly": {
-    "description": "Gentle prompt to seek an unhurried eye exam for medium-urgency conditions. Must not alarm or over-promise."
+    "description": "Gentle prompt to seek an unhurried eye exam for early-consultation-urgency conditions. Must not alarm or over-promise."
   },
   "consultEmergency": "Sudden changes in vision can need prompt medical attention.",
   "@consultEmergency": {
-    "description": "Prompt to seek timely care for high-urgency conditions. Must be accurate and not alarmist."
+    "description": "Prompt to seek timely care for emergency-urgency conditions. Must be accurate and not alarmist."
+  },
+  "consultDisclaimer": "This is general guidance, not a medical diagnosis.",
+  "@consultDisclaimer": {
+    "description": "Disclaimer shown alongside every consult note (advanced filter panel, experience presets, and PNG export), stating this app does not diagnose (#76)."
+  },
+  "escalationHeader": "See a doctor if:",
+  "@escalationHeader": {
+    "description": "Header introducing the list of conditions under which a normally-low-urgency filter's urgency actually escalates (Filter::urgency_escalation(), #76)."
+  },
+  "escalationConditionPhotophobiaSevere": "sudden, severe light sensitivity with eye pain or a headache",
+  "@escalationConditionPhotophobiaSevere": {
+    "description": "Escalation condition for photophobia (sensus condition string: 'sudden, severe photophobia with eye pain or a headache (e.g. iritis)')."
+  },
+  "escalationConditionBppvRecurrentSevere": "recurrent or severe episodes",
+  "@escalationConditionBppvRecurrentSevere": {
+    "description": "Escalation condition for BPPV rotation (sensus condition string: 'recurrent or severe episodes')."
+  },
+  "escalationConditionDryEyePersistent": "persistent pain or a change in vision",
+  "@escalationConditionDryEyePersistent": {
+    "description": "Escalation condition for dry eye (sensus condition string: 'persistent pain or a change in vision')."
+  },
+  "escalationConditionHearingSuddenOneEar": "a sudden drop in hearing, especially in one ear (possible sudden sensorineural hearing loss)",
+  "@escalationConditionHearingSuddenOneEar": {
+    "description": "Escalation condition shared by several hearing filters (sensus condition string, hearing-loss family, Emergency tier)."
+  },
+  "escalationConditionHearingNewWorseningOneEar": "a new or worsening change, particularly in one ear",
+  "@escalationConditionHearingNewWorseningOneEar": {
+    "description": "Escalation condition shared by several hearing filters (sensus condition string, hearing-loss family, EarlyConsultation tier)."
   },
 
   "exportButtonTooltip": "Export as PNG",
@@ -337,11 +361,6 @@
   "categoryVestibular": "Vestibular & dizziness",
   "categoryEyeStrain": "Eye strain",
   "categoryOther": "Other",
-
-  "urgencyNone": "None",
-  "urgencyLow": "Low",
-  "urgencyMedium": "Medium",
-  "urgencyHigh": "High",
 
   "paramAstigmatismAxisDeg": "Axis (deg)",
   "paramGlaucomaMode": "Scotoma mode",

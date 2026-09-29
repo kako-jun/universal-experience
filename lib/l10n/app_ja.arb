@@ -42,10 +42,17 @@
 
   "prevalenceLabel": "有病率：{value}",
   "strengthLabel": "強さ：{percent}%",
-  "urgencyLabel": "緊急度：{level}",
+  "resetToRecommendedStrength": "推奨値に戻す",
 
   "consultEarly": "もしこのような見え方をしているなら、一度眼科で診てもらうとよいかもしれません。",
   "consultEmergency": "見え方が急に変わったときは、早めに医療機関を受診してください。",
+  "consultDisclaimer": "これは一般的な案内であり、医学的な診断ではありません。",
+  "escalationHeader": "次の場合は受診を：",
+  "escalationConditionPhotophobiaSevere": "急に強い羞明が出て、目の痛みや頭痛を伴う場合",
+  "escalationConditionBppvRecurrentSevere": "発作を繰り返す場合や、症状が重い場合",
+  "escalationConditionDryEyePersistent": "痛みが続く場合や、見え方が変わった場合",
+  "escalationConditionHearingSuddenOneEar": "急に聴力が落ちた場合（特に片耳。突発性難聴の可能性）",
+  "escalationConditionHearingNewWorseningOneEar": "新しく症状が出た場合や悪化した場合（特に片耳）",
 
   "exportButtonTooltip": "PNG でエクスポート",
   "exportSuccess": "エクスポートしました：{path}",
@@ -130,11 +137,6 @@
   "categoryVestibular": "前庭・めまい",
   "categoryEyeStrain": "眼精疲労",
   "categoryOther": "その他",
-
-  "urgencyNone": "なし",
-  "urgencyLow": "低",
-  "urgencyMedium": "中",
-  "urgencyHigh": "高",
 
   "paramAstigmatismAxisDeg": "軸（度）",
   "paramGlaucomaMode": "暗点のタイプ",

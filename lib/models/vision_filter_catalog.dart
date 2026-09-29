@@ -1,8 +1,13 @@
 /// sensus の全 [VisionFilter]（30 種）を UI 向けに分類・記述したカタログ。
 ///
 /// **正本は sensus_bridge.dart の `VisionFilter` sealed class**。このカタログは
-/// その 30 variant を、カテゴリ・表示名・緊急度・payload パラメータ定義に
-/// メタデータとして写像する純粋なデータ層であり、アルゴリズムは持たない。
+/// その 30 variant を、カテゴリ・表示名・payload パラメータ定義にメタデータ
+/// として写像する純粋なデータ層であり、アルゴリズムは持たない。
+///
+/// 受診喚起の緊急度・推奨強度は本カタログが持たない（#76 / #77）。sensus-core
+/// 0.6.1 の `Filter::urgency()` / `urgency_escalation()` / `recommended_strength()`
+/// を `lib/services/vision_filter_metadata.dart` の provider 経由で唯一の正本
+/// として参照する。旧 `VisionFilterUrgency`（ue 独自・初版・要医療監修）は撤去した。
 ///
 /// 既存の色覚 7 種 UI（`ColorVisionType` ベースの `FilterService`）とは別系統。
 /// こちらは sensus が公開する **全** vision フィルタを破綻なく選べるようにする
@@ -73,35 +78,6 @@ enum VisionFilterCategory {
   final String displayName;
 
   /// i18n キー（実翻訳は #18 で定義）。
-  final String i18nKey;
-}
-
-/// 体験の緊急度／重大度の土台（実際の優先表示ロジックは #19 のプリセット側）。
-///
-/// 「この見え方をどれだけ早く周囲が把握すべきか」の目安。UI で選択時に小さく
-/// 表示する（#16 スコープ）。値そのものの調整・運用は将来 Issue。
-///
-/// NOTE: 各フィルタへの urgency 初期割り当て（[kVisionFilterCatalog] 内）は
-/// **初版・要医療監修**。現状は便宜的な目安であり、確定値ではない。
-enum VisionFilterUrgency {
-  /// 緊急度の概念が薄い（色覚など）。
-  none('None', 'urgency.none'),
-
-  /// 軽度（眼精疲労・ドライアイ等の日常的不快）。
-  low('Low', 'urgency.low'),
-
-  /// 中度（屈折・視野の一部欠損等）。
-  medium('Medium', 'urgency.medium'),
-
-  /// 高度（めまい・大きな視野欠損等、行動に強く影響）。
-  high('High', 'urgency.high');
-
-  const VisionFilterUrgency(this.displayName, this.i18nKey);
-
-  /// 英語フォールバック表示名。
-  final String displayName;
-
-  /// i18n キー（実翻訳は #18）。
   final String i18nKey;
 }
 
@@ -186,7 +162,6 @@ class VisionFilterEntry {
     required this.displayName,
     required this.i18nKey,
     required this.category,
-    required this.urgency,
     this.parameters = const [],
     this.isTimeDependent = false,
   });
@@ -202,9 +177,6 @@ class VisionFilterEntry {
 
   /// 所属カテゴリ。
   final VisionFilterCategory category;
-
-  /// 緊急度の土台。
-  final VisionFilterUrgency urgency;
 
   /// payload パラメータ定義（payload を持たないフィルタは空リスト）。
   final List<VisionParam> parameters;
@@ -268,35 +240,30 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     displayName: 'Protanopia',
     i18nKey: 'filter.protanopia',
     category: VisionFilterCategory.colorVision,
-    urgency: VisionFilterUrgency.none,
   ),
   VisionFilterEntry(
     id: 'deuteranopia',
     displayName: 'Deuteranopia',
     i18nKey: 'filter.deuteranopia',
     category: VisionFilterCategory.colorVision,
-    urgency: VisionFilterUrgency.none,
   ),
   VisionFilterEntry(
     id: 'tritanopia',
     displayName: 'Tritanopia',
     i18nKey: 'filter.tritanopia',
     category: VisionFilterCategory.colorVision,
-    urgency: VisionFilterUrgency.none,
   ),
   VisionFilterEntry(
     id: 'achromatopsia',
     displayName: 'Achromatopsia',
     i18nKey: 'filter.achromatopsia',
     category: VisionFilterCategory.colorVision,
-    urgency: VisionFilterUrgency.none,
   ),
   VisionFilterEntry(
     id: 'tetrachromacy',
     displayName: 'Tetrachromacy',
     i18nKey: 'filter.tetrachromacy',
     category: VisionFilterCategory.colorVision,
-    urgency: VisionFilterUrgency.none,
   ),
 
   // ── 屈折 ──────────────────────────────────────────────
@@ -305,28 +272,24 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     displayName: 'Myopia',
     i18nKey: 'filter.myopia',
     category: VisionFilterCategory.refraction,
-    urgency: VisionFilterUrgency.medium,
   ),
   VisionFilterEntry(
     id: 'hyperopia',
     displayName: 'Hyperopia',
     i18nKey: 'filter.hyperopia',
     category: VisionFilterCategory.refraction,
-    urgency: VisionFilterUrgency.medium,
   ),
   VisionFilterEntry(
     id: 'presbyopia',
     displayName: 'Presbyopia',
     i18nKey: 'filter.presbyopia',
     category: VisionFilterCategory.refraction,
-    urgency: VisionFilterUrgency.medium,
   ),
   VisionFilterEntry(
     id: 'astigmatism',
     displayName: 'Astigmatism',
     i18nKey: 'filter.astigmatism',
     category: VisionFilterCategory.refraction,
-    urgency: VisionFilterUrgency.medium,
     parameters: [
       VisionParam(
         name: 'axisDeg',
@@ -346,7 +309,6 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     displayName: 'Glaucoma',
     i18nKey: 'filter.glaucoma',
     category: VisionFilterCategory.visualField,
-    urgency: VisionFilterUrgency.high,
     parameters: [
       VisionParam(
         name: 'mode',
@@ -363,14 +325,12 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     displayName: 'Macular Degeneration',
     i18nKey: 'filter.macular_degeneration',
     category: VisionFilterCategory.visualField,
-    urgency: VisionFilterUrgency.high,
   ),
   VisionFilterEntry(
     id: 'hemianopia',
     displayName: 'Hemianopia',
     i18nKey: 'filter.hemianopia',
     category: VisionFilterCategory.visualField,
-    urgency: VisionFilterUrgency.high,
     parameters: [
       VisionParam(
         name: 'side',
@@ -401,7 +361,6 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     displayName: 'Tunnel Vision',
     i18nKey: 'filter.tunnel_vision',
     category: VisionFilterCategory.visualField,
-    urgency: VisionFilterUrgency.high,
   ),
 
   // ── 光・透明度 ────────────────────────────────────────
@@ -410,7 +369,6 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     displayName: 'Cataract',
     i18nKey: 'filter.cataract',
     category: VisionFilterCategory.lightAndTransparency,
-    urgency: VisionFilterUrgency.medium,
     parameters: [
       VisionParam(
         name: 'seed',
@@ -428,7 +386,6 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     displayName: 'Floaters',
     i18nKey: 'filter.floaters',
     category: VisionFilterCategory.lightAndTransparency,
-    urgency: VisionFilterUrgency.low,
     parameters: [
       VisionParam(
         name: 'seed',
@@ -482,21 +439,18 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     displayName: 'Photophobia',
     i18nKey: 'filter.photophobia',
     category: VisionFilterCategory.lightAndTransparency,
-    urgency: VisionFilterUrgency.low,
   ),
   VisionFilterEntry(
     id: 'night_blindness',
     displayName: 'Night Blindness',
     i18nKey: 'filter.night_blindness',
     category: VisionFilterCategory.lightAndTransparency,
-    urgency: VisionFilterUrgency.medium,
   ),
   VisionFilterEntry(
     id: 'starbursts',
     displayName: 'Starbursts',
     i18nKey: 'filter.starbursts',
     category: VisionFilterCategory.lightAndTransparency,
-    urgency: VisionFilterUrgency.low,
     parameters: [
       VisionParam(
         name: 'numRays',
@@ -543,7 +497,6 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     displayName: 'Vertigo',
     i18nKey: 'filter.vertigo',
     category: VisionFilterCategory.vestibular,
-    urgency: VisionFilterUrgency.high,
     isTimeDependent: true,
   ),
   VisionFilterEntry(
@@ -551,7 +504,6 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     displayName: 'BPPV Rotation',
     i18nKey: 'filter.bppv_rotation',
     category: VisionFilterCategory.vestibular,
-    urgency: VisionFilterUrgency.high,
     isTimeDependent: true,
   ),
   VisionFilterEntry(
@@ -559,14 +511,12 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     displayName: 'Vestibular Neuritis',
     i18nKey: 'filter.vestibular_neuritis',
     category: VisionFilterCategory.vestibular,
-    urgency: VisionFilterUrgency.high,
   ),
   VisionFilterEntry(
     id: 'nystagmus',
     displayName: 'Nystagmus',
     i18nKey: 'filter.nystagmus',
     category: VisionFilterCategory.vestibular,
-    urgency: VisionFilterUrgency.medium,
     parameters: [
       VisionParam(
         name: 'amplitude',
@@ -595,21 +545,18 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     displayName: 'Eye Strain',
     i18nKey: 'filter.eye_strain',
     category: VisionFilterCategory.eyeStrain,
-    urgency: VisionFilterUrgency.low,
   ),
   VisionFilterEntry(
     id: 'dry_eye',
     displayName: 'Dry Eye',
     i18nKey: 'filter.dry_eye',
     category: VisionFilterCategory.eyeStrain,
-    urgency: VisionFilterUrgency.low,
   ),
   VisionFilterEntry(
     id: 'contrast_sensitivity',
     displayName: 'Contrast Sensitivity Loss',
     i18nKey: 'filter.contrast_sensitivity',
     category: VisionFilterCategory.eyeStrain,
-    urgency: VisionFilterUrgency.medium,
   ),
 
   // ── その他 ────────────────────────────────────────────
@@ -618,7 +565,6 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     displayName: 'Diplopia',
     i18nKey: 'filter.diplopia',
     category: VisionFilterCategory.other,
-    urgency: VisionFilterUrgency.medium,
     parameters: [
       VisionParam(
         name: 'offsetX',
@@ -654,7 +600,6 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     displayName: 'Metamorphopsia',
     i18nKey: 'filter.metamorphopsia',
     category: VisionFilterCategory.other,
-    urgency: VisionFilterUrgency.medium,
     parameters: [
       VisionParam(
         name: 'freq',
@@ -681,7 +626,6 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     displayName: 'Detail Loss',
     i18nKey: 'filter.detail_loss',
     category: VisionFilterCategory.other,
-    urgency: VisionFilterUrgency.medium,
     parameters: [
       VisionParam(
         name: 'cellSize',
@@ -699,14 +643,12 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     displayName: 'Teichopsia',
     i18nKey: 'filter.teichopsia',
     category: VisionFilterCategory.other,
-    urgency: VisionFilterUrgency.medium,
   ),
   VisionFilterEntry(
     id: 'flickering_stars',
     displayName: 'Flickering Stars',
     i18nKey: 'filter.flickering_stars',
     category: VisionFilterCategory.other,
-    urgency: VisionFilterUrgency.low,
     parameters: [
       VisionParam(
         name: 'seed',

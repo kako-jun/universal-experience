@@ -7,7 +7,7 @@ import 'app_localizations.dart';
 /// 定義（enum / catalog id）→ 表示文言（i18n）の解決をここに集約する (#18)。
 ///
 /// 規律2（定義と表示文言を混ぜない）に従い、`ColorVisionType` /
-/// `VisionFilterCategory` / `VisionFilterUrgency` / catalog の `id` といった
+/// `VisionFilterCategory` / catalog の `id` といった
 /// **識別子** は文言を持たず、表示する側がこのマッピングで `AppLocalizations`
 /// から文字列を引く。UI（home_screen 等）とトレイ（起動時ロケールの
 /// AppLocalizations インスタンス）の両方がここを参照し、二重定義を避ける。
@@ -98,40 +98,6 @@ String visionCategoryName(
       return l10n.categoryEyeStrain;
     case VisionFilterCategory.other:
       return l10n.categoryOther;
-  }
-}
-
-/// Advanced カタログの [VisionFilterUrgency] 表示名を解決する。
-String visionUrgencyName(AppLocalizations l10n, VisionFilterUrgency urgency) {
-  switch (urgency) {
-    case VisionFilterUrgency.none:
-      return l10n.urgencyNone;
-    case VisionFilterUrgency.low:
-      return l10n.urgencyLow;
-    case VisionFilterUrgency.medium:
-      return l10n.urgencyMedium;
-    case VisionFilterUrgency.high:
-      return l10n.urgencyHigh;
-  }
-}
-
-/// 受診喚起メッセージ（urgency 由来）を解決する。null = 喚起なし。
-///
-/// urgency の土台は catalog（[VisionFilterUrgency]）が持ち、当事者への注記文言は
-/// ue 側が i18n で所有する。medium = 早めの受診を促す穏やかな注記、high = 急な
-/// 変化への速やかな受診を促す注記。none/low では出さない。
-String? consultMessageForUrgency(
-  AppLocalizations l10n,
-  VisionFilterUrgency urgency,
-) {
-  switch (urgency) {
-    case VisionFilterUrgency.none:
-    case VisionFilterUrgency.low:
-      return null;
-    case VisionFilterUrgency.medium:
-      return l10n.consultEarly;
-    case VisionFilterUrgency.high:
-      return l10n.consultEmergency;
   }
 }
 
@@ -306,15 +272,18 @@ String experienceDescription(AppLocalizations l10n, String id) {
   }
 }
 
-/// 体験プリセットの [Urgency]（sensus 由来）→ 受診喚起メッセージを解決する。
+/// [Urgency]（sensus 由来）→ 受診喚起メッセージを解決する。
 ///
-/// null = 喚起なし。`Urgency` の分類は bridge（sensus）が持ち、当事者への注記文言は
-/// ue 側が i18n で所有する（規律2）。`earlyConsultation` = 早期受診を促す穏やかな
-/// 注記、`emergency` = 速やかな受診を促す注記。`none` では出さない。
+/// null = 喚起なし。`Urgency` の分類は bridge（sensus）が唯一の正本として持ち、
+/// 当事者への注記文言は ue 側が i18n で所有する（規律2、#76）。
+/// `earlyConsultation` = 早期受診を促す穏やかな注記、`emergency` = 速やかな
+/// 受診を促す注記。`none` では出さない。
 ///
-/// NOTE: catalog 側 [VisionFilterUrgency] 用の [consultMessageForUrgency] とは別系統
-/// （#19 体験プリセットは bridge の `Urgency` 3 値を使う）。文言キー
-/// `consultEarly` / `consultEmergency` は両者で共有する。
+/// advanced カタログ（`FilterParamPanel`、フィルタの [VisionFilter] を
+/// `visionFilterUrgencyProvider` に渡して得る）・体験プリセット
+/// （`ExperiencePresets`、`Experience.urgency`）・export の焼き込み
+/// （`before_after_view.dart`）が、この 1 関数を共有する **唯一の正本**にする
+/// （#76: 「受診喚起は sensus の単一の正本に統一する」）。
 String? urgencyConsultMessage(AppLocalizations l10n, Urgency urgency) {
   switch (urgency) {
     case Urgency.none:
@@ -323,6 +292,35 @@ String? urgencyConsultMessage(AppLocalizations l10n, Urgency urgency) {
       return l10n.consultEarly;
     case Urgency.emergency:
       return l10n.consultEmergency;
+  }
+}
+
+/// sensus が返す [UrgencyEscalation.condition]（英語の条件文）→ 表示文言を解決する。
+///
+/// sensus-core 0.6.1 の `Filter::urgency_escalation()` / `HearingFilter::
+/// urgency_escalation()` は、条件文を **英語の固定文字列**で返す（i18n は消費側の
+/// 責務、kako-jun/sensus#182）。ここはその英文をキーにした ja/en 対応表で、
+/// 訳が無い条件文は英語のままフォールバック表示する（#76: 「訳が見つからない
+/// 場合は英語のまま表示する」）。
+///
+/// 対応表の英文は sensus-core 0.6.1 の `crates/core/src/lib.rs` の
+/// `urgency_escalation()` 実装から書き写した一次情報（変更があれば sensus の
+/// バージョンアップ時にここも追従する）。
+String escalationConditionText(AppLocalizations l10n, String condition) {
+  switch (condition) {
+    case 'sudden, severe photophobia with eye pain or a headache (e.g. iritis)':
+      return l10n.escalationConditionPhotophobiaSevere;
+    case 'recurrent or severe episodes':
+      return l10n.escalationConditionBppvRecurrentSevere;
+    case 'persistent pain or a change in vision':
+      return l10n.escalationConditionDryEyePersistent;
+    case 'a sudden drop in hearing, especially in one ear (possible sudden '
+        'sensorineural hearing loss)':
+      return l10n.escalationConditionHearingSuddenOneEar;
+    case 'a new or worsening change, particularly in one ear':
+      return l10n.escalationConditionHearingNewWorseningOneEar;
+    default:
+      return condition;
   }
 }
 

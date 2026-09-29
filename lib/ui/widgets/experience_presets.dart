@@ -180,6 +180,16 @@ class _ExperienceCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  // #76: FilterParamPanel の受診喚起ブロックと同じ文言（唯一の
+                  // 正本）を使う。
+                  l10n.consultDisclaimer,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontStyle: FontStyle.italic,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ],
             ],
           ),

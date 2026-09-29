@@ -11,6 +11,7 @@ import '../../models/disability_type.dart';
 import '../../models/vision_filter_catalog.dart';
 import '../../rendering/cpu_vision_renderer.dart';
 import '../../services/export_service.dart';
+import '../../services/vision_filter_metadata.dart';
 import '../../src/rust/api/sensus_bridge.dart';
 
 /// [_BeforeAfterViewState] が内部で使うサンプル画像生成ステップの型。
@@ -297,6 +298,13 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   ColorVisionType? _afterColorVisionType;
   double? _afterStrength;
 
+  /// The actual [VisionFilter] that produced the currently-held [_after]
+  /// (#76). Captured alongside [_afterFilterId] for the same S8 reason: the
+  /// export caption's urgency note must reflect the filter that produced the
+  /// exported pixels, not whatever `widget.filter` has moved on to while a
+  /// slower re-render is still in flight.
+  VisionFilter? _afterFilter;
+
   /// Monotonic request id. Bumped on every [_rebuild] call so a slow/late
   /// async result can tell it has been superseded by a newer request and
   /// discard (dispose) itself instead of overwriting `_before`/`_after` with
@@ -503,6 +511,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       _afterFilterId = widget.filterId; // #85 レビュー S8, #60
       _afterColorVisionType = widget.colorVisionType; // #60
       _afterStrength = widget.strength; // #85 レビュー S8
+      _afterFilter = widget.filter; // #76
       _currentSampleSize = sampleSize;
       _loading = false;
       _failed = false; // #58 レビュー SHOULD-1: 成功したら失敗表示を解除する。
@@ -580,20 +589,24 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     }
     final filterId = _afterFilterId;
     final colorVisionType = _afterColorVisionType;
+    final afterFilter = _afterFilter;
     setState(() => _exporting = true);
 
     final messenger = ScaffoldMessenger.of(context);
     try {
       final strengthPercent = (strength.clamp(0.0, 1.0) * 100).round();
       final date = isoDate(DateTime.now());
-      // 色覚特性は urgency=none のため受診喚起は出さない（緊急性のある症状ではない）。
-      // 色覚 7 型（このウィジェットが扱う範囲）は urgency=none なので受診喚起は焼かない。
-      // sensus advanced フィルタ（緑内障等）の live export に拡張する際は、ここで
-      // `consultMessageForUrgency(...)` を解決して `urgencyMessage` に渡せる（拡張ポイント）。
+      // #76: プレビューの注記（FilterParamPanel）と同じ正本（sensus ブリッジの
+      // urgency）・同じ文言（urgencyConsultMessage）を export の焼き込みにも使う。
+      // 色覚 7 型は urgency=none（プレビューでも喚起なし）なので自然に null になる。
+      final urgencyMessage = afterFilter == null
+          ? null
+          : urgencyConsultMessage(l10n, visionFilterUrgencyProvider(afterFilter));
       final caption = ExportCaption(
         symptomLabel: _displayName(l10n, colorVisionType, filterId),
         strengthLabel: l10n.strengthLabel(strengthPercent),
         isoDate: date,
+        urgencyMessage: urgencyMessage,
       );
 
       final composed = await exportImageComposer(base, caption);
