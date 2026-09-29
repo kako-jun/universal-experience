@@ -27,7 +27,7 @@ void selectColorVision(
 ) {
   filterService.applyFilter(type);
   if (type == ColorVisionType.none) {
-    // 「Normal vision」チップを選ぶ／解除するのも「別のフィルタを手動で選ぶ」
+    // 一覧の「正常色覚」行を選ぶ／解除するのも「別のフィルタを手動で選ぶ」
     // 操作の一種として扱う。advanced/プリセットを見ている最中でも上書きする
     // （protanopia 等を選ぶ場合と同じ規約）。
     visionState.selectColorVisionType(ColorVisionType.none);

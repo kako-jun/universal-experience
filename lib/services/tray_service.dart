@@ -448,7 +448,7 @@ class TrayService with TrayListener {
       alwaysOnTop: loupeWindow.alwaysOnTop,
       clickThrough: loupeWindow.clickThrough,
       // advanced/プリセットを選んでいる間は、色覚クイック選択のチェックマークを
-      // 出さない（#60。FilterBrowser のチップ点灯と同じ判定）。
+      // 出さない（#60。FilterBrowser 一覧の選択行の強調と同じ判定）。
       activeFilter: visionFilterState.isColorQuickSelection
           ? filterService.currentFilter
           : ColorVisionType.none,
