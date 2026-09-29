@@ -469,5 +469,22 @@
   "bypassedBadgeLabel": "Showing original",
   "@bypassedBadgeLabel": {
     "description": "Badge shown next to the preview section title while the hold-to-show-original bypass is active."
+  },
+
+  "hudCompareOriginalTooltip": "Press and hold to compare with the original",
+  "@hudCompareOriginalTooltip": {
+    "description": "Tooltip/semantics label for the loupe HUD's compare-original button (#79). Pressing and holding sets VisionFilterState.bypassed to true; releasing (or the pointer leaving the button, or a cancelled gesture) always sets it back to false."
+  },
+  "hudConsultNoticeTooltip": "Medical guidance available — tap for details",
+  "@hudConsultNoticeTooltip": {
+    "description": "Tooltip/semantics label for the loupe HUD's consult-notice icon (#79), shown only when resolveConsultNotice returns a non-null notice for the current selection. Tapping opens a dialog with the full ConsultNoticeBlock text."
+  },
+  "hudConsultDialogTitle": "Medical guidance",
+  "@hudConsultDialogTitle": {
+    "description": "Title of the dialog opened by the loupe HUD's consult-notice icon (#79)."
+  },
+  "hudOpenSettingsTooltip": "Open settings",
+  "@hudOpenSettingsTooltip": {
+    "description": "Tooltip/semantics label for the loupe HUD's settings button (#79). Switches LoupeWindowController.appMode back to AppMode.settings."
   }
 }

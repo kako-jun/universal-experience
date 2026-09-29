@@ -185,5 +185,10 @@
   "hotkeyToggleLoupeVisibility": "ルーペ窓の表示/非表示",
   "hotkeyRegistrationFailed": "登録に失敗しました",
   "hotkeyRegistrationCaveat": "登録に成功したと表示されていても、OS のセッションによっては実際には発火しないことがあります（一部の Linux Wayland セッションなど）。",
-  "bypassedBadgeLabel": "原画表示中"
+  "bypassedBadgeLabel": "原画表示中",
+
+  "hudCompareOriginalTooltip": "押している間だけ原画と比較",
+  "hudConsultNoticeTooltip": "受診の目安があります。タップで詳細を表示",
+  "hudConsultDialogTitle": "受診の目安",
+  "hudOpenSettingsTooltip": "設定を開く"
 }

@@ -48,7 +48,9 @@ lib/
     │                                 # experience_presets, filter_catalog_selector, filter_param_panel,
     │                                 # consult_notice_block（受診喚起の共有表示ウィジェット、#76）,
     │                                 # window_mode_panel（起動モード・最前面・クリックスルー・
-    │                                 # ホットキー一覧、#63）
+    │                                 # ホットキー一覧、#63）,
+    │                                 # loupe_hud（ルーペ窓モード限定の HUD。症状名・強度・
+    │                                 # 受診喚起・原画比較・設定を開く、#79）
     └── theme/app_theme.dart
 
 rust/                        # sensus-core を FRB で公開する Rust crate

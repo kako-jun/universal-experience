@@ -449,6 +449,68 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
   従う: 色覚クイック選択中は `FilterService.intensity`、advanced/プリセット
   選択中は `VisionFilterState.strength` を動かす。
 
+## ルーペ窓 HUD (#79)
+
+`lib/ui/widgets/loupe_hud.dart` の `LoupeHud`。`LoupeWindowController.appMode`
+が `AppMode.loupe`（ルーペ窓モード）のときだけ、窓の縁（上端）に小さな
+ツールバーを出す。`AppMode.settings`（設定窓モード）では何も描画しない。
+
+`main.dart` の `UniversalExperienceApp` は `home` を `Stack(children: [HomeScreen(),
+LoupeHud()])` として組み立て、`LoupeHud` を `HomeScreen` とは別の最上位レイヤに
+する。
+
+### 表示するもの
+
+- **症状名・強度**: `VisionFilterState` の現在の選択。表示名の解決は
+  `visionFilterDisplayName`（`lib/l10n/l10n_extensions.dart`）— #60 で
+  `before_after_view.dart` の `_displayName` として実装されていたものを、HUD と
+  共有できる形に抽出した（重複定義しない、色覚 -omaly の名前も正しく出る）。
+  強度は `previewStrength`（`lib/services/preview_selection.dart`）で、色覚
+  クイック選択・advanced/プリセットのどちらでも一貫した値を出す。
+- **受診喚起アイコン**: `resolveConsultNotice`（`lib/l10n/l10n_extensions.dart`、
+  #76）が非 null を返すときだけ表示する。押すと `ConsultNoticeBlock`
+  （`lib/ui/widgets/consult_notice_block.dart`）で全文（免責文込み）をダイアログ
+  表示する。advanced カタログ（`FilterParamPanel`）・体験プリセット
+  （`ExperiencePresets`）・PNG export と同じ解決経路・同じ表示ウィジェットを
+  共有する。
+- **原画比較ボタン**: 押している間だけ `VisionFilterState.bypassed` を true に
+  し、離すと false に戻す（#63 のホットキー「押している間だけ原画」と同じ
+  `bypassed` を共有）。ポインタが領域外に出た場合・ジェスチャがキャンセル
+  された場合も必ず false に戻す — `MouseRegion.onExit` はボタンを押したままの
+  ドラッグでは信頼できない既知の Flutter の制約があるため、`Listener.
+  onPointerMove` で生の座標をボタンの矩形と直接比較する方式を主経路にし、
+  `MouseRegion.onExit`（通常のホバー解除）・`Listener.onPointerCancel`
+  （ジェスチャキャンセル）を保険として併用する。Tab でフォーカスした状態での
+  Enter/Space 押下でも同じ挙動にする（キーボード操作）。
+- **設定を開くボタン**: `LoupeWindowController.setAppMode(AppMode.settings)` で
+  設定窓モードへ戻す。
+
+### 表示/非表示ロジック
+
+全画面（`LoupeWindowMode.fullscreen`）では自動的に隠れ、`MouseRegion` で窓の
+上端にポインタが近づいたときだけ表示する。非表示中も `MouseRegion` 自体は
+常にレイアウトされたまま（`AnimatedOpacity` は要素を消さず不透明度だけ 0 に
+する）なので、縁への接近を検知できる。内側の実ボタンは `IgnorePointer` で
+非表示中だけ操作不能にする。
+
+全画面判定は `LoupeWindowController.mode == LoupeWindowMode.fullscreen` を見る
+（`LoupeWindowController` は `onWindowEnterFullScreen`/`onWindowLeaveFullScreen`
+で既に `_mode` をリアルタイムに追従させているため、`window_manager` の
+`isFullScreen()` を別途ポーリングする必要は無い）。この判定自体は
+`loupe_hud.dart` の `isLoupeFullScreenProvider`（既定は上記の一行）という
+provider seam 越しに行う — `vision_filter_metadata.dart` の
+`visionFilterUrgencyProvider` 等と同じパターンで、widget test から差し替え
+可能にするため。
+
+### 将来のライブキャプチャ（#1）に向けた前提
+
+`LoupeHud` はキャプチャ対象・フィルタ対象から**除外する必要がある**（HUD 自体を
+フィルタ加工したりキャプチャに写り込ませたりしてはいけない）。現状ライブ
+キャプチャは実装されていないため実際の除外処理は無いが、`LoupeHud` を常に
+独立した最上位レイヤ（`main.dart` の `Stack`）として置くことで、#1 実装時に
+「キャプチャ対象の矩形から HUD の矩形を差し引く」または「キャプチャそのものを
+HUD より下のレイヤだけに限定する」実装がしやすい構造にしてある。
+
 ## `LoupeRectSource` (#63、#44 向けの差し替え可能な seam)
 
 `lib/services/loupe_rect_source.dart` は、ルーペ矩形の決定元をインターフェース

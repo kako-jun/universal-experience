@@ -21,6 +21,7 @@ import 'services/native_bridge_service.dart';
 import 'services/settings_service.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/theme/app_theme.dart';
+import 'ui/widgets/loupe_hud.dart';
 
 /// ルーペ窓の挙動 (#14) を集約したコントローラ。
 /// 最小サイズ・状態遷移(normal/maximized/fullscreen)・枠ポリシー・
@@ -457,7 +458,16 @@ class UniversalExperienceApp extends StatelessWidget {
               GlobalCupertinoLocalizations.delegate,
             ],
             supportedLocales: AppLocalizations.supportedLocales,
-            home: const HomeScreen(),
+            // #79: LoupeHud は HomeScreen とは別の最上位レイヤとして Stack で
+            // 重ねる。将来のライブキャプチャ（#1）がキャプチャ・フィルタ対象
+            // から HUD を除外しやすいよう、意図的に独立させてある
+            // （`lib/ui/widgets/loupe_hud.dart` の module doc 参照）。
+            home: const Stack(
+              children: [
+                HomeScreen(),
+                LoupeHud(),
+              ],
+            ),
             debugShowCheckedModeBanner: false,
           );
         },
