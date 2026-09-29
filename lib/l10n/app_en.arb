@@ -24,6 +24,10 @@
   "@aboutPhases": {
     "description": "Roadmap paragraph of the About dialog. Newline-separated phase list."
   },
+  "aboutLiveCaptureNote": "Filters are currently applied only to the before/after preview. Applying them to the live screen will follow once the screen-capture path is implemented.",
+  "@aboutLiveCaptureNote": {
+    "description": "Caution paragraph of the About dialog: the filter is not applied to the live screen yet."
+  },
 
   "themeTooltipSystem": "Theme: System",
   "@themeTooltipSystem": {

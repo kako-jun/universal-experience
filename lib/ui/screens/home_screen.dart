@@ -402,6 +402,8 @@ class _HomeScreenState extends State<HomeScreen> {
         Text(l10n.aboutBody),
         const SizedBox(height: 16),
         Text(l10n.aboutPhases),
+        const SizedBox(height: 16),
+        Text(l10n.aboutLiveCaptureNote),
       ],
     );
   }

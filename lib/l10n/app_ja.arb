@@ -9,6 +9,7 @@
   "aboutTooltip": "このアプリについて",
   "aboutBody": "Universal Experience は、さまざまな障害への理解と共感を助けるアクセシビリティ・シミュレーションツールです。",
   "aboutPhases": "Phase 1：色覚特性のシミュレーション\nPhase 2：聴覚障害のシミュレーション（準備中）\nPhase 3：視野の欠け・ぼやけなど色覚以外の見え方（アドバンストから選択でき、プレビューにも反映されます）",
+  "aboutLiveCaptureNote": "フィルタはいまのところ、ビフォー/アフターのプレビューにだけ適用されます。ライブ画面への適用は、画面キャプチャ経路の実装後に対応予定です。",
 
   "themeTooltipSystem": "テーマ：システムに従う",
   "themeTooltipLight": "テーマ：ライト",
