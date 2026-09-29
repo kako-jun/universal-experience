@@ -90,9 +90,11 @@ class FilterBrowser extends StatelessWidget {
 
   final FilterBrowserController controller;
 
-  /// 行を選んだ直後に呼ばれる。行にフォーカスが残るとその上のキー操作
-  /// （`←→` など）が効かなくなるため、画面がショートカットの受け口へ
-  /// フォーカスを戻すのに使う。
+  /// 行を**ポインタで**選んだ直後に呼ばれる。行にフォーカスが残るとその上の
+  /// キー操作（`←→` など）が効かなくなるため、画面がショートカットの受け口へ
+  /// フォーカスを戻すのに使う。Enter/Space での選択では呼ばれない（フォーカスを
+  /// 行に残し、次の Tab が先頭からやり直しにならないようにする。行の上では
+  /// ↑↓ は標準のフォーカス移動になる）。
   final VoidCallback? onActivated;
 
   @override
@@ -256,10 +258,9 @@ class _FilterList extends StatelessWidget {
               key: filterListTileKey(entry),
               title: filterListEntryName(l10n, entry),
               selected: entry == selected,
-              onTap: () {
-                applyFilterListEntry(filterService, visionState, entry);
-                onActivated?.call();
-              },
+              onTap: () =>
+                  applyFilterListEntry(filterService, visionState, entry),
+              onPointerActivated: onActivated,
             ));
           }
           return Column(

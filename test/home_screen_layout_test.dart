@@ -22,6 +22,7 @@ import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/consult_notice_block.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
+import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 import 'package:universal_experience/ui/widgets/image_source_picker.dart';
 import 'package:universal_experience/ui/widgets/intensity_slider.dart';
 import 'package:universal_experience/ui/widgets/welcome_banner.dart';
@@ -316,6 +317,77 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.pump();
       expect(selectedFilterListEntry(h.visionState), visible[0]);
+      await h.filterService.flush();
+    });
+  });
+
+  group('キーボードで行を選んでもフォーカスは行に残る', () {
+    FilterListTile? focusedTile(WidgetTester tester) => tester
+        .binding.focusManager.primaryFocus?.context
+        ?.findAncestorWidgetOfExactType<FilterListTile>();
+
+    Future<void> tabUntilTile(WidgetTester tester, Key tileKey) async {
+      for (var i = 0; i < 80; i++) {
+        if (focusedTile(tester)?.key == tileKey) return;
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+      }
+      fail('Tab で $tileKey に届かない');
+    }
+
+    testWidgets('Enter で選んだあと、フォーカスは同じ行に残り次の Tab は次の行へ進む', (tester) async {
+      final h = await pumpHomeScreen(tester, size: wide);
+      final first = kFilterListEntries[0];
+      final second = kFilterListEntries[1];
+
+      await tester.tap(find.byType(TextField));
+      await tester.pump();
+      await tabUntilTile(tester, filterListTileKey(first));
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(selectedFilterListEntry(h.visionState), first);
+      expect(focusedTile(tester)?.key, filterListTileKey(first),
+          reason: 'Enter の活性化ではショートカット受け口へフォーカスを飛ばさない');
+      expect(tester.binding.focusManager.primaryFocus?.debugLabel,
+          isNot('homeShortcuts'));
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(focusedTile(tester)?.key, filterListTileKey(second),
+          reason: '次の Tab は先頭からやり直さず、隣の行へ進む');
+
+      // 行の上の ↑ は標準のフォーカス移動（選択は Enter まで変わらない）。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pump();
+      expect(focusedTile(tester)?.key, filterListTileKey(first));
+      expect(selectedFilterListEntry(h.visionState), first);
+      await h.filterService.flush();
+    });
+
+    testWidgets('Space でも同じ（フォーカスを行に残す）', (tester) async {
+      final h = await pumpHomeScreen(tester, size: wide);
+      final first = kFilterListEntries[0];
+      await tester.tap(find.byType(TextField));
+      await tester.pump();
+      await tabUntilTile(tester, filterListTileKey(first));
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      await tester.pump();
+      expect(selectedFilterListEntry(h.visionState), first);
+      expect(focusedTile(tester)?.key, filterListTileKey(first));
+      await h.filterService.flush();
+    });
+
+    testWidgets('ポインタで選ぶとショートカット受け口へフォーカスが戻り ←→ が効く', (tester) async {
+      final h = await pumpHomeScreen(tester, size: wide);
+      final tile = find.byKey(filterListTileKey(entry('cv:protanopia')));
+      await tester.ensureVisible(tile);
+      await tester.tap(tile);
+      await tester.pump();
+
+      expect(tester.binding.focusManager.primaryFocus?.debugLabel,
+          'homeShortcuts');
       await h.filterService.flush();
     });
   });

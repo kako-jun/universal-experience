@@ -101,8 +101,9 @@ class ExperiencePresetTile extends StatelessWidget {
 
   final Experience experience;
 
-  /// 選択した直後に呼ばれる（一覧がキーボード操作の受け口へフォーカスを
-  /// 戻すために使う。`FilterBrowser` 参照）。
+  /// ポインタで選択した直後に呼ばれる（一覧がキーボード操作の受け口へ
+  /// フォーカスを戻すために使う。キーボードでの活性化では呼ばれない。
+  /// `FilterBrowser` 参照）。
   final VoidCallback? onActivated;
 
   @override
@@ -122,12 +123,10 @@ class ExperiencePresetTile extends StatelessWidget {
       // 視覚フィルタを持つ体験のみ適用可能（4 体験はすべて vision を持つ）。
       onTap: catalogId == null
           ? null
-          : () {
-              context
-                  .read<VisionFilterState>()
-                  .selectPreset(experience.id, catalogId);
-              onActivated?.call();
-            },
+          : () => context
+              .read<VisionFilterState>()
+              .selectPreset(experience.id, catalogId),
+      onPointerActivated: onActivated,
     );
   }
 }

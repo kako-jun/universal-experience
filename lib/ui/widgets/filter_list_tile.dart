@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderAbstractViewport;
+import 'package:flutter/services.dart' show HardwareKeyboard, LogicalKeyboardKey;
 
 import '../../l10n/app_localizations.dart';
 
@@ -23,6 +24,7 @@ class FilterListTile extends StatefulWidget {
     required this.title,
     required this.selected,
     required this.onTap,
+    this.onPointerActivated,
     this.leading,
   });
 
@@ -34,6 +36,12 @@ class FilterListTile extends StatefulWidget {
 
   /// タップ・Enter・Space で呼ばれる。null なら選べない行になる。
   final VoidCallback? onTap;
+
+  /// [onTap] のあと、**ポインタ（マウス・タッチ）で**選ばれたときだけ呼ばれる。
+  /// Enter/Space（キーボード操作）の活性化では呼ばれない。画面が
+  /// ショートカットの受け口へフォーカスを戻すのに使う（キーボード操作では
+  /// フォーカスを行に残し、次の Tab が先頭からやり直しにならないようにする）。
+  final VoidCallback? onPointerActivated;
 
   /// 先頭のアイコン（体験プリセットの行だけが使う）。
   final Widget? leading;
@@ -76,6 +84,21 @@ class _FilterListTileState extends State<FilterListTile> {
     });
   }
 
+  /// Enter/Space による活性化のあいだは、そのキーが押されている（InkWell は
+  /// キー押下と同じ処理の中で onTap を呼ぶ）。それ以外はポインタ操作。
+  bool get _activatedByKeyboard {
+    final keyboard = HardwareKeyboard.instance;
+    return keyboard.isLogicalKeyPressed(LogicalKeyboardKey.enter) ||
+        keyboard.isLogicalKeyPressed(LogicalKeyboardKey.numpadEnter) ||
+        keyboard.isLogicalKeyPressed(LogicalKeyboardKey.space);
+  }
+
+  void _handleTap() {
+    final byKeyboard = _activatedByKeyboard;
+    widget.onTap?.call();
+    if (!byKeyboard) widget.onPointerActivated?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -96,7 +119,7 @@ class _FilterListTileState extends State<FilterListTile> {
       trailing: widget.selected
           ? Icon(Icons.check, semanticLabel: l10n.filterListSelectedSemantics)
           : null,
-      onTap: widget.onTap,
+      onTap: widget.onTap == null ? null : _handleTap,
     );
   }
 }
