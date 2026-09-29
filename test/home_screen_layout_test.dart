@@ -38,6 +38,10 @@ void main() {
 
   const wide = Size(1280, 800);
   const narrow = Size(800, 700);
+  // LoupeWindowPolicy.defaultSize（起動時の既定ウィンドウ）。
+  final defaultWindow = LoupeWindowPolicy.defaultSize;
+  // 広幅で低い画面（ノート PC の縮めたウィンドウなど）。
+  const wideLow = Size(1280, 480);
 
   FilterListEntry entry(String key) =>
       kFilterListEntries.firstWhere((e) => e.key == key);
@@ -45,7 +49,8 @@ void main() {
   group('プレビューは最初のビューポートに収まる', () {
     for (final (label, size) in [
       ('広幅 1280x800', wide),
-      ('狭幅 800x700', narrow)
+      ('狭幅 800x700', narrow),
+      ('既定ウィンドウ 800x600', defaultWindow),
     ]) {
       testWidgets(label, (tester) async {
         await pumpHomeScreen(tester, size: size);
@@ -64,6 +69,67 @@ void main() {
         }
       });
     }
+  });
+
+  testWidgets('既定ウィンドウは LoupeWindowPolicy.defaultSize（800x600）', (tester) async {
+    expect(defaultWindow, const Size(800, 600));
+  });
+
+  group('広幅で低い画面（1280x480）', () {
+    Future<HomeScreenHarness> pumpLow(WidgetTester tester) async {
+      const uiContext = WindowModeUiContext(
+        trayAvailable: true,
+        hotkeyStatus: HotkeyStatus(),
+      );
+      final h = await pumpHomeScreen(tester,
+          size: wideLow, uiContext: uiContext);
+      // クリックスルー復帰バナーを出した状態（縦の余白が最も少ない）。
+      await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
+      await tester.runAsync(() => h.loupe.setClickThrough(true));
+      await tester.pump();
+      return h;
+    }
+
+    testWidgets('復帰バナー表示中でも overflow せず、一覧は操作できる高さを持つ', (tester) async {
+      final h = await pumpLow(tester);
+      expect(find.text('クリックスルーが ON です。解除するには:'), findsOneWidget);
+      // RenderFlex overflow などのレイアウト例外が出ていない。
+      expect(tester.takeException(), isNull);
+
+      final list = tester.getRect(find.descendant(
+        of: find.byType(FilterBrowser),
+        matching: find.byType(SingleChildScrollView),
+      ));
+      expect(list.height, greaterThanOrEqualTo(96),
+          reason: '一覧が操作できる高さを持つ（検索欄・カテゴリが固定で食い潰さない）');
+      // 検索欄は見えていて、一覧の行をタップして選べる。
+      expect(tester.getRect(find.byType(TextField)).top, greaterThanOrEqualTo(0));
+      final tile = find.byKey(filterListTileKey(entry('cv:protanopia')));
+      await tester.ensureVisible(tile);
+      await tester.pump();
+      await tester.tap(tile);
+      await tester.pump();
+      expect(h.visionState.colorVisionType, ColorVisionType.protanopia);
+      expect(tester.takeException(), isNull);
+
+      await tester.runAsync(() => h.loupe.setClickThrough(false));
+      await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
+      await h.filterService.flush();
+    });
+
+    testWidgets('カテゴリのチップも一覧のスクロールに含まれ、届く・押せる', (tester) async {
+      final h = await pumpLow(tester);
+      final chip = find.widgetWithText(ChoiceChip, '視野');
+      // 見出しとカテゴリは一覧と一緒にスクロールするので、下の行を見たあとも戻れる。
+      final last = find.byKey(filterListTileKey(kFilterListEntries.last));
+      await tester.ensureVisible(last);
+      await tester.pump();
+      await tester.ensureVisible(chip.first);
+      await tester.pump();
+      expect(chip, findsWidgets);
+      await tester.runAsync(() => h.loupe.setClickThrough(false));
+      await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
+    });
   });
 
   testWidgets('広幅は 3 カラム（左=選ぶ・中=見る・右=調整）で横に並ぶ', (tester) async {
@@ -271,8 +337,9 @@ void main() {
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
     });
 
-    testWidgets('ON でも案内を出したままプレビューは最初のビューポートに収まる（狭幅）', (tester) async {
-      final h = await pumpHomeScreen(tester, size: narrow);
+    testWidgets('ON でも案内を出したままプレビューは最初のビューポートに収まる（狭幅・既定ウィンドウ 800x600）',
+        (tester) async {
+      final h = await pumpHomeScreen(tester, size: defaultWindow);
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
       await tester.runAsync(() => h.loupe.setClickThrough(true));
       await tester.pump();
@@ -280,7 +347,11 @@ void main() {
       expect(find.text('クリックスルーが ON です。解除するには:'), findsOneWidget);
       expect(
         tester.getRect(find.byType(BeforeAfterView)).bottom,
-        lessThanOrEqualTo(narrow.height),
+        lessThanOrEqualTo(defaultWindow.height),
+      );
+      expect(
+        tester.getRect(find.byType(ImageSourcePicker)).bottom,
+        lessThanOrEqualTo(defaultWindow.height),
       );
       await tester.runAsync(() => h.loupe.setClickThrough(false));
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));

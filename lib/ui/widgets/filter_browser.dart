@@ -80,6 +80,7 @@ Key filterListTileKey(FilterListEntry entry) =>
 /// - 検索は日本語名・英語名のどちらでも当たる。検索語があるあいだは
 ///   カテゴリを無視して全体から探す。
 /// - カテゴリは「すべて」+ 7 カテゴリの `ChoiceChip`（選択中は色とチェックで示す）。
+///   一覧のスクロール領域の先頭に置く（見出しと検索欄だけが固定）。
 /// - 呼び出し側は**高さの制約が有限**の場所に置く（一覧は内側でスクロールする）。
 class FilterBrowser extends StatelessWidget {
   const FilterBrowser({
@@ -108,8 +109,8 @@ class FilterBrowser extends StatelessWidget {
         const SizedBox(height: 12),
         _SearchField(controller: controller),
         const SizedBox(height: 8),
-        _CategoryChips(controller: controller),
-        const SizedBox(height: 8),
+        // カテゴリのチップは一覧のスクロール領域の先頭に入れる（固定にすると、
+        // 低い画面でチップの Wrap が高さを食い潰して一覧が潰れる）。
         Expanded(
           child: ListenableBuilder(
             listenable: controller,
@@ -230,6 +231,8 @@ class _FilterList extends StatelessWidget {
         );
 
     final children = <Widget>[
+      _CategoryChips(controller: controller),
+      const SizedBox(height: 8),
       if (presets.isNotEmpty) ...[
         heading(l10n.experienceSectionTitle),
         for (final exp in presets)
