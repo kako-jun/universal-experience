@@ -24,7 +24,7 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 ## 2. カラートークン
 
 **Material 3 の `Theme.of(context).colorScheme` のロールだけを使う。ハードコードした色は禁止。**
-`Colors.xxx` / `Color(0x..)` / `.shadeNNN` を `lib/` に書かない。この規則は
+`Colors.xxx` / `Color(0x..)` / `Color.fromARGB` / `Color.fromRGBO` / `.shadeNNN` を `lib/` に書かない。この規則は
 `test/no_hardcoded_colors_test.dart` が機械的に守っている（例外表のファイルだけ許可）。
 
 ### 2.1 テーマは 3 種
@@ -39,6 +39,11 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 ハイコントラストは `contrastLevel: 1.0` だけが違い、生成ロジックは共通（`AppTheme._build`）。
 テーマを追加・変更するときは `_build` を 1 か所直す。ロールを足すために別の生成経路を作らない。
 
+**ハイコントラストの自動切替には限りがある。** `MediaQuery.highContrast` を Flutter が報告するのは
+一部のプラットフォームだけ（macOS・Windows など）で、Linux など報告されない環境では OS の設定が
+有効でもハイコントラストのテーマには切り替わらない。この環境の利用者向けの手動切替は未実装で、
+ライト/ダーク（`themeMode`）だけが選べる。
+
 ### 2.2 ロールの使い分け
 
 | 用途 | ロール |
@@ -49,7 +54,8 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 | 補足・注記・ラベル | `onSurfaceVariant` |
 | 見出しアイコン・強調テキスト・スライダー・選択中 | `primary` |
 | 選択中チップ・バナー（入口の案内） | `secondaryContainer` / `onSecondaryContainer` |
-| 選んだフィルタの説明カード | `primaryContainer` / `onPrimaryContainer` |
+| 選んだフィルタの説明（右カラム） | カード背景の上に `onSurface`（名前・説明）/ `onSurfaceVariant`（カテゴリ・有病率などの注記）。専用のコンテナ色は使わない |
+| ルーペ HUD の比較中ボタン | `primaryContainer`（非比較時は同じロールの alpha=0） |
 | 受診喚起（早期相談） | `tertiaryContainer` / `onTertiaryContainer` |
 | 受診喚起（緊急） | `errorContainer` / `onErrorContainer` |
 | 無効状態 | `onSurface.withValues(alpha: 0.38)`（M3 の無効表現） |
@@ -111,7 +117,7 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 | 24 | カードの内側余白、セクション間 |
 | 32 | 画面の大きなまとまりの間 |
 
-現状は 6 と 20 が数か所ある（目標: 8 / 24 のどちらかへ寄せる）。
+現状は 4 の倍数以外の余白はない（`loupe_hud.dart` の縦余白を 6 から 4 に寄せて解消した。HUD の高さは中のボタン 48dp が決めるので影響は小さい）。
 
 ### 4.2 角丸
 
@@ -133,7 +139,9 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 | 補足・免責 | `bodySmall` の `Text`（`onSurfaceVariant`） | 小さくして目立たなくする |
 
 - 操作領域は **48×48 dp 以上**（Material の最小タップ領域）。デスクトップの `visualDensity` で
-  チップが 48 未満に縮む場合は、`materialTapTargetSize: padded` を保つ。
+  チップが 48 未満に縮む場合は、`materialTapTargetSize: padded` を保つ（`AppTheme._build` が
+  `padded` + `VisualDensity.standard` を設定済み。個別に `compact` を指定しない。
+  `test/tap_target_size_test.dart` が macOS のプラットフォーム指定で 48dp を確認している）。
 - ツールチップ（`tooltip:`）は、アイコンだけのボタンには必ず付ける（Semantics ラベルを兼ねる）。
 
 ## 6. 画面構成の原則
@@ -143,7 +151,7 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 `HomeScreen` は広幅（≥ 1000dp）で 3 カラム、狭幅（< 1000dp）で縦積み。
 
 - **左「選ぶ」**（`FilterBrowser`）: 見出し・検索欄（日本語名・英語名・かな/カナのインクリメンタル検索）・
-  カテゴリの `ChoiceChip`・**統合一覧**（体験プリセット 4 件 → 色覚 7 型 + advanced 30 フィルタの 33 行）。
+  カテゴリの `ChoiceChip`（一覧のスクロール領域の先頭。低い画面で一覧を潰さないため）・**統合一覧**（体験プリセット 4 件 → 色覚 7 型 + advanced 30 フィルタの 33 行）。
   行は `ListTile`（選択中は色 + チェック）。書き込みは既存の入口のまま（色覚の行は
   `selectColorVision`、それ以外は `VisionFilterState.select`、プリセットは `selectPreset`）で、
   `VisionFilterState` が唯一の正本。
@@ -154,18 +162,25 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
   「何も選択されていません」だけを出す。
 - **起動モード**（`WindowModePanel`）は AppBar のボタンから開くダイアログ。クリックスルー ON の間は、
   復帰方法（フォーカス復帰・Esc・トレイ・ホットキー）を主画面最上部の `ClickThroughRecoveryBanner` に常時出す（#63）。
+  ダイアログ内でスイッチを ON にするとダイアログは自動で閉じ（案内が見えるようにする）、開いたままの間も
+  ダイアログ内で `Esc` が解除として効く。
 - キー操作: `/` は検索欄へ、`↑↓` は今見えている一覧の行を順送り（体験プリセットは含まない）、
   `←→` は強度 5% 刻み、`Esc` はクリックスルー解除。フォーカスがテキスト入力・ボタン・スライダー・
-  一覧の行などにあるときは奪わず、行を選んだあとは画面がショートカットの受け口へフォーカスを戻す。
+  一覧の行などにあるときは奪わない。行を**ポインタで**選んだあとだけ画面がショートカットの受け口へフォーカスを戻し、Enter/Space で選んだときはフォーカスを行に残す。
   Tab 順は左 → 中央 → 右。
 - 文字は `textTheme` のロール、余白は 4 の倍数、角丸は 8 / 12 / 999。`Card` は 3 カラムの面と
   狭幅の各区画だけ。
 
 6.2 との差（残っているもの）:
 
+- 狭幅の一覧は、`NavigationBar` + ボトムシートに置き換えるまでの**意図的な暫定状態**として縦積みの最下段に
+  置いている。そのため狭幅では、一覧で選んだ直後に調整結果（右カラム相当の `AdjustPanel`）が画面の上側に
+  移り、一覧を見ている視野からは見えなくなる（スクロールで戻る必要がある）。
 - カテゴリ切替は `NavigationRail` ではなく `ChoiceChip` の `Wrap`（広幅の左カラム幅が 280〜340dp と
   狭く、Rail を置くと一覧の幅が足りなくなるため）。
-- 狭幅の選択は `NavigationBar` + ボトムシートではなく、縦積みの最下段に固定高（560dp）の一覧を置く。
+- 狭幅の選択は `NavigationBar` + ボトムシートではなく、縦積みの最下段に固定高（560dp）の一覧を置く（上の暫定状態の項を参照）。
+- 狭幅（800x600 の既定ウィンドウ）でクリックスルーの案内（約 115dp）が出ている間は、`ImageSourcePicker` の
+  選択欄が最初のビューポートに収まりきらず、画像（`BeforeAfterView`）と選択欄の先頭の行までが見える。
 - advanced の各フィルタには説明文の文字列が無いため、右カラムに出るのは名前とカテゴリだけ
   （色覚 7 型と体験プリセットは説明あり）。
 - ちょうど 1000dp の広幅では中央カラムが 420dp を下回り、Before / After は縦に積み替わる。
@@ -260,7 +275,9 @@ UE_SCREENSHOTS=1 UE_SCREENSHOT_DIR=/path/to/out \
 - `UE_SCREENSHOTS=1` でないときは全ケースが skip される（通常の `flutter test`・CI に影響しない）。
 - 出力: `wide-{light|dark}-{ja|en}.png`（広幅 1280×800）、`narrow-light-ja.png` / `narrow-dark-en.png`
   （狭幅 800×700。どちらもウィンドウ 1 枚ぶん）、狭幅だけ同名に `-full` を付けた縦長の全体像（縦積みの
-  スクロール量の確認用）、`wide-{light|dark}-ja-hc.png`（ハイコントラスト）。
+  スクロール量の確認用）、`wide-{light|dark}-ja-hc.png`（ハイコントラスト）、
+  `{wide|wide-low|default-window}-light-ja-clickthrough.png`（クリックスルー ON の案内。`wide-low` は 1280×480、
+  `default-window` は 800×600）と `wide-light-ja-dialog.png`（起動モードのダイアログ）。
 - フォールバック: macOS のシステムフォント（ヒラギノ角ゴシック / Apple Symbols）と Flutter SDK 同梱の
   Roboto・Material Icons を `FontLoader` で読む。**フォントファイルはリポに入れない。** 見つからない環境では
   警告を出して既定フォント（四角）のまま進む。
