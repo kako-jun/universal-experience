@@ -163,5 +163,23 @@
   "paramMetamorphopsiaFreq": "周波数",
   "paramMetamorphopsiaSeed": "ゆがみのシード",
   "paramDetailLossCellSize": "セルの大きさ（px）",
-  "paramFlickeringStarsSeed": "シード"
+  "paramFlickeringStarsSeed": "シード",
+
+  "windowModeSectionTitle": "起動モード",
+  "windowModeSettings": "設定窓",
+  "windowModeLoupe": "ルーペ窓",
+  "alwaysOnTopLabel": "最前面に固定",
+  "clickThroughLabel": "クリックスルー",
+  "clickThroughRecoveryFocusHint": "Alt+Tab などでこのウィンドウを選び、何かキーを押すと解除されます",
+  "clickThroughRecoveryEscapeHint": "アプリ内で Esc キーを押しても解除できます",
+  "clickThroughRecoveryTrayHint": "トレイのメニューからも解除できます",
+  "clickThroughRecoveryHotkeyHint": "ホットキー {hotkey} でも解除できます",
+  "hotkeySectionTitle": "グローバルホットキー",
+  "hotkeyToggleClickThrough": "クリックスルーの切替",
+  "hotkeyHoldOriginal": "押している間だけ原画を表示",
+  "hotkeyEmergencyExit": "非常口",
+  "hotkeyToggleLoupeVisibility": "ルーペ窓の表示/非表示",
+  "hotkeyRegistrationFailed": "登録に失敗しました",
+  "hotkeyRegistrationCaveat": "登録に成功したと表示されていても、OS のセッションによっては実際には発火しないことがあります（一部の Linux Wayland セッションなど）。",
+  "bypassedBadgeLabel": "原画表示中"
 }

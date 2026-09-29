@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/filter_service.dart';
+import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/tray_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 
@@ -19,6 +21,9 @@ const _labels = TrayMenuLabels(
     ColorVisionType.tritanopia: '3型2色覚（青）',
     ColorVisionType.achromatopsia: '1色覚（全色盲）',
   },
+  appModeLoupeLabel: 'ルーペ窓',
+  alwaysOnTopLabel: '最前面に固定',
+  clickThroughLabel: 'クリックスルー',
 );
 
 void main() {
@@ -72,7 +77,13 @@ void main() {
         spec.where((e) => e.kind != TrayMenuKind.separator).toList();
 
     test('トグル・全クイックフィルタ・解除・設定・終了が揃う', () {
-      final spec = buildTrayMenuSpec(loupeVisible: true, labels: _labels);
+      final spec = buildTrayMenuSpec(
+        loupeVisible: true,
+        labels: _labels,
+        appMode: AppMode.settings,
+        alwaysOnTop: false,
+        clickThrough: false,
+      );
       final kinds = spec.map((e) => e.kind).toSet();
 
       expect(kinds, contains(TrayMenuKind.toggleLoupe));
@@ -84,7 +95,13 @@ void main() {
     });
 
     test('クイックフィルタごとに apply 項目が 1 つずつ並ぶ', () {
-      final spec = buildTrayMenuSpec(loupeVisible: true, labels: _labels);
+      final spec = buildTrayMenuSpec(
+        loupeVisible: true,
+        labels: _labels,
+        appMode: AppMode.settings,
+        alwaysOnTop: false,
+        clickThrough: false,
+      );
       final apply = spec
           .where((e) => e.kind == TrayMenuKind.applyColorVisionFilter)
           .toList();
@@ -97,7 +114,13 @@ void main() {
     });
 
     test('操作可能な項目はすべて非空かつ一意のキーを持つ', () {
-      final spec = buildTrayMenuSpec(loupeVisible: true, labels: _labels);
+      final spec = buildTrayMenuSpec(
+        loupeVisible: true,
+        labels: _labels,
+        appMode: AppMode.settings,
+        alwaysOnTop: false,
+        clickThrough: false,
+      );
       final keys = interactive(spec).map((e) => e.key).toList();
 
       expect(keys.every((k) => k != null && k.isNotEmpty), isTrue);
@@ -105,9 +128,21 @@ void main() {
     });
 
     test('トグルのラベルとチェックがルーペ表示状態を反映する', () {
-      final visible = buildTrayMenuSpec(loupeVisible: true, labels: _labels)
+      final visible = buildTrayMenuSpec(
+        loupeVisible: true,
+        labels: _labels,
+        appMode: AppMode.settings,
+        alwaysOnTop: false,
+        clickThrough: false,
+      )
           .firstWhere((e) => e.kind == TrayMenuKind.toggleLoupe);
-      final hidden = buildTrayMenuSpec(loupeVisible: false, labels: _labels)
+      final hidden = buildTrayMenuSpec(
+        loupeVisible: false,
+        labels: _labels,
+        appMode: AppMode.settings,
+        alwaysOnTop: false,
+        clickThrough: false,
+      )
           .firstWhere((e) => e.kind == TrayMenuKind.toggleLoupe);
 
       expect(visible.label, 'ルーペ窓を隠す');
@@ -120,6 +155,9 @@ void main() {
       final spec = buildTrayMenuSpec(
         loupeVisible: true,
         labels: _labels,
+        appMode: AppMode.settings,
+        alwaysOnTop: false,
+        clickThrough: false,
         activeFilter: ColorVisionType.deuteranopia,
       );
 
@@ -133,11 +171,20 @@ void main() {
     });
 
     test('フィルタ解除はフィルタ無しのときだけチェックされる', () {
-      final active = buildTrayMenuSpec(loupeVisible: true, labels: _labels)
+      final active = buildTrayMenuSpec(
+        loupeVisible: true,
+        labels: _labels,
+        appMode: AppMode.settings,
+        alwaysOnTop: false,
+        clickThrough: false,
+      )
           .firstWhere((e) => e.kind == TrayMenuKind.clearFilter);
       final inactive = buildTrayMenuSpec(
         loupeVisible: true,
         labels: _labels,
+        appMode: AppMode.settings,
+        alwaysOnTop: false,
+        clickThrough: false,
         activeFilter: ColorVisionType.protanopia,
       ).firstWhere((e) => e.kind == TrayMenuKind.clearFilter);
 
@@ -146,7 +193,13 @@ void main() {
     });
 
     test('末尾は終了項目', () {
-      final spec = buildTrayMenuSpec(loupeVisible: true, labels: _labels);
+      final spec = buildTrayMenuSpec(
+        loupeVisible: true,
+        labels: _labels,
+        appMode: AppMode.settings,
+        alwaysOnTop: false,
+        clickThrough: false,
+      );
       expect(spec.last.kind, TrayMenuKind.quit);
     });
 
@@ -154,6 +207,9 @@ void main() {
       final spec = buildTrayMenuSpec(
         loupeVisible: true,
         labels: _labels,
+        appMode: AppMode.settings,
+        alwaysOnTop: false,
+        clickThrough: false,
         activeFilter: ColorVisionType.protanopia,
       );
       String labelOf(TrayMenuKind kind) =>
@@ -168,6 +224,100 @@ void main() {
             e.colorVisionType == ColorVisionType.protanopia,
       );
       expect(proto.label, '1型2色覚（赤）');
+    });
+  });
+
+  group('buildTrayMenuSpec の起動モード/最前面/クリックスルー (#63)', () {
+    test('appMode/alwaysOnTop/clickThrough のチェック状態を反映する', () {
+      final loupeChecked = buildTrayMenuSpec(
+        loupeVisible: true,
+        labels: _labels,
+        appMode: AppMode.loupe,
+        alwaysOnTop: true,
+        clickThrough: true,
+      );
+      expect(
+        loupeChecked
+            .firstWhere((e) => e.kind == TrayMenuKind.toggleAppMode)
+            .checked,
+        isTrue,
+      );
+      expect(
+        loupeChecked
+            .firstWhere((e) => e.kind == TrayMenuKind.toggleAlwaysOnTop)
+            .checked,
+        isTrue,
+      );
+      expect(
+        loupeChecked
+            .firstWhere((e) => e.kind == TrayMenuKind.toggleClickThrough)
+            .checked,
+        isTrue,
+      );
+
+      final settingsUnchecked = buildTrayMenuSpec(
+        loupeVisible: true,
+        labels: _labels,
+        appMode: AppMode.settings,
+        alwaysOnTop: false,
+        clickThrough: false,
+      );
+      expect(
+        settingsUnchecked
+            .firstWhere((e) => e.kind == TrayMenuKind.toggleAppMode)
+            .checked,
+        isFalse,
+      );
+      expect(
+        settingsUnchecked
+            .firstWhere((e) => e.kind == TrayMenuKind.toggleAlwaysOnTop)
+            .checked,
+        isFalse,
+      );
+      expect(
+        settingsUnchecked
+            .firstWhere((e) => e.kind == TrayMenuKind.toggleClickThrough)
+            .checked,
+        isFalse,
+      );
+    });
+
+    test('ラベルが labels 経由で反映される', () {
+      final spec = buildTrayMenuSpec(
+        loupeVisible: true,
+        labels: _labels,
+        appMode: AppMode.settings,
+        alwaysOnTop: false,
+        clickThrough: false,
+      );
+      String labelOf(TrayMenuKind kind) =>
+          spec.firstWhere((e) => e.kind == kind).label!;
+
+      expect(labelOf(TrayMenuKind.toggleAppMode), 'ルーペ窓');
+      expect(labelOf(TrayMenuKind.toggleAlwaysOnTop), '最前面に固定');
+      expect(labelOf(TrayMenuKind.toggleClickThrough), 'クリックスルー');
+    });
+
+    test('3項目とも安定キーを持つ', () {
+      final spec = buildTrayMenuSpec(
+        loupeVisible: true,
+        labels: _labels,
+        appMode: AppMode.settings,
+        alwaysOnTop: false,
+        clickThrough: false,
+      );
+      expect(
+        spec.firstWhere((e) => e.kind == TrayMenuKind.toggleAppMode).key,
+        kToggleAppModeKey,
+      );
+      expect(
+        spec.firstWhere((e) => e.kind == TrayMenuKind.toggleAlwaysOnTop).key,
+        kToggleAlwaysOnTopKey,
+      );
+      expect(
+        spec.firstWhere((e) => e.kind == TrayMenuKind.toggleClickThrough).key,
+        kToggleClickThroughKey,
+      );
     });
   });
 
@@ -219,6 +369,7 @@ void main() {
       trayService = TrayService(
         filterService: filterService,
         visionFilterState: visionFilterState,
+        loupeWindow: LoupeWindowController(),
         iconPath: 'assets/tray/tray_icon.png',
         labels: _labels,
         tooltip: 'Universal Experience',
@@ -275,6 +426,111 @@ void main() {
       );
 
       await trayService.dispose();
+    });
+  });
+
+  group('TrayService.toggleLoupeVisible (#63)', () {
+    test('表示中なら onHideLoupe を呼び、非表示中なら onShowLoupe を呼ぶ', () async {
+      var showCalls = 0;
+      var hideCalls = 0;
+      final trayService = TrayService(
+        filterService: FilterService(),
+        visionFilterState: VisionFilterState(),
+        loupeWindow: LoupeWindowController(),
+        iconPath: 'assets/tray/tray_icon.png',
+        labels: _labels,
+        tooltip: 'Universal Experience',
+        onShowLoupe: () async {
+          showCalls++;
+        },
+        onHideLoupe: () async {
+          hideCalls++;
+        },
+        onOpenSettings: () async {},
+        onQuit: () async {},
+      );
+
+      // 既定は表示中 (loupeVisible: true) なので、最初の呼び出しは隠す。
+      await trayService.toggleLoupeVisible();
+      expect(hideCalls, 1);
+      expect(showCalls, 0);
+
+      // 次の呼び出しは表示に戻す（_toggleLoupe と同じロジックを経由する、#63）。
+      await trayService.toggleLoupeVisible();
+      expect(hideCalls, 1);
+      expect(showCalls, 1);
+    });
+  });
+
+  group('TrayService の loupeWindow listener / トレイ経由の操作 (#63)', () {
+    // TrayService.init() のネイティブ初期化はこの環境では必ず失敗する
+    // （#60 のグループと同じ理由）。TrayService は _initialised = false の
+    // まま続行するので、実際の trayManager クリックは再現できない。
+    // ここでは (1) init() が loupeWindow にも listener を付けて変化を
+    // 検知すること、(2) TrayService が保持する loupeWindow 自身の
+    // setAppMode/setAlwaysOnTop/setClickThrough を呼べば状態が反転する
+    // こと（トレイのクリックハンドラが最終的に呼ぶのと同じメソッド）を
+    // 確認する。
+    test('init() のあと loupeWindow の変化で listener が発火する', () async {
+      SharedPreferences.setMockInitialValues({});
+      final loupeWindow = LoupeWindowController();
+      final trayService = TrayService(
+        filterService: FilterService(),
+        visionFilterState: VisionFilterState(),
+        loupeWindow: loupeWindow,
+        iconPath: 'assets/tray/tray_icon.png',
+        labels: _labels,
+        tooltip: 'Universal Experience',
+        onShowLoupe: () async {},
+        onHideLoupe: () async {},
+        onOpenSettings: () async {},
+        onQuit: () async {},
+      );
+
+      await trayService.init();
+      expect(trayService.selectionChangedCallCount, 0);
+
+      await loupeWindow.setAlwaysOnTop(true);
+      expect(trayService.selectionChangedCallCount, 1);
+
+      await trayService.dispose();
+    });
+
+    test(
+        'loupeWindow.setAppMode/setAlwaysOnTop/setClickThrough で '
+        'トレイが参照する状態が反転する（クリックハンドラが最終的に呼ぶメソッド）',
+        () async {
+      SharedPreferences.setMockInitialValues({});
+      final loupeWindow = LoupeWindowController();
+      await loupeWindow.load();
+      TrayService(
+        filterService: FilterService(),
+        visionFilterState: VisionFilterState(),
+        loupeWindow: loupeWindow,
+        iconPath: 'assets/tray/tray_icon.png',
+        labels: _labels,
+        tooltip: 'Universal Experience',
+        onShowLoupe: () async {},
+        onHideLoupe: () async {},
+        onOpenSettings: () async {},
+        onQuit: () async {},
+      );
+
+      expect(loupeWindow.appMode, AppMode.settings);
+      await loupeWindow.setAppMode(
+        loupeWindow.appMode == AppMode.loupe
+            ? AppMode.settings
+            : AppMode.loupe,
+      );
+      expect(loupeWindow.appMode, AppMode.loupe);
+
+      expect(loupeWindow.alwaysOnTop, isFalse);
+      await loupeWindow.setAlwaysOnTop(!loupeWindow.alwaysOnTop);
+      expect(loupeWindow.alwaysOnTop, isTrue);
+
+      expect(loupeWindow.clickThrough, isFalse);
+      await loupeWindow.setClickThrough(!loupeWindow.clickThrough);
+      expect(loupeWindow.clickThrough, isTrue);
     });
   });
 }

@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -12,6 +13,8 @@ import 'l10n/l10n_extensions.dart';
 import 'services/color_vision_selection.dart';
 import 'services/filter_service.dart';
 import 'services/vision_filter_state.dart';
+import 'services/hotkey_actions.dart';
+import 'services/hotkey_service.dart';
 import 'services/loupe_window_controller.dart';
 import 'services/tray_service.dart';
 import 'services/native_bridge_service.dart';
@@ -61,6 +64,25 @@ late final AppLifecycleListener appLifecycleListener;
 /// 構築は settings 読込後の [main] 内で行う（top-level だと locale が未確定）。
 late final TrayService trayService;
 
+/// グローバルホットキー (#63)。トレイと同じくデスクトップのみ init() する。
+late final HotkeyService hotkeyService;
+
+/// トレイ・ホットキーの可用性をまとめて provide する値オブジェクト (#63)。
+///
+/// `Provider<bool>.value` は型が汎用的すぎて他の bool provider と衝突しうる
+/// ため使わず、この専用クラスにまとめて 1 つの Provider で供給する
+/// （`WindowModePanel` が読む）。
+@immutable
+class WindowModeUiContext {
+  const WindowModeUiContext({
+    required this.trayAvailable,
+    required this.hotkeyStatus,
+  });
+
+  final bool trayAvailable;
+  final HotkeyStatus hotkeyStatus;
+}
+
 /// トレイメニュー文言を起動時ロケールで解決して [TrayService] を構築する (#18)。
 ///
 /// トレイは BuildContext を持てないため、解決済みロケール（永続化設定 → 無ければ
@@ -71,6 +93,7 @@ TrayService _buildTrayService(SettingsService settings) {
   return TrayService(
     filterService: filterService,
     visionFilterState: visionFilterState,
+    loupeWindow: loupeWindow,
     iconPath: _trayIconPath,
     labels: trayMenuLabelsFrom(l10n),
     tooltip: l10n.trayTooltip,
@@ -92,6 +115,7 @@ TrayService _buildTrayService(SettingsService settings) {
       await filterService.flush();
       // トレイアイコンを破棄し、prevent-close を解除してから実際に終了する。
       await trayService.dispose();
+      await hotkeyService.dispose();
       if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
         await windowManager.setPreventClose(false);
         await windowManager.destroy();
@@ -218,26 +242,22 @@ void main() async {
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();
 
+    // 永続化済みのアプリモード・最前面固定・クリックスルー (#63) を復元する。
+    // WindowOptions の backgroundColor 構築より前に読む必要がある。
+    await loupeWindow.load();
+
     // ルーペ窓の起動オプション。サイズ・最小サイズ・透過の既定は
     // LoupeWindowPolicy に集約 (testable な純粋ロジック)。
-    // - backgroundColor: 透過。枠の外は透け、枠の中だけフィルタ描画する
-    //   (既定方針: 透明背景 ON / 最前面 ON / クリックスルーは切替式で初期 OFF)。
+    // - backgroundColor: 起動モード (#63) に応じて決める。設定モード（既定）は
+    //   不透明、ルーペモードは透過（枠の外は透け、枠の中だけフィルタ描画する）。
     // マルチモニタ: 第1弾はメインモニタのみ対象 (docs/ARCHITECTURE.md 参照)。
-    // backgroundColor は透過が既定 (LoupeWindowPolicy.defaultTransparent)。
     // window_manager の backgroundColor は非 null の Color のため、
     // 透過 ON のとき transparent、OFF のとき不透明黒を渡す。
-    //
-    // TODO(#14/#16): 起動既定を「設定モード (通常ウィンドウ・透明/最前面 OFF)」に
-    // するモード切替を将来導入する。今は起動から透明・最前面を常時適用しているため、
-    // フィルタ選択 UI (#16) 操作時に最前面・透明で操作しづらい。設定モードと
-    // ルーペモードの切替は #14 スコープ外なので、本 PR では起動既定 (透明・最前面 ON)
-    // を現状維持する。詳細は loupe_window_controller.dart の TODO と
-    // docs/ARCHITECTURE.md「フォロー事項: アプリモード切替」を参照。
-    const windowOptions = WindowOptions(
+    final windowOptions = WindowOptions(
       size: LoupeWindowPolicy.defaultSize,
       minimumSize: LoupeWindowPolicy.minimumSize,
       center: true,
-      backgroundColor: LoupeWindowPolicy.defaultTransparent
+      backgroundColor: LoupeWindowPolicy.transparentForMode(loupeWindow.appMode)
           ? Colors.transparent
           : Colors.black,
       skipTaskbar: false,
@@ -245,7 +265,7 @@ void main() async {
     );
 
     await windowManager.waitUntilReadyToShow(windowOptions, () async {
-      // 最小サイズ・最前面・枠ポリシーを適用 (#14)。
+      // 最小サイズ・最前面・枠ポリシーを適用 (#14/#63)。
       await loupeWindow.initialize();
       await windowManager.show();
       await windowManager.focus();
@@ -253,6 +273,56 @@ void main() async {
 
     // タスクトレイ常駐 + クローズ・ポリシー (#15)。
     await _setUpTray();
+
+    // グローバルホットキー (#63)。トレイ初期化の後に登録する
+    // （非常口アクションがトレイ経由の showAndFocusLoupe を使うため）。
+    hotkeyService = HotkeyService();
+    final hotkeyActions = HotkeyActions(
+      // #60 の唯一の入口（selectColorVision/deactivateColorVision）を経由する。
+      // filterService.deactivate() + visionFilterState.clear() と同じフィールド
+      // をクリアする実装だが、規律に合わせて置き換える。
+      deactivateFilters: () =>
+          deactivateColorVision(filterService, visionFilterState),
+      setClickThrough: loupeWindow.setClickThrough,
+      setAlwaysOnTop: loupeWindow.setAlwaysOnTop,
+      getClickThrough: () => loupeWindow.clickThrough,
+      setBypassed: visionFilterState.setBypassed,
+      getBypassed: () => visionFilterState.bypassed,
+      showAndFocusLoupe: trayService.onShowLoupe,
+      toggleLoupeVisible: trayService.toggleLoupeVisible,
+      setLoupeVisible: trayService.setLoupeVisible,
+    );
+    await hotkeyService.init({
+      AppHotkeyAction.toggleClickThrough: HotkeyHandlers(
+        onKeyDown: () => unawaited(hotkeyActions.toggleClickThrough()),
+      ),
+      AppHotkeyAction.holdOriginal: HotkeyHandlers(
+        onKeyDown: hotkeyActions.holdOriginalKeyDown,
+        onKeyUp: hotkeyActions.holdOriginalKeyUp,
+      ),
+      AppHotkeyAction.emergencyExit: HotkeyHandlers(
+        onKeyDown: () => unawaited(hotkeyActions.emergencyExit()),
+      ),
+      AppHotkeyAction.toggleLoupeVisibility: HotkeyHandlers(
+        onKeyDown: () => unawaited(hotkeyActions.toggleLoupeVisible()),
+      ),
+    });
+
+    // 永続化されたクリックスルー ON を、トレイ・ホットキーの初期化が終わった
+    // 今の時点で適用する (#63)。診断ログのタイミングを揃えるため、この順序
+    // 自体は変えていない。
+    await loupeWindow.restorePersistedClickThrough();
+
+    runApp(UniversalExperienceApp(
+      settings: settings,
+      trayAvailable: trayService.isAvailable,
+      hotkeyStatus: HotkeyStatus(
+        registered: hotkeyService.registeredActions,
+        failed: hotkeyService.failedActions,
+        bindings: hotkeyService.activeBindings,
+      ),
+    ));
+    return;
   }
 
   runApp(result.app);
@@ -317,10 +387,24 @@ class _AppWindowListener extends WindowListener {
 }
 
 class UniversalExperienceApp extends StatelessWidget {
-  const UniversalExperienceApp({super.key, required this.settings});
+  const UniversalExperienceApp({
+    super.key,
+    required this.settings,
+    this.trayAvailable = false,
+    this.hotkeyStatus = const HotkeyStatus(),
+  });
 
   /// Pre-loaded settings service (theme mode / last filter type / locale).
   final SettingsService settings;
+
+  /// トレイが使える環境か (#63)。`WindowModePanel` がクリックスルーの復帰手段
+  /// ヒントの表示判定に使う。デスクトップ初期化を経由しない widget test
+  /// （`UniversalExperienceApp(settings: settings)`）がそのまま動くよう、
+  /// 既定値は「トレイ無し」という最も安全側にしてある。
+  final bool trayAvailable;
+
+  /// グローバルホットキーの登録結果 (#63)。同じ理由で既定値は「ホットキー無し」。
+  final HotkeyStatus hotkeyStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -341,6 +425,17 @@ class UniversalExperienceApp extends StatelessWidget {
         // selectColorVision (#60) update.
         ChangeNotifierProvider<VisionFilterState>.value(
           value: visionFilterState,
+        ),
+        // ルーペ窓のモード/最前面/クリックスルー (#63)。同じ理由でトップレベルの
+        // 1 個を使い回す（トレイ・main() の起動シーケンスと同じインスタンス）。
+        ChangeNotifierProvider<LoupeWindowController>.value(value: loupeWindow),
+        // トレイ/ホットキーの可用性 (#63)。汎用的な Provider<bool> は他の bool
+        // provider と衝突しうるため使わず、専用の値オブジェクトにまとめて供給する。
+        Provider<WindowModeUiContext>.value(
+          value: WindowModeUiContext(
+            trayAvailable: trayAvailable,
+            hotkeyStatus: hotkeyStatus,
+          ),
         ),
       ],
       // Rebuild MaterialApp when the persisted theme mode changes.

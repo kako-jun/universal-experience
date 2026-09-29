@@ -1,6 +1,12 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/foundation.dart';
-import 'package:flutter/widgets.dart' show Size, VoidCallback;
+import 'package:flutter/services.dart' show HardwareKeyboard, KeyDownEvent, KeyEvent;
+import 'package:flutter/widgets.dart' show Color, Rect, Size;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
+
+import 'loupe_rect_source.dart';
 
 /// ルーペ窓の表示状態。
 ///
@@ -14,6 +20,11 @@ enum LoupeWindowMode { normal, maximized, fullscreen }
 
 /// モード遷移を起こすユーザーアクション。
 enum LoupeWindowAction { restore, toggleMaximize, toggleFullscreen }
+
+/// アプリの起動モード (#63)。ルーペ窓の透明度・タイトルバー等の見た目に関わる。
+/// 最前面固定・クリックスルーはこれとは独立したトグルとして別に持つ
+/// （モード切り替えはこれらを自動で変更しない）。
+enum AppMode { settings, loupe }
 
 /// ルーペ窓の純粋ロジック(プラットフォーム I/O を含まない)。
 ///
@@ -40,11 +51,16 @@ class LoupeWindowPolicy {
   /// 起動時の既定サイズ。最小より十分大きく、デスクトップの一角を覗ける程度。
   static const Size defaultSize = Size(800, 600);
 
-  /// 既定: ルーペ窓は常に最前面に出し続ける。
-  /// 下のアプリより手前にいないと「かざして見る」体験が成立しないため。
-  static const bool defaultAlwaysOnTop = true;
+  /// 既定: 最前面固定は **OFF**、切替式 (#63)。
+  ///
+  /// 起動直後は設定モード (通常ウィンドウ) から始まる (#63) ため、フィルタ
+  /// 選択 UI をまず操作したい。常に最前面だと設定 UI が他アプリの上に居座って
+  /// 操作しづらいので、既定は OFF にし、実際にかざして見たいときにユーザーが
+  /// トグル ON する運用にする。
+  static const bool defaultAlwaysOnTop = false;
 
-  /// 既定: 背景は完全透過。枠の外は透け、枠(レンズ)の中だけ描画する。
+  /// 既定: loupe モード時の透明値。settings モードは常に不透明
+  /// ([transparentForMode] 参照)。
   static const bool defaultTransparent = true;
 
   /// 既定: クリックスルーは **OFF**。
@@ -52,6 +68,14 @@ class LoupeWindowPolicy {
   /// イベントを受け取る。下のアプリを操作したいときにユーザーが
   /// トグル ON する運用 (切替式)。
   static const bool defaultClickThrough = false;
+
+  /// 起動時の既定モード。設定窓（通常ウィンドウ・不透明）から始める (#63)。
+  static const AppMode defaultAppMode = AppMode.settings;
+
+  /// 指定モードでの透明背景。loupe モードのみ透明 (defaultTransparent を流用)、
+  /// settings モードは常に不透明 (フィルタ選択 UI を見やすくするため)。
+  static bool transparentForMode(AppMode mode) =>
+      mode == AppMode.loupe && defaultTransparent;
 
   /// あるモードで「縁(フレーム/タイトルバー)を見せるか」を返す純粋関数。
   ///
@@ -88,6 +112,21 @@ class LoupeWindowPolicy {
             : LoupeWindowMode.fullscreen;
     }
   }
+
+  /// Linux で、グローバルホットキー（keybinder、X11 依存）が実際には発火しなそうな
+  /// セッションかを判定する (#63)。Wayland ネイティブセッションでは hotkey_manager の
+  /// 登録が「成功」を返しても実際には発火しないことがある。Wayland セッションの兆候
+  /// （`XDG_SESSION_TYPE=wayland` または `WAYLAND_DISPLAY`）が少しでもあれば、
+  /// `GDK_BACKEND=x11`（XWayland 経由の互換動作を示唆する値）が明示されていても
+  /// 信頼できない側に倒す — 判定を誤って「使える」と過信するより、ヒントから
+  /// 除外しすぎる方が安全なため。[environment] は呼び出し側が `Platform.environment`
+  /// を渡す想定（テストではフェイクの Map を渡せる）。
+  static bool isLikelyWaylandNativeSession(Map<String, String> environment) {
+    final sessionType = environment['XDG_SESSION_TYPE'];
+    final waylandDisplay = environment['WAYLAND_DISPLAY'];
+    return sessionType == 'wayland' ||
+        (waylandDisplay != null && waylandDisplay.isNotEmpty);
+  }
 }
 
 /// window_manager の薄いラッパ。
@@ -99,13 +138,22 @@ class LoupeWindowPolicy {
 /// プラットフォーム差: `setAsFrameless` / `setIgnoreMouseEvents(forward:)` は
 /// Linux/macOS/Windows で挙動差・未対応がある。利用不能でも落ちないよう
 /// 全 I/O を try/catch + ログで握る。
-class LoupeWindowController with WindowListener {
-  LoupeWindowController();
+class LoupeWindowController extends ChangeNotifier with WindowListener {
+  LoupeWindowController({LoupeRectSource rectSource = const ManualLoupeRectSource()})
+      : _rectSource = rectSource;
+
+  final LoupeRectSource _rectSource;
 
   LoupeWindowMode _mode = LoupeWindowMode.normal;
   bool _clickThrough = LoupeWindowPolicy.defaultClickThrough;
   bool _alwaysOnTop = LoupeWindowPolicy.defaultAlwaysOnTop;
+  AppMode _appMode = LoupeWindowPolicy.defaultAppMode;
   Size? _currentSize;
+  SharedPreferences? _prefs;
+
+  static const String _prefsAppMode = 'loupeWindow.appMode';
+  static const String _prefsAlwaysOnTop = 'loupeWindow.alwaysOnTop';
+  static const String _prefsClickThrough = 'loupeWindow.clickThrough';
 
   /// 現在の表示モード。
   LoupeWindowMode get mode => _mode;
@@ -116,42 +164,108 @@ class LoupeWindowController with WindowListener {
   /// 最前面固定が有効か。
   bool get alwaysOnTop => _alwaysOnTop;
 
+  /// アプリの起動モード (#63)。
+  AppMode get appMode => _appMode;
+
   /// 現在のウィンドウサイズ (リサイズ追従で更新)。null は未取得。
   Size? get currentSize => _currentSize;
 
-  /// リサイズなどで状態が変わったら呼ばれるコールバック (UI 再描画用)。
-  VoidCallback? onChanged;
+  /// ルーペ矩形の決定元 (#63、#44 向けの差し替え可能な seam) から現在の矩形を
+  /// 取得する。#44 実装時にこのコントローラへ対象アプリ追従の `LoupeRectSource`
+  /// を注入できる。現状どこからも消費されない（ライブ画面キャプチャ未実装の
+  /// ため）が、注入口だけは用意しておく。
+  Future<Rect?> currentLoupeRect() => _rectSource.currentRect();
 
-  // TODO(#14/#16): アプリモード切替を導入する。
-  // 現状は起動直後から「透明・最前面」を常時適用しているが、フィルタ選択 UI (#16)
-  // を操作するときは「常に最前面・背景透明」だと操作しづらい (UI が透けて背後の
-  // アプリと重なる / 他ウィンドウへ移れない)。
-  // 将来は次の2モードを切り替える想定:
-  //   - 設定モード (settings): 通常ウィンドウ。透明 OFF・最前面 OFF。フィルタ選択など
-  //     UI 操作に集中する。起動既定はこちらが望ましい。
-  //   - ルーペモード (loupe): 透明 ON・最前面 ON。実際に画面へかざして見る。
-  // 実装時は LoupeWindowController に setSettingsMode(bool)/setLoupeMode(bool) の口を
-  // 用意し、main の起動既定を「設定モード=通常ウィンドウ」にする。
-  // 本 PR (#14) ではスコープ外のため起動既定 (透明・最前面 ON) は現状維持。
-  // 詳細は docs/ARCHITECTURE.md「フォロー事項: アプリモード切替」を参照。
+  /// 永続化されたアプリモード・最前面固定・クリックスルーの状態を読み込む
+  /// (#63)。`main()` が [initialize] より先に呼ぶ責務を持つ — ここは
+  /// `_appMode`/`_alwaysOnTop`/`_clickThrough` を復元するだけで、実際の
+  /// window_manager への反映は [initialize] が行う。
+  Future<void> load() async {
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    final modeName = prefs.getString(_prefsAppMode);
+    if (modeName != null) {
+      _appMode = AppMode.values.firstWhere(
+        (m) => m.name == modeName,
+        orElse: () => LoupeWindowPolicy.defaultAppMode,
+      );
+    }
+    _alwaysOnTop =
+        prefs.getBool(_prefsAlwaysOnTop) ?? LoupeWindowPolicy.defaultAlwaysOnTop;
+    final storedClickThrough =
+        prefs.getBool(_prefsClickThrough) ?? LoupeWindowPolicy.defaultClickThrough;
+    if (_appMode == AppMode.settings && storedClickThrough) {
+      // 保存値が不変条件（設定窓モードはクリックスルー禁止）と矛盾していた
+      // 場合は正しい値へ正規化し、書き直す (#63)。
+      _clickThrough = false;
+      await _persist();
+    } else {
+      _clickThrough = storedClickThrough;
+    }
+  }
 
-  /// 起動時の初期化。最小サイズ・最前面・枠ポリシーを適用する。
-  /// (透過は WindowOptions.backgroundColor 側で設定済み。)
+  Future<void> _persist() async {
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    await prefs.setString(_prefsAppMode, _appMode.name);
+    await prefs.setBool(_prefsAlwaysOnTop, _alwaysOnTop);
+    await prefs.setBool(_prefsClickThrough, _clickThrough);
+  }
+
+  /// 起動時の初期化。[load] 済みの `_appMode`/`_alwaysOnTop` を実際の
+  /// window_manager へ反映する (#63)。`load()` 自体はここでは呼ばない
+  /// (`main.dart` の責務。`load()` を先に呼んでおかないと既定値のまま適用される)。
+  /// 背景色 (transparent/black) は `main.dart` の `WindowOptions` 構築時に別途
+  /// 反映するため、ここでは触らない。
+  ///
+  /// クリックスルーは適用しない。実際の適用は [restorePersistedClickThrough]
+  /// が担う（`main()` がトレイ・ホットキー初期化の後に呼ぶ構成は診断ログの
+  /// タイミングを揃えるため変えていないが、ゲート自体はもう無い）。
   Future<void> initialize() async {
     windowManager.addListener(this);
+    HardwareKeyboard.instance.addHandler(_handleAnyKeyEvent);
     await _guard('setMinimumSize', () async {
       await windowManager.setMinimumSize(LoupeWindowPolicy.minimumSize);
     });
-    if (LoupeWindowPolicy.defaultAlwaysOnTop) {
-      await setAlwaysOnTop(true);
-    }
+    await setAlwaysOnTop(_alwaysOnTop);
     // 起動は normal モード = 縁あり。
     await _applyFramePolicy();
   }
 
+  /// 永続化されたクリックスルーを window_manager へ適用する (#63)。
+  /// クリックスルーはいつでも ON にしてよい（フォーカス復帰＋キー入力・Esc の
+  /// 復帰経路が常にあるため）ので、復帰手段の可用性を待つ必要はもう無い。
+  /// main() がトレイ・ホットキー初期化の後に呼ぶ構成は変えていないが
+  /// （診断ログのタイミングを揃えるため）、ゲート自体は無い。
+  Future<void> restorePersistedClickThrough() async {
+    if (_clickThrough) {
+      await setClickThrough(true);
+    }
+  }
+
   /// 後始末。
+  @override
   void dispose() {
     windowManager.removeListener(this);
+    HardwareKeyboard.instance.removeHandler(_handleAnyKeyEvent);
+    super.dispose();
+  }
+
+  /// 起動モードを切り替える (#63)。背景の透明値 (settings=不透明/loupe=透明)
+  /// を反映する。settings モードに切り替えるときは、クリックスルーが ON の
+  /// ままだと設定 UI が操作不能になるため強制 OFF にする。
+  Future<void> setAppMode(AppMode mode) async {
+    _appMode = mode;
+    await _guard('setBackgroundColor', () async {
+      await windowManager.setBackgroundColor(
+        LoupeWindowPolicy.transparentForMode(mode)
+            ? const Color(0x00000000)
+            : const Color(0xFF000000),
+      );
+    });
+    if (mode == AppMode.settings && _clickThrough) {
+      await setClickThrough(false);
+    }
+    await _persist();
+    _notify();
   }
 
   /// 最前面固定のトグル。
@@ -160,6 +274,7 @@ class LoupeWindowController with WindowListener {
     await _guard('setAlwaysOnTop', () async {
       await windowManager.setAlwaysOnTop(value);
     });
+    await _persist();
     _notify();
   }
 
@@ -174,10 +289,24 @@ class LoupeWindowController with WindowListener {
   /// **Linux 実機での確認が必要 (#11 描画統合後)**。未対応でも落ちないよう
   /// try/catch で握る。
   Future<void> setClickThrough(bool value) async {
+    if (value && _appMode == AppMode.settings) {
+      // 安全策 (#63): 設定窓モードは UI 操作が前提の通常ウィンドウなので、
+      // クリックスルーを ON にはできない。呼び出し元（UI パネル/トレイ/
+      // ホットキー）を問わずここで一括して拒否する。ここに来た時点で true の
+      // 余地は無いはずだが、念のため false を確定させて persist/notify する
+      // （拒否するだけで状態確定をサボらない）。
+      if (_clickThrough) {
+        _clickThrough = false;
+        await _persist();
+        _notify();
+      }
+      return;
+    }
     _clickThrough = value;
     await _guard('setIgnoreMouseEvents', () async {
       await windowManager.setIgnoreMouseEvents(value, forward: true);
     });
+    await _persist();
     _notify();
   }
 
@@ -236,7 +365,7 @@ class LoupeWindowController with WindowListener {
     });
   }
 
-  void _notify() => onChanged?.call();
+  void _notify() => notifyListeners();
 
   /// 診断ログ。avoid_print lint を踏まないよう debug ビルド限定で出す。
   void _log(String message) {
@@ -257,6 +386,51 @@ class LoupeWindowController with WindowListener {
   }
 
   // --- WindowListener: リサイズ追従とモード同期 ---
+
+  /// クリックスルー解除が「予約」されているか。フォーカスを得た直後は即座に
+  /// 解除せず、実際にユーザーがこのウィンドウを操作し始めた合図（最初の
+  /// キー入力）まで待つ ([releaseClickThroughOnFirstKeyPress] 参照)。
+  bool _clickThroughReleaseArmed = false;
+
+  @override
+  void onWindowFocus() {
+    if (_clickThrough) {
+      // 復帰経路 (#63): クリックスルー ON のままフォーカスを得ても、ここでは
+      // 即座に解除しない。トレイメニューを開いた・OS がユーザー操作を伴わず
+      // フォーカスを移しただけ（Windows の SetForegroundWindow 等）のときに
+      // 意図せず解除されるのを避けるため、実際に最初のキー入力があるまで
+      // 「解除の予約」だけをする。
+      _clickThroughReleaseArmed = true;
+    }
+  }
+
+  @override
+  void onWindowBlur() {
+    // フォーカスを失ったら予約は取り消す。
+    _clickThroughReleaseArmed = false;
+  }
+
+  /// フォーカス復帰後の最初のキー入力でクリックスルーを解除する。
+  /// [onWindowFocus] で予約されていなければ何もしない。`HardwareKeyboard`
+  /// の全キーイベントハンドラ（[initialize] で登録、[dispose] で解除）から
+  /// キー入力ごとに呼ばれる。
+  void releaseClickThroughOnFirstKeyPress() {
+    if (_clickThroughReleaseArmed) {
+      _clickThroughReleaseArmed = false;
+      unawaited(setClickThrough(false));
+    }
+  }
+
+  /// [HardwareKeyboard] の全キーイベントハンドラ。keyDown のたびに
+  /// [releaseClickThroughOnFirstKeyPress] を呼ぶだけで、イベント自体は消費
+  /// しない（false を返し、通常のフォーカスチェーン・IME 等の処理へそのまま
+  /// 渡す）。
+  bool _handleAnyKeyEvent(KeyEvent event) {
+    if (event is KeyDownEvent) {
+      releaseClickThroughOnFirstKeyPress();
+    }
+    return false;
+  }
 
   @override
   void onWindowResize() {

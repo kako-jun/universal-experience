@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/disability_type.dart';
+import '../../services/app_shortcuts.dart';
 import '../../services/filter_service.dart';
+import '../../services/loupe_window_controller.dart';
 import '../../services/preview_selection.dart';
 import '../../services/settings_service.dart';
 import '../../services/vision_filter_state.dart';
@@ -13,6 +16,7 @@ import '../widgets/filter_selector.dart';
 import '../widgets/intensity_slider.dart';
 import '../widgets/filter_catalog_selector.dart';
 import '../widgets/filter_param_panel.dart';
+import '../widgets/window_mode_panel.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,6 +27,10 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   FilterService? _filterService;
+
+  /// `/`（アプリ内ショートカット、#63）で advanced カタログへフォーカスを移す
+  /// ための FocusNode。検索欄が無い現状は、このカタログが `/` の唯一の対象。
+  final FocusNode _catalogFocusNode = FocusNode(debugLabel: 'filterCatalog');
 
   @override
   void didChangeDependencies() {
@@ -69,44 +77,107 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _filterService?.removeListener(_persistFilterState);
+    _catalogFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.appTitle),
-        actions: [
-          const _ThemeModeButton(),
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            onPressed: () => _showAboutDialog(context),
-            tooltip: l10n.aboutTooltip,
+    return Shortcuts(
+      shortcuts: const <ShortcutActivator, Intent>{
+        // キー配列非依存にするため物理キーではなく文字で判定する (#63)。
+        CharacterActivator('/'): FocusFilterSearchIntent(),
+        SingleActivator(LogicalKeyboardKey.arrowUp):
+            CycleFilterIntent(forward: false),
+        SingleActivator(LogicalKeyboardKey.arrowDown):
+            CycleFilterIntent(forward: true),
+        SingleActivator(LogicalKeyboardKey.arrowLeft):
+            AdjustStrengthIntent(delta: -kKeyboardStrengthStep),
+        SingleActivator(LogicalKeyboardKey.arrowRight):
+            AdjustStrengthIntent(delta: kKeyboardStrengthStep),
+        SingleActivator(LogicalKeyboardKey.escape): ReleaseClickThroughIntent(),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          FocusFilterSearchIntent:
+              InteractiveFocusAwareCallbackAction<FocusFilterSearchIntent>(
+            onInvoke: (_) {
+              _catalogFocusNode.requestFocus();
+              return null;
+            },
           ),
-        ],
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
-          child: ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              _buildHeaderSection(l10n),
-              const SizedBox(height: 32),
-              _buildFilterSection(l10n),
-              const SizedBox(height: 24),
-              _buildControlsSection(l10n),
-              const SizedBox(height: 24),
-              _buildPreviewSection(),
-              const SizedBox(height: 32),
-              _buildAdvancedSection(l10n),
-              const SizedBox(height: 32),
-              _buildExperiencePresetsSection(l10n),
-              const SizedBox(height: 32),
-              _buildInfoSection(),
-            ],
+          CycleFilterIntent:
+              InteractiveFocusAwareCallbackAction<CycleFilterIntent>(
+            onInvoke: (intent) {
+              cycleAdvancedFilter(
+                context.read<VisionFilterState>(),
+                forward: intent.forward,
+              );
+              return null;
+            },
+          ),
+          AdjustStrengthIntent:
+              InteractiveFocusAwareCallbackAction<AdjustStrengthIntent>(
+            onInvoke: (intent) {
+              adjustPreviewStrength(
+                context.read<VisionFilterState>(),
+                context.read<FilterService>(),
+                intent.delta,
+              );
+              return null;
+            },
+          ),
+          ReleaseClickThroughIntent:
+              CallbackAction<ReleaseClickThroughIntent>(
+            onInvoke: (_) {
+              final loupeWindow = context.read<LoupeWindowController>();
+              if (loupeWindow.clickThrough) {
+                loupeWindow.setClickThrough(false);
+              }
+              return null;
+            },
+          ),
+        },
+        child: Focus(
+          autofocus: true,
+          child: Scaffold(
+            appBar: AppBar(
+              title: Text(l10n.appTitle),
+              actions: [
+                const _ThemeModeButton(),
+                IconButton(
+                  icon: const Icon(Icons.info_outline),
+                  onPressed: () => _showAboutDialog(context),
+                  tooltip: l10n.aboutTooltip,
+                ),
+              ],
+            ),
+            body: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: ListView(
+                  padding: const EdgeInsets.all(24),
+                  children: [
+                    _buildHeaderSection(l10n),
+                    const SizedBox(height: 32),
+                    const WindowModePanel(),
+                    const SizedBox(height: 24),
+                    _buildFilterSection(l10n),
+                    const SizedBox(height: 24),
+                    _buildControlsSection(l10n),
+                    const SizedBox(height: 24),
+                    _buildPreviewSection(),
+                    const SizedBox(height: 32),
+                    _buildAdvancedSection(l10n),
+                    const SizedBox(height: 32),
+                    _buildExperiencePresetsSection(l10n),
+                    const SizedBox(height: 32),
+                    _buildInfoSection(),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -235,6 +306,17 @@ class _HomeScreenState extends State<HomeScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+                    if (visionState.bypassed) ...[
+                      const SizedBox(width: 12),
+                      Chip(
+                        label: Text(l10n.bypassedBadgeLabel),
+                        backgroundColor: theme.colorScheme.secondaryContainer,
+                        labelStyle: TextStyle(
+                          color: theme.colorScheme.onSecondaryContainer,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -285,7 +367,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            const FilterCatalogSelector(),
+            FilterCatalogSelector(focusNode: _catalogFocusNode),
             const Divider(height: 32),
             const FilterParamPanel(),
           ],

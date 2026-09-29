@@ -17,8 +17,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/main.dart' show WindowModeUiContext;
 import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/filter_service.dart';
+import 'package:universal_experience/services/hotkey_service.dart';
+import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
@@ -55,6 +58,15 @@ void main() {
           ChangeNotifierProvider<SettingsService>.value(value: settings),
           ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
+          ChangeNotifierProvider<LoupeWindowController>.value(
+            value: LoupeWindowController(),
+          ),
+          Provider<WindowModeUiContext>.value(
+            value: const WindowModeUiContext(
+              trayAvailable: false,
+              hotkeyStatus: HotkeyStatus(),
+            ),
+          ),
         ],
         child: const MaterialApp(
           localizationsDelegates: [
@@ -119,6 +131,15 @@ void main() {
           ChangeNotifierProvider<SettingsService>.value(value: settings),
           ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
+          ChangeNotifierProvider<LoupeWindowController>.value(
+            value: LoupeWindowController(),
+          ),
+          Provider<WindowModeUiContext>.value(
+            value: const WindowModeUiContext(
+              trayAvailable: false,
+              hotkeyStatus: HotkeyStatus(),
+            ),
+          ),
         ],
         child: const MaterialApp(
           localizationsDelegates: [
@@ -164,6 +185,15 @@ void main() {
           ChangeNotifierProvider<SettingsService>.value(value: settings),
           ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
+          ChangeNotifierProvider<LoupeWindowController>.value(
+            value: LoupeWindowController(),
+          ),
+          Provider<WindowModeUiContext>.value(
+            value: const WindowModeUiContext(
+              trayAvailable: false,
+              hotkeyStatus: HotkeyStatus(),
+            ),
+          ),
         ],
         child: const MaterialApp(
           localizationsDelegates: [
@@ -248,6 +278,15 @@ void main() {
           ChangeNotifierProvider<SettingsService>.value(value: settings),
           ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
+          ChangeNotifierProvider<LoupeWindowController>.value(
+            value: LoupeWindowController(),
+          ),
+          Provider<WindowModeUiContext>.value(
+            value: const WindowModeUiContext(
+              trayAvailable: false,
+              hotkeyStatus: HotkeyStatus(),
+            ),
+          ),
         ],
         child: const MaterialApp(
           locale: Locale('en'),
@@ -309,5 +348,59 @@ void main() {
     expect(currentPreview().filterId, 'protanopia');
     expect(visionState.isColorQuickSelection, isTrue);
     expect(protanopiaChipSelected(), isTrue);
+  });
+
+  testWidgets(
+      'VisionFilterState.bypassed が true の間、プレビューに「原画表示中」バッジが出る (#63)',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1200, 4000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final settings = SettingsService();
+    await settings.load();
+    final filterService = FilterService();
+    final visionState = VisionFilterState();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsService>.value(value: settings),
+          ChangeNotifierProvider<FilterService>.value(value: filterService),
+          ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
+          ChangeNotifierProvider<LoupeWindowController>.value(
+            value: LoupeWindowController(),
+          ),
+          Provider<WindowModeUiContext>.value(
+            value: const WindowModeUiContext(
+              trayAvailable: false,
+              hotkeyStatus: HotkeyStatus(),
+            ),
+          ),
+        ],
+        child: const MaterialApp(
+          localizationsDelegates: [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: HomeScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Showing original'), findsNothing);
+
+    visionState.setBypassed(true);
+    await tester.pump();
+    expect(find.text('Showing original'), findsOneWidget);
+
+    visionState.setBypassed(false);
+    await tester.pump();
+    expect(find.text('Showing original'), findsNothing);
   });
 }

@@ -342,5 +342,10 @@ TrayMenuLabels trayMenuLabelsFrom(AppLocalizations l10n) {
       for (final type in quickColorVisionFilters())
         type: colorVisionTypeName(l10n, type),
     },
+    // 起動モード・最前面・クリックスルーのトレイ項目 (#63) は WindowModePanel が
+    // 使っているのと同じ ARB キーを再利用する（新規キー不要）。
+    appModeLoupeLabel: l10n.windowModeLoupe,
+    alwaysOnTopLabel: l10n.alwaysOnTopLabel,
+    clickThroughLabel: l10n.clickThroughLabel,
   );
 }

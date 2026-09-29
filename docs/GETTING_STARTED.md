@@ -43,6 +43,12 @@ Android / Windows は計画中で、ランナーディレクトリ自体がま�
 - CMake 3.10以上
 - GTK 3.0 development headers
 - pkg-config
+- libayatana-appindicator3 development headers（タスクトレイ、#15）
+- libkeybinder-3.0 development headers（グローバルホットキー、#63）
+
+ビルド時は `-dev` パッケージ、実行時はそれぞれの共有ライブラリ本体が必要。Ubuntu では
+`sudo apt-get install libayatana-appindicator3-dev libkeybinder-3.0-dev`。実行時の共有
+ライブラリは通常 `-dev` パッケージの依存で一緒に入る。
 
 #### Android開発（計画中）
 - Android Studio
