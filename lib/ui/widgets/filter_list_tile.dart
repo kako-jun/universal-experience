@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 
 import '../../l10n/app_localizations.dart';
 
@@ -57,9 +58,18 @@ class _FilterListTileState extends State<FilterListTile> {
       final renderObject = context.findRenderObject();
       if (scrollable == null || renderObject == null) return;
       // 最小限のスクロールで見える位置へ（すでに見えていれば動かない）。
-      scrollable.position.ensureVisible(
+      // 行がビューポートより上（↑・末尾→先頭の折り返し）なら上端に、下
+      // （↓）なら下端に揃える。`keepVisibleAtEnd` だけだと上方向に効かない。
+      final viewport = RenderAbstractViewport.maybeOf(renderObject);
+      final position = scrollable.position;
+      final isBeforeViewport = viewport != null &&
+          viewport.getOffsetToReveal(renderObject, 0.0).offset <
+              position.pixels;
+      position.ensureVisible(
         renderObject,
-        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+        alignmentPolicy: isBeforeViewport
+            ? ScrollPositionAlignmentPolicy.keepVisibleAtStart
+            : ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOut,
       );

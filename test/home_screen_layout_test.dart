@@ -320,6 +320,64 @@ void main() {
     });
   });
 
+  group('↑↓ で選んだ行は一覧のビューポート内に追従する（両方向・折り返し）', () {
+    Rect listViewport(WidgetTester tester) => tester.getRect(find.descendant(
+          of: find.byType(FilterBrowser),
+          matching: find.byType(SingleChildScrollView),
+        ));
+
+    void expectSelectedVisible(
+      WidgetTester tester,
+      FilterListEntry selected,
+      String reason,
+    ) {
+      final rect = tester.getRect(find.byKey(filterListTileKey(selected)));
+      final vp = listViewport(tester);
+      expect(rect.top, greaterThanOrEqualTo(vp.top - 1), reason: reason);
+      expect(rect.bottom, lessThanOrEqualTo(vp.bottom + 1), reason: reason);
+    }
+
+    testWidgets('↑ を連打して一覧の上方向へ進んでも選択行が見える', (tester) async {
+      final h = await pumpHomeScreen(tester, size: wide);
+      final start = kFilterListEntries[kFilterListEntries.length - 3];
+      final tile = find.byKey(filterListTileKey(start));
+      await tester.ensureVisible(tile);
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+
+      for (var i = 0; i < 25; i++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+        await tester.pumpAndSettle();
+        expectSelectedVisible(
+          tester,
+          selectedFilterListEntry(h.visionState)!,
+          '↑ ${i + 1} 回目',
+        );
+      }
+      await h.filterService.flush();
+    });
+
+    testWidgets('末尾で ↓ すると先頭へ折り返し、先頭で ↑ すると末尾へ折り返しても見える', (tester) async {
+      final h = await pumpHomeScreen(tester, size: wide);
+      final last = kFilterListEntries.last;
+      final tile = find.byKey(filterListTileKey(last));
+      await tester.ensureVisible(tile);
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      expect(selectedFilterListEntry(h.visionState), kFilterListEntries.first);
+      expectSelectedVisible(tester, kFilterListEntries.first, '末尾→先頭');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      expect(selectedFilterListEntry(h.visionState), last);
+      expectSelectedVisible(tester, last, '先頭→末尾');
+      await h.filterService.flush();
+    });
+  });
+
   testWidgets('WelcomeBanner の「ほかの見え方を選ぶ」で検索欄にフォーカスが移る', (tester) async {
     await pumpHomeScreen(tester, size: wide);
     expect(find.byType(WelcomeBanner), findsOneWidget);
