@@ -66,7 +66,7 @@ void main() {
     }
   });
 
-  testWidgets('広幅は 3 カラム（左=選ぶ・中=見る・右=調整）で、Tab 順は左→中→右', (tester) async {
+  testWidgets('広幅は 3 カラム（左=選ぶ・中=見る・右=調整）で横に並ぶ', (tester) async {
     await pumpHomeScreen(tester, size: wide);
 
     final browser = tester.getRect(find.byType(FilterBrowser));
@@ -74,27 +74,55 @@ void main() {
     final adjust = tester.getRect(find.byType(AdjustPanel));
     expect(browser.right, lessThanOrEqualTo(preview.left));
     expect(preview.right, lessThanOrEqualTo(adjust.left));
+  });
 
-    // 検索欄（左）→ サンプル切替（中）→ 右カラムの順に Tab で進む。
-    final search = find.byType(TextField);
-    await tester.tap(search);
+  testWidgets('Tab は 左 → 中央 → 右 の順に進み、右カラム（調整）へ届く', (tester) async {
+    // 右カラムに操作要素（解除ボタン・強度スライダー）を出すため、色覚を選んでおく。
+    await pumpHomeScreen(
+      tester,
+      size: wide,
+      select: (f, s) => selectColorVision(f, s, ColorVisionType.protanopia),
+    );
+    final browser = tester.getRect(find.byType(FilterBrowser));
+    final adjust = tester.getRect(find.byType(AdjustPanel));
+
+    // 0=左 1=中央 2=右。フォーカス中の要素の矩形の位置で判定する。
+    int? columnOfFocus() {
+      final box = tester
+          .binding.focusManager.primaryFocus?.context?.findRenderObject();
+      if (box is! RenderBox || !box.hasSize) return null;
+      final left = box.localToGlobal(Offset.zero).dx;
+      if (left >= adjust.left) return 2;
+      if (left >= browser.right) return 1;
+      return 0;
+    }
+
+    await tester.tap(find.byType(TextField));
     await tester.pump();
     expect(
         tester.binding.focusManager.primaryFocus?.debugLabel, 'filterSearch');
-    // 左カラムの中で完結する間は左のまま、最後まで進むと中央へ入る。
-    var reachedCenter = false;
-    for (var i = 0; i < 80 && !reachedCenter; i++) {
+
+    final visited = <int>[0];
+    Widget? rightFocusOwner;
+    for (var i = 0; i < 200 && visited.last != 2; i++) {
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();
-      final focused = tester.binding.focusManager.primaryFocus?.context;
-      if (focused == null) continue;
-      final box = focused.findRenderObject();
-      if (box is RenderBox && box.hasSize) {
-        final x = box.localToGlobal(Offset.zero).dx;
-        if (x >= browser.right) reachedCenter = true;
+      final column = columnOfFocus();
+      if (column == null) continue;
+      expect(column, greaterThanOrEqualTo(visited.last),
+          reason: 'Tab が ${visited.last} 番目のカラムから戻った（$i 回目）');
+      visited.add(column);
+      if (column == 2) {
+        rightFocusOwner = tester.binding.focusManager.primaryFocus?.context
+            ?.widget;
       }
     }
-    expect(reachedCenter, isTrue, reason: 'Tab で左カラムを抜けて中央へ進める');
+    expect(visited, containsAllInOrder([0, 1, 2]),
+        reason: 'Tab で 左 → 中央 → 右 の順に届く');
+    expect(rightFocusOwner, isNotNull);
+    // 右カラムでフォーカスが乗った要素は、確かに調整パネルの矩形の中にある。
+    final focusedRect = tester.getRect(find.byWidget(rightFocusOwner!).first);
+    expect(adjust.overlaps(focusedRect), isTrue);
   });
 
   testWidgets('狭幅は縦積み（プレビューが選択より上）', (tester) async {
