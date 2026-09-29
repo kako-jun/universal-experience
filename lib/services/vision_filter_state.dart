@@ -75,15 +75,42 @@ class VisionFilterState extends ChangeNotifier {
   /// 色覚クイック選択でなければ null。
   ColorVisionType? _colorVisionType;
 
-  bool _bypassed = false;
+  /// 一時的に「原画をそのまま表示」させている入力元の集合（#79）。
+  ///
+  /// #63 では単一の bool だったが、ホットキー（`hotkey_actions.dart`）と
+  /// ルーペ HUD（`loupe_hud.dart`、#79）の両方が同時に「押している間だけ原画」を
+  /// 要求しうるようになったため、入力元ごとの保持（holder）に変更した。片方が
+  /// 離してももう片方が保持していれば bypassed のままになる（#79 レビュー M3）。
+  /// 各呼び出し元は自分専用の識別子（Object の同一性で十分。文字列でも可）を
+  /// [acquireBypass]/[releaseBypass] に渡し、同じ識別子で対にする。
+  final Set<Object> _bypassHolders = {};
 
   /// 一時的に「原画をそのまま表示」するか (#63 ホットキー「押している間だけ原画」)。
-  /// 選択中のフィルタ・strength・params は一切変更しない。解除すれば元の見え方に戻る。
-  bool get bypassed => _bypassed;
+  /// 選択中のフィルタ・strength・params は一切変更しない。誰も保持していなければ
+  /// false（#79: holder が 1 つでもあれば true）。
+  bool get bypassed => _bypassHolders.isNotEmpty;
 
-  void setBypassed(bool value) {
-    if (_bypassed == value) return;
-    _bypassed = value;
+  /// [source] を bypass の holder として追加する（#79）。既に保持していれば
+  /// no-op（冪等）。
+  void acquireBypass(Object source) {
+    if (_bypassHolders.add(source)) notifyListeners();
+  }
+
+  /// [source] の bypass 保持を解除する（#79）。保持していなければ no-op
+  /// （冪等 — dispose 等から無条件に呼んでよい）。
+  void releaseBypass(Object source) {
+    if (_bypassHolders.remove(source)) notifyListeners();
+  }
+
+  /// 誰が保持しているかに関わらず、すべての bypass holder を強制的に解除する
+  /// （#79）。フィルタ選択・強度変更・非常口など、「原画比較の状態に関わらず
+  /// 必ずフィルタ表示に戻す」操作から呼ぶ。[select] 等の内部呼び出しは
+  /// notifyListeners の二重呼び出しを避けるため直接 [_bypassHolders] を
+  /// clear するだけに留め、この公開メソッドは外部（`hotkey_actions.dart` の
+  /// 非常口）から明示的に呼ぶ用。
+  void clearBypass() {
+    if (_bypassHolders.isEmpty) return;
+    _bypassHolders.clear();
     notifyListeners();
   }
 
@@ -124,7 +151,7 @@ class VisionFilterState extends ChangeNotifier {
     _selectedPresetId = null;
     _isColorQuickSelection = false;
     _colorVisionType = null;
-    _bypassed = false;
+    _bypassHolders.clear();
     _selectInternal(id);
   }
 
@@ -151,7 +178,7 @@ class VisionFilterState extends ChangeNotifier {
   /// 操作として）常に上書きする。プリセットの選択は解除する。
   void selectColorVisionType(ColorVisionType type, [String? catalogId]) {
     _selectedPresetId = null;
-    _bypassed = false;
+    _bypassHolders.clear();
     if (type == ColorVisionType.none) {
       _isColorQuickSelection = false;
       _colorVisionType = null;
@@ -186,7 +213,7 @@ class VisionFilterState extends ChangeNotifier {
     _selectedPresetId = presetId;
     _isColorQuickSelection = false;
     _colorVisionType = null;
-    _bypassed = false;
+    _bypassHolders.clear();
     _selectedId = catalogId;
     _params
       ..clear()
@@ -267,7 +294,7 @@ class VisionFilterState extends ChangeNotifier {
     _selectedPresetId = null;
     _isColorQuickSelection = false;
     _colorVisionType = null;
-    _bypassed = false;
+    _bypassHolders.clear();
     _params.clear();
     notifyListeners();
   }
@@ -289,7 +316,7 @@ class VisionFilterState extends ChangeNotifier {
     _paramsById[id] = Map<String, Object>.from(_params);
     _strengthById[id] = _strength;
 
-    _bypassed = false;
+    _bypassHolders.clear();
     _clearPresetSelectionOnCustomize();
     notifyListeners();
   }
@@ -302,7 +329,7 @@ class VisionFilterState extends ChangeNotifier {
     _strength = value.clamp(0.0, 1.0);
     final id = _selectedId;
     if (id != null) _strengthById[id] = _strength;
-    _bypassed = false;
+    _bypassHolders.clear();
     _clearPresetSelectionOnCustomize();
     notifyListeners();
   }
@@ -317,7 +344,7 @@ class VisionFilterState extends ChangeNotifier {
     if (id != null) {
       (_paramsById[id] ??= {})[name] = value;
     }
-    _bypassed = false;
+    _bypassHolders.clear();
     _clearPresetSelectionOnCustomize();
     notifyListeners();
   }
@@ -346,7 +373,7 @@ class VisionFilterState extends ChangeNotifier {
     if (id != null) {
       (_paramsById[id] ??= {})[name] = seed;
     }
-    _bypassed = false;
+    _bypassHolders.clear();
     _clearPresetSelectionOnCustomize();
     notifyListeners();
   }

@@ -1,5 +1,12 @@
 // HotkeyActions（#63）の単体テスト。すべてのコールバックをフェイクに差し替え、
 // 実 OS のホットキー/window_manager 無しで検証する。
+//
+// #79: bypass は acquireBypass/releaseBypass/clearBypass（入力元ごとの保持）
+// 経由になった。ここでは HotkeyActions 自身の hold/toggle/非常口ロジックだけを
+// 検証するため、フェイクの acquire/release/clear はローカルな bool 変数を
+// 直接書き換えるだけの単純なものにしている（実際の複数 holder の振る舞いは
+// `test/vision_filter_state_bypass_test.dart`、ホットキーと HUD の相互作用は
+// `test/loupe_hud_test.dart` で検証する）。
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/services/hotkey_actions.dart';
@@ -17,8 +24,9 @@ void main() {
         },
         setAlwaysOnTop: (value) async {},
         getClickThrough: () => current,
-        setBypassed: (value) {},
-        getBypassed: () => false,
+        acquireBypass: () {},
+        releaseBypass: () {},
+        clearBypass: () {},
         showAndFocusLoupe: () async {},
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async {},
@@ -43,8 +51,9 @@ void main() {
         setClickThrough: (value) async {},
         setAlwaysOnTop: (value) async {},
         getClickThrough: () => false,
-        setBypassed: (value) => bypassed = value,
-        getBypassed: () => bypassed,
+        acquireBypass: () => bypassed = true,
+        releaseBypass: () => bypassed = false,
+        clearBypass: () => bypassed = false,
         showAndFocusLoupe: () async {},
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async {},
@@ -59,16 +68,16 @@ void main() {
       expect(bypassed, isFalse);
     });
 
-    test('keyUp が届く環境: keyDown で ON、keyUp で OFF になる（正しい hold 挙動）',
-        () {
+    test('keyUp が届く環境: keyDown で ON、keyUp で OFF になる（正しい hold 挙動）', () {
       var bypassed = false;
       final actions = HotkeyActions(
         deactivateFilters: () {},
         setClickThrough: (value) async {},
         setAlwaysOnTop: (value) async {},
         getClickThrough: () => false,
-        setBypassed: (value) => bypassed = value,
-        getBypassed: () => bypassed,
+        acquireBypass: () => bypassed = true,
+        releaseBypass: () => bypassed = false,
+        clearBypass: () => bypassed = false,
         showAndFocusLoupe: () async {},
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async {},
@@ -88,8 +97,9 @@ void main() {
         setClickThrough: (value) async {},
         setAlwaysOnTop: (value) async {},
         getClickThrough: () => false,
-        setBypassed: (value) => bypassed = value,
-        getBypassed: () => bypassed,
+        acquireBypass: () => bypassed = true,
+        releaseBypass: () => bypassed = false,
+        clearBypass: () => bypassed = false,
         showAndFocusLoupe: () async {},
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async {},
@@ -114,8 +124,9 @@ void main() {
         setClickThrough: (value) async {},
         setAlwaysOnTop: (value) async {},
         getClickThrough: () => false,
-        setBypassed: (value) => bypassed = value,
-        getBypassed: () => bypassed,
+        acquireBypass: () => bypassed = true,
+        releaseBypass: () => bypassed = false,
+        clearBypass: () => bypassed = false,
         showAndFocusLoupe: () async {},
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async {},
@@ -136,8 +147,7 @@ void main() {
         now = now.add(const Duration(milliseconds: 33));
         actions.holdOriginalKeyDown();
       }
-      expect(bypassed, isTrue,
-          reason: '押しっぱなしの間、トグルは最初の1回だけになる');
+      expect(bypassed, isTrue, reason: '押しっぱなしの間、トグルは最初の1回だけになる');
     });
 
     test('一度 keyUp を受け取った後は keyDown 連打しても常に true のまま', () {
@@ -148,8 +158,9 @@ void main() {
         setClickThrough: (value) async {},
         setAlwaysOnTop: (value) async {},
         getClickThrough: () => false,
-        setBypassed: (value) => bypassed = value,
-        getBypassed: () => bypassed,
+        acquireBypass: () => bypassed = true,
+        releaseBypass: () => bypassed = false,
+        clearBypass: () => bypassed = false,
         showAndFocusLoupe: () async {},
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async {},
@@ -172,26 +183,27 @@ void main() {
       expect(bypassed, isFalse);
     });
 
-    test('keyUp は bypassed が既に false なら何もしない（no-op）', () {
+    test('keyUp はホットキーが保持していなければ何もしない（no-op）', () {
       var bypassed = false;
-      var setCalls = 0;
+      var releaseCalls = 0;
       final actions = HotkeyActions(
         deactivateFilters: () {},
         setClickThrough: (value) async {},
         setAlwaysOnTop: (value) async {},
         getClickThrough: () => false,
-        setBypassed: (value) {
-          setCalls++;
-          bypassed = value;
+        acquireBypass: () => bypassed = true,
+        releaseBypass: () {
+          releaseCalls++;
+          bypassed = false;
         },
-        getBypassed: () => bypassed,
+        clearBypass: () => bypassed = false,
         showAndFocusLoupe: () async {},
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async {},
       );
 
       actions.holdOriginalKeyUp();
-      expect(setCalls, 0);
+      expect(releaseCalls, 0);
       expect(bypassed, isFalse);
     });
   });
@@ -205,6 +217,7 @@ void main() {
       bool? alwaysOnTopPassed;
       var showAndFocusCalled = false;
       var bypassed = true;
+      var clearCalls = 0;
       bool? loupeVisiblePassed;
 
       final actions = HotkeyActions(
@@ -212,8 +225,12 @@ void main() {
         setClickThrough: (value) async => clickThroughPassed = value,
         setAlwaysOnTop: (value) async => alwaysOnTopPassed = value,
         getClickThrough: () => true,
-        setBypassed: (value) => bypassed = value,
-        getBypassed: () => bypassed,
+        acquireBypass: () => bypassed = true,
+        releaseBypass: () => bypassed = false,
+        clearBypass: () {
+          clearCalls++;
+          bypassed = false;
+        },
         showAndFocusLoupe: () async => showAndFocusCalled = true,
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async => loupeVisiblePassed = value,
@@ -221,21 +238,16 @@ void main() {
 
       await actions.emergencyExit();
 
-      expect(deactivateCalled, isTrue,
-          reason: '非常口はフィルタを全停止するべき');
-      expect(clickThroughPassed, isFalse,
-          reason: '非常口はクリックスルーを解除するべき');
-      expect(alwaysOnTopPassed, isFalse,
-          reason: '非常口は最前面固定を解除するべき');
-      expect(showAndFocusCalled, isTrue,
-          reason: '非常口はルーペ窓を表示・前面化するべき');
+      expect(deactivateCalled, isTrue, reason: '非常口はフィルタを全停止するべき');
+      expect(clickThroughPassed, isFalse, reason: '非常口はクリックスルーを解除するべき');
+      expect(alwaysOnTopPassed, isFalse, reason: '非常口は最前面固定を解除するべき');
+      expect(showAndFocusCalled, isTrue, reason: '非常口はルーペ窓を表示・前面化するべき');
       expect(bypassed, isFalse, reason: '非常口は bypassed も解除するべき');
-      expect(loupeVisiblePassed, isTrue,
-          reason: '非常口はトレイの表示状態ブックキーピングも同期するべき');
+      expect(clearCalls, 1, reason: '非常口は誰が保持していても解除する clearBypass を呼ぶべき');
+      expect(loupeVisiblePassed, isTrue, reason: '非常口はトレイの表示状態ブックキーピングも同期するべき');
     });
 
-    test('showAndFocusLoupe が throw しても残りのステップは実行される',
-        () async {
+    test('showAndFocusLoupe が throw しても残りのステップは実行される', () async {
       var deactivateCalled = false;
       bool? clickThroughPassed;
       bool? alwaysOnTopPassed;
@@ -247,8 +259,9 @@ void main() {
         setClickThrough: (value) async => clickThroughPassed = value,
         setAlwaysOnTop: (value) async => alwaysOnTopPassed = value,
         getClickThrough: () => true,
-        setBypassed: (value) => bypassed = value,
-        getBypassed: () => bypassed,
+        acquireBypass: () => bypassed = true,
+        releaseBypass: () => bypassed = false,
+        clearBypass: () => bypassed = false,
         showAndFocusLoupe: () async => throw Exception('boom'),
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async => loupeVisiblePassed = value,
@@ -264,8 +277,7 @@ void main() {
           reason: 'showAndFocusLoupe が失敗しても後続の setLoupeVisible は実行される');
     });
 
-    test('setClickThrough が throw しても残りのステップは実行される',
-        () async {
+    test('setClickThrough が throw しても残りのステップは実行される', () async {
       var deactivateCalled = false;
       bool? alwaysOnTopPassed;
       var showAndFocusCalled = false;
@@ -277,8 +289,9 @@ void main() {
         setClickThrough: (value) async => throw Exception('boom'),
         setAlwaysOnTop: (value) async => alwaysOnTopPassed = value,
         getClickThrough: () => true,
-        setBypassed: (value) => bypassed = value,
-        getBypassed: () => bypassed,
+        acquireBypass: () => bypassed = true,
+        releaseBypass: () => bypassed = false,
+        clearBypass: () => bypassed = false,
         showAndFocusLoupe: () async => showAndFocusCalled = true,
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async => loupeVisiblePassed = value,

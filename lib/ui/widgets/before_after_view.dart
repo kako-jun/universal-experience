@@ -102,7 +102,7 @@ class BeforeAfterView extends StatefulWidget {
     required this.strength,
     this.colorVisionType,
     this.sampleSize,
-  }) : assert(
+  })  : assert(
           (filter == null) == (filterId == null),
           'filter and filterId must both be null or both be set',
         );
@@ -687,9 +687,8 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         // 引いて解決する。after ペインの見出しは widget.colorVisionType が
         // あればそちらを優先する（#60: -omaly の名前を正しく出すため、
         // [visionFilterDisplayName] 参照）。
-        final entry = widget.filterId == null
-            ? null
-            : kVisionFilterCatalogById[widget.filterId];
+        final entry =
+            widget.filterId == null ? null : kVisionFilterCatalogById[widget.filterId];
         final afterPane = _Pane(
           label: visionFilterDisplayName(
               l10n, widget.colorVisionType, widget.filterId),

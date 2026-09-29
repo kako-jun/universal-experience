@@ -337,7 +337,7 @@ String escalationConditionText(AppLocalizations l10n, String condition) {
     case 'persistent pain or a change in vision':
       return l10n.escalationConditionDryEyePersistent;
     case 'a sudden drop in hearing, especially in one ear (possible sudden '
-          'sensorineural hearing loss)':
+        'sensorineural hearing loss)':
       return l10n.escalationConditionHearingSuddenOneEar;
     case 'a new or worsening change, particularly in one ear':
       return l10n.escalationConditionHearingNewWorseningOneEar;
@@ -422,8 +422,7 @@ ConsultNotice? resolveConsultNotice(
 
   final emergencyLines = [
     for (final e in escalation)
-      if (e.urgency == Urgency.emergency)
-        escalationConditionText(l10n, e.condition),
+      if (e.urgency == Urgency.emergency) escalationConditionText(l10n, e.condition),
   ];
   final earlyLines = [
     for (final e in escalation)

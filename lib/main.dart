@@ -40,6 +40,12 @@ final FilterService filterService = FilterService();
 /// 同じインスタンスを更新する必要があるため（#60）。
 final VisionFilterState visionFilterState = VisionFilterState();
 
+/// ホットキー「押している間だけ原画」（#63）用の bypass holder トークン
+/// （#79）。`VisionFilterState.acquireBypass`/`releaseBypass` は入力元ごとに
+/// holder を持つため、ルーペ HUD（`loupe_hud.dart`）側の holder と衝突しない
+/// よう、ホットキー用に 1 つだけ生成して使い回す。
+final Object _hotkeyBypassSource = Object();
+
 /// トレイアイコンの Flutter アセットパス。`tray_manager` の `setIcon` が
 /// `data/flutter_assets/` 配下のこのパスを解決する。Windows でより精細に
 /// するなら `assets/tray/tray_icon.ico` を追加して分岐すればよい。
@@ -287,8 +293,11 @@ void main() async {
       setClickThrough: loupeWindow.setClickThrough,
       setAlwaysOnTop: loupeWindow.setAlwaysOnTop,
       getClickThrough: () => loupeWindow.clickThrough,
-      setBypassed: visionFilterState.setBypassed,
-      getBypassed: () => visionFilterState.bypassed,
+      // #79: ホットキー専用の holder（_hotkeyBypassSource）で acquire/release
+      // する。emergencyExit だけは誰が保持していても解除する clearBypass を使う。
+      acquireBypass: () => visionFilterState.acquireBypass(_hotkeyBypassSource),
+      releaseBypass: () => visionFilterState.releaseBypass(_hotkeyBypassSource),
+      clearBypass: visionFilterState.clearBypass,
       showAndFocusLoupe: trayService.onShowLoupe,
       toggleLoupeVisible: trayService.toggleLoupeVisible,
       setLoupeVisible: trayService.setLoupeVisible,

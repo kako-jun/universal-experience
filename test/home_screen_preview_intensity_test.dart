@@ -122,7 +122,7 @@ void main() {
     final filterService = FilterService();
     final visionState = VisionFilterState();
     selectColorVision(filterService, visionState, ColorVisionType.protanopia);
-    visionState.setBypassed(true);
+    visionState.acquireBypass('test');
     expect(visionState.bypassed, isTrue);
 
     await tester.pumpWidget(
