@@ -27,7 +27,22 @@ ExperiencesProvider experiencesProvider = experiences;
 ///
 /// `@visibleForTesting` の [experiencesProvider] を production コードから
 /// 直接参照しないための窓口（一覧 `FilterBrowser` はここから読む）。
-List<Experience> availableExperiences() => experiencesProvider();
+///
+/// 一覧は選択・検索のたびに再構築され、既定の供給源は FFI 呼び出しなので、
+/// 結果は供給源の関数ごとに 1 度だけ取得して使い回す。テストが
+/// [experiencesProvider] を差し替えると（関数が変わるので）取り直すため、
+/// テスト間でキャッシュが漏れない。
+List<Experience> availableExperiences() {
+  final provider = experiencesProvider;
+  final cached = _cachedExperiences;
+  if (cached != null && _cachedExperiencesFor == provider) return cached;
+  final fresh = provider();
+  _cachedExperiencesFor = provider;
+  return _cachedExperiences = fresh;
+}
+
+ExperiencesProvider? _cachedExperiencesFor;
+List<Experience>? _cachedExperiences;
 
 /// 体験プリセットの行（[ExperiencePresetTile]）を一意に指す [Key]。
 ///

@@ -39,7 +39,7 @@ void main() {
   const wide = Size(1280, 800);
   const narrow = Size(800, 700);
   // LoupeWindowPolicy.defaultSize（起動時の既定ウィンドウ）。
-  final defaultWindow = LoupeWindowPolicy.defaultSize;
+  const defaultWindow = LoupeWindowPolicy.defaultSize;
   // 広幅で低い画面（ノート PC の縮めたウィンドウなど）。
   const wideLow = Size(1280, 480);
 
@@ -349,8 +349,11 @@ void main() {
         tester.getRect(find.byType(BeforeAfterView)).bottom,
         lessThanOrEqualTo(defaultWindow.height),
       );
+      // 案内（約 115dp）の分だけ本文が低くなるため、選択欄の下端までは収まらない
+      // ことがある（DESIGN.md §6.1）。画像（BeforeAfterView）が収まり、選択欄の
+      // 先頭の行が見えていて、スクロールで残りへ届くことを保証する。
       expect(
-        tester.getRect(find.byType(ImageSourcePicker)).bottom,
+        tester.getRect(find.text('プレビュー画像')).bottom,
         lessThanOrEqualTo(defaultWindow.height),
       );
       await tester.runAsync(() => h.loupe.setClickThrough(false));
@@ -652,5 +655,41 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsNothing);
+  });
+  testWidgets('このアプリについてで「ライブ画面にはまだ適用されない」注意を読める', (tester) async {
+    await pumpHomeScreen(tester, size: wide);
+
+    await tester.tap(find.byTooltip('このアプリについて'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('ライブ画面への適用は'), findsOneWidget);
+    expect(find.textContaining('プレビューにだけ適用されます'), findsOneWidget);
+  });
+
+  test('体験プリセットの供給源は関数ごとに 1 度だけ呼ぶ（差し替えたら取り直す）', () {
+    final saved = experiencesProvider;
+    addTearDown(() => experiencesProvider = saved);
+
+    var calls = 0;
+    List<Experience> counting() {
+      calls++;
+      return const <Experience>[];
+    }
+
+    experiencesProvider = counting;
+    availableExperiences();
+    availableExperiences();
+    availableExperiences();
+    expect(calls, 1);
+
+    var otherCalls = 0;
+    experiencesProvider = () {
+      otherCalls++;
+      return const <Experience>[];
+    };
+    availableExperiences();
+    availableExperiences();
+    expect(otherCalls, 1);
+    expect(calls, 1);
   });
 }
