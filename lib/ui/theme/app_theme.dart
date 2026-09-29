@@ -43,6 +43,11 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: colorScheme,
       brightness: brightness,
+      // デスクトップ（macOS/Windows/Linux）の既定は shrinkWrap + 密な密度で、
+      // チップ・テキストボタン・アイコンボタンが 48dp を割る。全プラットフォームで
+      // 最小タップ領域 48×48dp を保つ（DESIGN §5、#45）。
+      materialTapTargetSize: MaterialTapTargetSize.padded,
+      visualDensity: VisualDensity.standard,
       appBarTheme: AppBarTheme(
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,

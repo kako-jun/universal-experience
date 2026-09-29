@@ -230,7 +230,6 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
           IconButton(
             icon: const Icon(Icons.close, size: 18),
             tooltip: l10n.imageSourceClosePhotoTooltip,
-            visualDensity: VisualDensity.compact,
             onPressed: () =>
                 imageSourceState.clearUserImage(recommendedId),
           ),

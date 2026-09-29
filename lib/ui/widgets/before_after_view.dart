@@ -719,7 +719,6 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
               ? IconButton(
                   icon: const Icon(Icons.download_outlined),
                   iconSize: 20,
-                  visualDensity: VisualDensity.compact,
                   tooltip: l10n.exportButtonTooltip,
                   onPressed: _exporting ? null : () => _export(l10n),
                 )

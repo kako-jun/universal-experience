@@ -89,6 +89,7 @@ Future<HomeScreenHarness> pumpHomeScreen(
     hotkeyStatus: HotkeyStatus(),
   ),
   void Function(FilterService filterService, VisionFilterState state)? select,
+  ThemeData? theme,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -114,6 +115,7 @@ Future<HomeScreenHarness> pumpHomeScreen(
         Provider<WindowModeUiContext>.value(value: uiContext),
       ],
       child: MaterialApp(
+        theme: theme,
         locale: locale,
         localizationsDelegates: const [
           AppLocalizations.delegate,
