@@ -2,8 +2,8 @@ import '../models/vision_filter_catalog.dart';
 import 'filter_service.dart';
 import 'vision_filter_state.dart';
 
-/// 「今選んでいるフィルタの素の強度」を、bypass に関わらず返す（#79 レビュー
-/// S1）。強度の出どころは 2 系統ある:
+/// 「今選んでいるフィルタの素の強度」を、bypass に関わらず返す（#79）。
+/// 強度の出どころは 2 系統ある:
 /// - 色覚のクイック選択（`FilterSelector`/トレイ、[FilterService] 経由）は
 ///   色覚タイプごとの強度の記憶（#57、[FilterService.intensity]）を使う。
 /// - advanced カタログ・体験プリセット経由の選択は [VisionFilterState.strength]

@@ -5,11 +5,16 @@
 // アイコンの条件付き表示とダイアログ、原画比較ボタンの押す/離す/キャンセル/
 // 領域外・タッチでの bypass 切替、フォーカス喪失・dispose・KeyRepeat での
 // 解除、ホットキーとの多重 holder、設定ボタンでのモード復帰、全画面での
-// 自動非表示と縁の検知帯でのホバー表示、Semantics を検証する。
+// 自動非表示と縁の検知帯でのホバー表示（非表示中も下のウィジェットへタップが
+// 届くこと・表示/非表示でツリー形状を変えずトグル状態と Tab フォーカスの
+// 可否が正しく切り替わること）、Semantics（label/tooltip の重複回避・
+// toggled/hint・onTap トグルが select() 後も正しく機能すること）を検証する。
 //
 // urgency/urgency_escalation/recommended_strength は sensus ブリッジの provider
 // seam（`vision_filter_metadata.dart`）経由なので、他の widget test と同じく
 // `test/support/vision_filter_metadata_fixture.dart` のフィクスチャに差し替える。
+
+import 'dart:ui' show Tristate;
 
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
@@ -120,7 +125,7 @@ void main() {
       expect(find.text('Strength: 60%'), findsOneWidget);
     });
 
-    testWidgets('原画比較中でも強度は素の値のまま表示する (#79 レビュー S1)', (tester) async {
+    testWidgets('原画比較中でも強度は素の値のまま表示する (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
       visionState.select('protanopia');
       visionState.setStrength(0.42);
@@ -139,7 +144,7 @@ void main() {
       expect(find.text('Strength: 0%'), findsNothing);
     });
 
-    testWidgets('原画比較中は原画比較ボタンのアイコン色が変わる (#79 レビュー S1)', (tester) async {
+    testWidgets('原画比較中は原画比較ボタンのアイコン色が変わる (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
       visionState.select('protanopia');
       await pumpHud(tester);
@@ -214,7 +219,7 @@ void main() {
       expect(visionState.bypassed, isFalse);
     });
 
-    testWidgets('タッチ入力（hover の無い経路）でも押す/離すが機能する (#79 レビュー S5)', (tester) async {
+    testWidgets('タッチ入力（hover の無い経路）でも押す/離すが機能する (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
       visionState.select('protanopia');
       await pumpHud(tester);
@@ -232,7 +237,7 @@ void main() {
       expect(visionState.bypassed, isFalse);
     });
 
-    testWidgets('タッチ入力で押したまま領域外に出たら OFF に戻る (#79 レビュー S5)', (tester) async {
+    testWidgets('タッチ入力で押したまま領域外に出たら OFF に戻る (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
       visionState.select('protanopia');
       await pumpHud(tester);
@@ -291,7 +296,7 @@ void main() {
       await tester.pump();
     });
 
-    testWidgets('dispose 時点で押下中なら holder を解放する (#79 レビュー M1)', (tester) async {
+    testWidgets('dispose 時点で押下中なら holder を解放する (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
       visionState.select('protanopia');
       await pumpHud(tester);
@@ -312,7 +317,7 @@ void main() {
       await gesture.up();
     });
 
-    testWidgets('フォーカスを失ったら holder を解放する (#79 レビュー M2)', (tester) async {
+    testWidgets('フォーカスを失ったら holder を解放する (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
       visionState.select('protanopia');
       await pumpHud(tester);
@@ -338,7 +343,7 @@ void main() {
 
     testWidgets(
         'Enter/Space の押下・解放で bypass が切り替わり、KeyRepeat は無視する'
-        ' (#79 レビュー M2)', (tester) async {
+        ' (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
       visionState.select('protanopia');
       await pumpHud(tester);
@@ -351,6 +356,12 @@ void main() {
       await tester.sendKeyDownEvent(LogicalKeyboardKey.enter);
       await tester.pump();
       expect(visionState.bypassed, isTrue);
+
+      // OS のキーリピートが届いても、押しっぱなし状態は変わらない
+      // （再取得も解除もしない、handled として握りつぶすだけ）。
+      await tester.sendKeyRepeatEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(visionState.bypassed, isTrue, reason: 'KeyRepeat では状態を変えない');
 
       await tester.sendKeyUpEvent(LogicalKeyboardKey.enter);
       await tester.pump();
@@ -366,7 +377,7 @@ void main() {
     });
   });
 
-  group('ホットキーとの多重 holder (#79 レビュー M3)', () {
+  group('ホットキーとの多重 holder (#79)', () {
     HotkeyActions buildHotkeyActions() {
       return HotkeyActions(
         deactivateFilters: () {},
@@ -376,6 +387,7 @@ void main() {
         acquireBypass: () => visionState.acquireBypass('hotkey'),
         releaseBypass: () => visionState.releaseBypass('hotkey'),
         clearBypass: visionState.clearBypass,
+        isBypassHeldByHotkey: () => visionState.isHeldBy('hotkey'),
         showAndFocusLoupe: () async {},
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async {},
@@ -446,7 +458,7 @@ void main() {
   });
 
   group('全画面での自動非表示・縁の検知帯でのホバー表示', () {
-    testWidgets('全画面でなければ常に表示される (#79 レビュー S5)', (tester) async {
+    testWidgets('全画面でなければ常に表示される (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
       await pumpHud(tester);
 
@@ -515,25 +527,102 @@ void main() {
       await gesture.removePointer();
     });
 
-    testWidgets(
-        '隠れている間は IgnorePointer と ExcludeSemantics でバーを外す'
-        ' (#79 レビュー S3)', (tester) async {
+    testWidgets('非表示にしてから再表示してもトグルが維持される (#79)', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
+      await tester.runAsync(
+        () => loupeWindow.applyAction(LoupeWindowAction.toggleFullscreen),
+      );
+      visionState.select('protanopia');
+      await pumpHud(tester);
+
+      final topLeft = tester.getTopLeft(find.byType(LoupeHud));
+      final gesture = await tester.createGesture(
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.addPointer(location: topLeft + const Offset(5, 5));
+      // AnimatedOpacity のアニメーション（150ms）が終わるまで待つ — 完了する
+      // までは ExcludeSemantics の反映を含むセマンティクスツリーの更新が
+      // 追いつかないことがある。
+      await tester.pumpAndSettle();
+
+      // 表示中にトグルを ON にする。
+      final semanticsFinder = find.semantics.byLabel(
+        'Press and hold to compare with the original',
+      );
+      tester.semantics.tap(semanticsFinder);
+      await tester.pump();
+      expect(visionState.bypassed, isTrue);
+
+      // 離れて、猶予が過ぎるまで待つ → 隠れる。ツリー形状は変わらないので
+      // _CompareOriginalButton の State（トグル用 holder の保持）は消えない。
+      await gesture.moveTo(topLeft + const Offset(5, 2000));
+      await tester.pump();
+      await tester.pump(kLoupeHudHideDelay + const Duration(milliseconds: 50));
+      final opacityFinder = find.byType(AnimatedOpacity);
+      expect(tester.widget<AnimatedOpacity>(opacityFinder).opacity, 0.0);
+      expect(visionState.bypassed, isTrue,
+          reason: '非表示は holder を解除しない（dispose されないため）');
+
+      // 再びホバーして表示する。
+      await gesture.moveTo(topLeft + const Offset(5, 5));
+      await tester.pump();
+      expect(tester.widget<AnimatedOpacity>(opacityFinder).opacity, 1.0);
+      expect(visionState.bypassed, isTrue, reason: '再表示後もトグルは維持されているべき');
+
+      await gesture.removePointer();
+      handle.dispose();
+    });
+
+    testWidgets('非表示中は Tab でフォーカスが届かない (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
       await tester.runAsync(
         () => loupeWindow.applyAction(LoupeWindowAction.toggleFullscreen),
       );
       await pumpHud(tester);
 
-      // AnimatedOpacity（縁のバー用）の直接の子で判定する — ボタン群の
-      // Tooltip（excludeFromSemantics: true）も内部で ExcludeSemantics を
-      // 使うため、配下を検索すると無関係な一致を拾ってしまう。
-      final opacityFinder = find.byType(AnimatedOpacity);
-      final opacityChild = tester.widget<AnimatedOpacity>(opacityFinder).child;
-      expect(opacityChild, isA<ExcludeSemantics>());
-      expect(
-        (opacityChild as ExcludeSemantics).child,
-        isA<IgnorePointer>(),
+      final focusNode = Focus.of(
+        tester.element(find.byIcon(Icons.visibility_outlined)),
       );
+      expect(focusNode.canRequestFocus, isFalse,
+          reason: '非表示中は ExcludeFocus で Tab によるフォーカスが届かない');
+
+      // ホバーして表示する。
+      final topLeft = tester.getTopLeft(find.byType(LoupeHud));
+      final gesture = await tester.createGesture(
+        kind: PointerDeviceKind.mouse,
+      );
+      await gesture.addPointer(location: topLeft + const Offset(5, 5));
+      await tester.pump();
+
+      expect(focusNode.canRequestFocus, isTrue, reason: '表示中は Tab が届く');
+
+      await gesture.removePointer();
+    });
+
+    testWidgets(
+        '隠れている間は IgnorePointer と ExcludeSemantics でバーを外す'
+        ' (#79)', (tester) async {
+      await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
+      await tester.runAsync(
+        () => loupeWindow.applyAction(LoupeWindowAction.toggleFullscreen),
+      );
+      await pumpHud(tester);
+
+      // AnimatedOpacity（縁のバー用）の直接の子は常に ExcludeSemantics >
+      // IgnorePointer > ExcludeFocus の形（#79: 表示/非表示でツリー形状を
+      // 変えず、excluding/ignoring フラグだけを切り替える）。非表示中は
+      // すべて true になる。
+      final opacityFinder = find.byType(AnimatedOpacity);
+      final excludeSemantics = tester
+          .widget<AnimatedOpacity>(opacityFinder)
+          .child as ExcludeSemantics;
+      expect(excludeSemantics.excluding, isTrue);
+      final ignorePointer = excludeSemantics.child as IgnorePointer;
+      expect(ignorePointer.ignoring, isTrue);
+      final excludeFocus = ignorePointer.child as ExcludeFocus;
+      expect(excludeFocus.excluding, isTrue);
+
       // 設定ボタンは実体としてツリーにあるが、操作不能。
       final settingsButton = tester.widget<IconButton>(
         find.descendant(
@@ -548,8 +637,78 @@ void main() {
       );
     });
 
-    testWidgets('検知帯の MouseRegion は opaque: false (#79 レビュー S3)',
-        (tester) async {
+    testWidgets(
+        '表示中は ExcludeSemantics/IgnorePointer/ExcludeFocus が false になる'
+        ' (#79)', (tester) async {
+      await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
+      await pumpHud(tester);
+
+      final opacityFinder = find.byType(AnimatedOpacity);
+      final excludeSemantics = tester
+          .widget<AnimatedOpacity>(opacityFinder)
+          .child as ExcludeSemantics;
+      expect(excludeSemantics.excluding, isFalse);
+      final ignorePointer = excludeSemantics.child as IgnorePointer;
+      expect(ignorePointer.ignoring, isFalse);
+      final excludeFocus = ignorePointer.child as ExcludeFocus;
+      expect(excludeFocus.excluding, isFalse);
+    });
+
+    testWidgets('非表示中にバーの中心をタップすると、下のウィジェットに届く (#79)', (tester) async {
+      await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
+      await tester.runAsync(
+        () => loupeWindow.applyAction(LoupeWindowAction.toggleFullscreen),
+      );
+
+      var tapped = false;
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<VisionFilterState>.value(
+              value: visionState,
+            ),
+            ChangeNotifierProvider<FilterService>.value(value: filterService),
+            ChangeNotifierProvider<LoupeWindowController>.value(
+              value: loupeWindow,
+            ),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            // main.dart と同じ重ね順（下から HomeScreen 相当、上に LoupeHud）。
+            home: Scaffold(
+              body: Stack(
+                children: [
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => tapped = true,
+                    child: const SizedBox.expand(),
+                  ),
+                  const LoupeHud(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // 全画面・非ホバーなので HUD は隠れている。
+      final barCenter = tester.getCenter(find.byType(AnimatedOpacity));
+      await tester.tapAt(barCenter);
+      await tester.pump();
+
+      expect(tapped, isTrue,
+          reason: '非表示中はバー本体の MouseRegion も opaque: false で'
+              '下のウィジェットへのタップを奪わない');
+    });
+
+    testWidgets('検知帯の MouseRegion は opaque: false (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
       await pumpHud(tester);
 
@@ -592,7 +751,7 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('label と tooltip が同じ文言で二重に載らない (#79 レビュー nit)', (tester) async {
+    testWidgets('label と tooltip が同じ文言で二重に載らない (#79)', (tester) async {
       final handle = tester.ensureSemantics();
 
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
@@ -608,7 +767,41 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('押し続けられない場合の代替: Semantics.onTap でトグルできる (#79 レビュー S4)',
+    testWidgets('押し続けられない場合の代替: Semantics.onTap でトグルできる (#79)', (tester) async {
+      final handle = tester.ensureSemantics();
+
+      await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
+      visionState.select('protanopia');
+      await pumpHud(tester);
+
+      final semanticsFinder = find.semantics.byLabel(
+        'Press and hold to compare with the original',
+      );
+      final elementFinder = find.bySemanticsLabel(
+        'Press and hold to compare with the original',
+      );
+      expect(visionState.bypassed, isFalse);
+      var node = tester.getSemantics(elementFinder);
+      expect(node.hint, 'Double-tap to toggle comparing with the original');
+      expect(node.flagsCollection.isToggled, Tristate.isFalse);
+
+      tester.semantics.tap(semanticsFinder);
+      await tester.pump();
+      expect(visionState.bypassed, isTrue, reason: '1 回目のトグルで ON');
+      node = tester.getSemantics(elementFinder);
+      expect(node.flagsCollection.isToggled, Tristate.isTrue,
+          reason: 'Semantics.toggled が ON を反映する');
+
+      tester.semantics.tap(semanticsFinder);
+      await tester.pump();
+      expect(visionState.bypassed, isFalse, reason: '2 回目のトグルで OFF');
+      node = tester.getSemantics(elementFinder);
+      expect(node.flagsCollection.isToggled, Tristate.isFalse);
+
+      handle.dispose();
+    });
+
+    testWidgets('onTap で ON → select() → onTap で再び ON になる (#79)',
         (tester) async {
       final handle = tester.ensureSemantics();
 
@@ -619,20 +812,27 @@ void main() {
       final semanticsFinder = find.semantics.byLabel(
         'Press and hold to compare with the original',
       );
+
+      tester.semantics.tap(semanticsFinder);
+      await tester.pump();
+      expect(visionState.bypassed, isTrue, reason: '1 回目のタップで ON');
+
+      // 別のフィルタを選ぶと、select() が全 holder（トグル用も含む）を
+      // まとめて解除する。
+      visionState.select('cataract');
       expect(visionState.bypassed, isFalse);
 
       tester.semantics.tap(semanticsFinder);
       await tester.pump();
-      expect(visionState.bypassed, isTrue, reason: '1 回目のトグルで ON');
-
-      tester.semantics.tap(semanticsFinder);
-      await tester.pump();
-      expect(visionState.bypassed, isFalse, reason: '2 回目のトグルで OFF');
+      expect(visionState.bypassed, isTrue,
+          reason: 'select() で holder が消えたあとも、次のタップで再び ON に'
+              'なるべき（ローカルにミラーした ON/OFF ではなく isHeldBy を'
+              '都度クエリするため、#79）');
 
       handle.dispose();
     });
 
-    testWidgets('フォーカスが当たると 2px の枠が表示される (#79 レビュー S4)', (tester) async {
+    testWidgets('フォーカスが当たると 2px の枠が表示される (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
       visionState.select('protanopia');
       await pumpHud(tester);

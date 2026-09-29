@@ -80,7 +80,7 @@ class VisionFilterState extends ChangeNotifier {
   /// #63 では単一の bool だったが、ホットキー（`hotkey_actions.dart`）と
   /// ルーペ HUD（`loupe_hud.dart`、#79）の両方が同時に「押している間だけ原画」を
   /// 要求しうるようになったため、入力元ごとの保持（holder）に変更した。片方が
-  /// 離してももう片方が保持していれば bypassed のままになる（#79 レビュー M3）。
+  /// 離してももう片方が保持していれば bypassed のままになる（#79）。
   /// 各呼び出し元は自分専用の識別子（Object の同一性で十分。文字列でも可）を
   /// [acquireBypass]/[releaseBypass] に渡し、同じ識別子で対にする。
   final Set<Object> _bypassHolders = {};
@@ -113,6 +113,14 @@ class VisionFilterState extends ChangeNotifier {
     _bypassHolders.clear();
     notifyListeners();
   }
+
+  /// [source] が現在 bypass を保持しているか（#79）。ホットキー
+  /// （`hotkey_actions.dart`）の hold/toggle 判定や、ルーペ HUD の原画比較
+  /// ボタンのトグル代替（`loupe_hud.dart`）が、ローカルにミラーした bool を
+  /// 持つ代わりにこれを直接クエリする — ローカルなミラーは `clearBypass()`
+  /// 等の外部からの一括解除に追従できず、解除済みなのに release し続けて
+  /// 何も起きない（あるいはその逆）というズレを起こすため。
+  bool isHeldBy(Object source) => _bypassHolders.contains(source);
 
   /// 選択中のフィルタ id（snake_case）。未選択なら null。
   String? get selectedId => _selectedId;
@@ -585,5 +593,20 @@ class VisionFilterState extends ChangeNotifier {
       }
     } while (result >= bound);
     return result;
+  }
+
+  /// dispose 済みかどうか（#79）。`loupe_hud.dart` の原画比較ボタンが
+  /// dispose 時に holder 解放をマイクロタスクへ遅延させる際、その時点で
+  /// この state 自体が既に dispose 済みなら何もしない（`notifyListeners()`
+  /// を dispose 後に呼ぶと落ちるため）ガードに使う。
+  bool _disposed = false;
+
+  /// dispose 済みかどうか。
+  bool get isDisposed => _disposed;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

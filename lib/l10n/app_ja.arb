@@ -188,6 +188,7 @@
   "bypassedBadgeLabel": "原画表示中",
 
   "hudCompareOriginalTooltip": "押している間だけ原画と比較",
+  "hudCompareOriginalHint": "ダブルタップで原画比較の切り替え",
   "hudConsultNoticeTooltip": "受診の目安があります。押すと詳細を表示",
   "hudConsultDialogTitle": "受診の目安",
   "hudOpenSettingsTooltip": "設定を開く"

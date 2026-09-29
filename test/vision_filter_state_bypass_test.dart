@@ -76,7 +76,7 @@ void main() {
     });
   });
 
-  group('入力元ごとの保持 (#79 レビュー M3)', () {
+  group('入力元ごとの保持 (#79)', () {
     test('2 つの holder が保持している間は、片方を release しても bypassed のまま', () {
       final state = VisionFilterState();
 

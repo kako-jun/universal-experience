@@ -1,15 +1,18 @@
 // HotkeyActions（#63）の単体テスト。すべてのコールバックをフェイクに差し替え、
 // 実 OS のホットキー/window_manager 無しで検証する。
 //
-// #79: bypass は acquireBypass/releaseBypass/clearBypass（入力元ごとの保持）
-// 経由になった。ここでは HotkeyActions 自身の hold/toggle/非常口ロジックだけを
-// 検証するため、フェイクの acquire/release/clear はローカルな bool 変数を
-// 直接書き換えるだけの単純なものにしている（実際の複数 holder の振る舞いは
-// `test/vision_filter_state_bypass_test.dart`、ホットキーと HUD の相互作用は
-// `test/loupe_hud_test.dart` で検証する）。
+// #79: bypass は acquireBypass/releaseBypass/clearBypass/isHeldBy（入力元ごと
+// の保持）経由になった。ほとんどのテストは HotkeyActions 自身の hold/toggle/
+// 非常口ロジックだけを検証するため、フェイクの acquire/release/clear はローカル
+// な bool 変数を直接書き換えるだけの単純なものにしている（実際の複数 holder の
+// 振る舞いは `test/vision_filter_state_bypass_test.dart`、ホットキーと HUD の
+// 相互作用は `test/loupe_hud_test.dart` で検証する）。ただし「外部からの
+// clearBypass に追従できず ON にならない」バグの再現には実際の
+// VisionFilterState を使う 1 本がある。
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/services/hotkey_actions.dart';
+import 'package:universal_experience/services/vision_filter_state.dart';
 
 void main() {
   group('HotkeyActions.toggleClickThrough', () {
@@ -27,6 +30,7 @@ void main() {
         acquireBypass: () {},
         releaseBypass: () {},
         clearBypass: () {},
+        isBypassHeldByHotkey: () => false,
         showAndFocusLoupe: () async {},
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async {},
@@ -54,6 +58,7 @@ void main() {
         acquireBypass: () => bypassed = true,
         releaseBypass: () => bypassed = false,
         clearBypass: () => bypassed = false,
+        isBypassHeldByHotkey: () => bypassed,
         showAndFocusLoupe: () async {},
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async {},
@@ -78,6 +83,7 @@ void main() {
         acquireBypass: () => bypassed = true,
         releaseBypass: () => bypassed = false,
         clearBypass: () => bypassed = false,
+        isBypassHeldByHotkey: () => bypassed,
         showAndFocusLoupe: () async {},
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async {},
@@ -100,6 +106,7 @@ void main() {
         acquireBypass: () => bypassed = true,
         releaseBypass: () => bypassed = false,
         clearBypass: () => bypassed = false,
+        isBypassHeldByHotkey: () => bypassed,
         showAndFocusLoupe: () async {},
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async {},
@@ -127,6 +134,7 @@ void main() {
         acquireBypass: () => bypassed = true,
         releaseBypass: () => bypassed = false,
         clearBypass: () => bypassed = false,
+        isBypassHeldByHotkey: () => bypassed,
         showAndFocusLoupe: () async {},
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async {},
@@ -161,6 +169,7 @@ void main() {
         acquireBypass: () => bypassed = true,
         releaseBypass: () => bypassed = false,
         clearBypass: () => bypassed = false,
+        isBypassHeldByHotkey: () => bypassed,
         showAndFocusLoupe: () async {},
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async {},
@@ -197,6 +206,7 @@ void main() {
           bypassed = false;
         },
         clearBypass: () => bypassed = false,
+        isBypassHeldByHotkey: () => bypassed,
         showAndFocusLoupe: () async {},
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async {},
@@ -205,6 +215,48 @@ void main() {
       actions.holdOriginalKeyUp();
       expect(releaseCalls, 0);
       expect(bypassed, isFalse);
+    });
+
+    test(
+        'トグルモードで外部から holder が clear された後、次の keyDown 1 回で ON になる '
+        '(#79)', () {
+      // 実際の VisionFilterState を使う — ローカルにミラーした bool
+      // （旧 `_heldByHotkey`）だと、フィルタ選択等の外部操作が holder を
+      // まとめて解除しても追従できず、次の keyDown が「まだ保持している」と
+      // 誤認して release を呼ぶだけ（実際には何も起きず ON にならない）
+      // というバグがあった。isBypassHeldByHotkey は都度クエリするので
+      // 正しく ON になる。
+      final visionState = VisionFilterState();
+      const hotkeySource = 'hotkey';
+      var now = DateTime(2026, 1, 1, 0, 0, 0);
+      final actions = HotkeyActions(
+        deactivateFilters: () {},
+        setClickThrough: (value) async {},
+        setAlwaysOnTop: (value) async {},
+        getClickThrough: () => false,
+        acquireBypass: () => visionState.acquireBypass(hotkeySource),
+        releaseBypass: () => visionState.releaseBypass(hotkeySource),
+        clearBypass: visionState.clearBypass,
+        isBypassHeldByHotkey: () => visionState.isHeldBy(hotkeySource),
+        showAndFocusLoupe: () async {},
+        toggleLoupeVisible: () async {},
+        setLoupeVisible: (value) async {},
+        now: () => now,
+      );
+
+      // トグルモード（keyUp 未到達）で ON にする。
+      actions.holdOriginalKeyDown();
+      expect(visionState.bypassed, isTrue);
+
+      // フィルタ選択などの外部操作が全 holder を一括解除する。
+      visionState.clearBypass();
+      expect(visionState.bypassed, isFalse);
+
+      // 1100ms 以上空けた次の keyDown は ON になるべき（stale なローカル
+      // 状態に基づいて release を呼んでしまってはいけない）。
+      now = now.add(const Duration(milliseconds: 1200));
+      actions.holdOriginalKeyDown();
+      expect(visionState.bypassed, isTrue);
     });
   });
 
@@ -231,6 +283,7 @@ void main() {
           clearCalls++;
           bypassed = false;
         },
+        isBypassHeldByHotkey: () => bypassed,
         showAndFocusLoupe: () async => showAndFocusCalled = true,
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async => loupeVisiblePassed = value,
@@ -262,6 +315,7 @@ void main() {
         acquireBypass: () => bypassed = true,
         releaseBypass: () => bypassed = false,
         clearBypass: () => bypassed = false,
+        isBypassHeldByHotkey: () => bypassed,
         showAndFocusLoupe: () async => throw Exception('boom'),
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async => loupeVisiblePassed = value,
@@ -292,6 +346,7 @@ void main() {
         acquireBypass: () => bypassed = true,
         releaseBypass: () => bypassed = false,
         clearBypass: () => bypassed = false,
+        isBypassHeldByHotkey: () => bypassed,
         showAndFocusLoupe: () async => showAndFocusCalled = true,
         toggleLoupeVisible: () async {},
         setLoupeVisible: (value) async => loupeVisiblePassed = value,

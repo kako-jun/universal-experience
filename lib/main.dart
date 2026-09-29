@@ -298,6 +298,8 @@ void main() async {
       acquireBypass: () => visionFilterState.acquireBypass(_hotkeyBypassSource),
       releaseBypass: () => visionFilterState.releaseBypass(_hotkeyBypassSource),
       clearBypass: visionFilterState.clearBypass,
+      isBypassHeldByHotkey: () =>
+          visionFilterState.isHeldBy(_hotkeyBypassSource),
       showAndFocusLoupe: trayService.onShowLoupe,
       toggleLoupeVisible: trayService.toggleLoupeVisible,
       setLoupeVisible: trayService.setLoupeVisible,

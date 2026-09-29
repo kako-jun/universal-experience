@@ -475,6 +475,10 @@
   "@hudCompareOriginalTooltip": {
     "description": "Tooltip/semantics label for the loupe HUD's compare-original button (#79). Pressing and holding sets VisionFilterState.bypassed to true; releasing (or the pointer leaving the button, or a cancelled gesture) always sets it back to false."
   },
+  "hudCompareOriginalHint": "Double-tap to toggle comparing with the original",
+  "@hudCompareOriginalHint": {
+    "description": "Semantics hint for the loupe HUD's compare-original button (#79), describing the toggle alternative (Semantics.onTap) for people who can't sustain a press-and-hold gesture."
+  },
   "hudConsultNoticeTooltip": "Medical guidance available — tap for details",
   "@hudConsultNoticeTooltip": {
     "description": "Tooltip/semantics label for the loupe HUD's consult-notice icon (#79), shown only when resolveConsultNotice returns a non-null notice for the current selection. Tapping opens a dialog with the full ConsultNoticeBlock text."

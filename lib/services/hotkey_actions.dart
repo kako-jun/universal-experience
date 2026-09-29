@@ -11,6 +11,7 @@ class HotkeyActions {
     required this.acquireBypass,
     required this.releaseBypass,
     required this.clearBypass,
+    required this.isBypassHeldByHotkey,
     required this.showAndFocusLoupe,
     required this.toggleLoupeVisible,
     required this.setLoupeVisible,
@@ -31,13 +32,6 @@ class HotkeyActions {
   /// (#63)。
   static const Duration _repeatDebounce = Duration(milliseconds: 1100);
 
-  /// このホットキー自身が原画比較の holder を確保しているか（#79）。
-  /// `VisionFilterState.bypassed`（[acquireBypass]/[releaseBypass] の裏側）は
-  /// 「誰か 1 人でも保持していれば true」のグローバルな値になったため、
-  /// hold/toggle 判定はホットキー自身のこのローカルなフラグで行う（HUD 等
-  /// 他の入力元が保持しているかどうかに左右されないようにするため）。
-  bool _heldByHotkey = false;
-
   /// filterService.deactivate() + visionFilterState.clear() 相当。
   final void Function() deactivateFilters;
   final Future<void> Function(bool value) setClickThrough;
@@ -57,6 +51,17 @@ class HotkeyActions {
   /// hold/toggle には使わない。
   final void Function() clearBypass;
 
+  /// このホットキー専用の holder を今まさに保持しているか（#79。呼び出し元が
+  /// `VisionFilterState.isHeldBy` にホットキー専用の識別子を束縛して渡す）。
+  ///
+  /// hold/toggle 判定はこれで行う（グローバルな `VisionFilterState.bypassed`
+  /// ではなく）。以前はホットキー側にローカルな bool（`_heldByHotkey`）を
+  /// ミラーしていたが、`clearBypass()`（フィルタ選択・非常口）で外部から
+  /// holder が解除されてもローカルな bool は追従せず、次の keyDown が
+  /// 「まだ保持している」と誤認して release を呼び、実際には何も起きない
+  /// （ON にならない）バグがあった。都度クエリすることでこのズレを無くす。
+  final bool Function() isBypassHeldByHotkey;
+
   /// ルーペ窓を表示して前面化する（windowManager.show() + focus() 相当）。
   final Future<void> Function() showAndFocusLoupe;
 
@@ -75,18 +80,15 @@ class HotkeyActions {
   /// 押している間だけ原画を表示 (#63)。
   ///
   /// - keyUp が一度でも届いた環境（[_keyUpSeen]）: 以降の keyDown は常に
-  ///   holder を確保するだけ（[_acquireIfNeeded] が冪等）。keyUp が常に解放
-  ///   するので、正しい hold 挙動になる。
+  ///   holder を確保するだけ（既に確保済みなら [acquireBypass] は呼ばない）。
+  ///   keyUp が常に解放するので、正しい hold 挙動になる。
   /// - keyUp が一度も届いていない環境: keyDown のたびに確保/解放をトグルする
   ///   が、直前の keyDown から [_repeatDebounce]（1100ms）以内の keyDown は
   ///   OS のキーリピートとみなして無視する（押しっぱなしで OS が keyDown を
   ///   連続送出する環境でも 1 回のトグルにしかならないようにする、#63）。
-  ///
-  /// トグル判定はグローバルな `VisionFilterState.bypassed` ではなく
-  /// [_heldByHotkey]（ホットキー自身が保持しているかどうか）で行う（#79）。
   void holdOriginalKeyDown() {
     if (_keyUpSeen) {
-      _acquireIfNeeded();
+      if (!isBypassHeldByHotkey()) acquireBypass();
       return;
     }
     final now = _now();
@@ -96,29 +98,17 @@ class HotkeyActions {
       return;
     }
     _lastKeyDownAt = now;
-    if (_heldByHotkey) {
-      _releaseIfNeeded();
+    if (isBypassHeldByHotkey()) {
+      releaseBypass();
     } else {
-      _acquireIfNeeded();
+      acquireBypass();
     }
   }
 
   void holdOriginalKeyUp() {
     _keyUpSeen = true;
     _lastKeyDownAt = null;
-    _releaseIfNeeded();
-  }
-
-  void _acquireIfNeeded() {
-    if (_heldByHotkey) return;
-    _heldByHotkey = true;
-    acquireBypass();
-  }
-
-  void _releaseIfNeeded() {
-    if (!_heldByHotkey) return;
-    _heldByHotkey = false;
-    releaseBypass();
+    if (isBypassHeldByHotkey()) releaseBypass();
   }
 
   /// 非常口: 全フィルタ停止 + 原画表示解除 + クリックスルー解除 + 最前面解除 +
@@ -135,7 +125,6 @@ class HotkeyActions {
   /// 経路なので、HUD 等の他入力元が原画比較中でも一緒に解除する。
   Future<void> emergencyExit() async {
     deactivateFilters();
-    _heldByHotkey = false;
     clearBypass();
 
     await _runStep(() => setClickThrough(false));
