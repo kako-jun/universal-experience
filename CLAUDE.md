@@ -46,6 +46,7 @@ lib/
     ├── screens/home_screen.dart
     ├── widgets/                     # filter_selector, intensity_slider, before_after_view,
     │                                 # experience_presets, filter_catalog_selector, filter_param_panel,
+    │                                 # consult_notice_block（受診喚起の共有表示ウィジェット、#76）,
     │                                 # window_mode_panel（起動モード・最前面・クリックスルー・
     │                                 # ホットキー一覧、#63）
     └── theme/app_theme.dart

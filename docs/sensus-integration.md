@@ -596,8 +596,30 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   `ColorScheme` のロールのみ（`tertiaryContainer`/`errorContainer`/
   `surfaceContainerHighest`）を使う。`urgency_escalation()` の条件文
   （英語）は `l10n_extensions.dart` の `escalationConditionText` で ja/en の
-  対応表を引き、訳が無ければ英語のままフォールバックする。喚起の末尾には
-  「一般的な案内であり、診断ではない」（`consultDisclaimer`）を必ず添える。
+  対応表を引き、訳が無ければ英語のままフォールバックする。喚起文からは診療科名
+  を外した（めまい系フィルタは眼科の話ではないため。Opus レビュー S4）。
+- **#76 レビュー M1: 喚起の解決とその表示を 1 箇所に共有化**。1 巡目の Opus
+  レビューで「パネル・プリセットカード・export でそれぞれ受診喚起を組み立てて
+  いて、3 か所が食い違いうる」という指摘（must）を受け、
+  `lib/l10n/l10n_extensions.dart` の `ConsultNotice` / `resolveConsultNotice`
+  （urgency + escalation → 喚起文・escalation の訳・免責文をまとめて解決する
+  唯一の関数）と、`lib/ui/widgets/consult_notice_block.dart` の
+  `ConsultNoticeBlock`（表示ウィジェット）を切り出した。`FilterParamPanel`・
+  `ExperiencePresets` のカード・`before_after_view.dart` の export の 3 か所が
+  これを共有する。export（`ExportCaption` / `export_service.dart`）にも
+  免責文（短い形）と escalation の行を必ず焼き込む。
+- **#76 レビュー M2: 免責文に医療監修の非該当と出典を明記**。免責文
+  （`consultDisclaimer`）に「医療監修を受けたものではありません」を追加し、
+  根拠として sensus の公開ドキュメント（[Medical notes 節](https://github.com/kako-jun/sensus/blob/main/docs/overview.md)）
+  への参照を示す。UI は `ConsultNoticeBlock` が URL を選択可能なテキストとして
+  表示する（新規依存を避けるため、生きたハイパーリンクにはしていない）。PNG
+  焼き込みは帯を圧迫しないよう短い形（`consultDisclaimerShort`、「根拠: sensus
+  Medical notes」）を使う。
+- **#76 レビュー N4: escalation を emergency/earlyConsultation で見出しを
+  分ける**。現状 vision フィルタの escalation は全て earlyConsultation だが、
+  `HearingFilter` の聴力低下系は emergency 段も持つ（§10 冒頭参照）。聴覚側の
+  UI（#80）が同じ `ConsultNoticeBlock` を再利用できるよう、両方の見出しを
+  最初から用意した。
 - **#77: 推奨強度の唯一の正本**。`VisionFilterState` はフィルタ id ごとに
   strength/payload を記憶する（`_strengthById` / `_paramsById`）。初めて
   選ぶフィルタは `recommended_strength()` の値から始まり（旧仕様は全フィルタ
@@ -605,10 +627,18 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   — #51 注記1）、以後はフィルタを切り替えても保持される。「推奨値に戻す」
   ボタン（`resetToRecommended()`）で強度・パラメータの両方を戻せる。体験
   プリセット（`selectPreset`）は #60 で入れていた「強制的に 1.0 に戻す」を
-  「常に推奨値に戻す」へ置き換えた。色覚のクイック選択（#57）は従来どおり
-  `FilterService`/`recommendedStrength(ColorVisionType)` のタイプ別記憶を使う
-  （sensus 0.6.1 の CVD 3 型の推奨値は 1.0、-omaly 相当の
+  「常に推奨値に戻す」へ置き換え、パラメータも常にカタログ既定値へ戻す
+  （#76 レビュー N1）。既定値の組み立て（`_defaultParamsFor`）と推奨強度の
+  解決（`_recommendedStrength`）は `_selectInternal`/`resetToRecommended`/
+  `selectPreset` の 3 箇所が共有する（#76 レビュー N3）。色覚のクイック選択
+  （#57）は従来どおり `FilterService`/`recommendedStrength(ColorVisionType)`
+  のタイプ別記憶を使う（sensus 0.6.1 の CVD 3 型の推奨値は 1.0、-omaly 相当の
   `kAnomalyDefaultSeverity` は 0.6 のままで整合している）。
+  **既知の限界（#76 レビュー N8）**: `recommended_strength()` は sensus 側で
+  `f32` として計算される。FRB は `f32` をそのまま Dart の `double`（f64）へ
+  渡すため、ビット拡張時の丸め誤差（実用上は無視できる程度、1e-7 未満）が
+  乗る可能性がある。厳密な決定論的値（例えば永続化した値の再比較）が必要に
+  なったら、この丸めを考慮すること。
 - **FFI 制約と provider seam**: `#[frb(sync)]` 関数は native lib を要求し、
   ネイティブブリッジ未初期化のプレーンな `flutter test` からは呼べない
   （§7 と同じ制約）。`experiencesProvider` 等の既存 seam は宣言ファイル
@@ -620,5 +650,12 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   widget/unit test は `test/support/vision_filter_metadata_fixture.dart` の
   フィクスチャ（既定値は旧挙動と同じ urgency=none・strength=1.0）に差し替える。
   実ブリッジとの一致自体は
-  `integration_test/vision_filter_urgency_parity_test.dart` が検証する。
+  `integration_test/vision_filter_urgency_parity_test.dart` が検証する
+  （sensus の escalation 条件文が変わっても、ja 訳が対応表に無ければこの
+  integration test が検知する、#76 レビュー S1）。
 - **citation() / limitations()**: 公開のみ行い、UI 配線は #80 のスコープ。
+- **#65（永続化）向けの注意点（#76 レビュー N9）**: `VisionFilterState` の
+  `_strengthById`/`_paramsById` はそのまま永続化できる構造にしてあるが、
+  `_paramsById` の値は seed パラメータを [BigInt] で持つ（`kSeedMax` 参照）。
+  `BigInt` は `jsonEncode` が標準ではシリアライズできないため、#65 で永続化
+  する際は seed を文字列（10進数）化するなど明示的な変換が要る。
