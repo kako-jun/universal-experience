@@ -596,17 +596,24 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     try {
       final strengthPercent = (strength.clamp(0.0, 1.0) * 100).round();
       final date = isoDate(DateTime.now());
-      // #76: プレビューの注記（FilterParamPanel）と同じ正本（sensus ブリッジの
-      // urgency）・同じ文言（urgencyConsultMessage）を export の焼き込みにも使う。
-      // 色覚 7 型は urgency=none（プレビューでも喚起なし）なので自然に null になる。
-      final urgencyMessage = afterFilter == null
+      // #76 レビュー M1: プレビューの注記（FilterParamPanel・
+      // ExperiencePresets）と同じ正本・同じ解決経路（resolveConsultNotice）を
+      // export の焼き込みにも使う。色覚 7 型は urgency=none かつ escalation も
+      // 無いので notice は自然に null になる。
+      final notice = afterFilter == null
           ? null
-          : urgencyConsultMessage(l10n, visionFilterUrgencyProvider(afterFilter));
+          : resolveConsultNotice(
+              l10n,
+              visionFilterUrgencyProvider(afterFilter),
+              visionFilterUrgencyEscalationProvider(afterFilter),
+            );
       final caption = ExportCaption(
         symptomLabel: _displayName(l10n, colorVisionType, filterId),
         strengthLabel: l10n.strengthLabel(strengthPercent),
         isoDate: date,
-        urgencyMessage: urgencyMessage,
+        urgencyMessage: notice?.message,
+        escalationLines: [for (final e in notice?.escalations ?? const []) e.text],
+        disclaimer: notice?.disclaimerShort,
       );
 
       final composed = await exportImageComposer(base, caption);

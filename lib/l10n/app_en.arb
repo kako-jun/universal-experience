@@ -151,21 +151,29 @@
   "@resetToRecommendedStrength": {
     "description": "Button that resets the selected filter's strength and parameters back to sensus's recommended_strength and the catalog's default parameter values (#77)."
   },
-  "consultEarly": "If this is how you see, consider getting your eyes checked.",
+  "consultEarly": "If these symptoms continue, consider talking to a healthcare professional.",
   "@consultEarly": {
-    "description": "Gentle prompt to seek an unhurried eye exam for early-consultation-urgency conditions. Must not alarm or over-promise."
+    "description": "Gentle prompt for early-consultation-urgency conditions. Deliberately names no medical department (many of these filters, e.g. vertigo, aren't an eye complaint) — #76 review S4. Must not alarm or over-promise."
   },
-  "consultEmergency": "Sudden changes in vision can need prompt medical attention.",
+  "consultEmergency": "If these symptoms appear suddenly, seek medical care right away.",
   "@consultEmergency": {
-    "description": "Prompt to seek timely care for emergency-urgency conditions. Must be accurate and not alarmist."
+    "description": "Firmer prompt for emergency-urgency conditions. Deliberately names no medical department (#76 review S4). Must be accurate and not alarmist."
   },
-  "consultDisclaimer": "This is general guidance, not a medical diagnosis.",
+  "consultDisclaimer": "This is general guidance, not a medical diagnosis. It has not been reviewed by a medical professional. Source: sensus Medical notes",
   "@consultDisclaimer": {
-    "description": "Disclaimer shown alongside every consult note (advanced filter panel, experience presets, and PNG export), stating this app does not diagnose (#76)."
+    "description": "Full disclaimer shown in the UI (advanced filter panel and experience presets) alongside every consult note, stating this app does not diagnose and has not had medical review, with a citation to sensus's own Medical notes doc (#76 review M2). The actual URL is shown separately as selectable text (ConsultNoticeBlock), not embedded in this string."
   },
-  "escalationHeader": "See a doctor if:",
-  "@escalationHeader": {
-    "description": "Header introducing the list of conditions under which a normally-low-urgency filter's urgency actually escalates (Filter::urgency_escalation(), #76)."
+  "consultDisclaimerShort": "Source: sensus Medical notes",
+  "@consultDisclaimerShort": {
+    "description": "Compact disclaimer burned into the exported PNG caption (#76 review M1/M2) — kept short so the caption band stays small. The UI uses the longer consultDisclaimer instead."
+  },
+  "escalationHeaderEarly": "Consider seeing a doctor if:",
+  "@escalationHeaderEarly": {
+    "description": "Header introducing the EarlyConsultation-tier escalation conditions (Filter::urgency_escalation() / HearingFilter::urgency_escalation(), #76 review N4)."
+  },
+  "escalationHeaderEmergency": "See a doctor right away if:",
+  "@escalationHeaderEmergency": {
+    "description": "Header introducing the Emergency-tier escalation conditions (#76 review N4). Vision filters never escalate to Emergency today, but HearingFilter's hearing-loss family does — this header is ready for that UI (#80)."
   },
   "escalationConditionPhotophobiaSevere": "sudden, severe light sensitivity with eye pain or a headache",
   "@escalationConditionPhotophobiaSevere": {

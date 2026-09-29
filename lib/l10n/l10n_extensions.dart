@@ -324,6 +324,89 @@ String escalationConditionText(AppLocalizations l10n, String condition) {
   }
 }
 
+/// sensus の公開ドキュメントのうち、受診喚起の根拠（Medical notes 節）を指す URL。
+/// [ConsultNotice.citationUrl] の値。UI（`ConsultNoticeBlock`）はこれを
+/// 選択可能なテキストとして表示する（#76 レビュー M2）。
+const String kSensusMedicalNotesUrl =
+    'https://github.com/kako-jun/sensus/blob/main/docs/overview.md';
+
+/// [resolveConsultNotice] が返す、条件付きエスカレーション 1 行（表示用に
+/// 解決済み）。
+class ConsultEscalationLine {
+  const ConsultEscalationLine({required this.urgency, required this.text});
+
+  /// 条件が満たされたときの緊急度（見出しの出し分けに使う、#76 レビュー N4）。
+  final Urgency urgency;
+
+  /// [escalationConditionText] で解決済みの条件文（訳が無ければ英語）。
+  final String text;
+}
+
+/// 受診喚起の解決結果（#76 レビュー M1）。
+///
+/// urgency/escalation から「何を表示するか」を **1 箇所**（[resolveConsultNotice]）
+/// で決め、advanced カタログ（`FilterParamPanel`）・体験プリセットのカード
+/// （`ExperiencePresets`）・PNG export（`before_after_view.dart` /
+/// `export_service.dart`）の 3 箇所がこの結果を共有する。UI 表示は
+/// `ConsultNoticeBlock`（`lib/ui/widgets/consult_notice_block.dart`）が担う。
+class ConsultNotice {
+  const ConsultNotice({
+    required this.urgency,
+    required this.message,
+    required this.escalations,
+    required this.disclaimer,
+    required this.disclaimerShort,
+    required this.citationUrl,
+  });
+
+  /// 喚起の緊急度（sensus 由来）。
+  final Urgency urgency;
+
+  /// 喚起文（[urgency] が `none` なら null）。
+  final String? message;
+
+  /// 条件付きで緊急度が上がる場合の一覧（表示用に解決済み）。
+  final List<ConsultEscalationLine> escalations;
+
+  /// UI 用の免責文（医療監修を受けていない旨・根拠への言及を含む、#76 レビュー M2）。
+  final String disclaimer;
+
+  /// PNG 焼き込み用の短い免責文（`ExportCaption.disclaimer`、#76 レビュー M1）。
+  final String disclaimerShort;
+
+  /// 免責文が参照する根拠（sensus の Medical notes）への URL。
+  final Uri citationUrl;
+}
+
+/// urgency/escalation から [ConsultNotice] を解決する（#76 レビュー M1）。
+///
+/// [urgency] が `none` かつ [escalation] が空なら、表示する喚起が無いので
+/// `null` を返す。呼び出し側（`FilterParamPanel`・`ExperiencePresets`・
+/// `before_after_view.dart`）はこの 1 関数だけを呼べばよく、喚起文・
+/// escalation の訳・免責文をそれぞれ個別に解決しない。
+ConsultNotice? resolveConsultNotice(
+  AppLocalizations l10n,
+  Urgency urgency,
+  List<UrgencyEscalation> escalation,
+) {
+  final message = urgencyConsultMessage(l10n, urgency);
+  if (message == null && escalation.isEmpty) return null;
+  return ConsultNotice(
+    urgency: urgency,
+    message: message,
+    escalations: [
+      for (final e in escalation)
+        ConsultEscalationLine(
+          urgency: e.urgency,
+          text: escalationConditionText(l10n, e.condition),
+        ),
+    ],
+    disclaimer: l10n.consultDisclaimer,
+    disclaimerShort: l10n.consultDisclaimerShort,
+    citationUrl: Uri.parse(kSensusMedicalNotesUrl),
+  );
+}
+
 /// 起動時ロケールの [AppLocalizations] からトレイメニュー文言を組み立てる (#18)。
 ///
 /// トレイは BuildContext を持てないため、`AppLocalizations.of(context)` ではなく

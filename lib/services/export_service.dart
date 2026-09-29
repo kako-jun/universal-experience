@@ -54,14 +54,16 @@ String _sanitizeForFilename(String raw) {
 /// [composeExportImage] に焼き込むキャプション（**解決済み i18n 文字列**）。
 ///
 /// service を pure に保つため、enum/id ではなく既にローカライズされた文字列を受ける。
-/// 文言の解決（`colorVisionTypeName` / `urgencyConsultMessage` / 強度ラベル /
-/// `isoDate`）は呼び出し側（UI）の責務。
+/// 文言の解決（`colorVisionTypeName` / `resolveConsultNotice` / 強度ラベル /
+/// `isoDate`）は呼び出し側（UI、`before_after_view.dart`）の責務。
 class ExportCaption {
   const ExportCaption({
     required this.symptomLabel,
     required this.strengthLabel,
     required this.isoDate,
     this.urgencyMessage,
+    this.escalationLines = const [],
+    this.disclaimer,
   });
 
   /// 症状の表示名（例「1型2色覚（赤）」/ "Protanopia"）。
@@ -73,6 +75,15 @@ class ExportCaption {
   /// 受診喚起メッセージ。null = 喚起なし（色覚特性は緊急性 none のため通常 null）。
   final String? urgencyMessage;
 
+  /// 条件付きエスカレーションの条件文（解決済み、#76 レビュー M1）。
+  /// [urgencyMessage] が null でも非空になり得る（urgency=none だが
+  /// escalation を持つフィルタ、例: BPPV）。
+  final List<String> escalationLines;
+
+  /// 免責文の短い形（`ConsultNotice.disclaimerShort`、#76 レビュー M1/M2）。
+  /// null = 喚起なし（[urgencyMessage] と [escalationLines] がどちらも無い）。
+  final String? disclaimer;
+
   /// ISO 日付（`YYYY-MM-DD`）。[isoDate] 関数で整形済みの文字列を渡す。
   final String isoDate;
 }
@@ -80,20 +91,26 @@ class ExportCaption {
 /// [base] 画像の下部にキャプション帯を合成した新しい [ui.Image] を返す。
 ///
 /// `PictureRecorder` + `Canvas` で base をそのまま描き、下に半透明の帯を敷いて
-/// [TextPainter] で症状名 / 強度 / 受診喚起（あれば）/ ISO 日付を描画する。戻り画像の
-/// 高さは `base.height + 帯の高さ`、幅は `base.width`。
+/// [TextPainter] で症状名 / 強度 / 受診喚起（あれば）/ escalation（あれば）/
+/// 免責文（あれば）/ ISO 日付を描画する。戻り画像の高さは
+/// `base.height + 帯の高さ`、幅は `base.width`。
 ///
 /// **pure**: 引数の解決済み文字列のみを使い、enum/i18n をここで引かない（規律2）。
 /// I/O を持たない（規律3）。
 Future<ui.Image> composeExportImage(
     ui.Image base, ExportCaption caption) async {
   final width = base.width;
-  // 行リストを組む（urgencyMessage は任意）。
+  // 行リストを組む（urgencyMessage/escalationLines/disclaimer はいずれも
+  // 任意。#76 レビュー M1: 免責文と escalation の行も必ず焼き込む）。
   final lines = <_CaptionLine>[
     _CaptionLine(caption.symptomLabel, _Style.title),
     _CaptionLine(caption.strengthLabel, _Style.body),
     if (caption.urgencyMessage != null)
       _CaptionLine(caption.urgencyMessage!, _Style.note),
+    for (final line in caption.escalationLines)
+      _CaptionLine('• $line', _Style.note),
+    if (caption.disclaimer != null)
+      _CaptionLine(caption.disclaimer!, _Style.meta),
     _CaptionLine(caption.isoDate, _Style.meta),
   ];
 
