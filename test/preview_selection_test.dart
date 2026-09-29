@@ -8,7 +8,12 @@ import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/preview_selection.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 
+import 'support/vision_filter_metadata_fixture.dart';
+
 void main() {
+  setUp(installVisionFilterMetadataFixture);
+  tearDown(resetVisionFilterMetadataProviders);
+
   group('previewStrength', () {
     test('bypassed のときは isColorQuickSelection に関わらず常に 0.0', () {
       final filterService = FilterService();

@@ -122,6 +122,13 @@ jobs:
       - name: Flutter integration test (macos, cpu_preview_all_filters_test)
         run: flutter test integration_test/cpu_preview_all_filters_test.dart -d macos
 
+      # urgency/urgency_escalation/recommended_strength（#76/#77）が
+      # kVisionFilterCatalog 全 30 種で実ブリッジ経由で sensus-core 0.6.1 の値を
+      # 一致して返すことを確認する。widget/unit test はフィクスチャ止まりなので
+      # ここが実ブリッジとの一致を保証する唯一の場所。
+      - name: Flutter integration test (macos, vision_filter_urgency_parity_test)
+        run: flutter test integration_test/vision_filter_urgency_parity_test.dart -d macos
+
   # Linux でも cargokit (#55) が rust/ crate を実際にビルドして同梱することを
   # 検証する。macOS の `check` job は golden テスト用に必須だが、Linux 側の
   # 同梱経路（linux/CMakeLists.txt の apply_cargokit、rpath $ORIGIN/lib）は
@@ -216,3 +223,8 @@ jobs:
       # 全 30 種で実ブリッジ経由で例外なく動くことを確認する（macOS 側と対）。
       - name: Flutter integration test (linux, cpu_preview_all_filters_test)
         run: xvfb-run -a flutter test integration_test/cpu_preview_all_filters_test.dart -d linux
+
+      # urgency/urgency_escalation/recommended_strength（#76/#77）が実ブリッジ
+      # 経由で sensus-core 0.6.1 の値と一致することを確認する（macOS 側と対）。
+      - name: Flutter integration test (linux, vision_filter_urgency_parity_test)
+        run: xvfb-run -a flutter test integration_test/vision_filter_urgency_parity_test.dart -d linux

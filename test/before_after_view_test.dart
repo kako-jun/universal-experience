@@ -12,6 +12,8 @@ import 'package:universal_experience/services/export_service.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 
+import 'support/vision_filter_metadata_fixture.dart';
+
 /// BeforeAfterView の before/after 生成ロジックと描画カバレッジのテスト（#17）。
 ///
 /// 静的ヘルパ（generateSampleImage / renderAfter）を直接検証する。
@@ -971,11 +973,16 @@ void main() {
     });
 
     group('export の caption (#85 レビュー S8)', () {
+      // #76: _export は urgencyConsultMessage 用に visionFilterUrgencyProvider
+      // （sensus ブリッジ）を呼ぶ。実ブリッジは native lib を要求するため
+      // flutter test ではフィクスチャに差し替える。
+      setUp(installVisionFilterMetadataFixture);
       tearDown(() {
         sampleImageGenerator = BeforeAfterView.generateSampleImage;
         afterImageRenderer = BeforeAfterView.renderAfter;
         exportImageComposer = composeExportImage;
         pngSaver = savePng;
+        resetVisionFilterMetadataProviders();
       });
 
       testWidgets(

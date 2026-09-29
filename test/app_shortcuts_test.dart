@@ -20,6 +20,8 @@ import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
+import 'support/vision_filter_metadata_fixture.dart';
+
 /// isFocusOnInteractiveControl のテスト専用ダミー Intent（本番の 3 Intent の
 /// 代わりに、ガードのロジックだけを最小構成で検証するために使う）。
 class _ProbeIntent extends Intent {
@@ -29,9 +31,13 @@ class _ProbeIntent extends Intent {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() => experiencesProvider = () => const []);
+  setUp(() {
+    experiencesProvider = () => const [];
+    installVisionFilterMetadataFixture();
+  });
   tearDown(() async {
     experiencesProvider = experiences;
+    resetVisionFilterMetadataProviders();
     // トップレベル共有シングルトンをテスト間で汚染しない（#63）。clear() は
     // strength をリセットしない既存仕様のため、明示的に既定へ戻す。
     visionFilterState.clear();

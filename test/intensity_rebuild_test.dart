@@ -23,7 +23,12 @@ import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/settings_service.dart';
 
+import 'support/vision_filter_metadata_fixture.dart';
+
 void main() {
+  setUp(installVisionFilterMetadataFixture);
+  tearDown(resetVisionFilterMetadataProviders);
+
   testWidgets(
       'スライダーをドラッグしている間、SettingsService は notifyListeners されない（MaterialApp 再構築なし、#57）',
       (WidgetTester tester) async {

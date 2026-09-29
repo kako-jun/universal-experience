@@ -19,14 +19,18 @@ import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 
+import 'support/vision_filter_metadata_fixture.dart';
+
 void main() {
   late FilterService filterService;
   late VisionFilterState visionState;
 
   setUp(() {
+    installVisionFilterMetadataFixture();
     filterService = FilterService();
     visionState = VisionFilterState();
   });
+  tearDown(resetVisionFilterMetadataProviders);
 
   group('selectColorVision', () {
     test('色覚型を選ぶと FilterService と VisionFilterState の両方が更新される', () {

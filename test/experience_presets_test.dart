@@ -26,6 +26,8 @@ import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
+import 'support/vision_filter_metadata_fixture.dart';
+
 /// テスト用の 4 体験 fixture（sensus の experiences() と同じ id / vision / hearing /
 /// urgency）。実 bridge は native を要求するため fixture で代替する。
 List<Experience> _fixtureExperiences() => const [
@@ -59,10 +61,14 @@ void main() {
 
   setUp(() {
     experiencesProvider = _fixtureExperiences;
+    installVisionFilterMetadataFixture();
     visionState = VisionFilterState();
     filterService = FilterService();
   });
-  tearDown(() => experiencesProvider = experiences);
+  tearDown(() {
+    experiencesProvider = experiences;
+    resetVisionFilterMetadataProviders();
+  });
 
   Future<void> pumpPresets(WidgetTester tester, Locale locale) async {
     // ListView 内の全カードが lazy build されるよう十分高いビューポートにする。

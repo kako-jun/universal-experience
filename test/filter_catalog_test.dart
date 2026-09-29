@@ -3,13 +3,22 @@ import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 
+import 'support/vision_filter_metadata_fixture.dart';
+
 /// vision_filter_catalog（#16）の不変条件と vision_filter_state.build() の検証。
 ///
 /// 正本は sensus_bridge.dart の `VisionFilter` sealed（30 variant）。このテストは
 /// カタログがその 30 種を漏れ・重複なく全カテゴリに分類していること、payload 付き
 /// フィルタの parameters 数が sensus payload と一致すること、build() が選択 +
 /// パラメータから正しい VisionFilter を構築することを保証する。
+///
+/// `VisionFilterState.select()` は選択のたびに sensus ブリッジの
+/// recommended_strength（#77）を呼ぶため、実ブリッジ非対応の `flutter test` では
+/// フィクスチャに差し替える（`test/support/vision_filter_metadata_fixture.dart`）。
 void main() {
+  setUp(installVisionFilterMetadataFixture);
+  tearDown(resetVisionFilterMetadataProviders);
+
   group('カタログの網羅性・一意性', () {
     test('カタログは 30 フィルタちょうど（sensus VisionFilter variant 数）', () {
       expect(kVisionFilterCatalog.length, 30);
