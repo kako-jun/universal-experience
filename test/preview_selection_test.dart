@@ -22,17 +22,18 @@ void main() {
       // advanced 選択（isColorQuickSelection == false）。
       visionState.select('cataract');
       visionState.setStrength(0.8);
-      visionState.setBypassed(true);
+      visionState.acquireBypass('test');
       expect(previewStrength(visionState, filterService), 0.0);
 
       // 色覚クイック選択（isColorQuickSelection == true）でも同様。
       selectColorVision(filterService, visionState, ColorVisionType.protanopia);
-      visionState.setBypassed(true);
+      visionState.acquireBypass('test');
       expect(previewStrength(visionState, filterService), 0.0);
 
       // 解除すれば直前の強度に戻る。
-      visionState.setBypassed(false);
-      expect(previewStrength(visionState, filterService), filterService.intensity);
+      visionState.releaseBypass('test');
+      expect(
+          previewStrength(visionState, filterService), filterService.intensity);
     });
 
     test('色覚クイック選択なら FilterService.intensity を使う', () {
@@ -51,6 +52,38 @@ void main() {
       visionState.setStrength(0.42);
 
       expect(previewStrength(visionState, filterService), 0.42);
+    });
+  });
+
+  group('selectedStrength (#79)', () {
+    test('bypassed でも素の強度を返す（previewStrength と違い 0.0 にしない）', () {
+      final filterService = FilterService();
+      final visionState = VisionFilterState();
+
+      visionState.select('cataract');
+      visionState.setStrength(0.8);
+      visionState.acquireBypass('test');
+
+      expect(previewStrength(visionState, filterService), 0.0);
+      expect(selectedStrength(visionState, filterService), 0.8);
+    });
+
+    test('色覚クイック選択なら FilterService.intensity を使う', () {
+      final filterService = FilterService();
+      final visionState = VisionFilterState();
+      selectColorVision(filterService, visionState, ColorVisionType.protanopia);
+      filterService.setIntensity(0.6);
+
+      expect(selectedStrength(visionState, filterService), 0.6);
+    });
+
+    test('advanced/プリセット選択なら VisionFilterState.strength を使う', () {
+      final filterService = FilterService();
+      final visionState = VisionFilterState();
+      visionState.select('cataract');
+      visionState.setStrength(0.42);
+
+      expect(selectedStrength(visionState, filterService), 0.42);
     });
   });
 
@@ -81,7 +114,7 @@ void main() {
       final filterService = FilterService();
       final visionState = VisionFilterState();
       selectColorVision(filterService, visionState, ColorVisionType.protanopia);
-      visionState.setBypassed(true);
+      visionState.acquireBypass('test');
       expect(visionState.bypassed, isTrue);
 
       adjustPreviewStrength(visionState, filterService, kKeyboardStrengthStep);

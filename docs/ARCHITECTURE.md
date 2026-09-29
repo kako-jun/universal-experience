@@ -345,9 +345,10 @@ Linux debug ビルド成功で代替している:
 
 - **`HotkeyActions`**（`lib/services/hotkey_actions.dart`）— 4 アクションの
   実処理。すべて注入されたコールバック（`setClickThrough` / `setAlwaysOnTop` /
-  `setBypassed` / `showAndFocusLoupe` / `toggleLoupeVisible` 等）経由で副作用を
-  起こすため、実 OS のホットキー/window_manager 無しでフェイクにより単体
-  テストできる（`test/hotkey_actions_test.dart`）。
+  `acquireBypass` / `releaseBypass` / `clearBypass` / `isBypassHeldByHotkey` /
+  `showAndFocusLoupe` / `toggleLoupeVisible` 等）経由で副作用を起こすため、
+  実 OS のホットキー/window_manager 無しでフェイクにより単体テストできる
+  （`test/hotkey_actions_test.dart`）。
 - **`HotkeyService`**（`lib/services/hotkey_service.dart`）— `hotkey_manager`
   への実際の登録を担う副作用層。登録処理は `HotkeyGateway` インターフェース
   越しに行い、テストではフェイクゲートウェイに差し替える
@@ -448,6 +449,168 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
 - ←→ の強度調整は `previewStrength` と同じ判定（`isColorQuickSelection`）に
   従う: 色覚クイック選択中は `FilterService.intensity`、advanced/プリセット
   選択中は `VisionFilterState.strength` を動かす。
+
+## ルーペ窓 HUD (#79)
+
+`lib/ui/widgets/loupe_hud.dart` の `LoupeHud`。`LoupeWindowController.appMode`
+が `AppMode.loupe`（ルーペ窓モード）のときだけ、窓の縁（上端）に小さな
+ツールバーを出す。`AppMode.settings`（設定窓モード）では何も描画しない。
+
+`main.dart` の `UniversalExperienceApp` は `home` を `Stack(children: [HomeScreen(),
+LoupeHud()])` として組み立て、`LoupeHud` を `HomeScreen` とは別の最上位レイヤに
+する。
+
+### 表示するもの
+
+- **症状名・強度**: `VisionFilterState` の現在の選択。表示名の解決は
+  `visionFilterDisplayName`（`lib/l10n/l10n_extensions.dart`）— #60 で
+  `before_after_view.dart` の `_displayName` として実装されていたものを、HUD と
+  共有できる形に抽出した（重複定義しない、色覚 -omaly の名前も正しく出る）。
+  強度は `selectedStrength`（`lib/services/preview_selection.dart`）で、bypass
+  に関わらない素の値を表示する — 原画比較中でも「今選んでいるフィルタは何%か」
+  が見え続けるようにするため（`previewStrength` は bypass 中に 0.0 を返すので
+  ここでは使わない）。原画比較中であること自体は原画比較ボタンのアイコンの色
+  （後述）で示す。
+- **受診喚起アイコン**: `resolveConsultNotice`（`lib/l10n/l10n_extensions.dart`、
+  #76）が非 null を返すときだけ表示する。押すと `ConsultNoticeBlock`
+  （`lib/ui/widgets/consult_notice_block.dart`）で全文（免責文込み）をダイアログ
+  表示する。advanced カタログ（`FilterParamPanel`）・体験プリセット
+  （`ExperiencePresets`）・PNG export と同じ解決経路・同じ表示ウィジェットを
+  共有する。
+- **原画比較ボタン**: 押している間だけ `VisionFilterState.bypassed` を true に
+  し、離すと false に戻す（#63 のホットキー「押している間だけ原画」と同じ
+  `bypassed` を共有）。アイコンの色は「このボタン自身が押されているか」では
+  なく `VisionFilterState.bypassed`（グローバル）を見て決める — ホットキー等
+  他の入力元が保持している場合も原画比較中であることを示すため。
+  「押している間だけ」の詳しい挙動・入力元ごとの保持は次節「bypass の
+  入力元ごとの保持」参照。
+- **設定を開くボタン**: `LoupeWindowController.setAppMode(AppMode.settings)` で
+  設定窓モードへ戻す。
+
+### bypass の入力元ごとの保持（#79）
+
+`VisionFilterState.bypassed` は当初（#63）単一の bool だったが、ホットキー
+（`hotkey_actions.dart`）とルーペ HUD（`loupe_hud.dart`）の両方が同時に
+「押している間だけ原画」を要求しうるため、入力元ごとの保持（holder、
+`Set<Object>`）に変更した:
+
+- `VisionFilterState.acquireBypass(Object source)` / `releaseBypass(Object
+  source)` が入力元ごとの holder を追加/削除する。`bypassed` は holder が
+  1 つでもあれば true。片方の入力元が離しても、もう片方がまだ保持していれば
+  `bypassed` のままになる。
+- `VisionFilterState.isHeldBy(Object source)` は、特定の入力元が今まさに
+  保持しているかを返す。ホットキーの hold/toggle 判定やルーペ HUD のトグル
+  代替（後述）は、ローカルにミラーした bool ではなくこれを都度クエリする —
+  ローカルなミラーは `clearBypass()` 等の外部からの一括解除に追従できず、
+  「解除済みなのに release し続けて何も起きない」「ON のつもりのまま次の
+  操作が release を呼んでしまい実際には ON にならない」というズレを起こす
+  ため。
+- `VisionFilterState.clearBypass()` は誰が保持していても全 holder を強制的に
+  解除する。フィルタ選択（`select`/`selectColorVisionType`/`selectPreset`/
+  `clear`）・強度変更（`setStrength`/`setParam`/`randomizeSeed`/
+  `resetToRecommended`）・アプリ内ショートカット（`adjustPreviewStrength`）・
+  `IntensitySlider` の操作・非常口（`HotkeyActions.emergencyExit`）が使う —
+  これらは「原画比較の状態に関わらず必ずフィルタ表示に戻す」操作なので、
+  誰が原画比較していたかは問わない。
+- `hotkey_actions.dart` は `VisionFilterState.bypassed` のようなグローバル値
+  ではなく、注入された `isBypassHeldByHotkey`（`VisionFilterState.isHeldBy` に
+  ホットキー専用の識別子を束縛したもの）で hold/toggle 判定する。
+  `HotkeyActions` はサービス層を直接知らず、`acquireBypass`/`releaseBypass`/
+  `clearBypass`/`isBypassHeldByHotkey` の 4 コールバックを注入される
+  （`main.dart` がホットキー専用の holder トークン `_hotkeyBypassSource` を
+  束縛して渡す）。
+- `LoupeHud` の原画比較ボタン（`_CompareOriginalButton`）はボタンインスタンス
+  専用の 2 つの holder を持つ: 押している間用（`_pressHolder`）と、
+  押し続けられない場合の代替トグル用（`_toggleHolder`、後述）。互いに独立
+  しているので、押している間にトグルの状態が乱れることはない。トグルの
+  ON/OFF もローカルなミラーではなく `isHeldBy(_toggleHolder)` を都度クエリ
+  する。
+
+### 原画比較ボタンの解除経路（#79）
+
+「押している間だけ」を確実に離すため、以下すべての経路で holder
+（`_pressHolder`）を解放する:
+
+- 通常のポインタ up（`Listener.onPointerUp`）・ジェスチャキャンセル
+  （`Listener.onPointerCancel`）。
+- 押したまま領域外に出た場合。**タッチ入力には hover の概念が無い**ため
+  `MouseRegion.onExit` だけには頼れない。`Listener.onPointerMove` で生の
+  座標を直接見て、ボタンの実際のレンダリングサイズ（`RenderBox`、ハード
+  コードした定数ではなく実測）に収まっているかを毎回判定する方式を主経路に
+  し、`MouseRegion.onExit`（通常のホバー解除）は保険として併用する。
+- フォーカスを失ったとき（`Focus.onFocusChange`。マウスボタンを離さないまま
+  ダイアログ等へフォーカスが移ったケースを含む）。
+- キーボード操作: Tab でフォーカスした状態での Enter/Space 押下で hold/
+  release する。OS のキーリピート（`KeyRepeatEvent`）は再確保せず
+  `handled` を返すだけにする。
+- ウィジェット自体が dispose されるとき（`State.dispose`）。`dispose()` は
+  ウィジェットツリーの unmount 中（フレームワークがロックされている間）に
+  呼ばれるため、ここで同期的に `notifyListeners` すると Provider の
+  `InheritedWidget` が `setState() called when widget tree was locked` で
+  落ちる。解放そのものは `scheduleMicrotask` で遅延し、現在の unmount
+  パスを抜けてから通知する。マイクロタスク実行時点で `VisionFilterState`
+  自体が既に dispose 済み（`VisionFilterState.isDisposed`）なら、
+  `notifyListeners` が落ちるので何もしない。
+
+押し続ける操作ができない場合の代替として、`Semantics.onTap`（スクリーン
+リーダー等の「アクティブ化」操作、Semantics のタップ）は押し続けではなく
+**トグル**にする（専用の `_toggleHolder` で acquire/release。`_pressHolder`
+とは独立）。`Semantics` の `toggled` フラグはこのトグル状態
+（`isHeldBy(_toggleHolder)`）を反映し、`hint`（例: 「ダブルタップで原画比較の
+切り替え」、ARB `hudCompareOriginalHint`）でその操作方法を説明する。
+
+フォーカスが当たると `scheme.primary` の 2px 枠を表示する（`Container` の
+`BoxDecoration.border`。既定の `IconButton`/`Material` の focus インジケータを
+持たない自前の Container なので、明示的に描画する）。
+
+`Tooltip` は `excludeFromSemantics: true` にし、代わりに明示的な `Semantics`
+で `label` を 1 つだけ載せる。両方を素朴に重ねると、アクセシビリティツリーに
+`label` と `tooltip` の両方が同じ文言で載って二重に読み上げられる。HUD の丸い
+アイコンボタン（`_HudIconButton`）も同じパターンを使う。
+
+### 表示/非表示ロジック（#79）
+
+窓の**上端全幅・高さ 12px の検知帯**（`Positioned` + `MouseRegion`）にポインタが
+入ると表示し、バー本体（検知帯より下に張り出す）の上にいる間は表示を維持する。
+検知帯・バーいずれからも離れると、`kLoupeHudHideDelay`（700ms）だけ遅らせて
+隠す — 検知帯からバー本体へ移動する一瞬の途切れで隠れてしまわないための猶予。
+`Timer` は `State.dispose` で必ず `cancel` する。
+
+検知帯・バー本体いずれの `MouseRegion` も `opaque: false` にする（純粋な
+ホバー検知専用）。既定の `opaque: true` のままだと、非表示中に中身を
+`IgnorePointer` で操作不能にしていても `MouseRegion` 自身がヒットテストを
+奪ってしまい、下の画面（将来のライブキャプチャ #1 が描く実デスクトップ等）
+へのクリックが届かなくなる。
+
+非表示中は `IgnorePointer`（操作不能）・`ExcludeSemantics`（アクセシビリティ
+ツリーから除外）・`ExcludeFocus`（Tab フォーカスが届かないようにする）の
+3 つでバーを外す。**表示/非表示でウィジェットツリーの形は変えず、これら
+3 つの `excluding`/`ignoring` フラグだけを切り替える**（常に
+`ExcludeSemantics(excluding:) > IgnorePointer(ignoring:) > ExcludeFocus
+(excluding:) > _LoupeHudBar()` の形）。以前は非表示中だけ別の Widget 型で
+ラップしており、表示状態が切り替わるたびに `_LoupeHudBar` 以下の Element が
+作り直され、`_CompareOriginalButton` の State（トグルの保持・フォーカス）が
+失われていた。非表示中も外側の `MouseRegion` 自体は常にレイアウトされたまま
+（`AnimatedOpacity` は要素を消さず不透明度だけ 0 にする）なので、縁への接近を
+検知できる。
+
+全画面判定は `LoupeWindowController.mode == LoupeWindowMode.fullscreen` を見る
+（`LoupeWindowController` は `onWindowEnterFullScreen`/`onWindowLeaveFullScreen`
+で既に `_mode` をリアルタイムに追従させているため、`window_manager` の
+`isFullScreen()` を別途ポーリングする必要は無い）。この判定自体は
+`loupe_hud.dart` の `isLoupeFullScreenProvider`（既定は上記の一行）という
+provider seam 越しに行う — `vision_filter_metadata.dart` の
+`visionFilterUrgencyProvider` 等と同じパターンで、widget test から差し替え
+可能にするため。
+
+### 将来のライブキャプチャ（#1）に向けた前提
+
+`LoupeHud` はキャプチャ対象・フィルタ対象から**除外する必要がある**（HUD 自体を
+フィルタ加工したりキャプチャに写り込ませたりしてはいけない）。現状ライブ
+キャプチャは実装されていないため実際の除外処理は無いが、`LoupeHud` を常に
+独立した最上位レイヤ（`main.dart` の `Stack`）として置くことで、#1 実装時に
+「キャプチャ対象の矩形から HUD の矩形を差し引く」または「キャプチャそのものを
+HUD より下のレイヤだけに限定する」実装がしやすい構造にしてある。
 
 ## `LoupeRectSource` (#63、#44 向けの差し替え可能な seam)
 

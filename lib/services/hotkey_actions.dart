@@ -8,8 +8,10 @@ class HotkeyActions {
     required this.setClickThrough,
     required this.setAlwaysOnTop,
     required this.getClickThrough,
-    required this.setBypassed,
-    required this.getBypassed,
+    required this.acquireBypass,
+    required this.releaseBypass,
+    required this.clearBypass,
+    required this.isBypassHeldByHotkey,
     required this.showAndFocusLoupe,
     required this.toggleLoupeVisible,
     required this.setLoupeVisible,
@@ -35,8 +37,30 @@ class HotkeyActions {
   final Future<void> Function(bool value) setClickThrough;
   final Future<void> Function(bool value) setAlwaysOnTop;
   final bool Function() getClickThrough;
-  final void Function(bool value) setBypassed;
-  final bool Function() getBypassed;
+
+  /// 原画比較の bypass を、このホットキー専用の holder として確保する
+  /// （#79。呼び出し元（main.dart）が `VisionFilterState.acquireBypass` に
+  /// ホットキー専用の識別子を束縛して渡す）。
+  final void Function() acquireBypass;
+
+  /// このホットキー専用の holder を解放する（#79）。
+  final void Function() releaseBypass;
+
+  /// 誰が保持しているかに関わらず、すべての bypass holder を強制的に解除する
+  /// （#79。`VisionFilterState.clearBypass`）。非常口専用 — 通常の
+  /// hold/toggle には使わない。
+  final void Function() clearBypass;
+
+  /// このホットキー専用の holder を今まさに保持しているか（#79。呼び出し元が
+  /// `VisionFilterState.isHeldBy` にホットキー専用の識別子を束縛して渡す）。
+  ///
+  /// hold/toggle 判定はこれで行う（グローバルな `VisionFilterState.bypassed`
+  /// ではなく）。以前はホットキー側にローカルな bool（`_heldByHotkey`）を
+  /// ミラーしていたが、`clearBypass()`（フィルタ選択・非常口）で外部から
+  /// holder が解除されてもローカルな bool は追従せず、次の keyDown が
+  /// 「まだ保持している」と誤認して release を呼び、実際には何も起きない
+  /// （ON にならない）バグがあった。都度クエリすることでこのズレを無くす。
+  final bool Function() isBypassHeldByHotkey;
 
   /// ルーペ窓を表示して前面化する（windowManager.show() + focus() 相当）。
   final Future<void> Function() showAndFocusLoupe;
@@ -56,15 +80,15 @@ class HotkeyActions {
   /// 押している間だけ原画を表示 (#63)。
   ///
   /// - keyUp が一度でも届いた環境（[_keyUpSeen]）: 以降の keyDown は常に
-  ///   bypassed を true にするだけ（冪等）。keyUp が常に false にするので、
-  ///   正しい hold 挙動になる。
-  /// - keyUp が一度も届いていない環境: keyDown のたびにトグルするが、直前の
-  ///   keyDown から [_repeatDebounce]（1100ms）以内の keyDown は OS のキー
-  ///   リピートとみなして無視する（押しっぱなしで OS が keyDown を連続送出する
-  ///   環境でも 1 回のトグルにしかならないようにする、#63）。
+  ///   holder を確保するだけ（既に確保済みなら [acquireBypass] は呼ばない）。
+  ///   keyUp が常に解放するので、正しい hold 挙動になる。
+  /// - keyUp が一度も届いていない環境: keyDown のたびに確保/解放をトグルする
+  ///   が、直前の keyDown から [_repeatDebounce]（1100ms）以内の keyDown は
+  ///   OS のキーリピートとみなして無視する（押しっぱなしで OS が keyDown を
+  ///   連続送出する環境でも 1 回のトグルにしかならないようにする、#63）。
   void holdOriginalKeyDown() {
     if (_keyUpSeen) {
-      setBypassed(true);
+      if (!isBypassHeldByHotkey()) acquireBypass();
       return;
     }
     final now = _now();
@@ -74,26 +98,34 @@ class HotkeyActions {
       return;
     }
     _lastKeyDownAt = now;
-    setBypassed(!getBypassed());
+    if (isBypassHeldByHotkey()) {
+      releaseBypass();
+    } else {
+      acquireBypass();
+    }
   }
 
   void holdOriginalKeyUp() {
     _keyUpSeen = true;
     _lastKeyDownAt = null;
-    if (getBypassed()) setBypassed(false);
+    if (isBypassHeldByHotkey()) releaseBypass();
   }
 
   /// 非常口: 全フィルタ停止 + 原画表示解除 + クリックスルー解除 + 最前面解除 +
   /// ウィンドウ表示/前面化 (#63)。
   ///
-  /// メモリ上の状態変更（[deactivateFilters]/[setBypassed]）を先に行い、以降の
+  /// メモリ上の状態変更（[deactivateFilters]/[clearBypass]）を先に行い、以降の
   /// I/O を伴うステップは 1 つずつ個別に try/catch する。どれか 1 ステップが
   /// 失敗しても（例: window_manager の呼び出しが例外を投げる）、残りのステップ
   /// は実行される — 非常口は「できるところまで全部やる」ことが要件のため、
   /// 1 つの失敗で他まで巻き添えにしない。
+  ///
+  /// 原画表示の解除は、ホットキー自身の holder だけでなく **誰が保持していても**
+  /// 必ず解除する（[clearBypass]、#79）。非常口は「何が原因でも確実に元へ戻す」
+  /// 経路なので、HUD 等の他入力元が原画比較中でも一緒に解除する。
   Future<void> emergencyExit() async {
     deactivateFilters();
-    setBypassed(false);
+    clearBypass();
 
     await _runStep(() => setClickThrough(false));
     await _runStep(() => setAlwaysOnTop(false));

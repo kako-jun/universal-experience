@@ -171,6 +171,28 @@ String visionFilterName(AppLocalizations l10n, String id) {
   }
 }
 
+/// フィルタの表示名を解決する、唯一の正本（#60。`before_after_view.dart` の
+/// after ペイン見出し・export の caption・ルーペ窓 HUD（`loupe_hud.dart`、#79）
+/// が共有する — 重複定義しない）。
+///
+/// [colorVisionType] が非 null なら常にそれを優先する（[colorVisionTypeName]、
+/// -omaly の名前も正しく出る）。カタログ（[filterId]）は色覚を 5 種しか持たず、
+/// -omaly は対応する base の -opia と同じ id に写るため、[filterId] だけで
+/// 解決すると常に -opia の名前になってしまう。[colorVisionType] が null なら
+/// [filterId] からカタログの l10n 名（[visionFilterName]）を引く。どちらも
+/// null なら「原画」。
+String visionFilterDisplayName(
+  AppLocalizations l10n,
+  ColorVisionType? colorVisionType,
+  String? filterId,
+) {
+  if (colorVisionType != null) {
+    return colorVisionTypeName(l10n, colorVisionType);
+  }
+  if (filterId == null) return l10n.previewPaneOriginal;
+  return visionFilterName(l10n, filterId);
+}
+
 /// Advanced カタログの payload パラメータ labelKey → 表示名を解決する。
 ///
 /// labelKey はカタログが持つ安定キー（例 `param.astigmatism.axis_deg`）。

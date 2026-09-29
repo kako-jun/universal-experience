@@ -405,11 +405,11 @@ void main() {
 
     expect(find.text('Showing original'), findsNothing);
 
-    visionState.setBypassed(true);
+    visionState.acquireBypass('test');
     await tester.pump();
     expect(find.text('Showing original'), findsOneWidget);
 
-    visionState.setBypassed(false);
+    visionState.releaseBypass('test');
     await tester.pump();
     expect(find.text('Showing original'), findsNothing);
   });

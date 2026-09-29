@@ -545,25 +545,6 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     super.dispose();
   }
 
-  /// after ペインの見出し・export の caption に出す表示名を解決する
-  /// （#60）。
-  ///
-  /// [colorVisionType] が非 null なら常にそれを優先する
-  /// （[colorVisionTypeName]、-omaly の名前も正しく出る）。カタログ
-  /// （[filterId]）は色覚を 5 種しか持たず、-omaly は対応する base の -opia
-  /// と同じ id に写るため、[filterId] だけで解決すると常に -opia の名前に
-  /// なってしまう。[colorVisionType] が null なら [filterId] からカタログの
-  /// l10n 名（[visionFilterName]）を引く。どちらも null なら「原画」。
-  static String _displayName(
-    AppLocalizations l10n,
-    ColorVisionType? colorVisionType,
-    String? filterId,
-  ) {
-    if (colorVisionType != null) return colorVisionTypeName(l10n, colorVisionType);
-    if (filterId == null) return l10n.previewPaneOriginal;
-    return visionFilterName(l10n, filterId);
-  }
-
   /// Exports the current "after" image as a PNG with burned-in metadata (#43).
   ///
   /// i18n は **UI 側でここで解決** し、`ExportCaption`（解決済み文字列）として
@@ -608,7 +589,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
               visionFilterUrgencyEscalationProvider(afterFilter),
             );
       final caption = ExportCaption(
-        symptomLabel: _displayName(l10n, colorVisionType, filterId),
+        symptomLabel: visionFilterDisplayName(l10n, colorVisionType, filterId),
         strengthLabel: l10n.strengthLabel(strengthPercent),
         isoDate: date,
         urgencyMessage: notice?.message,
@@ -705,11 +686,12 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         // #60: 時間依存の注記は widget.filterId（カタログ id）からカタログを
         // 引いて解決する。after ペインの見出しは widget.colorVisionType が
         // あればそちらを優先する（#60: -omaly の名前を正しく出すため、
-        // [_displayName] 参照）。
+        // [visionFilterDisplayName] 参照）。
         final entry =
             widget.filterId == null ? null : kVisionFilterCatalogById[widget.filterId];
         final afterPane = _Pane(
-          label: _displayName(l10n, widget.colorVisionType, widget.filterId),
+          label: visionFilterDisplayName(
+              l10n, widget.colorVisionType, widget.filterId),
           // Export is only meaningful when a real "after" image exists.
           // The failed state (null _after) gets no button.
           trailing: _after != null

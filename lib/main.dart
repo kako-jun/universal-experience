@@ -21,6 +21,7 @@ import 'services/native_bridge_service.dart';
 import 'services/settings_service.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/theme/app_theme.dart';
+import 'ui/widgets/loupe_hud.dart';
 
 /// ルーペ窓の挙動 (#14) を集約したコントローラ。
 /// 最小サイズ・状態遷移(normal/maximized/fullscreen)・枠ポリシー・
@@ -38,6 +39,12 @@ final FilterService filterService = FilterService();
 /// `lib/services/color_vision_selection.dart` の `selectColorVision` を経由して
 /// 同じインスタンスを更新する必要があるため（#60）。
 final VisionFilterState visionFilterState = VisionFilterState();
+
+/// ホットキー「押している間だけ原画」（#63）用の bypass holder トークン
+/// （#79）。`VisionFilterState.acquireBypass`/`releaseBypass` は入力元ごとに
+/// holder を持つため、ルーペ HUD（`loupe_hud.dart`）側の holder と衝突しない
+/// よう、ホットキー用に 1 つだけ生成して使い回す。
+final Object _hotkeyBypassSource = Object();
 
 /// トレイアイコンの Flutter アセットパス。`tray_manager` の `setIcon` が
 /// `data/flutter_assets/` 配下のこのパスを解決する。Windows でより精細に
@@ -286,8 +293,13 @@ void main() async {
       setClickThrough: loupeWindow.setClickThrough,
       setAlwaysOnTop: loupeWindow.setAlwaysOnTop,
       getClickThrough: () => loupeWindow.clickThrough,
-      setBypassed: visionFilterState.setBypassed,
-      getBypassed: () => visionFilterState.bypassed,
+      // #79: ホットキー専用の holder（_hotkeyBypassSource）で acquire/release
+      // する。emergencyExit だけは誰が保持していても解除する clearBypass を使う。
+      acquireBypass: () => visionFilterState.acquireBypass(_hotkeyBypassSource),
+      releaseBypass: () => visionFilterState.releaseBypass(_hotkeyBypassSource),
+      clearBypass: visionFilterState.clearBypass,
+      isBypassHeldByHotkey: () =>
+          visionFilterState.isHeldBy(_hotkeyBypassSource),
       showAndFocusLoupe: trayService.onShowLoupe,
       toggleLoupeVisible: trayService.toggleLoupeVisible,
       setLoupeVisible: trayService.setLoupeVisible,
@@ -457,7 +469,16 @@ class UniversalExperienceApp extends StatelessWidget {
               GlobalCupertinoLocalizations.delegate,
             ],
             supportedLocales: AppLocalizations.supportedLocales,
-            home: const HomeScreen(),
+            // #79: LoupeHud は HomeScreen とは別の最上位レイヤとして Stack で
+            // 重ねる。将来のライブキャプチャ（#1）がキャプチャ・フィルタ対象
+            // から HUD を除外しやすいよう、意図的に独立させてある
+            // （`lib/ui/widgets/loupe_hud.dart` の module doc 参照）。
+            home: const Stack(
+              children: [
+                HomeScreen(),
+                LoupeHud(),
+              ],
+            ),
             debugShowCheckedModeBanner: false,
           );
         },
