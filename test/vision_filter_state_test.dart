@@ -106,7 +106,17 @@ void main() {
       expect(state.paramValue(state.selectedEntry!.parameters.first), seed);
     });
 
-    test('色覚クイック選択（selectColorVisionType）経由でも記憶が働く', () {
+    // #76 レビュー N10: このテストの意図は「色覚クイック選択でもプレビュー
+    // 強度が #77 のフィルタ別記憶に従う」ことではない — production の
+    // プレビュー強度は色覚クイック選択のとき常に FilterService のタイプ別
+    // 記憶（#57）を使い、この state.strength は使われない
+    // （`preview_selection.dart` の `previewStrength` 参照）。ここで見たいのは
+    // 「selectColorVisionType も内部的には _selectInternal を経由するので、
+    // 同じ記憶ロジック（_strengthById）が selectColorVisionType 経由でも
+    // 一貫して働く」という、実装の共有経路そのものの回帰である
+    // （advanced 経由の select() と選択元が違うだけで、記憶の仕組みは
+    // 分岐させていないことの検証）。
+    test('色覚クイック選択（selectColorVisionType）経由でも _strengthById の記憶ロジックは一貫して働く', () {
       visionFilterRecommendedStrengthProvider = (_) => 0.6;
       state.selectColorVisionType(ColorVisionType.protanopia, 'protanopia');
       expect(state.strength, 0.6);

@@ -14,12 +14,38 @@
 // integration_test` 呼び出しに複数ファイルを渡すと2番目以降のアプリ起動が失敗する
 // 既知の制約があるため、CI でも個別コマンドとして実行する。
 
+import 'package:flutter/material.dart' show Locale;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:universal_experience/l10n/app_localizations.dart';
+import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/native_bridge_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
+
+/// [HearingFilter] の全 14 バリアント（#76 レビュー S1）。
+///
+/// カタログ（[kVisionFilterCatalog]）は視覚フィルタしか持たないため、聴覚側は
+/// ここで直接列挙する。payload 付きバリアントは urgency/urgency_escalation が
+/// payload に依存しないので代表値でよい（`rust/src/api/sensus_bridge.rs` の
+/// `ALL_HEARING_FILTERS` と同じ考え方）。
+const List<HearingFilter> _allHearingFilters = [
+  HearingFilter.hearingLoss(),
+  HearingFilter.suddenHearingLoss(freqHz: 2000.0),
+  HearingFilter.noiseInducedHearingLoss(),
+  HearingFilter.tinnitus(freqHz: 4000.0),
+  HearingFilter.hyperacusis(),
+  HearingFilter.misophonia(freqHz: 1000.0),
+  HearingFilter.paracusis(),
+  HearingFilter.amusia(),
+  HearingFilter.dysmelodia(),
+  HearingFilter.pitchShift(semitones: -2.0),
+  HearingFilter.diplacusis(),
+  HearingFilter.auditoryProcessingDisorder(),
+  HearingFilter.meniere(),
+  HearingFilter.labyrinthitis(),
+];
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -104,6 +130,50 @@ void main() {
       expect(urgencyOf('hemianopia'), Urgency.emergency);
       expect(urgencyOf('vestibular_neuritis'), Urgency.emergency);
       expect(urgencyOf('flickering_stars'), Urgency.emergency);
+    });
+  });
+
+  group('escalation 条件文の訳漏れ検知（#76 レビュー S1）', () {
+    // sensus 側の条件文（英語）が変わる／増えると、escalationConditionText
+    // （l10n_extensions.dart）の対応表に無いキーになり、デフォルト分岐で
+    // 英語のまま返ってしまう。ここでは実ブリッジから集めた「今実際に存在する
+    // 全条件文」について、ja 訳が英語と異なる（＝対応表にヒットしている）
+    // ことを確認する。ヒットしなくなったら、この integration test が最初に
+    // 検知する場所になる。
+    testWidgets(
+        'vision 30 種 + HearingFilter 14 種の escalation 条件文はすべて ja 訳を持つ',
+        (tester) async {
+      final ja = lookupAppLocalizations(const Locale('ja'));
+      final conditions = <String>{};
+
+      for (final entry in kVisionFilterCatalog) {
+        final state = VisionFilterState()..select(entry.id);
+        final filter = state.build()!;
+        for (final e in visionFilterUrgencyEscalation(filter: filter)) {
+          conditions.add(e.condition);
+        }
+      }
+      for (final filter in _allHearingFilters) {
+        for (final e in hearingFilterUrgencyEscalation(filter: filter)) {
+          conditions.add(e.condition);
+        }
+      }
+
+      // 現状の既知件数（#76 時点、rust 側
+      // `escalation_condition_strings_match_known_set` と対）。sensus が
+      // escalation を増減したら、まずこの件数がズレて気付ける。
+      expect(conditions.length, 5, reason: conditions.toString());
+
+      for (final condition in conditions) {
+        final translated = escalationConditionText(ja, condition);
+        expect(
+          translated,
+          isNot(equals(condition)),
+          reason: 'ja 訳が対応表に無い（英語のままフォールバックしている）: '
+              '"$condition"。escalationConditionText '
+              '（lib/l10n/l10n_extensions.dart）に対応を追加してください。',
+        );
+      }
     });
   });
 }

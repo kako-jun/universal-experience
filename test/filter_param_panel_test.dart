@@ -134,7 +134,7 @@ void main() {
 
       // urgency=none なので喚起文そのものは出ないが、escalation ブロックは出る。
       expect(find.text(ja.consultEarly), findsNothing);
-      expect(find.text(ja.escalationHeader), findsOneWidget);
+      expect(find.text(ja.escalationHeaderEarly), findsOneWidget);
       expect(
         find.textContaining(ja.escalationConditionBppvRecurrentSevere),
         findsOneWidget,
@@ -156,6 +156,72 @@ void main() {
       await pumpPanel(tester);
 
       expect(find.textContaining(unknownCondition), findsOneWidget);
+    });
+
+    testWidgets(
+        'escalation は emergency と earlyConsultation で見出しを分けて表示する（#76 レビュー N4）',
+        (tester) async {
+      // 現状 vision フィルタの escalation は全て earlyConsultation だが、
+      // ConsultNoticeBlock 自体は聴覚側（#80、emergency 段を持つ）にも備えて
+      // 両方の見出しを持つため、フィクスチャで両段を同時に発生させて検証する。
+      visionFilterUrgencyProvider = (_) => Urgency.none;
+      visionFilterUrgencyEscalationProvider = (_) => const [
+            UrgencyEscalation(
+              urgency: Urgency.emergency,
+              condition: 'a sudden drop in hearing, especially in one ear '
+                  '(possible sudden sensorineural hearing loss)',
+            ),
+            UrgencyEscalation(
+              urgency: Urgency.earlyConsultation,
+              condition: 'recurrent or severe episodes',
+            ),
+          ];
+      visionState.select('bppv_rotation');
+
+      await pumpPanel(tester);
+      final en = lookupAppLocalizations(const Locale('en'));
+
+      expect(find.text(en.escalationHeaderEmergency), findsOneWidget);
+      expect(find.text(en.escalationHeaderEarly), findsOneWidget);
+      expect(
+        find.textContaining(en.escalationConditionHearingSuddenOneEar),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining(en.escalationConditionBppvRecurrentSevere),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('emergency の喚起文は本文（bodyMedium）より大きいスタイルで表示する（#76 レビュー N5）',
+        (tester) async {
+      visionFilterUrgencyProvider = (_) => Urgency.emergency;
+      visionFilterUrgencyEscalationProvider = (_) => const [];
+      visionState.select('hemianopia');
+
+      await pumpPanel(tester);
+      final en = lookupAppLocalizations(const Locale('en'));
+
+      final messageWidget =
+          tester.widget<Text>(find.text(en.consultEmergency));
+      final theme = Theme.of(tester.element(find.text(en.consultEmergency)));
+      final bodySize = theme.textTheme.bodyMedium?.fontSize ?? 0;
+      final messageSize = messageWidget.style?.fontSize ??
+          theme.textTheme.titleSmall?.fontSize ??
+          0;
+      expect(messageSize, greaterThan(bodySize));
+    });
+
+    testWidgets('免責文の根拠 URL を選択可能なテキストで表示する（#76 レビュー M2）',
+        (tester) async {
+      visionFilterUrgencyProvider = (_) => Urgency.earlyConsultation;
+      visionFilterUrgencyEscalationProvider = (_) => const [];
+      visionState.select('glaucoma');
+
+      await pumpPanel(tester);
+
+      expect(find.textContaining('sensus/blob/main/docs/overview.md'),
+          findsOneWidget);
     });
   });
 

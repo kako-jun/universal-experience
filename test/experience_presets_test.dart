@@ -11,6 +11,9 @@
 // 5. meniere と labyrinthitis はどちらもカタログ id vertigo に写るが、
 //    selectedPresetId による比較で選んだ方だけが点灯する（#60: 2 枚同時点灯の
 //    修正）。
+// 6. escalation は Experience.vision（visionFilterUrgencyEscalationProvider）
+//    から取得し、ConsultNoticeBlock（FilterParamPanel・export と共有）で
+//    表示する（#76 レビュー S3）。
 //
 // bridge の experiences() は native lib（FFI）を要求し flutter test では呼べないため、
 // experiencesProvider seam を fixture で差し替える（音声再生は #19 非スコープ）。
@@ -22,6 +25,7 @@ import 'package:provider/provider.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/services/filter_service.dart';
+import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
@@ -217,5 +221,38 @@ void main() {
     await pumpPresets(tester, const Locale('en'));
     final en = lookupAppLocalizations(const Locale('en'));
     expect(find.text(en.experienceIncludesHearingNote), findsNothing);
+  });
+
+  testWidgets(
+      'escalation は Experience.vision から取得し、ConsultNoticeBlock で表示する'
+      '（#76 レビュー S3）', (tester) async {
+    // urgency=none の bppv でも、Experience.vision（bppvRotation）に対する
+    // escalation フィクスチャがあれば ConsultNoticeBlock の escalation ブロックが
+    // 出ることを確認する（喚起文そのものは urgency=none のため出ない）。
+    visionFilterUrgencyEscalationProvider = (filter) =>
+        filter == const VisionFilter.bppvRotation()
+            ? const [
+                UrgencyEscalation(
+                  urgency: Urgency.earlyConsultation,
+                  condition: 'recurrent or severe episodes',
+                ),
+              ]
+            : const [];
+    experiencesProvider = () => const [
+          Experience(
+            id: 'bppv',
+            vision: VisionFilter.bppvRotation(),
+            urgency: Urgency.none,
+          ),
+        ];
+    await pumpPresets(tester, const Locale('en'));
+    final en = lookupAppLocalizations(const Locale('en'));
+
+    expect(find.text(en.consultEarly), findsNothing);
+    expect(find.text(en.escalationHeaderEarly), findsOneWidget);
+    expect(
+      find.textContaining(en.escalationConditionBppvRecurrentSevere),
+      findsOneWidget,
+    );
   });
 }
