@@ -11,6 +11,7 @@
 // skip される。出力ファイル名:
 //   {wide|narrow}-{light|dark}-{ja|en}.png        — ウィンドウ 1 枚ぶん
 //                                                    （wide=1280x800、narrow=800x700）
+//   wide-{light|dark}-ja-hc.png                    — ハイコントラストテーマ
 //   {wide|narrow}-{light|dark}-{ja|en}-full.png   — 縦に十分長い画面で全体を撮ったもの
 //                                                    （スクロール量の確認用）
 //
@@ -149,6 +150,7 @@ void main() {
     required bool dark,
     required String locale,
     required String suffix,
+    bool highContrast = false,
   }) async {
     tester.view.physicalSize = Size(width, height);
     tester.view.devicePixelRatio = 1.0;
@@ -202,8 +204,14 @@ void main() {
               GlobalCupertinoLocalizations.delegate,
             ],
             supportedLocales: AppLocalizations.supportedLocales,
-            theme: themed(AppTheme.lightTheme),
-            darkTheme: themed(AppTheme.darkTheme),
+            theme: themed(
+              highContrast ? AppTheme.highContrastTheme : AppTheme.lightTheme,
+            ),
+            darkTheme: themed(
+              highContrast
+                  ? AppTheme.highContrastDarkTheme
+                  : AppTheme.darkTheme,
+            ),
             themeMode: dark ? ThemeMode.dark : ThemeMode.light,
             home: const HomeScreen(),
           ),
@@ -226,6 +234,25 @@ void main() {
     );
     // ignore: avoid_print
     print('[ui_screenshots] wrote $path');
+  }
+
+  // ハイコントラスト（OS 設定が有効なときに切り替わるテーマ）。ファイル名は
+  // wide-{light|dark}-ja-hc.png。
+  for (final dark in [false, true]) {
+    testWidgets(
+      'screenshot wide/${dark ? 'dark' : 'light'}/ja high-contrast',
+      (tester) => shoot(
+        tester,
+        widthLabel: 'wide',
+        width: 1280,
+        height: 800,
+        dark: dark,
+        locale: 'ja',
+        suffix: '-hc',
+        highContrast: true,
+      ),
+      skip: !screenshotsEnabled,
+    );
   }
 
   for (final (widthLabel, dark, locale) in combos) {

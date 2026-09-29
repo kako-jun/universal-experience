@@ -81,6 +81,11 @@ class WelcomeBanner extends StatelessWidget {
                   runSpacing: 8,
                   children: [
                     OutlinedButton(
+                      // 前景はコンテナの上の文字色に揃える（ハイコントラストでは
+                      // primary がコンテナと近い明度になり読めなくなるため）。
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: onContainer,
+                      ),
                       onPressed: () {
                         onChooseOtherView?.call();
                         settings.dismissWelcomeBanner();

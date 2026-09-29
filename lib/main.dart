@@ -497,6 +497,10 @@ class UniversalExperienceApp extends StatelessWidget {
                 AppLocalizations.of(context)!.appTitle,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
+            // OS のハイコントラスト設定（MediaQuery.highContrast）が有効なとき
+            // だけ自動で切り替わる（DESIGN.md）。
+            highContrastTheme: AppTheme.highContrastTheme,
+            highContrastDarkTheme: AppTheme.highContrastDarkTheme,
             themeMode: settings.themeMode,
             // i18n (#18). locale = null はシステム追従。言語ピッカー UI は本 Issue
             // 外（#16/#19）。SettingsService.setLocale が将来の足場。
