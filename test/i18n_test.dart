@@ -160,13 +160,15 @@ void main() {
     });
 
     test(
-        'consultDisclaimerShort（PNG 用の短い免責文）は診断ではない旨と根拠の両方を含む'
-        '（#76 再レビュー M1\'）', () {
+        'consultDisclaimerShort（PNG 用の短い免責文）は診断ではない旨・医療監修なしの旨・'
+        '根拠の三つを含む（#76 再レビュー M1\'、最終レビュー nit）', () {
       final en = lookupAppLocalizations(const Locale('en'));
       final ja = lookupAppLocalizations(const Locale('ja'));
       expect(en.consultDisclaimerShort, contains('diagnos'));
+      expect(en.consultDisclaimerShort, contains('review'));
       expect(en.consultDisclaimerShort, contains('sensus'));
       expect(ja.consultDisclaimerShort, contains('診断'));
+      expect(ja.consultDisclaimerShort, contains('監修'));
       expect(ja.consultDisclaimerShort, contains('sensus'));
     });
   });
