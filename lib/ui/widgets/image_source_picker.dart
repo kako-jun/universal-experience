@@ -40,6 +40,23 @@ Future<XFile?> _defaultPickImageFile() {
 /// oversized file is rejected without ever loading its bytes into memory.
 const int kMaxUserImageFileBytes = 50 * 1024 * 1024; // 50MB
 
+/// Thrown by [loadUserImageFile] when a file's reported length exceeds
+/// [kMaxUserImageFileBytes] (#78 レビュー nit). A distinct type (rather than
+/// a plain [StateError]) so the catch block can show a size-specific
+/// SnackBar (`imageSourceFileTooLarge`) instead of the generic
+/// `imageSourcePickFailed` one — a 200MB RAW file and a corrupt PNG are
+/// different problems with different fixes for the person picking the file.
+class UserImageTooLargeException implements Exception {
+  const UserImageTooLargeException(this.bytes);
+
+  /// The file's reported length in bytes (always `> kMaxUserImageFileBytes`).
+  final int bytes;
+
+  @override
+  String toString() =>
+      'UserImageTooLargeException: $bytes bytes (max $kMaxUserImageFileBytes)';
+}
+
 /// Reads and decodes [file] into a [ui.Image] and hands it to
 /// `ImageSourceState.setUserImage` — which takes ownership of it (disposes
 /// the previous user image, #58/#85 discipline). Shared by
@@ -58,8 +75,10 @@ const int kMaxUserImageFileBytes = 50 * 1024 * 1024; // 50MB
 /// file, corrupt/unsupported image data) is reported via
 /// [FlutterError.reportError] (same convention as `before_after_view.dart`'s
 /// generator/renderer errors) and, only if [context] is still mounted,
-/// surfaced with the `imageSourcePickFailed` SnackBar. `ImageSourceState` is
-/// left untouched on any failure.
+/// surfaced with a SnackBar — [UserImageTooLargeException] gets the
+/// size-specific `imageSourceFileTooLarge` message (#78 レビュー nit), any
+/// other failure gets the generic `imageSourcePickFailed`. `ImageSourceState`
+/// is left untouched on any failure.
 ///
 /// Returns `true` on success, `false` on failure — the welcome banner
 /// (`lib/ui/widgets/welcome_banner.dart`) uses this to decide whether its
@@ -71,10 +90,7 @@ Future<bool> loadUserImageFile(BuildContext context, XFile file) async {
   try {
     final length = await file.length();
     if (length > kMaxUserImageFileBytes) {
-      throw StateError(
-        'user image file too large: $length bytes '
-        '(max $kMaxUserImageFileBytes)',
-      );
+      throw UserImageTooLargeException(length);
     }
     final bytes = await file.readAsBytes();
     decoded = await decodeUserImageBytes(bytes);
@@ -85,10 +101,12 @@ Future<bool> loadUserImageFile(BuildContext context, XFile file) async {
       library: 'image_source_picker',
     ));
     if (!context.mounted) return false;
+    final l10n = AppLocalizations.of(context)!;
+    final message = e is UserImageTooLargeException
+        ? l10n.imageSourceFileTooLarge(kMaxUserImageFileBytes ~/ (1024 * 1024))
+        : l10n.imageSourcePickFailed;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppLocalizations.of(context)!.imageSourcePickFailed),
-      ),
+      SnackBar(content: Text(message)),
     );
     return false;
   }

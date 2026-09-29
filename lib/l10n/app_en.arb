@@ -549,6 +549,13 @@
   "@imageSourcePickFailed": {
     "description": "SnackBar shown when a picked or dropped file couldn't be decoded as an image (#78)."
   },
+  "imageSourceFileTooLarge": "That image is too large (max {maxMegabytes} MB). Try a smaller file.",
+  "@imageSourceFileTooLarge": {
+    "description": "SnackBar shown when a picked or dropped file exceeds kMaxUserImageFileBytes (#78 レビュー nit) — shown instead of the generic imageSourcePickFailed so the person knows it's a size problem, not a corrupt/unsupported file. The file's body is never read in this case (checked via XFile.length() first).",
+    "placeholders": {
+      "maxMegabytes": { "type": "int" }
+    }
+  },
 
   "welcomeBannerTitle": "New here?",
   "@welcomeBannerTitle": {

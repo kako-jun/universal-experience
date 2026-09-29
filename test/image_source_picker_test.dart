@@ -185,7 +185,10 @@ void main() {
       expect(readBytesCalled, isFalse,
           reason: 'サイズ超過は length() だけで弾かれ、readAsBytes は呼ばれない');
       expect(imageSourceState.hasUserImage, isFalse);
-      expect(find.text(en.imageSourcePickFailed), findsOneWidget);
+      // #78 レビュー nit: 上限超過は専用の文言（imageSourceFileTooLarge）を
+      // 出す。汎用の imageSourcePickFailed とは区別する。
+      expect(find.text(en.imageSourceFileTooLarge(50)), findsOneWidget);
+      expect(find.text(en.imageSourcePickFailed), findsNothing);
     });
 
     testWidgets(

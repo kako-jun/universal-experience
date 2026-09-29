@@ -37,11 +37,14 @@ class _HomeScreenState extends State<HomeScreen> {
   /// ための FocusNode。検索欄が無い現状は、このカタログが `/` の唯一の対象。
   final FocusNode _catalogFocusNode = FocusNode(debugLabel: 'filterCatalog');
 
-  /// ウェルカムバナーの「ほかの見え方を選ぶ」（#78 レビュー S8）で色覚クイック
-  /// 選択のチップへフォーカスを移すための FocusNode。上の `_catalogFocusNode`
-  /// と同じパターン。
-  final FocusNode _colorVisionFocusNode =
-      FocusNode(debugLabel: 'colorVisionFilter');
+  /// ウェルカムバナーの「ほかの見え方を選ぶ」（#78 レビュー S8/nit）で
+  /// `FilterSelectorState.focusSelectedChip` を呼ぶための GlobalKey。単一の
+  /// 外部 FocusNode で `FilterSelector` 全体を包むだけでは見た目に何も
+  /// 起きないため、実際に選択中のチップ（無ければ先頭）へフォーカスを移し
+  /// `Scrollable.ensureVisible` でスクロールする責務は `FilterSelectorState`
+  /// 自身に持たせ、ここからは GlobalKey 経由で呼び出すだけにする。
+  final GlobalKey<FilterSelectorState> _filterSelectorKey =
+      GlobalKey<FilterSelectorState>();
 
   @override
   void didChangeDependencies() {
@@ -111,7 +114,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _filterService?.removeListener(_persistFilterState);
     _visionFilterStateForImageSource?.removeListener(_followRecommendedSample);
     _catalogFocusNode.dispose();
-    _colorVisionFocusNode.dispose();
     super.dispose();
   }
 
@@ -195,7 +197,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     _buildHeaderSection(l10n),
                     const SizedBox(height: 24),
-                    WelcomeBanner(colorVisionFocusNode: _colorVisionFocusNode),
+                    WelcomeBanner(
+                      onChooseOtherView: () =>
+                          _filterSelectorKey.currentState?.focusSelectedChip(),
+                    ),
                     const SizedBox(height: 8),
                     const WindowModePanel(),
                     const SizedBox(height: 24),
@@ -265,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            FilterSelector(focusNode: _colorVisionFocusNode),
+            FilterSelector(key: _filterSelectorKey),
             const SizedBox(height: 16),
             Text(
               l10n.colorVisionSectionNote,

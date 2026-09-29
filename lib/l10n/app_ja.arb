@@ -208,6 +208,7 @@
   "imageSourceResetToRecommended": "おすすめに戻す",
   "imageSourceClosePhotoTooltip": "画像を閉じる",
   "imageSourcePickFailed": "その画像を読み込めませんでした。別のファイルをお試しください。",
+  "imageSourceFileTooLarge": "その画像は大きすぎます（上限 {maxMegabytes}MB）。もっと小さいファイルをお試しください。",
 
   "welcomeBannerTitle": "はじめての方へ",
   "welcomeBannerBody": "よくある色覚の見え方（2型3色覚）を推奨の強さで最初に表示しています。ほかの見え方を選んだり、自分の画像で試したりできます。",

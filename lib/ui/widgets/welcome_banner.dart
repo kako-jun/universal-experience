@@ -12,9 +12,14 @@ import 'image_source_picker.dart' show pickAndLoadUserImage;
 /// and it never reappears (`SettingsService.welcomeBannerDismissed`).
 ///
 /// - "Choose another way of seeing" moves focus to the colour-vision chips
-///   ([colorVisionFocusNode], #78 レビュー S8) and dismisses — the chips are
+///   ([onChooseOtherView], #78 レビュー S8) and dismisses — the chips are
 ///   already visible on the same screen, so no navigation is needed, just a
-///   focus handoff.
+///   focus handoff. `home_screen.dart` wires this to
+///   `FilterSelectorState.focusSelectedChip` (via a `GlobalKey`), which moves
+///   focus to a specific chip (visibly, with Material's focus ring) and
+///   scrolls it into view with `Scrollable.ensureVisible` — not just to an
+///   inert container `FocusNode` (#78 レビュー nit: the handoff must be
+///   visible, not just logically correct).
 /// - "Try it with your photo" opens the file picker ([pickAndLoadUserImage],
 ///   the exact same path `ImageSourcePicker`'s own button uses) and
 ///   dismisses **only if a photo was actually loaded** (#78 レビュー Q3):
@@ -24,12 +29,12 @@ import 'image_source_picker.dart' show pickAndLoadUserImage;
 /// Colours come only from `colorScheme` roles (repo convention, no
 /// hardcoded values).
 class WelcomeBanner extends StatelessWidget {
-  const WelcomeBanner({super.key, this.colorVisionFocusNode});
+  const WelcomeBanner({super.key, this.onChooseOtherView});
 
-  /// Focus target for "choose another way of seeing" (#78 レビュー S8) —
-  /// `home_screen.dart` passes the same `FocusNode` it gives `FilterSelector`.
-  /// `null` (e.g. in isolated widget tests) just skips the focus handoff.
-  final FocusNode? colorVisionFocusNode;
+  /// Called for "choose another way of seeing" (#78 レビュー S8/nit), before
+  /// dismissing. `null` (e.g. in isolated widget tests) just skips the
+  /// handoff — the banner still dismisses.
+  final VoidCallback? onChooseOtherView;
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +82,7 @@ class WelcomeBanner extends StatelessWidget {
                   children: [
                     OutlinedButton(
                       onPressed: () {
-                        colorVisionFocusNode?.requestFocus();
+                        onChooseOtherView?.call();
                         settings.dismissWelcomeBanner();
                       },
                       child: Text(l10n.welcomeBannerChooseOtherAction),

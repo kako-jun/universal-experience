@@ -120,14 +120,16 @@ void main() {
   });
 
   testWidgets(
-      '「ほかの見え方を選ぶ」は色覚チップの FocusNode にフォーカスを移してから'
-      ' dismiss する（#78 レビュー S8）', (tester) async {
+      '「ほかの見え方を選ぶ」は onChooseOtherView を呼んでから dismiss する'
+      '（#78 レビュー S8）。実際にチップへフォーカスを移し画面内へスクロール'
+      'する側の契約は test/filter_selector_test.dart の '
+      'FilterSelectorState.focusSelectedChip が担う（#78 レビュー nit）',
+      (tester) async {
     SharedPreferences.setMockInitialValues({});
     final settings = SettingsService();
     await settings.load();
     final en = lookupAppLocalizations(const Locale('en'));
-    final focusNode = FocusNode(debugLabel: 'colorVisionFilter');
-    addTearDown(focusNode.dispose);
+    var chooseOtherCalled = false;
 
     await tester.pumpWidget(
       ChangeNotifierProvider<SettingsService>.value(
@@ -142,26 +144,20 @@ void main() {
           ],
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
-            body: Column(
-              children: [
-                // home_screen.dart が FilterSelector に渡すのと同じ
-                // FocusNode を、ここでは適当な focusable ウィジェットに
-                // 割り当てて焦点移動そのものを検証する。
-                Focus(focusNode: focusNode, child: const SizedBox(height: 4)),
-                WelcomeBanner(colorVisionFocusNode: focusNode),
-              ],
+            body: WelcomeBanner(
+              onChooseOtherView: () => chooseOtherCalled = true,
             ),
           ),
         ),
       ),
     );
     await tester.pump();
-    expect(focusNode.hasFocus, isFalse);
+    expect(chooseOtherCalled, isFalse);
 
     await tester.tap(find.text(en.welcomeBannerChooseOtherAction));
     await tester.pump();
 
-    expect(focusNode.hasFocus, isTrue);
+    expect(chooseOtherCalled, isTrue);
     expect(settings.welcomeBannerDismissed, isTrue);
     expect(find.text(en.welcomeBannerTitle), findsNothing);
   });
