@@ -1,6 +1,6 @@
 {
   "schema": "sensus-shader-dump/v1",
-  "sensus_core_version": "0.6.0",
+  "sensus_core_version": "0.6.1",
   "shaders": [
     {
       "name": "protanopia",

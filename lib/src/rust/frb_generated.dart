@@ -68,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => -326563465;
+  int get rustContentHash => -978312356;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -87,6 +87,27 @@ abstract class RustLibApi extends BaseApi {
       required double strength});
 
   List<Experience> crateApiSensusBridgeExperiences();
+
+  Urgency crateApiSensusBridgeHearingFilterUrgency(
+      {required HearingFilter filter});
+
+  List<UrgencyEscalation> crateApiSensusBridgeHearingFilterUrgencyEscalation(
+      {required HearingFilter filter});
+
+  String? crateApiSensusBridgeVisionFilterCitation(
+      {required VisionFilter filter});
+
+  String crateApiSensusBridgeVisionFilterLimitations(
+      {required VisionFilter filter});
+
+  double crateApiSensusBridgeVisionFilterRecommendedStrength(
+      {required VisionFilter filter});
+
+  Urgency crateApiSensusBridgeVisionFilterUrgency(
+      {required VisionFilter filter});
+
+  List<UrgencyEscalation> crateApiSensusBridgeVisionFilterUrgencyEscalation(
+      {required VisionFilter filter});
 
   String crateApiSensusBridgeVisionShaderGlsl({required VisionFilter filter});
 
@@ -163,6 +184,187 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         debugName: 'experiences',
         argNames: [],
       );
+
+  @override
+  Urgency crateApiSensusBridgeHearingFilterUrgency(
+      {required HearingFilter filter}) {
+    return handler.executeSync(SyncTask(
+      callFfi: () {
+        var arg0 = cst_encode_box_autoadd_hearing_filter(filter);
+        return wire
+            .wire__crate__api__sensus_bridge__hearing_filter_urgency(arg0);
+      },
+      codec: DcoCodec(
+        decodeSuccessData: dco_decode_urgency,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateApiSensusBridgeHearingFilterUrgencyConstMeta,
+      argValues: [filter],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiSensusBridgeHearingFilterUrgencyConstMeta =>
+      const TaskConstMeta(
+        debugName: 'hearing_filter_urgency',
+        argNames: ['filter'],
+      );
+
+  @override
+  List<UrgencyEscalation> crateApiSensusBridgeHearingFilterUrgencyEscalation(
+      {required HearingFilter filter}) {
+    return handler.executeSync(SyncTask(
+      callFfi: () {
+        var arg0 = cst_encode_box_autoadd_hearing_filter(filter);
+        return wire
+            .wire__crate__api__sensus_bridge__hearing_filter_urgency_escalation(
+                arg0);
+      },
+      codec: DcoCodec(
+        decodeSuccessData: dco_decode_list_urgency_escalation,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateApiSensusBridgeHearingFilterUrgencyEscalationConstMeta,
+      argValues: [filter],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta
+      get kCrateApiSensusBridgeHearingFilterUrgencyEscalationConstMeta =>
+          const TaskConstMeta(
+            debugName: 'hearing_filter_urgency_escalation',
+            argNames: ['filter'],
+          );
+
+  @override
+  String? crateApiSensusBridgeVisionFilterCitation(
+      {required VisionFilter filter}) {
+    return handler.executeSync(SyncTask(
+      callFfi: () {
+        var arg0 = cst_encode_box_autoadd_vision_filter(filter);
+        return wire
+            .wire__crate__api__sensus_bridge__vision_filter_citation(arg0);
+      },
+      codec: DcoCodec(
+        decodeSuccessData: dco_decode_opt_String,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateApiSensusBridgeVisionFilterCitationConstMeta,
+      argValues: [filter],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiSensusBridgeVisionFilterCitationConstMeta =>
+      const TaskConstMeta(
+        debugName: 'vision_filter_citation',
+        argNames: ['filter'],
+      );
+
+  @override
+  String crateApiSensusBridgeVisionFilterLimitations(
+      {required VisionFilter filter}) {
+    return handler.executeSync(SyncTask(
+      callFfi: () {
+        var arg0 = cst_encode_box_autoadd_vision_filter(filter);
+        return wire
+            .wire__crate__api__sensus_bridge__vision_filter_limitations(arg0);
+      },
+      codec: DcoCodec(
+        decodeSuccessData: dco_decode_String,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateApiSensusBridgeVisionFilterLimitationsConstMeta,
+      argValues: [filter],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiSensusBridgeVisionFilterLimitationsConstMeta =>
+      const TaskConstMeta(
+        debugName: 'vision_filter_limitations',
+        argNames: ['filter'],
+      );
+
+  @override
+  double crateApiSensusBridgeVisionFilterRecommendedStrength(
+      {required VisionFilter filter}) {
+    return handler.executeSync(SyncTask(
+      callFfi: () {
+        var arg0 = cst_encode_box_autoadd_vision_filter(filter);
+        return wire
+            .wire__crate__api__sensus_bridge__vision_filter_recommended_strength(
+                arg0);
+      },
+      codec: DcoCodec(
+        decodeSuccessData: dco_decode_f_32,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateApiSensusBridgeVisionFilterRecommendedStrengthConstMeta,
+      argValues: [filter],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta
+      get kCrateApiSensusBridgeVisionFilterRecommendedStrengthConstMeta =>
+          const TaskConstMeta(
+            debugName: 'vision_filter_recommended_strength',
+            argNames: ['filter'],
+          );
+
+  @override
+  Urgency crateApiSensusBridgeVisionFilterUrgency(
+      {required VisionFilter filter}) {
+    return handler.executeSync(SyncTask(
+      callFfi: () {
+        var arg0 = cst_encode_box_autoadd_vision_filter(filter);
+        return wire
+            .wire__crate__api__sensus_bridge__vision_filter_urgency(arg0);
+      },
+      codec: DcoCodec(
+        decodeSuccessData: dco_decode_urgency,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateApiSensusBridgeVisionFilterUrgencyConstMeta,
+      argValues: [filter],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiSensusBridgeVisionFilterUrgencyConstMeta =>
+      const TaskConstMeta(
+        debugName: 'vision_filter_urgency',
+        argNames: ['filter'],
+      );
+
+  @override
+  List<UrgencyEscalation> crateApiSensusBridgeVisionFilterUrgencyEscalation(
+      {required VisionFilter filter}) {
+    return handler.executeSync(SyncTask(
+      callFfi: () {
+        var arg0 = cst_encode_box_autoadd_vision_filter(filter);
+        return wire
+            .wire__crate__api__sensus_bridge__vision_filter_urgency_escalation(
+                arg0);
+      },
+      codec: DcoCodec(
+        decodeSuccessData: dco_decode_list_urgency_escalation,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateApiSensusBridgeVisionFilterUrgencyEscalationConstMeta,
+      argValues: [filter],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta
+      get kCrateApiSensusBridgeVisionFilterUrgencyEscalationConstMeta =>
+          const TaskConstMeta(
+            debugName: 'vision_filter_urgency_escalation',
+            argNames: ['filter'],
+          );
 
   @override
   String crateApiSensusBridgeVisionShaderGlsl({required VisionFilter filter}) {
@@ -365,6 +567,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<UrgencyEscalation> dco_decode_list_urgency_escalation(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_urgency_escalation).toList();
+  }
+
+  @protected
+  String? dco_decode_opt_String(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_String(raw);
+  }
+
+  @protected
   HearingFilter? dco_decode_opt_box_autoadd_hearing_filter(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_hearing_filter(raw);
@@ -404,6 +618,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Urgency dco_decode_urgency(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return Urgency.values[raw as int];
+  }
+
+  @protected
+  UrgencyEscalation dco_decode_urgency_escalation(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return UrgencyEscalation(
+      urgency: dco_decode_urgency(arr[0]),
+      condition: dco_decode_String(arr[1]),
+    );
   }
 
   @protected
@@ -662,6 +888,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<UrgencyEscalation> sse_decode_list_urgency_escalation(
+      SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <UrgencyEscalation>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_urgency_escalation(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  String? sse_decode_opt_String(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_String(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   HearingFilter? sse_decode_opt_box_autoadd_hearing_filter(
       SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -713,6 +963,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return Urgency.values[inner];
+  }
+
+  @protected
+  UrgencyEscalation sse_decode_urgency_escalation(
+      SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_urgency = sse_decode_urgency(deserializer);
+    var var_condition = sse_decode_String(deserializer);
+    return UrgencyEscalation(urgency: var_urgency, condition: var_condition);
   }
 
   @protected
@@ -1023,6 +1282,26 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_urgency_escalation(
+      List<UrgencyEscalation> self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_urgency_escalation(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_String(String? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_String(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_hearing_filter(
       HearingFilter? self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -1071,6 +1350,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_urgency(Urgency self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_urgency_escalation(
+      UrgencyEscalation self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_urgency(self.urgency, serializer);
+    sse_encode_String(self.condition, serializer);
   }
 
   @protected

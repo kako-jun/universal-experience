@@ -928,6 +928,57 @@ impl HearingFilter {
             H::Labyrinthitis => HearingFilter::Labyrinthitis,
         }
     }
+
+    /// [`Self::from_sensus`] の逆写像。urgency 系メタデータ API（
+    /// [`hearing_filter_urgency`] / [`hearing_filter_urgency_escalation`]）が
+    /// `sensus_core::HearingFilter::urgency()` / `urgency_escalation()` を呼ぶために使う。
+    /// 音声再生（`apply_hearing`）は本ブリッジのスコープ外のまま（聴覚モード設計 #20
+    /// に委ねる）で、この変換もメタデータ取得専用。
+    fn to_sensus(self) -> sensus_core::HearingFilter {
+        use sensus_core::HearingFilter as H;
+        match self {
+            HearingFilter::HearingLoss => H::HearingLoss,
+            HearingFilter::SuddenHearingLoss { freq_hz } => H::SuddenHearingLoss { freq_hz },
+            HearingFilter::NoiseInducedHearingLoss => H::NoiseInducedHearingLoss,
+            HearingFilter::Tinnitus { freq_hz } => H::Tinnitus { freq_hz },
+            HearingFilter::Hyperacusis => H::Hyperacusis,
+            HearingFilter::Misophonia { freq_hz } => H::Misophonia { freq_hz },
+            HearingFilter::Paracusis => H::Paracusis,
+            HearingFilter::Amusia => H::Amusia,
+            HearingFilter::Dysmelodia => H::Dysmelodia,
+            HearingFilter::PitchShift { semitones } => H::PitchShift { semitones },
+            HearingFilter::Diplacusis => H::Diplacusis,
+            HearingFilter::AuditoryProcessingDisorder => H::AuditoryProcessingDisorder,
+            HearingFilter::Meniere => H::Meniere,
+            HearingFilter::Labyrinthitis => H::Labyrinthitis,
+        }
+    }
+}
+
+/// 条件付きで緊急度が上がる場合の 1 エントリ。`sensus_core` の
+/// `(Urgency, &'static str)` タプルの FRB 公開ミラー（タプルは FRB が Dart
+/// へ直接出せないため構造体にする）。[`condition`](Self::condition) は英語のまま
+/// 返す（kako-jun/sensus#182 の設計どおり、i18n は消費側の責務）。ue 側は
+/// `l10n_extensions.dart` の対応表でこの英文をキーに ja/en を引き、訳が
+/// 見つからなければ英文のままフォールバック表示する。
+#[derive(Debug, Clone, PartialEq)]
+pub struct UrgencyEscalation {
+    /// 条件が満たされたときの緊急度。
+    pub urgency: Urgency,
+    /// どんな場合に上がるか（英語、sensus-core 由来の一次情報）。
+    pub condition: String,
+}
+
+fn urgency_escalation_mirror(
+    pairs: &[(sensus_core::Urgency, &'static str)],
+) -> Vec<UrgencyEscalation> {
+    pairs
+        .iter()
+        .map(|(urgency, condition)| UrgencyEscalation {
+            urgency: Urgency::from_sensus(*urgency),
+            condition: condition.to_string(),
+        })
+        .collect()
 }
 
 /// 視覚 + 聴覚にまたがる「複合体験」の Dart 公開ミラー。`sensus_core::Experience` 由来。
@@ -981,6 +1032,73 @@ pub fn experiences() -> Vec<Experience> {
     .into_iter()
     .map(Experience::from_sensus)
     .collect()
+}
+
+// =============================================================================
+// フィルタ単位のメタデータ（kako-jun/sensus#182, ue #76 / #77）
+// =============================================================================
+//
+// [`Filter::urgency`]/[`Filter::urgency_escalation`]/[`Filter::recommended_strength`]/
+// [`Filter::citation`]/[`Filter::limitations`]（sensus-core 0.6.1 で追加）を
+// [`VisionFilter`]/[`HearingFilter`] ミラー経由で薄く公開する。値はバリアント
+// 種別だけで決まり payload には依存しない（sensus 側 doc 参照）ため、渡す
+// インスタンスの payload フィールドは何でもよい（呼び出し側が既に持っている
+// 実インスタンスをそのまま渡せばよく、メタデータ専用の別インスタンスを
+// 組み立て直す必要はない）。
+//
+// #76: 受診喚起（urgency/urgency_escalation）の唯一の正本にする。ue 側は
+// 独自の緊急度分類（旧 `VisionFilterUrgency`）を持たない。
+// #77: recommended_strength を「初めて選んだフィルタの初期強度」に使う。
+
+/// 受診喚起の緊急度。payload に依存せず [`VisionFilter`] のバリアント種別だけで
+/// 決まる（[`sensus_core::Filter::urgency`] 参照）。
+#[flutter_rust_bridge::frb(sync)]
+pub fn vision_filter_urgency(filter: VisionFilter) -> Urgency {
+    Urgency::from_sensus(filter.to_sensus().urgency())
+}
+
+/// 条件付きで緊急度が上がる場合の一覧。上がらないフィルタは空を返す
+/// （[`sensus_core::Filter::urgency_escalation`] 参照）。
+#[flutter_rust_bridge::frb(sync)]
+pub fn vision_filter_urgency_escalation(filter: VisionFilter) -> Vec<UrgencyEscalation> {
+    urgency_escalation_mirror(filter.to_sensus().urgency_escalation())
+}
+
+/// 典型的な症状の程度として推奨される `strength`（`(0.0, 1.0]`）。
+/// ue はこれを「初めて選んだフィルタの初期強度」・「推奨値に戻す」の値として使う
+/// （#77。[`sensus_core::Filter::recommended_strength`] 参照）。
+#[flutter_rust_bridge::frb(sync)]
+pub fn vision_filter_recommended_strength(filter: VisionFilter) -> f32 {
+    filter.to_sensus().recommended_strength()
+}
+
+/// モデル名と出典（DOI 等）。出典が無ければ `None`
+/// （[`sensus_core::Filter::citation`] 参照。#80 で使用予定、本 PR では公開のみ）。
+#[flutter_rust_bridge::frb(sync)]
+pub fn vision_filter_citation(filter: VisionFilter) -> Option<String> {
+    filter.to_sensus().citation().map(|s| s.to_string())
+}
+
+/// このシミュレーションで表現できないことの簡潔な説明（英語）
+/// （[`sensus_core::Filter::limitations`] 参照。#80 で使用予定、本 PR では公開のみ）。
+#[flutter_rust_bridge::frb(sync)]
+pub fn vision_filter_limitations(filter: VisionFilter) -> String {
+    filter.to_sensus().limitations().to_string()
+}
+
+/// 受診喚起の緊急度（聴覚フィルタ版）。[`vision_filter_urgency`] と同じ考え方
+/// （[`sensus_core::HearingFilter::urgency`] 参照）。
+#[flutter_rust_bridge::frb(sync)]
+pub fn hearing_filter_urgency(filter: HearingFilter) -> Urgency {
+    Urgency::from_sensus(filter.to_sensus().urgency())
+}
+
+/// 条件付きで緊急度が上がる場合の一覧（聴覚フィルタ版）。
+/// [`vision_filter_urgency_escalation`] と同じ考え方
+/// （[`sensus_core::HearingFilter::urgency_escalation`] 参照）。
+#[flutter_rust_bridge::frb(sync)]
+pub fn hearing_filter_urgency_escalation(filter: HearingFilter) -> Vec<UrgencyEscalation> {
+    urgency_escalation_mirror(filter.to_sensus().urgency_escalation())
 }
 
 #[cfg(test)]
@@ -1610,6 +1728,108 @@ pub(crate) mod tests {
         for f in ALL_FILTERS {
             let back = VisionFilter::from_sensus(f.to_sensus());
             assert_eq!(back, Some(f), "{f:?}: from_sensus(to_sensus) mismatch");
+        }
+    }
+
+    // --- フィルタ単位のメタデータ（#76 / #77） ---
+
+    /// 全 30 vision フィルタで urgency/urgency_escalation/recommended_strength/
+    /// citation/limitations が panic せず呼べる（網羅性の回帰）。
+    #[test]
+    fn vision_filter_metadata_covers_all_variants() {
+        for f in ALL_FILTERS {
+            let _ = vision_filter_urgency(f);
+            let _ = vision_filter_urgency_escalation(f);
+            let strength = vision_filter_recommended_strength(f);
+            assert!(
+                strength > 0.0 && strength <= 1.0,
+                "{f:?}: recommended_strength {strength} out of (0.0, 1.0]"
+            );
+            let _ = vision_filter_citation(f);
+            assert!(
+                !vision_filter_limitations(f).is_empty(),
+                "{f:?}: limitations must not be empty"
+            );
+        }
+    }
+
+    /// #76 が問題にした食い違いの回帰: BPPV はプリセット側（Experience::BPPV.urgency）
+    /// と advanced フィルタ側（Filter::BppvRotation.urgency）の両方で None（喚起なし）
+    /// になる。典型的には良性の前庭疾患だが、反復・重症例では受診を促す
+    /// （urgency_escalation が非空）。
+    #[test]
+    fn bppv_urgency_matches_between_experience_and_filter() {
+        let experience_urgency = experiences()
+            .into_iter()
+            .find(|e| e.id == "bppv")
+            .unwrap()
+            .urgency;
+        let filter_urgency = vision_filter_urgency(VisionFilter::BppvRotation);
+        assert_eq!(experience_urgency, Urgency::None);
+        assert_eq!(filter_urgency, Urgency::None);
+        assert_eq!(experience_urgency, filter_urgency);
+        assert!(
+            !vision_filter_urgency_escalation(VisionFilter::BppvRotation).is_empty(),
+            "BppvRotation should still expose an escalation path (recurrent/severe episodes)"
+        );
+    }
+
+    /// sensus_core 自身の不変条件（3 variant だけが非空 escalation を持つ）を
+    /// ブリッジ経由でも保つ。ブリッジが取りこぼす／余計に足すと壊れる。
+    #[test]
+    fn vision_filter_urgency_escalation_nonempty_count_matches_sensus() {
+        let count = ALL_FILTERS
+            .iter()
+            .filter(|f| !vision_filter_urgency_escalation(**f).is_empty())
+            .count();
+        assert_eq!(
+            count, 3,
+            "expected exactly 3 vision filters with escalation via bridge"
+        );
+    }
+
+    /// recommended_strength はブリッジ経由でも sensus-core の値をそのまま透過する
+    /// （代表値の回帰）。
+    #[test]
+    fn vision_filter_recommended_strength_representative_values() {
+        assert_eq!(
+            vision_filter_recommended_strength(VisionFilter::Protanopia),
+            1.0
+        );
+        assert_eq!(
+            vision_filter_recommended_strength(VisionFilter::TunnelVision {
+                field_loss_mode: VisionFieldLossMode::Darken,
+            }),
+            0.5
+        );
+        assert_eq!(
+            vision_filter_recommended_strength(VisionFilter::BppvRotation),
+            0.6
+        );
+    }
+
+    /// HearingFilter 側のメタデータも全 14 バリアントで panic せず呼べる。
+    #[test]
+    fn hearing_filter_metadata_covers_all_variants() {
+        let all: [HearingFilter; 14] = [
+            HearingFilter::HearingLoss,
+            HearingFilter::SuddenHearingLoss { freq_hz: 2000.0 },
+            HearingFilter::NoiseInducedHearingLoss,
+            HearingFilter::Tinnitus { freq_hz: 4000.0 },
+            HearingFilter::Hyperacusis,
+            HearingFilter::Misophonia { freq_hz: 1000.0 },
+            HearingFilter::Paracusis,
+            HearingFilter::Amusia,
+            HearingFilter::Dysmelodia,
+            HearingFilter::PitchShift { semitones: -2.0 },
+            HearingFilter::Diplacusis,
+            HearingFilter::AuditoryProcessingDisorder,
+            HearingFilter::Meniere,
+            HearingFilter::Labyrinthitis,
+        ];
+        for f in all {
+            let _ = hearing_filter_urgency(f);
+            let _ = hearing_filter_urgency_escalation(f);
         }
     }
 }

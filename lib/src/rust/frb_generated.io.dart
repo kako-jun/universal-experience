@@ -55,6 +55,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  List<UrgencyEscalation> dco_decode_list_urgency_escalation(dynamic raw);
+
+  @protected
+  String? dco_decode_opt_String(dynamic raw);
+
+  @protected
   HearingFilter? dco_decode_opt_box_autoadd_hearing_filter(dynamic raw);
 
   @protected
@@ -74,6 +80,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Urgency dco_decode_urgency(dynamic raw);
+
+  @protected
+  UrgencyEscalation dco_decode_urgency_escalation(dynamic raw);
 
   @protected
   VisionFieldLossMode dco_decode_vision_field_loss_mode(dynamic raw);
@@ -123,6 +132,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  List<UrgencyEscalation> sse_decode_list_urgency_escalation(
+      SseDeserializer deserializer);
+
+  @protected
+  String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
   HearingFilter? sse_decode_opt_box_autoadd_hearing_filter(
       SseDeserializer deserializer);
 
@@ -144,6 +160,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Urgency sse_decode_urgency(SseDeserializer deserializer);
+
+  @protected
+  UrgencyEscalation sse_decode_urgency_escalation(SseDeserializer deserializer);
 
   @protected
   VisionFieldLossMode sse_decode_vision_field_loss_mode(
@@ -229,6 +248,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     final ans = wire.cst_new_list_prim_u_8_strict(raw.length);
     ans.ref.ptr.asTypedList(raw.length).setAll(0, raw);
     return ans;
+  }
+
+  @protected
+  ffi.Pointer<wire_cst_list_urgency_escalation>
+      cst_encode_list_urgency_escalation(List<UrgencyEscalation> raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    final ans = wire.cst_new_list_urgency_escalation(raw.length);
+    for (var i = 0; i < raw.length; ++i) {
+      cst_api_fill_to_wire_urgency_escalation(raw[i], ans.ref.ptr[i]);
+    }
+    return ans;
+  }
+
+  @protected
+  ffi.Pointer<wire_cst_list_prim_u_8_strict> cst_encode_opt_String(
+      String? raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return raw == null ? ffi.nullptr : cst_encode_String(raw);
   }
 
   @protected
@@ -343,6 +380,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       wireObj.tag = 13;
       return;
     }
+  }
+
+  @protected
+  void cst_api_fill_to_wire_urgency_escalation(
+      UrgencyEscalation apiObj, wire_cst_urgency_escalation wireObj) {
+    wireObj.urgency = cst_encode_urgency(apiObj.urgency);
+    wireObj.condition = cst_encode_String(apiObj.condition);
   }
 
   @protected
@@ -592,6 +636,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       Uint8List self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_urgency_escalation(
+      List<UrgencyEscalation> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_box_autoadd_hearing_filter(
       HearingFilter? self, SseSerializer serializer);
 
@@ -613,6 +664,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_urgency(Urgency self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_urgency_escalation(
+      UrgencyEscalation self, SseSerializer serializer);
 
   @protected
   void sse_encode_vision_field_loss_mode(
@@ -719,6 +774,142 @@ class RustLibWire implements BaseWire {
   late final _wire__crate__api__sensus_bridge__experiences =
       _wire__crate__api__sensus_bridge__experiencesPtr
           .asFunction<WireSyncRust2DartDco Function()>();
+
+  WireSyncRust2DartDco wire__crate__api__sensus_bridge__hearing_filter_urgency(
+    ffi.Pointer<wire_cst_hearing_filter> filter,
+  ) {
+    return _wire__crate__api__sensus_bridge__hearing_filter_urgency(filter);
+  }
+
+  late final _wire__crate__api__sensus_bridge__hearing_filter_urgencyPtr =
+      _lookup<
+          ffi.NativeFunction<
+              WireSyncRust2DartDco Function(
+                  ffi.Pointer<wire_cst_hearing_filter>)>>(
+    'frbgen_universal_experience_wire__crate__api__sensus_bridge__hearing_filter_urgency',
+  );
+  late final _wire__crate__api__sensus_bridge__hearing_filter_urgency =
+      _wire__crate__api__sensus_bridge__hearing_filter_urgencyPtr.asFunction<
+          WireSyncRust2DartDco Function(
+              ffi.Pointer<wire_cst_hearing_filter>)>();
+
+  WireSyncRust2DartDco
+      wire__crate__api__sensus_bridge__hearing_filter_urgency_escalation(
+    ffi.Pointer<wire_cst_hearing_filter> filter,
+  ) {
+    return _wire__crate__api__sensus_bridge__hearing_filter_urgency_escalation(
+      filter,
+    );
+  }
+
+  late final _wire__crate__api__sensus_bridge__hearing_filter_urgency_escalationPtr =
+      _lookup<
+          ffi.NativeFunction<
+              WireSyncRust2DartDco Function(
+                  ffi.Pointer<wire_cst_hearing_filter>)>>(
+    'frbgen_universal_experience_wire__crate__api__sensus_bridge__hearing_filter_urgency_escalation',
+  );
+  late final _wire__crate__api__sensus_bridge__hearing_filter_urgency_escalation =
+      _wire__crate__api__sensus_bridge__hearing_filter_urgency_escalationPtr
+          .asFunction<
+              WireSyncRust2DartDco Function(
+                  ffi.Pointer<wire_cst_hearing_filter>)>();
+
+  WireSyncRust2DartDco wire__crate__api__sensus_bridge__vision_filter_citation(
+    ffi.Pointer<wire_cst_vision_filter> filter,
+  ) {
+    return _wire__crate__api__sensus_bridge__vision_filter_citation(filter);
+  }
+
+  late final _wire__crate__api__sensus_bridge__vision_filter_citationPtr =
+      _lookup<
+          ffi.NativeFunction<
+              WireSyncRust2DartDco Function(
+                  ffi.Pointer<wire_cst_vision_filter>)>>(
+    'frbgen_universal_experience_wire__crate__api__sensus_bridge__vision_filter_citation',
+  );
+  late final _wire__crate__api__sensus_bridge__vision_filter_citation =
+      _wire__crate__api__sensus_bridge__vision_filter_citationPtr.asFunction<
+          WireSyncRust2DartDco Function(ffi.Pointer<wire_cst_vision_filter>)>();
+
+  WireSyncRust2DartDco
+      wire__crate__api__sensus_bridge__vision_filter_limitations(
+    ffi.Pointer<wire_cst_vision_filter> filter,
+  ) {
+    return _wire__crate__api__sensus_bridge__vision_filter_limitations(filter);
+  }
+
+  late final _wire__crate__api__sensus_bridge__vision_filter_limitationsPtr =
+      _lookup<
+          ffi.NativeFunction<
+              WireSyncRust2DartDco Function(
+                  ffi.Pointer<wire_cst_vision_filter>)>>(
+    'frbgen_universal_experience_wire__crate__api__sensus_bridge__vision_filter_limitations',
+  );
+  late final _wire__crate__api__sensus_bridge__vision_filter_limitations =
+      _wire__crate__api__sensus_bridge__vision_filter_limitationsPtr.asFunction<
+          WireSyncRust2DartDco Function(ffi.Pointer<wire_cst_vision_filter>)>();
+
+  WireSyncRust2DartDco
+      wire__crate__api__sensus_bridge__vision_filter_recommended_strength(
+    ffi.Pointer<wire_cst_vision_filter> filter,
+  ) {
+    return _wire__crate__api__sensus_bridge__vision_filter_recommended_strength(
+      filter,
+    );
+  }
+
+  late final _wire__crate__api__sensus_bridge__vision_filter_recommended_strengthPtr =
+      _lookup<
+          ffi.NativeFunction<
+              WireSyncRust2DartDco Function(
+                  ffi.Pointer<wire_cst_vision_filter>)>>(
+    'frbgen_universal_experience_wire__crate__api__sensus_bridge__vision_filter_recommended_strength',
+  );
+  late final _wire__crate__api__sensus_bridge__vision_filter_recommended_strength =
+      _wire__crate__api__sensus_bridge__vision_filter_recommended_strengthPtr
+          .asFunction<
+              WireSyncRust2DartDco Function(
+                  ffi.Pointer<wire_cst_vision_filter>)>();
+
+  WireSyncRust2DartDco wire__crate__api__sensus_bridge__vision_filter_urgency(
+    ffi.Pointer<wire_cst_vision_filter> filter,
+  ) {
+    return _wire__crate__api__sensus_bridge__vision_filter_urgency(filter);
+  }
+
+  late final _wire__crate__api__sensus_bridge__vision_filter_urgencyPtr =
+      _lookup<
+          ffi.NativeFunction<
+              WireSyncRust2DartDco Function(
+                  ffi.Pointer<wire_cst_vision_filter>)>>(
+    'frbgen_universal_experience_wire__crate__api__sensus_bridge__vision_filter_urgency',
+  );
+  late final _wire__crate__api__sensus_bridge__vision_filter_urgency =
+      _wire__crate__api__sensus_bridge__vision_filter_urgencyPtr.asFunction<
+          WireSyncRust2DartDco Function(ffi.Pointer<wire_cst_vision_filter>)>();
+
+  WireSyncRust2DartDco
+      wire__crate__api__sensus_bridge__vision_filter_urgency_escalation(
+    ffi.Pointer<wire_cst_vision_filter> filter,
+  ) {
+    return _wire__crate__api__sensus_bridge__vision_filter_urgency_escalation(
+      filter,
+    );
+  }
+
+  late final _wire__crate__api__sensus_bridge__vision_filter_urgency_escalationPtr =
+      _lookup<
+          ffi.NativeFunction<
+              WireSyncRust2DartDco Function(
+                  ffi.Pointer<wire_cst_vision_filter>)>>(
+    'frbgen_universal_experience_wire__crate__api__sensus_bridge__vision_filter_urgency_escalation',
+  );
+  late final _wire__crate__api__sensus_bridge__vision_filter_urgency_escalation =
+      _wire__crate__api__sensus_bridge__vision_filter_urgency_escalationPtr
+          .asFunction<
+              WireSyncRust2DartDco Function(
+                  ffi.Pointer<wire_cst_vision_filter>)>();
 
   WireSyncRust2DartDco wire__crate__api__sensus_bridge__vision_shader_glsl(
     ffi.Pointer<wire_cst_vision_filter> filter,
@@ -871,6 +1062,21 @@ class RustLibWire implements BaseWire {
       'frbgen_universal_experience_cst_new_list_prim_u_8_strict');
   late final _cst_new_list_prim_u_8_strict = _cst_new_list_prim_u_8_strictPtr
       .asFunction<ffi.Pointer<wire_cst_list_prim_u_8_strict> Function(int)>();
+
+  ffi.Pointer<wire_cst_list_urgency_escalation> cst_new_list_urgency_escalation(
+    int len,
+  ) {
+    return _cst_new_list_urgency_escalation(len);
+  }
+
+  late final _cst_new_list_urgency_escalationPtr = _lookup<
+          ffi.NativeFunction<
+              ffi.Pointer<wire_cst_list_urgency_escalation> Function(
+                  ffi.Int32)>>(
+      'frbgen_universal_experience_cst_new_list_urgency_escalation');
+  late final _cst_new_list_urgency_escalation =
+      _cst_new_list_urgency_escalationPtr.asFunction<
+          ffi.Pointer<wire_cst_list_urgency_escalation> Function(int)>();
 
   int dummy_method_to_enforce_bundling() {
     return _dummy_method_to_enforce_bundling();
@@ -1110,6 +1316,20 @@ final class wire_cst_list_experience extends ffi.Struct {
 
 final class wire_cst_list_prim_f_32_strict extends ffi.Struct {
   external ffi.Pointer<ffi.Float> ptr;
+
+  @ffi.Int32()
+  external int len;
+}
+
+final class wire_cst_urgency_escalation extends ffi.Struct {
+  @ffi.Int32()
+  external int urgency;
+
+  external ffi.Pointer<wire_cst_list_prim_u_8_strict> condition;
+}
+
+final class wire_cst_list_urgency_escalation extends ffi.Struct {
+  external ffi.Pointer<wire_cst_urgency_escalation> ptr;
 
   @ffi.Int32()
   external int len;
