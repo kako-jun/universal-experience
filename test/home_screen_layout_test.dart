@@ -488,6 +488,85 @@ void main() {
         tester.binding.focusManager.primaryFocus?.debugLabel, 'filterSearch');
   });
 
+  group('クリックスルーとダイアログの Esc（#63）', () {
+    const banner = 'クリックスルーが ON です。解除するには:';
+
+    testWidgets('ダイアログのスイッチで ON にするとダイアログが自動で閉じ、Esc 1 回で解除される',
+        (tester) async {
+      final h = await pumpHomeScreen(tester, size: wide);
+      await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('起動モード'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+
+      await tester.runAsync(() async {
+        await tester.tap(find.widgetWithText(SwitchListTile, 'クリックスルー'));
+        // setClickThrough の非同期処理（プラグイン呼び出しの失敗ガードなど）を待つ。
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pumpAndSettle();
+
+      expect(h.loupe.clickThrough, isTrue);
+      expect(find.byType(AlertDialog), findsNothing,
+          reason: 'ON にした時点でダイアログは閉じ、復帰方法の案内が見える');
+      expect(find.text(banner), findsOneWidget);
+
+      await tester.runAsync(() async {
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pumpAndSettle();
+      expect(h.loupe.clickThrough, isFalse, reason: 'Esc 1 回で解除');
+      expect(find.text(banner), findsNothing);
+      await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
+    });
+
+    testWidgets('ホットキー等の別経路で ON になってもダイアログは閉じる', (tester) async {
+      final h = await pumpHomeScreen(tester, size: wide);
+      await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
+      await tester.tap(find.byTooltip('起動モード'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+
+      await tester.runAsync(() => h.loupe.setClickThrough(true));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text(banner), findsOneWidget);
+
+      await tester.runAsync(() => h.loupe.setClickThrough(false));
+      await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
+    });
+
+    testWidgets('ON のままダイアログを開いた場合、ダイアログの中でも Esc は解除になる（閉じない）',
+        (tester) async {
+      final h = await pumpHomeScreen(tester, size: wide);
+      await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
+      await tester.runAsync(() => h.loupe.setClickThrough(true));
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('起動モード'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+
+      await tester.runAsync(() async {
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pumpAndSettle();
+      expect(h.loupe.clickThrough, isFalse);
+      expect(find.byType(AlertDialog), findsOneWidget,
+          reason: '1 回目の Esc は解除に使い、ダイアログは閉じない');
+
+      // OFF になったので、次の Esc は標準どおりダイアログを閉じる。
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
+    });
+  });
+
   testWidgets('AppBar の起動モードのボタンでダイアログが開き、閉じられる', (tester) async {
     await pumpHomeScreen(tester, size: wide);
     expect(find.byType(AlertDialog), findsNothing);
