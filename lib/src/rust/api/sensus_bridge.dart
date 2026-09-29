@@ -8,8 +8,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:freezed_annotation/freezed_annotation.dart' hide protected;
 part 'sensus_bridge.freezed.dart';
 
-// These functions are ignored because they are not marked as `pub`: `color_matrix_flat`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `to_sensus`, `to_sensus`, `to_sensus`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These functions are ignored because they are not marked as `pub`: `color_matrix_flat`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `to_sensus`, `to_sensus`, `to_sensus`, `to_sensus`, `urgency_escalation_mirror`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// 指定フィルタの GLSL ES 3.00 ソースを返す。
 ///
@@ -98,6 +98,52 @@ Future<Uint8List> applyVisionCpuRgba8(
 /// Dart 側 i18n（#18）が解決する。
 List<Experience> experiences() =>
     RustLib.instance.api.crateApiSensusBridgeExperiences();
+
+/// 受診喚起の緊急度。payload に依存せず [`VisionFilter`] のバリアント種別だけで
+/// 決まる（[`sensus_core::Filter::urgency`] 参照）。
+Urgency visionFilterUrgency({required VisionFilter filter}) =>
+    RustLib.instance.api
+        .crateApiSensusBridgeVisionFilterUrgency(filter: filter);
+
+/// 条件付きで緊急度が上がる場合の一覧。上がらないフィルタは空を返す
+/// （[`sensus_core::Filter::urgency_escalation`] 参照）。
+List<UrgencyEscalation> visionFilterUrgencyEscalation(
+        {required VisionFilter filter}) =>
+    RustLib.instance.api
+        .crateApiSensusBridgeVisionFilterUrgencyEscalation(filter: filter);
+
+/// 典型的な症状の程度として推奨される `strength`（`(0.0, 1.0]`）。
+/// ue はこれを「初めて選んだフィルタの初期強度」・「推奨値に戻す」の値として使う
+/// （#77。[`sensus_core::Filter::recommended_strength`] 参照）。
+double visionFilterRecommendedStrength({required VisionFilter filter}) =>
+    RustLib.instance.api
+        .crateApiSensusBridgeVisionFilterRecommendedStrength(filter: filter);
+
+/// モデル名と出典（DOI 等）。出典が無ければ `None`
+/// （[`sensus_core::Filter::citation`] 参照。#80 で使用予定、本 PR では公開のみ）。
+String? visionFilterCitation({required VisionFilter filter}) =>
+    RustLib.instance.api
+        .crateApiSensusBridgeVisionFilterCitation(filter: filter);
+
+/// このシミュレーションで表現できないことの簡潔な説明（英語）
+/// （[`sensus_core::Filter::limitations`] 参照。#80 で使用予定、本 PR では公開のみ）。
+String visionFilterLimitations({required VisionFilter filter}) =>
+    RustLib.instance.api
+        .crateApiSensusBridgeVisionFilterLimitations(filter: filter);
+
+/// 受診喚起の緊急度（聴覚フィルタ版）。[`vision_filter_urgency`] と同じ考え方
+/// （[`sensus_core::HearingFilter::urgency`] 参照）。
+Urgency hearingFilterUrgency({required HearingFilter filter}) =>
+    RustLib.instance.api
+        .crateApiSensusBridgeHearingFilterUrgency(filter: filter);
+
+/// 条件付きで緊急度が上がる場合の一覧（聴覚フィルタ版）。
+/// [`vision_filter_urgency_escalation`] と同じ考え方
+/// （[`sensus_core::HearingFilter::urgency_escalation`] 参照）。
+List<UrgencyEscalation> hearingFilterUrgencyEscalation(
+        {required HearingFilter filter}) =>
+    RustLib.instance.api
+        .crateApiSensusBridgeHearingFilterUrgencyEscalation(filter: filter);
 
 /// 視覚 + 聴覚にまたがる「複合体験」の Dart 公開ミラー。`sensus_core::Experience` 由来。
 ///
@@ -216,6 +262,36 @@ enum Urgency {
   /// 即救急（脳卒中等のサインの可能性）。
   emergency,
   ;
+}
+
+/// 条件付きで緊急度が上がる場合の 1 エントリ。`sensus_core` の
+/// `(Urgency, &'static str)` タプルの FRB 公開ミラー（タプルは FRB が Dart
+/// へ直接出せないため構造体にする）。[`condition`](Self::condition) は英語のまま
+/// 返す（kako-jun/sensus#182 の設計どおり、i18n は消費側の責務）。ue 側は
+/// `l10n_extensions.dart` の対応表でこの英文をキーに ja/en を引き、訳が
+/// 見つからなければ英文のままフォールバック表示する。
+class UrgencyEscalation {
+  /// 条件が満たされたときの緊急度。
+  final Urgency urgency;
+
+  /// どんな場合に上がるか（英語、sensus-core 由来の一次情報）。
+  final String condition;
+
+  const UrgencyEscalation({
+    required this.urgency,
+    required this.condition,
+  });
+
+  @override
+  int get hashCode => urgency.hashCode ^ condition.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is UrgencyEscalation &&
+          runtimeType == other.runtimeType &&
+          urgency == other.urgency &&
+          condition == other.condition;
 }
 
 /// 視野欠損の表現モード。`sensus_core::vision::FieldLossMode` の FRB 公開ミラー。

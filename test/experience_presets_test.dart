@@ -11,6 +11,11 @@
 // 5. meniere と labyrinthitis はどちらもカタログ id vertigo に写るが、
 //    selectedPresetId による比較で選んだ方だけが点灯する（#60: 2 枚同時点灯の
 //    修正）。
+// 6. escalation は Experience.vision（visionFilterUrgencyEscalationProvider）
+//    から取得し、ConsultNoticeBlock（FilterParamPanel・export と共有）で
+//    表示する（#76 レビュー S3）。
+// 7. 免責文・根拠 URL は各カードには出さず、セクション末尾に 1 回だけ出す
+//    （#76 再レビュー nit）。
 //
 // bridge の experiences() は native lib（FFI）を要求し flutter test では呼べないため、
 // experiencesProvider seam を fixture で差し替える（音声再生は #19 非スコープ）。
@@ -22,9 +27,12 @@ import 'package:provider/provider.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/services/filter_service.dart';
+import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
+
+import 'support/vision_filter_metadata_fixture.dart';
 
 /// テスト用の 4 体験 fixture（sensus の experiences() と同じ id / vision / hearing /
 /// urgency）。実 bridge は native を要求するため fixture で代替する。
@@ -59,10 +67,14 @@ void main() {
 
   setUp(() {
     experiencesProvider = _fixtureExperiences;
+    installVisionFilterMetadataFixture();
     visionState = VisionFilterState();
     filterService = FilterService();
   });
-  tearDown(() => experiencesProvider = experiences);
+  tearDown(() {
+    experiencesProvider = experiences;
+    resetVisionFilterMetadataProviders();
+  });
 
   Future<void> pumpPresets(WidgetTester tester, Locale locale) async {
     // ListView 内の全カードが lazy build されるよう十分高いビューポートにする。
@@ -211,5 +223,71 @@ void main() {
     await pumpPresets(tester, const Locale('en'));
     final en = lookupAppLocalizations(const Locale('en'));
     expect(find.text(en.experienceIncludesHearingNote), findsNothing);
+  });
+
+  testWidgets(
+      'escalation は Experience.vision から取得し、ConsultNoticeBlock で表示する'
+      '（#76 レビュー S3）', (tester) async {
+    // urgency=none の bppv でも、Experience.vision（bppvRotation）に対する
+    // escalation フィクスチャがあれば ConsultNoticeBlock の escalation ブロックが
+    // 出ることを確認する（喚起文そのものは urgency=none のため出ない）。
+    visionFilterUrgencyEscalationProvider = (filter) =>
+        filter == const VisionFilter.bppvRotation()
+            ? const [
+                UrgencyEscalation(
+                  urgency: Urgency.earlyConsultation,
+                  condition: 'recurrent or severe episodes',
+                ),
+              ]
+            : const [];
+    experiencesProvider = () => const [
+          Experience(
+            id: 'bppv',
+            vision: VisionFilter.bppvRotation(),
+            urgency: Urgency.none,
+          ),
+        ];
+    await pumpPresets(tester, const Locale('en'));
+    final en = lookupAppLocalizations(const Locale('en'));
+
+    expect(find.text(en.consultEarly), findsNothing);
+    expect(find.text(en.escalationHeaderEarly), findsOneWidget);
+    expect(
+      find.textContaining(en.escalationConditionBppvRecurrentSevere),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+      '免責文・根拠 URL は各カードには出さず、セクション末尾に 1 回だけ出す'
+      '（#76 再レビュー nit）', (tester) async {
+    // 既定の 4 体験フィクスチャは meniere/labyrinthitis（earlyConsultation）・
+    // vestibular_neuritis（emergency）の 3 枚が喚起を持つ。カード側に免責文を
+    // 出していれば 3 件、セクション単位なら 1 件になる。
+    await pumpPresets(tester, const Locale('en'));
+    final en = lookupAppLocalizations(const Locale('en'));
+
+    expect(find.text(en.consultDisclaimer), findsOneWidget);
+    expect(find.textContaining('sensus/blob/main/docs/overview.md'),
+        findsOneWidget);
+    // 喚起文・escalation は引き続き各カードに残る（免責文だけがセクション
+    // 末尾へ移った）ことも確認する。
+    expect(find.text(en.consultEmergency), findsOneWidget);
+    expect(find.text(en.consultEarly), findsNWidgets(2));
+  });
+
+  testWidgets('どのカードにも喚起が無ければセクション末尾の免責文も出ない（#76 再レビュー nit）',
+      (tester) async {
+    experiencesProvider = () => const [
+          Experience(
+            id: 'bppv',
+            vision: VisionFilter.bppvRotation(),
+            urgency: Urgency.none,
+          ),
+        ];
+    await pumpPresets(tester, const Locale('en'));
+    final en = lookupAppLocalizations(const Locale('en'));
+
+    expect(find.text(en.consultDisclaimer), findsNothing);
   });
 }

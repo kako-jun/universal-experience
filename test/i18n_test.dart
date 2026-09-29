@@ -25,8 +25,11 @@ import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
+import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
+
+import 'support/vision_filter_metadata_fixture.dart';
 
 Map<String, dynamic> _readArb(String name) {
   final file = File('lib/l10n/$name');
@@ -135,14 +138,38 @@ void main() {
           contains('男性'));
     });
 
-    test('urgency 由来の受診喚起は medium/high のみ出る', () {
+    test('urgency 由来の受診喚起は none 以外でのみ出る（#76: sensus の Urgency が唯一の正本）',
+        () {
       final en = lookupAppLocalizations(const Locale('en'));
-      expect(consultMessageForUrgency(en, VisionFilterUrgency.none), isNull);
-      expect(consultMessageForUrgency(en, VisionFilterUrgency.low), isNull);
-      expect(consultMessageForUrgency(en, VisionFilterUrgency.medium),
+      expect(urgencyConsultMessage(en, Urgency.none), isNull);
+      expect(urgencyConsultMessage(en, Urgency.earlyConsultation),
           en.consultEarly);
-      expect(consultMessageForUrgency(en, VisionFilterUrgency.high),
-          en.consultEmergency);
+      expect(urgencyConsultMessage(en, Urgency.emergency), en.consultEmergency);
+    });
+
+    test('escalation の条件文は訳があれば日本語、なければ英語のまま（#76）', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final ja = lookupAppLocalizations(const Locale('ja'));
+      expect(escalationConditionText(en, 'recurrent or severe episodes'),
+          en.escalationConditionBppvRecurrentSevere);
+      expect(escalationConditionText(ja, 'recurrent or severe episodes'),
+          ja.escalationConditionBppvRecurrentSevere);
+      // 訳の対応表に無い文字列は英語のままフォールバックする。
+      const unknown = 'some future sensus condition not yet translated';
+      expect(escalationConditionText(ja, unknown), unknown);
+    });
+
+    test(
+        'consultDisclaimerShort（PNG 用の短い免責文）は診断ではない旨・医療監修なしの旨・'
+        '根拠の三つを含む（#76 再レビュー M1\'、最終レビュー nit）', () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final ja = lookupAppLocalizations(const Locale('ja'));
+      expect(en.consultDisclaimerShort, contains('diagnos'));
+      expect(en.consultDisclaimerShort, contains('review'));
+      expect(en.consultDisclaimerShort, contains('sensus'));
+      expect(ja.consultDisclaimerShort, contains('診断'));
+      expect(ja.consultDisclaimerShort, contains('監修'));
+      expect(ja.consultDisclaimerShort, contains('sensus'));
     });
   });
 
@@ -172,7 +199,11 @@ void main() {
   group('HomeScreen ロケール別描画', () {
     // HomeScreen は体験プリセット集 (#19) が bridge の experiences() を呼ぶ。FFI 未
     // ロードの flutter test では native を叩けないため、fixture で seam を差し替える。
+    // VisionFilterState の選択も urgency/recommended_strength（#76/#77）で実
+    // ブリッジを要求するため、既定は installVisionFilterMetadataFixture()
+    // （urgency=none 一律）にする。urgency を検証するテストだけ個別に上書きする。
     setUp(() {
+      installVisionFilterMetadataFixture();
       experiencesProvider = () => const [
             Experience(
               id: 'meniere',
@@ -198,7 +229,10 @@ void main() {
             ),
           ];
     });
-    tearDown(() => experiencesProvider = experiences);
+    tearDown(() {
+      experiencesProvider = experiences;
+      resetVisionFilterMetadataProviders();
+    });
 
     Future<void> pumpHome(WidgetTester tester, Locale locale) async {
       // HomeScreen は ListView で縦に長いため、全セクションが lazy build されるよう
@@ -264,19 +298,28 @@ void main() {
       expect(find.text('すべての感覚を、すべての人に。'), findsNothing);
     });
 
-    testWidgets('high urgency フィルタ選択で緊急受診メッセージが出る', (tester) async {
+    testWidgets('emergency urgency フィルタ選択で緊急受診メッセージが出る（#76）', (tester) async {
+      // #76: urgency は sensus ブリッジ（fixture）が唯一の正本。ここでは
+      // vestibular_neuritis だけ emergency を返すフィクスチャにする
+      // （vestibular_neuritis は payload を持たないカタログ id なので
+      //  FilterParamPanel 側の VisionFilter インスタンスとも == で一致する）。
+      visionFilterUrgencyProvider = (filter) =>
+          filter == const VisionFilter.vestibularNeuritis()
+              ? Urgency.emergency
+              : Urgency.none;
+
       await pumpHome(tester, const Locale('en'));
       final en = lookupAppLocalizations(const Locale('en'));
 
-      // glaucoma は urgency.high。Advanced カタログから選択する。
       final state =
           tester.element(find.byType(HomeScreen)).read<VisionFilterState>();
-      state.select('glaucoma');
+      state.select('vestibular_neuritis');
       await tester.pump();
 
-      // glaucoma 選択で param panel に緊急受診メッセージが 1 件。加えて体験プリセット
-      // 集 (#19) の vestibular_neuritis（emergency）が常時同じメッセージを表示するため
-      // 厳密に計 2 件。プリセットが落ちたら 1 件になり検出できる（exact count）。
+      // advanced カタログ選択（FilterParamPanel）で緊急受診メッセージが 1 件。
+      // 加えて体験プリセット集 (#19) の vestibular_neuritis（emergency）が常時
+      // 同じメッセージを表示するため厳密に計 2 件。プリセットが落ちたら 1 件に
+      // なり検出できる（exact count）。
       expect(find.text(en.consultEmergency), findsNWidgets(2));
     });
   });

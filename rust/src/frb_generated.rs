@@ -37,7 +37,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueNom,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.11.1";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -326563465;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -978312356;
 
 // Section: executor
 
@@ -91,6 +91,146 @@ fn wire__crate__api__sensus_bridge__experiences_impl(
         move || {
             transform_result_dco::<_, _, ()>((move || {
                 let output_ok = Result::<_, ()>::Ok(crate::api::sensus_bridge::experiences())?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__sensus_bridge__hearing_filter_urgency_impl(
+    filter: impl CstDecode<crate::api::sensus_bridge::HearingFilter>,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::DcoCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "hearing_filter_urgency",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let api_filter = filter.cst_decode();
+            transform_result_dco::<_, _, ()>((move || {
+                let output_ok = Result::<_, ()>::Ok(
+                    crate::api::sensus_bridge::hearing_filter_urgency(api_filter),
+                )?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__sensus_bridge__hearing_filter_urgency_escalation_impl(
+    filter: impl CstDecode<crate::api::sensus_bridge::HearingFilter>,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::DcoCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "hearing_filter_urgency_escalation",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let api_filter = filter.cst_decode();
+            transform_result_dco::<_, _, ()>((move || {
+                let output_ok = Result::<_, ()>::Ok(
+                    crate::api::sensus_bridge::hearing_filter_urgency_escalation(api_filter),
+                )?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__sensus_bridge__vision_filter_citation_impl(
+    filter: impl CstDecode<crate::api::sensus_bridge::VisionFilter>,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::DcoCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "vision_filter_citation",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let api_filter = filter.cst_decode();
+            transform_result_dco::<_, _, ()>((move || {
+                let output_ok = Result::<_, ()>::Ok(
+                    crate::api::sensus_bridge::vision_filter_citation(api_filter),
+                )?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__sensus_bridge__vision_filter_limitations_impl(
+    filter: impl CstDecode<crate::api::sensus_bridge::VisionFilter>,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::DcoCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "vision_filter_limitations",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let api_filter = filter.cst_decode();
+            transform_result_dco::<_, _, ()>((move || {
+                let output_ok = Result::<_, ()>::Ok(
+                    crate::api::sensus_bridge::vision_filter_limitations(api_filter),
+                )?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__sensus_bridge__vision_filter_recommended_strength_impl(
+    filter: impl CstDecode<crate::api::sensus_bridge::VisionFilter>,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::DcoCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "vision_filter_recommended_strength",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let api_filter = filter.cst_decode();
+            transform_result_dco::<_, _, ()>((move || {
+                let output_ok = Result::<_, ()>::Ok(
+                    crate::api::sensus_bridge::vision_filter_recommended_strength(api_filter),
+                )?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__sensus_bridge__vision_filter_urgency_impl(
+    filter: impl CstDecode<crate::api::sensus_bridge::VisionFilter>,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::DcoCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "vision_filter_urgency",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let api_filter = filter.cst_decode();
+            transform_result_dco::<_, _, ()>((move || {
+                let output_ok = Result::<_, ()>::Ok(
+                    crate::api::sensus_bridge::vision_filter_urgency(api_filter),
+                )?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__sensus_bridge__vision_filter_urgency_escalation_impl(
+    filter: impl CstDecode<crate::api::sensus_bridge::VisionFilter>,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::DcoCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "vision_filter_urgency_escalation",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let api_filter = filter.cst_decode();
+            transform_result_dco::<_, _, ()>((move || {
+                let output_ok = Result::<_, ()>::Ok(
+                    crate::api::sensus_bridge::vision_filter_urgency_escalation(api_filter),
+                )?;
                 Ok(output_ok)
             })())
         },
@@ -389,6 +529,31 @@ impl SseDecode for Vec<u8> {
     }
 }
 
+impl SseDecode for Vec<crate::api::sensus_bridge::UrgencyEscalation> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = vec![];
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::sensus_bridge::UrgencyEscalation>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Option<String> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<String>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<crate::api::sensus_bridge::HearingFilter> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -450,6 +615,18 @@ impl SseDecode for crate::api::sensus_bridge::Urgency {
             1 => crate::api::sensus_bridge::Urgency::EarlyConsultation,
             2 => crate::api::sensus_bridge::Urgency::Emergency,
             _ => unreachable!("Invalid variant for Urgency: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::sensus_bridge::UrgencyEscalation {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_urgency = <crate::api::sensus_bridge::Urgency>::sse_decode(deserializer);
+        let mut var_condition = <String>::sse_decode(deserializer);
+        return crate::api::sensus_bridge::UrgencyEscalation {
+            urgency: var_urgency,
+            condition: var_condition,
         };
     }
 }
@@ -775,6 +952,27 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::sensus_bridge::Urgency>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::sensus_bridge::UrgencyEscalation {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.urgency.into_into_dart().into_dart(),
+            self.condition.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::sensus_bridge::UrgencyEscalation
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::sensus_bridge::UrgencyEscalation>
+    for crate::api::sensus_bridge::UrgencyEscalation
+{
+    fn into_into_dart(self) -> crate::api::sensus_bridge::UrgencyEscalation {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::sensus_bridge::VisionFieldLossMode {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         match self {
@@ -1079,6 +1277,26 @@ impl SseEncode for Vec<u8> {
     }
 }
 
+impl SseEncode for Vec<crate::api::sensus_bridge::UrgencyEscalation> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::sensus_bridge::UrgencyEscalation>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<String> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <String>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<crate::api::sensus_bridge::HearingFilter> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1139,6 +1357,14 @@ impl SseEncode for crate::api::sensus_bridge::Urgency {
             },
             serializer,
         );
+    }
+}
+
+impl SseEncode for crate::api::sensus_bridge::UrgencyEscalation {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::api::sensus_bridge::Urgency>::sse_encode(self.urgency, serializer);
+        <String>::sse_encode(self.condition, serializer);
     }
 }
 
@@ -1487,6 +1713,27 @@ mod io {
             }
         }
     }
+    impl CstDecode<Vec<crate::api::sensus_bridge::UrgencyEscalation>>
+        for *mut wire_cst_list_urgency_escalation
+    {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> Vec<crate::api::sensus_bridge::UrgencyEscalation> {
+            let vec = unsafe {
+                let wrap = flutter_rust_bridge::for_generated::box_from_leak_ptr(self);
+                flutter_rust_bridge::for_generated::vec_from_leak_ptr(wrap.ptr, wrap.len)
+            };
+            vec.into_iter().map(CstDecode::cst_decode).collect()
+        }
+    }
+    impl CstDecode<crate::api::sensus_bridge::UrgencyEscalation> for wire_cst_urgency_escalation {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> crate::api::sensus_bridge::UrgencyEscalation {
+            crate::api::sensus_bridge::UrgencyEscalation {
+                urgency: self.urgency.cst_decode(),
+                condition: self.condition.cst_decode(),
+            }
+        }
+    }
     impl CstDecode<crate::api::sensus_bridge::VisionFilter> for wire_cst_vision_filter {
         // Codec=Cst (C-struct based), see doc to use other codecs
         fn cst_decode(self) -> crate::api::sensus_bridge::VisionFilter {
@@ -1631,6 +1878,19 @@ mod io {
             Self::new_with_null_ptr()
         }
     }
+    impl NewWithNullPtr for wire_cst_urgency_escalation {
+        fn new_with_null_ptr() -> Self {
+            Self {
+                urgency: Default::default(),
+                condition: core::ptr::null_mut(),
+            }
+        }
+    }
+    impl Default for wire_cst_urgency_escalation {
+        fn default() -> Self {
+            Self::new_with_null_ptr()
+        }
+    }
     impl NewWithNullPtr for wire_cst_vision_filter {
         fn new_with_null_ptr() -> Self {
             Self {
@@ -1663,6 +1923,55 @@ mod io {
     pub extern "C" fn frbgen_universal_experience_wire__crate__api__sensus_bridge__experiences(
     ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
         wire__crate__api__sensus_bridge__experiences_impl()
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_universal_experience_wire__crate__api__sensus_bridge__hearing_filter_urgency(
+        filter: *mut wire_cst_hearing_filter,
+    ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+        wire__crate__api__sensus_bridge__hearing_filter_urgency_impl(filter)
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_universal_experience_wire__crate__api__sensus_bridge__hearing_filter_urgency_escalation(
+        filter: *mut wire_cst_hearing_filter,
+    ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+        wire__crate__api__sensus_bridge__hearing_filter_urgency_escalation_impl(filter)
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_universal_experience_wire__crate__api__sensus_bridge__vision_filter_citation(
+        filter: *mut wire_cst_vision_filter,
+    ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+        wire__crate__api__sensus_bridge__vision_filter_citation_impl(filter)
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_universal_experience_wire__crate__api__sensus_bridge__vision_filter_limitations(
+        filter: *mut wire_cst_vision_filter,
+    ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+        wire__crate__api__sensus_bridge__vision_filter_limitations_impl(filter)
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_universal_experience_wire__crate__api__sensus_bridge__vision_filter_recommended_strength(
+        filter: *mut wire_cst_vision_filter,
+    ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+        wire__crate__api__sensus_bridge__vision_filter_recommended_strength_impl(filter)
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_universal_experience_wire__crate__api__sensus_bridge__vision_filter_urgency(
+        filter: *mut wire_cst_vision_filter,
+    ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+        wire__crate__api__sensus_bridge__vision_filter_urgency_impl(filter)
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_universal_experience_wire__crate__api__sensus_bridge__vision_filter_urgency_escalation(
+        filter: *mut wire_cst_vision_filter,
+    ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+        wire__crate__api__sensus_bridge__vision_filter_urgency_escalation_impl(filter)
     }
 
     #[unsafe(no_mangle)]
@@ -1767,6 +2076,20 @@ mod io {
         flutter_rust_bridge::for_generated::new_leak_box_ptr(ans)
     }
 
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_universal_experience_cst_new_list_urgency_escalation(
+        len: i32,
+    ) -> *mut wire_cst_list_urgency_escalation {
+        let wrap = wire_cst_list_urgency_escalation {
+            ptr: flutter_rust_bridge::for_generated::new_leak_vec_ptr(
+                <wire_cst_urgency_escalation>::new_with_null_ptr(),
+                len,
+            ),
+            len,
+        };
+        flutter_rust_bridge::for_generated::new_leak_box_ptr(wrap)
+    }
+
     #[repr(C)]
     #[derive(Clone, Copy)]
     pub struct wire_cst_experience {
@@ -1839,6 +2162,18 @@ mod io {
     pub struct wire_cst_list_prim_u_8_strict {
         ptr: *mut u8,
         len: i32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_list_urgency_escalation {
+        ptr: *mut wire_cst_urgency_escalation,
+        len: i32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_urgency_escalation {
+        urgency: i32,
+        condition: *mut wire_cst_list_prim_u_8_strict,
     }
     #[repr(C)]
     #[derive(Clone, Copy)]
@@ -2064,6 +2399,44 @@ mod web {
             self.into_vec()
         }
     }
+    impl CstDecode<Vec<crate::api::sensus_bridge::UrgencyEscalation>>
+        for flutter_rust_bridge::for_generated::wasm_bindgen::JsValue
+    {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> Vec<crate::api::sensus_bridge::UrgencyEscalation> {
+            self.dyn_into::<flutter_rust_bridge::for_generated::js_sys::Array>()
+                .unwrap()
+                .iter()
+                .map(CstDecode::cst_decode)
+                .collect()
+        }
+    }
+    impl CstDecode<Option<String>> for Option<String> {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> Option<String> {
+            self.map(CstDecode::cst_decode)
+        }
+    }
+    impl CstDecode<crate::api::sensus_bridge::UrgencyEscalation>
+        for flutter_rust_bridge::for_generated::wasm_bindgen::JsValue
+    {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> crate::api::sensus_bridge::UrgencyEscalation {
+            let self_ = self
+                .dyn_into::<flutter_rust_bridge::for_generated::js_sys::Array>()
+                .unwrap();
+            assert_eq!(
+                self_.length(),
+                2,
+                "Expected 2 elements, got {}",
+                self_.length()
+            );
+            crate::api::sensus_bridge::UrgencyEscalation {
+                urgency: self_.get(0).cst_decode(),
+                condition: self_.get(1).cst_decode(),
+            }
+        }
+    }
     impl CstDecode<crate::api::sensus_bridge::VisionFilter>
         for flutter_rust_bridge::for_generated::wasm_bindgen::JsValue
     {
@@ -2239,6 +2612,55 @@ mod web {
     pub fn wire__crate__api__sensus_bridge__experiences(
     ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
         wire__crate__api__sensus_bridge__experiences_impl()
+    }
+
+    #[wasm_bindgen]
+    pub fn wire__crate__api__sensus_bridge__hearing_filter_urgency(
+        filter: flutter_rust_bridge::for_generated::wasm_bindgen::JsValue,
+    ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+        wire__crate__api__sensus_bridge__hearing_filter_urgency_impl(filter)
+    }
+
+    #[wasm_bindgen]
+    pub fn wire__crate__api__sensus_bridge__hearing_filter_urgency_escalation(
+        filter: flutter_rust_bridge::for_generated::wasm_bindgen::JsValue,
+    ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+        wire__crate__api__sensus_bridge__hearing_filter_urgency_escalation_impl(filter)
+    }
+
+    #[wasm_bindgen]
+    pub fn wire__crate__api__sensus_bridge__vision_filter_citation(
+        filter: flutter_rust_bridge::for_generated::wasm_bindgen::JsValue,
+    ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+        wire__crate__api__sensus_bridge__vision_filter_citation_impl(filter)
+    }
+
+    #[wasm_bindgen]
+    pub fn wire__crate__api__sensus_bridge__vision_filter_limitations(
+        filter: flutter_rust_bridge::for_generated::wasm_bindgen::JsValue,
+    ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+        wire__crate__api__sensus_bridge__vision_filter_limitations_impl(filter)
+    }
+
+    #[wasm_bindgen]
+    pub fn wire__crate__api__sensus_bridge__vision_filter_recommended_strength(
+        filter: flutter_rust_bridge::for_generated::wasm_bindgen::JsValue,
+    ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+        wire__crate__api__sensus_bridge__vision_filter_recommended_strength_impl(filter)
+    }
+
+    #[wasm_bindgen]
+    pub fn wire__crate__api__sensus_bridge__vision_filter_urgency(
+        filter: flutter_rust_bridge::for_generated::wasm_bindgen::JsValue,
+    ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+        wire__crate__api__sensus_bridge__vision_filter_urgency_impl(filter)
+    }
+
+    #[wasm_bindgen]
+    pub fn wire__crate__api__sensus_bridge__vision_filter_urgency_escalation(
+        filter: flutter_rust_bridge::for_generated::wasm_bindgen::JsValue,
+    ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartDco {
+        wire__crate__api__sensus_bridge__vision_filter_urgency_escalation_impl(filter)
     }
 
     #[wasm_bindgen]

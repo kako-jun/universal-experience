@@ -9,8 +9,11 @@ import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
 import 'package:universal_experience/services/export_service.dart';
+import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
+
+import 'support/vision_filter_metadata_fixture.dart';
 
 /// BeforeAfterView の before/after 生成ロジックと描画カバレッジのテスト（#17）。
 ///
@@ -971,11 +974,16 @@ void main() {
     });
 
     group('export の caption (#85 レビュー S8)', () {
+      // #76: _export は urgencyConsultMessage 用に visionFilterUrgencyProvider
+      // （sensus ブリッジ）を呼ぶ。実ブリッジは native lib を要求するため
+      // flutter test ではフィクスチャに差し替える。
+      setUp(installVisionFilterMetadataFixture);
       tearDown(() {
         sampleImageGenerator = BeforeAfterView.generateSampleImage;
         afterImageRenderer = BeforeAfterView.renderAfter;
         exportImageComposer = composeExportImage;
         pngSaver = savePng;
+        resetVisionFilterMetadataProviders();
       });
 
       testWidgets(
@@ -1176,6 +1184,173 @@ void main() {
         );
         expect(savedFilename, contains('-deuteranomaly-'));
         expect(savedFilename, isNot(contains('deuteranopia')));
+      });
+
+      testWidgets(
+          'emergency フィルタで export すると urgencyMessage・escalation・disclaimer を焼き込む '
+          '(#76 レビュー M1/S2)', (tester) async {
+        late ui.Image before1, after1, composedStub;
+        await tester.runAsync(() async {
+          before1 = await BeforeAfterView.generateSampleImage(4);
+          after1 = await BeforeAfterView.generateSampleImage(4);
+          composedStub = await BeforeAfterView.generateSampleImage(4);
+        });
+        sampleImageGenerator = (size) => Future.value(before1);
+        afterImageRenderer = (source, filter, strength) => Future.value(after1);
+
+        visionFilterUrgencyProvider = (_) => Urgency.emergency;
+        visionFilterUrgencyEscalationProvider = (_) => const [
+              UrgencyEscalation(
+                urgency: Urgency.emergency,
+                condition: 'a sudden drop in hearing, especially in one ear '
+                    '(possible sudden sensorineural hearing loss)',
+              ),
+            ];
+
+        ExportCaption? capturedCaption;
+        exportImageComposer = (base, caption) async {
+          capturedCaption = caption;
+          return composedStub;
+        };
+        String? savedFilename;
+        pngSaver = (bytes, filename) async {
+          savedFilename = filename;
+          return '/fake/downloads/$filename';
+        };
+
+        final en = lookupAppLocalizations(const Locale('en'));
+
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filter: VisionFilter.hemianopia(
+            side: 1.0,
+            fieldLossMode: VisionFieldLossMode.darken,
+          ),
+          filterId: 'hemianopia',
+          strength: 1.0,
+          sampleSize: 16,
+        )));
+        await tester.pump();
+        await tester.pump();
+
+        await tester.tap(find.byTooltip(en.exportButtonTooltip));
+        await tester.runAsync(() async {
+          for (var i = 0; i < 50; i++) {
+            if (savedFilename != null) return;
+            await tester.pump(const Duration(milliseconds: 20));
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+          }
+        });
+        await tester.pump();
+
+        expect(capturedCaption, isNotNull);
+        expect(capturedCaption!.urgencyMessage, en.consultEmergency);
+        expect(capturedCaption!.disclaimer, en.consultDisclaimerShort);
+        // #76 再レビュー M1': disclaimer は否定（診断ではない）・医療監修なし・
+        // 根拠の三つを 1 行に含む（最終レビュー nit）。
+        expect(capturedCaption!.disclaimer, contains('diagnos'));
+        expect(capturedCaption!.disclaimer, contains('review'));
+        expect(capturedCaption!.disclaimer, contains('sensus'));
+        // #76 再レビュー S-a: PNG でも escalation を段（見出し + 条件文）で
+        // 焼き込む。
+        expect(capturedCaption!.escalationGroups, hasLength(1));
+        expect(
+          capturedCaption!.escalationGroups.first.header,
+          en.escalationHeaderEmergency,
+        );
+        expect(
+          capturedCaption!.escalationGroups.first.lines,
+          [en.escalationConditionHearingSuddenOneEar],
+        );
+      });
+
+      testWidgets(
+          '描画中に filter が変わっても、export の caption は描画時点の filter の urgency になる '
+          '(#76 レビュー S2、#85 レビュー S8 と同じ規律)', (tester) async {
+        late ui.Image before1, after1, composedStub;
+        await tester.runAsync(() async {
+          before1 = await BeforeAfterView.generateSampleImage(4);
+          after1 = await BeforeAfterView.generateSampleImage(4);
+          composedStub = await BeforeAfterView.generateSampleImage(4);
+        });
+        sampleImageGenerator = (size) => Future.value(before1);
+
+        // protanopia(urgency=none) → hemianopia(urgency=emergency) への
+        // 切替を想定する。
+        const hemianopia = VisionFilter.hemianopia(
+          side: 1.0,
+          fieldLossMode: VisionFieldLossMode.darken,
+        );
+        visionFilterUrgencyProvider =
+            (filter) => filter == hemianopia ? Urgency.emergency : Urgency.none;
+        visionFilterUrgencyEscalationProvider = (_) => const [];
+
+        // 1回目（protanopia）はすぐ解決する。2回目（hemianopia への切替、
+        // コアレス後に走る）は意図的に未解決のまま止め、「表示中の _after は
+        // まだ1回目のまま」という状況を作る。
+        var rendererCallCount = 0;
+        final pending = Completer<ui.Image?>();
+        afterImageRenderer = (source, filter, strength) {
+          rendererCallCount++;
+          if (rendererCallCount == 1) return Future.value(after1);
+          return pending.future;
+        };
+
+        ExportCaption? capturedCaption;
+        exportImageComposer = (base, caption) async {
+          capturedCaption = caption;
+          return composedStub;
+        };
+        String? savedFilename;
+        pngSaver = (bytes, filename) async {
+          savedFilename = filename;
+          return '/fake/downloads/$filename';
+        };
+
+        final en = lookupAppLocalizations(const Locale('en'));
+
+        // 1回目: protanopia（urgency=none）で描画完了させる。
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 1.0,
+          sampleSize: 16,
+        )));
+        await tester.pump();
+        await tester.pump();
+        expect(rendererCallCount, 1);
+
+        // hemianopia（urgency=emergency）へ切り替える。2回目の描画は未解決の
+        // まま止めてあるので、_after はまだ1回目（protanopia）のまま。
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filter: hemianopia,
+          filterId: 'hemianopia',
+          strength: 1.0,
+          sampleSize: 16,
+        )));
+        await tester.pump();
+        expect(rendererCallCount, 2, reason: '2回目のレンダリングは開始しているが、まだ完了していない');
+
+        // ここで export をタップする。表示されている _after はまだ1回目
+        // （protanopia、urgency=none）の結果なので、caption の
+        // urgencyMessage も null のままであるべき —— widget.filter の現在値
+        // （hemianopia、urgency=emergency）を使ってはいけない。
+        await tester.tap(find.byTooltip(en.exportButtonTooltip));
+        await tester.runAsync(() async {
+          for (var i = 0; i < 50; i++) {
+            if (savedFilename != null) return;
+            await tester.pump(const Duration(milliseconds: 20));
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+          }
+        });
+        await tester.pump();
+
+        expect(capturedCaption, isNotNull);
+        expect(
+          capturedCaption!.urgencyMessage,
+          isNull,
+          reason: '描画時（1回目、protanopia=urgency none）の値を使うべき',
+        );
+        expect(capturedCaption!.symptomLabel, visionFilterName(en, 'protanopia'));
       });
     });
   });

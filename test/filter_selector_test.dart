@@ -19,16 +19,20 @@ import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/ui/widgets/filter_selector.dart';
 
+import 'support/vision_filter_metadata_fixture.dart';
+
 void main() {
   late FilterService filterService;
   late VisionFilterState visionState;
   late AppLocalizations en;
 
   setUp(() {
+    installVisionFilterMetadataFixture();
     filterService = FilterService();
     visionState = VisionFilterState();
     en = lookupAppLocalizations(const Locale('en'));
   });
+  tearDown(resetVisionFilterMetadataProviders);
 
   Future<void> pumpSelector(WidgetTester tester) async {
     await tester.pumpWidget(

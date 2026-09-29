@@ -1,7 +1,7 @@
 # sensus 連携 — シェーダ方言調査と統合方針
 
 感覚障害シミュレーションのアルゴリズム正本は別 crate
-[`sensus-core`](https://crates.io/crates/sensus-core)（Rust, crates.io 公開, v0.6.0）に
+[`sensus-core`](https://crates.io/crates/sensus-core)（Rust, crates.io 公開, v0.6.1）に
 一元化する。universal-experience（ue）は GLSL や行列・半径式を**再実装しない**。
 
 このドキュメントは Issue #7（sensus 連携 1/3）のスコープのうち「シェーダ方言の
@@ -569,3 +569,115 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
     （GPU 経路は現状どこからも呼ばれないため、この差が実際に見えることもない。
     将来ライブ画面キャプチャで GPU 経路が使われる際は従来どおり maxDiff≤8 の
     差が生じうる）。
+
+---
+
+## 10. フィルタ単位のメタデータ API — 受診喚起・推奨強度の単一正本化（#76 / #77）
+
+`sensus-core` を 0.6.0 → 0.6.1 に上げた。追加された `Filter::urgency()` /
+`Filter::urgency_escalation()` / `Filter::recommended_strength()` /
+`Filter::citation()` / `Filter::limitations()`（`HearingFilter` も urgency 系
+2 つを持つ）を `rust/src/api/sensus_bridge.rs` の薄いラッパー（
+`vision_filter_urgency` / `vision_filter_urgency_escalation` /
+`vision_filter_recommended_strength` / `vision_filter_citation` /
+`vision_filter_limitations` / `hearing_filter_urgency` /
+`hearing_filter_urgency_escalation`）で FRB 公開した。
+
+- **#76: 受診喚起の唯一の正本**。ue 独自だった `VisionFilterUrgency`
+  （`vision_filter_catalog.dart` の 4 段階 enum、「初版・要医療監修」と自ら
+  書いていた便宜的な値）は撤去した。プリセット（`Experience.urgency`）も
+  advanced カタログ（`FilterParamPanel`）も、常にこのブリッジ関数を通じて
+  同じ `sensus_core::Urgency` を参照する。旧仕様では BPPV がプリセット側
+  （sensus 由来）で「喚起なし」、advanced 側（ue 独自値）で「早めに受診」と
+  矛盾していたが、正本が 1 つになったことで解消した（`bppv_urgency_matches_
+  between_experience_and_filter`、rust 側テスト）。
+  UI（`FilterParamPanel._buildConsultBlock`）は段階名（「緊急度：高」）を一切
+  出さず、喚起文だけを本文サイズ以上の専用ブロックで表示する。色は
+  `ColorScheme` のロールのみ（`tertiaryContainer`/`errorContainer`/
+  `surfaceContainerHighest`）を使う。`urgency_escalation()` の条件文
+  （英語）は `l10n_extensions.dart` の `escalationConditionText` で ja/en の
+  対応表を引き、訳が無ければ英語のままフォールバックする。喚起文からは診療科名
+  を外した（めまい系フィルタは眼科の話ではないため。Opus レビュー S4）。
+- **#76 レビュー M1: 喚起の解決とその表示を 1 箇所に共有化**。1 巡目の Opus
+  レビューで「パネル・プリセットカード・export でそれぞれ受診喚起を組み立てて
+  いて、3 か所が食い違いうる」という指摘（must）を受け、
+  `lib/l10n/l10n_extensions.dart` の `ConsultNotice` / `resolveConsultNotice`
+  （urgency + escalation → 喚起文・段ごとにまとめた escalation
+  （`ConsultEscalationGroup`）・免責文をまとめて解決する唯一の関数）と、
+  `lib/ui/widgets/consult_notice_block.dart` の `ConsultNoticeBlock`
+  （表示ウィジェット）を切り出した。`FilterParamPanel`・`ExperiencePresets`
+  のカード・`before_after_view.dart` の export の 3 か所がこれを共有する。
+  export（`ExportCaption` / `export_service.dart`）にも免責文（短い形）と
+  escalation の行を必ず焼き込む。escalation は PNG でも emergency/
+  earlyConsultation の見出しで段を分ける（`ExportCaption.escalationGroups`、
+  再レビュー S-a: `ConsultNotice.escalationGroups` をそのまま詰め替えるだけで、
+  グルーピングのロジックはブリッジ層だけに置く）。
+- **#76 レビュー M2 / 再レビュー M1'・nit: 免責文に医療監修の非該当と出典を
+  明記**。UI 用の免責文（`consultDisclaimer`）に「医療監修を受けたものでは
+  ありません」を追加し、根拠として「シミュレーションライブラリ sensus の
+  公開資料（[Medical notes 節](https://github.com/kako-jun/sensus/blob/main/docs/overview.md#medical-notes-when-to-see-a-doctor)）」
+  への参照を示す（URL はその節を指すアンカー付き）。UI は
+  `ConsultNoticeBlock`/`ConsultDisclaimerFooter` が URL を選択可能なテキスト
+  として表示する（新規依存を避けるため、生きたハイパーリンクにはしていない）。
+  PNG 焼き込み用の短い形（`consultDisclaimerShort`）は、1 巡目レビューで
+  出典だけの「根拠: sensus Medical notes」にしていたが、2 巡目レビュー（M1'）
+  で「診断ではない旨と根拠の両方を 1 行に」という指摘を受け、
+  en "Not a diagnosis; not medically reviewed. Source: sensus Medical notes" /
+  ja「診断ではありません・医療監修なし。根拠: sensus Medical notes」に改めた。
+- **#76 レビュー N4 / 再レビュー S-a: escalation を emergency/earlyConsultation
+  で見出しを分ける**。現状 vision フィルタの escalation は全て
+  earlyConsultation だが、`HearingFilter` の聴力低下系は emergency 段も持つ
+  （§10 冒頭参照）。聴覚側の UI（#80）が同じグルーピングを再利用できるよう、
+  UI（`ConsultNoticeBlock`）だけでなく PNG（`ExportCaption.escalationGroups`）
+  でも両方の見出しを最初から用意した。
+- **#76 再レビュー nit: 体験プリセットの免責文はセクション単位で 1 回**。
+  `ExperiencePresets` の各カードは喚起文・escalation は出すが、免責文・根拠
+  URL は出さない（`ConsultNoticeBlock(showDisclaimer: false)`）。代わりに
+  「体験プリセット」セクションの末尾に `ConsultDisclaimerFooter` を 1 回だけ
+  表示する（いずれかのカードに喚起があるときのみ）。「免責文を必ず添える」
+  という要件はセクション単位で満たせばよい、という判断による。
+  `FilterParamPanel`（1 フィルタだけを表示する画面）は従来どおり
+  `ConsultNoticeBlock` の既定（`showDisclaimer: true`）のまま。
+- **#76 再レビュー S-b: emergency の文字サイズ**。`ConsultNoticeBlock` の
+  emergency 喚起文は当初 `titleMedium`（16px、太字）にしていたが、
+  `ExperiencePresets` のカードタイトル（同じ `titleMedium` + bold）と見た目が
+  衝突するという指摘を受け、`bodyLarge`（16px、太字）に変更した。
+- **#77: 推奨強度の唯一の正本**。`VisionFilterState` はフィルタ id ごとに
+  strength/payload を記憶する（`_strengthById` / `_paramsById`）。初めて
+  選ぶフィルタは `recommended_strength()` の値から始まり（旧仕様は全フィルタ
+  一律 1.0 固定で、`tunnel_vision` を初めて選ぶとほぼ画面が真っ黒になっていた
+  — #51 注記1）、以後はフィルタを切り替えても保持される。「推奨値に戻す」
+  ボタン（`resetToRecommended()`）で強度・パラメータの両方を戻せる。体験
+  プリセット（`selectPreset`）は #60 で入れていた「強制的に 1.0 に戻す」を
+  「常に推奨値に戻す」へ置き換え、パラメータも常にカタログ既定値へ戻す
+  （#76 レビュー N1）。既定値の組み立て（`_defaultParamsFor`）と推奨強度の
+  解決（`_recommendedStrength`）は `_selectInternal`/`resetToRecommended`/
+  `selectPreset` の 3 箇所が共有する（#76 レビュー N3）。色覚のクイック選択
+  （#57）は従来どおり `FilterService`/`recommendedStrength(ColorVisionType)`
+  のタイプ別記憶を使う（sensus 0.6.1 の CVD 3 型の推奨値は 1.0、-omaly 相当の
+  `kAnomalyDefaultSeverity` は 0.6 のままで整合している）。
+  **既知の限界（#76 レビュー N8）**: `recommended_strength()` は sensus 側で
+  `f32` として計算される。FRB は `f32` をそのまま Dart の `double`（f64）へ
+  渡すため、ビット拡張時の丸め誤差（実用上は無視できる程度、1e-7 未満）が
+  乗る可能性がある。厳密な決定論的値（例えば永続化した値の再比較）が必要に
+  なったら、この丸めを考慮すること。
+- **FFI 制約と provider seam**: `#[frb(sync)]` 関数は native lib を要求し、
+  ネイティブブリッジ未初期化のプレーンな `flutter test` からは呼べない
+  （§7 と同じ制約）。`experiencesProvider` 等の既存 seam は宣言ファイル
+  自身からしか production 利用されない前提で `@visibleForTesting` を付けて
+  いたが、今回のメタデータ seam（`lib/services/vision_filter_metadata.dart`
+  の `visionFilterUrgencyProvider` 等）は `VisionFilterState` /
+  `FilterParamPanel` / `before_after_view.dart` の複数ファイルから正規に
+  production 利用されるため、意図的に `@visibleForTesting` を付けていない。
+  widget/unit test は `test/support/vision_filter_metadata_fixture.dart` の
+  フィクスチャ（既定値は旧挙動と同じ urgency=none・strength=1.0）に差し替える。
+  実ブリッジとの一致自体は
+  `integration_test/vision_filter_urgency_parity_test.dart` が検証する
+  （sensus の escalation 条件文が変わっても、ja 訳が対応表に無ければこの
+  integration test が検知する、#76 レビュー S1）。
+- **citation() / limitations()**: 公開のみ行い、UI 配線は #80 のスコープ。
+- **#65（永続化）向けの注意点（#76 レビュー N9）**: `VisionFilterState` の
+  `_strengthById`/`_paramsById` はそのまま永続化できる構造にしてあるが、
+  `_paramsById` の値は seed パラメータを [BigInt] で持つ（`kSeedMax` 参照）。
+  `BigInt` は `jsonEncode` が標準ではシリアライズできないため、#65 で永続化
+  する際は seed を文字列（10進数）化するなど明示的な変換が要る。

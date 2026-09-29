@@ -4,7 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 
+import 'support/vision_filter_metadata_fixture.dart';
+
 void main() {
+  setUp(installVisionFilterMetadataFixture);
+  tearDown(resetVisionFilterMetadataProviders);
+
   group('VisionFilterState.setBypassed', () {
     test('既定は false', () {
       final state = VisionFilterState();

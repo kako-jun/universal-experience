@@ -52,6 +52,52 @@
 > `visionFilterState` の変化を listener で受けて `refresh()` する（#60。
 > ウィンドウ内 UI での選択もトレイのチェックマークに反映されるようにする
 > ため。listener は `TrayService.dispose()` で外す）。
+>
+> **追補（#76 / #77）**: 受診喚起の緊急度（`Urgency`）・条件付きの上振れ
+> （`urgency_escalation()`）・推奨強度（`recommended_strength()`）は
+> sensus-core 0.6.1 が `Filter`/`HearingFilter` に追加した API を唯一の正本
+> にする。ue 独自の段階分類（旧 `vision_filter_catalog.dart` の
+> `VisionFilterUrgency`）は撤去した。喚起の解決（urgency + escalation →
+> 喚起文・escalation の訳・免責文）は `lib/l10n/l10n_extensions.dart` の
+> `resolveConsultNotice` に一本化し、表示は `lib/ui/widgets/
+> consult_notice_block.dart` の `ConsultNoticeBlock` が担う。`FilterParamPanel`・
+> `ExperiencePresets` のカード・PNG export（`ExportCaption`）の 3 か所が
+> これを共有する（Opus レビュー 1 巡目 M1: 3 か所がそれぞれ解決していて
+> 食い違いうる、という指摘への対応）。段階名は出さず、喚起文だけを
+> `ColorScheme` ロール（`tertiaryContainer`/`errorContainer`/
+> `surfaceContainerHighest`）で塗った専用ブロックに表示し、emergency は
+> earlyConsultation より大きい文字サイズにする。escalation は emergency/
+> earlyConsultation で見出しを分ける（vision フィルタは全て earlyConsultation
+> だが、`HearingFilter` の聴力低下系は emergency も持つため、聴覚側 UI #80 に
+> 備える）。末尾には「医学的な診断ではない・医療監修を受けたものではない」旨と
+> sensus の Medical notes への参照を必ず添える（レビュー M2）。喚起文からは
+> 診療科名を外した（レビュー S4。めまい系フィルタは眼科の話ではないため）。
+> `VisionFilterState` はフィルタ id ごとに強度・パラメータを記憶し
+> （`_strengthById`/`_paramsById`）、初めて選ぶフィルタは推奨強度から始まる。
+> 体験プリセットの強度・パラメータも #60 の「強制的に 1.0」から「常に推奨値・
+> 常に既定パラメータ」へ置き換えた（レビュー N1）。既定パラメータの組み立て
+> （`_defaultParamsFor`）と推奨強度の解決（`_recommendedStrength`）は
+> `_selectInternal`/`resetToRecommended`/`selectPreset` が共有する
+> （レビュー N3）。`#[frb(sync)]` 関数は native lib を要求しプレーンな
+> `flutter test` から呼べないため、`lib/services/vision_filter_metadata.dart`
+> の provider seam（`experiencesProvider` 等の既存 seam と異なり、複数
+> ファイルから正規に production 利用されるため `@visibleForTesting` は
+> 付けない）を経由し、widget/unit test は `test/support/
+> vision_filter_metadata_fixture.dart` のフィクスチャに差し替える。実ブリッジ
+> との一致・escalation 条件文の訳漏れ検知は
+> `integration_test/vision_filter_urgency_parity_test.dart` が検証する
+> （レビュー S1）。
+>
+> **再レビュー対応**: escalation は UI（`ConsultNoticeBlock`）だけでなく PNG
+> （`ExportCaption.escalationGroups`）でも emergency/earlyConsultation の
+> 見出しで段を分ける（S-a）。PNG 用の短い免責文は「診断ではない旨」と「根拠」
+> の両方を 1 行に含める（M1'）。体験プリセットの各カードは喚起文・escalation
+> は出すが免責文・根拠 URL は出さず、「体験プリセット」セクション末尾に
+> `ConsultDisclaimerFooter` を 1 回だけ表示する（nit）。emergency の喚起文は
+> `titleMedium` ではなく `bodyLarge`（プリセットカードのタイトルと衝突しない
+> よう、S-b）。根拠 URL には Medical notes 節そのものを指すアンカーを付けた
+> （nit）。
+> 詳細は `docs/sensus-integration.md` §10。
 
 ## ルーペ窓挙動 (#14)
 

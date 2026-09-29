@@ -4,8 +4,10 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_catalog.dart';
+import '../../services/vision_filter_metadata.dart';
 import '../../services/vision_filter_state.dart';
 import '../../src/rust/api/sensus_bridge.dart';
+import 'consult_notice_block.dart';
 
 /// 体験プリセットの供給源。既定は sensus bridge の [experiences]。
 ///
@@ -43,8 +45,14 @@ Key experienceCardKey(String experienceId) =>
 ///   ため、選択表示（`isSelected`）はカタログ id ではなく
 ///   [VisionFilterState.selectedPresetId]（`Experience.id`）で比較する
 ///   （#60: 2 枚同時点灯バグの修正）。
-/// - 受診喚起: `Experience.urgency`（bridge の [Urgency]）を [urgencyConsultMessage]
-///   で i18n 注記へ写す。`none` では出さない。
+/// - 受診喚起: `Experience.urgency`（bridge の [Urgency]）と、
+///   `Experience.vision` から取得した escalation（#76 レビュー S3。
+///   `visionFilterUrgencyEscalationProvider`）を [resolveConsultNotice] で
+///   まとめ、[ConsultNoticeBlock] で表示する（FilterParamPanel・export と
+///   共有する唯一の解決経路・表示ウィジェット）。免責文・根拠 URL は各カードに
+///   繰り返さず、「体験プリセット」セクションの末尾に 1 回だけ表示する
+///   （#76 再レビュー nit。「必ず添える」という要件はセクション単位で満たす。
+///   喚起文・escalation は引き続き各カードに残す）。
 /// - 聴覚: hearing を含む体験（meniere / labyrinthitis）は「聴覚症状も含む」注記に
 ///   留める。**音声再生は本 Issue 非スコープ**（聴覚モード設計に委ねる）。音は鳴らさない。
 ///
@@ -54,7 +62,13 @@ class ExperiencePresets extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final presets = experiencesProvider();
+    // セクション末尾の免責文は、どれか 1 枚でもカードに喚起があるときだけ出す
+    // （#76 再レビュー nit）。
+    final anyNotice = presets.any(
+      (exp) => resolveConsultNotice(l10n, exp.urgency, _escalationFor(exp)) != null,
+    );
     return Consumer<VisionFilterState>(
       builder: (context, state, _) {
         return Column(
@@ -65,12 +79,27 @@ class ExperiencePresets extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 12),
                 child: _ExperienceCard(experience: exp, state: state),
               ),
+            if (anyNotice)
+              ConsultDisclaimerFooter(
+                disclaimer: l10n.consultDisclaimer,
+                citationUrl: Uri.parse(kSensusMedicalNotesUrl),
+              ),
           ],
         );
       },
     );
   }
 }
+
+/// [experience] の escalation を [Experience.vision] から取得する（#76 レビュー
+/// S3）。Experience 自体は urgency_escalation を持たないため、視覚フィルタの
+/// escalation をそのまま使う。vision を持たない体験は現状無いが、無い場合は
+/// 空リスト（喚起なし）にする。[ExperiencePresets] と [_ExperienceCard] の
+/// 両方が参照するため、ここに抽出する。
+List<UrgencyEscalation> _escalationFor(Experience experience) =>
+    experience.vision == null
+        ? const <UrgencyEscalation>[]
+        : visionFilterUrgencyEscalationProvider(experience.vision!);
 
 class _ExperienceCard extends StatelessWidget {
   const _ExperienceCard({required this.experience, required this.state});
@@ -90,7 +119,8 @@ class _ExperienceCard extends StatelessWidget {
     // labyrinthitis はどちらも catalogId == 'vertigo' に写るため、catalogId
     // 比較だと選択していない方まで点灯してしまう。
     final isSelected = state.selectedPresetId == experience.id;
-    final consult = urgencyConsultMessage(l10n, experience.urgency);
+    final notice =
+        resolveConsultNotice(l10n, experience.urgency, _escalationFor(experience));
     final includesHearing = experience.hearing != null;
 
     return Card(
@@ -153,32 +183,14 @@ class _ExperienceCard extends StatelessWidget {
                   ],
                 ),
               ],
-              if (consult != null) ...[
+              if (notice != null) ...[
                 const SizedBox(height: 8),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      experience.urgency == Urgency.emergency
-                          ? Icons.warning_amber_rounded
-                          : Icons.info_outline,
-                      size: 16,
-                      color: experience.urgency == Urgency.emergency
-                          ? theme.colorScheme.error
-                          : theme.colorScheme.primary,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        consult,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: experience.urgency == Urgency.emergency
-                              ? theme.colorScheme.error
-                              : theme.colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                  ],
+                // #76 再レビュー nit: 免責文・根拠 URL は各カードには出さない
+                // （ExperiencePresets がセクション末尾に 1 回だけ出す）。
+                ConsultNoticeBlock(
+                  notice: notice,
+                  l10n: l10n,
+                  showDisclaimer: false,
                 ),
               ],
             ],

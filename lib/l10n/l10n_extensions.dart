@@ -7,7 +7,7 @@ import 'app_localizations.dart';
 /// 定義（enum / catalog id）→ 表示文言（i18n）の解決をここに集約する (#18)。
 ///
 /// 規律2（定義と表示文言を混ぜない）に従い、`ColorVisionType` /
-/// `VisionFilterCategory` / `VisionFilterUrgency` / catalog の `id` といった
+/// `VisionFilterCategory` / catalog の `id` といった
 /// **識別子** は文言を持たず、表示する側がこのマッピングで `AppLocalizations`
 /// から文字列を引く。UI（home_screen 等）とトレイ（起動時ロケールの
 /// AppLocalizations インスタンス）の両方がここを参照し、二重定義を避ける。
@@ -98,40 +98,6 @@ String visionCategoryName(
       return l10n.categoryEyeStrain;
     case VisionFilterCategory.other:
       return l10n.categoryOther;
-  }
-}
-
-/// Advanced カタログの [VisionFilterUrgency] 表示名を解決する。
-String visionUrgencyName(AppLocalizations l10n, VisionFilterUrgency urgency) {
-  switch (urgency) {
-    case VisionFilterUrgency.none:
-      return l10n.urgencyNone;
-    case VisionFilterUrgency.low:
-      return l10n.urgencyLow;
-    case VisionFilterUrgency.medium:
-      return l10n.urgencyMedium;
-    case VisionFilterUrgency.high:
-      return l10n.urgencyHigh;
-  }
-}
-
-/// 受診喚起メッセージ（urgency 由来）を解決する。null = 喚起なし。
-///
-/// urgency の土台は catalog（[VisionFilterUrgency]）が持ち、当事者への注記文言は
-/// ue 側が i18n で所有する。medium = 早めの受診を促す穏やかな注記、high = 急な
-/// 変化への速やかな受診を促す注記。none/low では出さない。
-String? consultMessageForUrgency(
-  AppLocalizations l10n,
-  VisionFilterUrgency urgency,
-) {
-  switch (urgency) {
-    case VisionFilterUrgency.none:
-    case VisionFilterUrgency.low:
-      return null;
-    case VisionFilterUrgency.medium:
-      return l10n.consultEarly;
-    case VisionFilterUrgency.high:
-      return l10n.consultEmergency;
   }
 }
 
@@ -306,15 +272,18 @@ String experienceDescription(AppLocalizations l10n, String id) {
   }
 }
 
-/// 体験プリセットの [Urgency]（sensus 由来）→ 受診喚起メッセージを解決する。
+/// [Urgency]（sensus 由来）→ 受診喚起メッセージを解決する。
 ///
-/// null = 喚起なし。`Urgency` の分類は bridge（sensus）が持ち、当事者への注記文言は
-/// ue 側が i18n で所有する（規律2）。`earlyConsultation` = 早期受診を促す穏やかな
-/// 注記、`emergency` = 速やかな受診を促す注記。`none` では出さない。
+/// null = 喚起なし。`Urgency` の分類は bridge（sensus）が唯一の正本として持ち、
+/// 当事者への注記文言は ue 側が i18n で所有する（規律2、#76）。
+/// `earlyConsultation` = 早期受診を促す穏やかな注記、`emergency` = 速やかな
+/// 受診を促す注記。`none` では出さない。
 ///
-/// NOTE: catalog 側 [VisionFilterUrgency] 用の [consultMessageForUrgency] とは別系統
-/// （#19 体験プリセットは bridge の `Urgency` 3 値を使う）。文言キー
-/// `consultEarly` / `consultEmergency` は両者で共有する。
+/// advanced カタログ（`FilterParamPanel`、フィルタの [VisionFilter] を
+/// `visionFilterUrgencyProvider` に渡して得る）・体験プリセット
+/// （`ExperiencePresets`、`Experience.urgency`）・export の焼き込み
+/// （`before_after_view.dart`）が、この 1 関数を共有する **唯一の正本**にする
+/// （#76: 「受診喚起は sensus の単一の正本に統一する」）。
 String? urgencyConsultMessage(AppLocalizations l10n, Urgency urgency) {
   switch (urgency) {
     case Urgency.none:
@@ -324,6 +293,139 @@ String? urgencyConsultMessage(AppLocalizations l10n, Urgency urgency) {
     case Urgency.emergency:
       return l10n.consultEmergency;
   }
+}
+
+/// sensus が返す [UrgencyEscalation.condition]（英語の条件文）→ 表示文言を解決する。
+///
+/// sensus-core 0.6.1 の `Filter::urgency_escalation()` / `HearingFilter::
+/// urgency_escalation()` は、条件文を **英語の固定文字列**で返す（i18n は消費側の
+/// 責務、kako-jun/sensus#182）。ここはその英文をキーにした ja/en 対応表で、
+/// 訳が無い条件文は英語のままフォールバック表示する（#76: 「訳が見つからない
+/// 場合は英語のまま表示する」）。
+///
+/// 対応表の英文は sensus-core 0.6.1 の `crates/core/src/lib.rs` の
+/// `urgency_escalation()` 実装から書き写した一次情報（変更があれば sensus の
+/// バージョンアップ時にここも追従する）。
+String escalationConditionText(AppLocalizations l10n, String condition) {
+  switch (condition) {
+    case 'sudden, severe photophobia with eye pain or a headache (e.g. iritis)':
+      return l10n.escalationConditionPhotophobiaSevere;
+    case 'recurrent or severe episodes':
+      return l10n.escalationConditionBppvRecurrentSevere;
+    case 'persistent pain or a change in vision':
+      return l10n.escalationConditionDryEyePersistent;
+    case 'a sudden drop in hearing, especially in one ear (possible sudden '
+        'sensorineural hearing loss)':
+      return l10n.escalationConditionHearingSuddenOneEar;
+    case 'a new or worsening change, particularly in one ear':
+      return l10n.escalationConditionHearingNewWorseningOneEar;
+    default:
+      return condition;
+  }
+}
+
+/// sensus の公開ドキュメントのうち、受診喚起の根拠（Medical notes 節）を指す URL。
+/// [ConsultNotice.citationUrl] の値。UI（`ConsultNoticeBlock`）はこれを
+/// 選択可能なテキストとして表示する（#76 レビュー M2）。アンカーは節そのもの
+/// を指す（#76 再レビュー nit）。
+const String kSensusMedicalNotesUrl =
+    'https://github.com/kako-jun/sensus/blob/main/docs/overview.md'
+    '#medical-notes-when-to-see-a-doctor';
+
+/// [resolveConsultNotice] が返す、緊急度の段ごとにまとめた escalation
+/// （見出し + 条件文のリスト）。UI（`ConsultNoticeBlock`）と PNG export
+/// （`ExportCaption.escalationGroups`）の両方がこの単位で表示する
+/// （#76 再レビュー S-a: PNG でも段ごとの見出しを出す）。
+class ConsultEscalationGroup {
+  const ConsultEscalationGroup({required this.header, required this.lines});
+
+  /// 見出し（`escalationHeaderEmergency` / `escalationHeaderEarly`）。
+  final String header;
+
+  /// [escalationConditionText] で解決済みの条件文（訳が無ければ英語）。
+  final List<String> lines;
+}
+
+/// 受診喚起の解決結果（#76 レビュー M1）。
+///
+/// urgency/escalation から「何を表示するか」を **1 箇所**（[resolveConsultNotice]）
+/// で決め、advanced カタログ（`FilterParamPanel`）・体験プリセットのカード
+/// （`ExperiencePresets`）・PNG export（`before_after_view.dart` /
+/// `export_service.dart`）の 3 箇所がこの結果を共有する。UI 表示は
+/// `ConsultNoticeBlock`（`lib/ui/widgets/consult_notice_block.dart`）が担う。
+class ConsultNotice {
+  const ConsultNotice({
+    required this.urgency,
+    required this.message,
+    required this.escalationGroups,
+    required this.disclaimer,
+    required this.disclaimerShort,
+    required this.citationUrl,
+  });
+
+  /// 喚起の緊急度（sensus 由来）。
+  final Urgency urgency;
+
+  /// 喚起文（[urgency] が `none` なら null）。
+  final String? message;
+
+  /// 条件付きで緊急度が上がる場合の一覧。emergency → earlyConsultation の順で
+  /// 段ごとにまとめてある（#76 レビュー N4/再レビュー S-a）。どちらの段も
+  /// 無ければ空リスト。
+  final List<ConsultEscalationGroup> escalationGroups;
+
+  /// UI 用の免責文（医療監修を受けていない旨・根拠への言及を含む、#76 レビュー M2）。
+  final String disclaimer;
+
+  /// PNG 焼き込み用の短い免責文（`ExportCaption.disclaimer`、#76 レビュー M1/再レビュー M1'）。
+  final String disclaimerShort;
+
+  /// 免責文が参照する根拠（sensus の Medical notes）への URL。
+  final Uri citationUrl;
+}
+
+/// urgency/escalation から [ConsultNotice] を解決する（#76 レビュー M1）。
+///
+/// [urgency] が `none` かつ [escalation] が空なら、表示する喚起が無いので
+/// `null` を返す。呼び出し側（`FilterParamPanel`・`ExperiencePresets`・
+/// `before_after_view.dart`）はこの 1 関数だけを呼べばよく、喚起文・
+/// escalation の訳・免責文をそれぞれ個別に解決しない。
+ConsultNotice? resolveConsultNotice(
+  AppLocalizations l10n,
+  Urgency urgency,
+  List<UrgencyEscalation> escalation,
+) {
+  final message = urgencyConsultMessage(l10n, urgency);
+  if (message == null && escalation.isEmpty) return null;
+
+  final emergencyLines = [
+    for (final e in escalation)
+      if (e.urgency == Urgency.emergency) escalationConditionText(l10n, e.condition),
+  ];
+  final earlyLines = [
+    for (final e in escalation)
+      if (e.urgency == Urgency.earlyConsultation)
+        escalationConditionText(l10n, e.condition),
+  ];
+  return ConsultNotice(
+    urgency: urgency,
+    message: message,
+    escalationGroups: [
+      if (emergencyLines.isNotEmpty)
+        ConsultEscalationGroup(
+          header: l10n.escalationHeaderEmergency,
+          lines: emergencyLines,
+        ),
+      if (earlyLines.isNotEmpty)
+        ConsultEscalationGroup(
+          header: l10n.escalationHeaderEarly,
+          lines: earlyLines,
+        ),
+    ],
+    disclaimer: l10n.consultDisclaimer,
+    disclaimerShort: l10n.consultDisclaimerShort,
+    citationUrl: Uri.parse(kSensusMedicalNotesUrl),
+  );
 }
 
 /// 起動時ロケールの [AppLocalizations] からトレイメニュー文言を組み立てる (#18)。

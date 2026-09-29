@@ -57,6 +57,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  List<UrgencyEscalation> dco_decode_list_urgency_escalation(dynamic raw);
+
+  @protected
+  String? dco_decode_opt_String(dynamic raw);
+
+  @protected
   HearingFilter? dco_decode_opt_box_autoadd_hearing_filter(dynamic raw);
 
   @protected
@@ -76,6 +82,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Urgency dco_decode_urgency(dynamic raw);
+
+  @protected
+  UrgencyEscalation dco_decode_urgency_escalation(dynamic raw);
 
   @protected
   VisionFieldLossMode dco_decode_vision_field_loss_mode(dynamic raw);
@@ -125,6 +134,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  List<UrgencyEscalation> sse_decode_list_urgency_escalation(
+      SseDeserializer deserializer);
+
+  @protected
+  String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
   HearingFilter? sse_decode_opt_box_autoadd_hearing_filter(
       SseDeserializer deserializer);
 
@@ -146,6 +162,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Urgency sse_decode_urgency(SseDeserializer deserializer);
+
+  @protected
+  UrgencyEscalation sse_decode_urgency_escalation(SseDeserializer deserializer);
 
   @protected
   VisionFieldLossMode sse_decode_vision_field_loss_mode(
@@ -270,6 +289,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   }
 
   @protected
+  JSAny cst_encode_list_urgency_escalation(List<UrgencyEscalation> raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return raw.map(cst_encode_urgency_escalation).toList().jsify()!;
+  }
+
+  @protected
+  String? cst_encode_opt_String(String? raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return raw == null ? null : cst_encode_String(raw);
+  }
+
+  @protected
   JSAny? cst_encode_opt_box_autoadd_hearing_filter(HearingFilter? raw) {
     // Codec=Cst (C-struct based), see doc to use other codecs
     return raw == null ? null : cst_encode_box_autoadd_hearing_filter(raw);
@@ -285,6 +316,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   JSAny cst_encode_u_64(BigInt raw) {
     // Codec=Cst (C-struct based), see doc to use other codecs
     return castNativeBigInt(raw);
+  }
+
+  @protected
+  JSAny cst_encode_urgency_escalation(UrgencyEscalation raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return [cst_encode_urgency(raw.urgency), cst_encode_String(raw.condition)]
+        .jsify()!;
   }
 
   @protected
@@ -483,6 +521,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       Uint8List self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_urgency_escalation(
+      List<UrgencyEscalation> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_box_autoadd_hearing_filter(
       HearingFilter? self, SseSerializer serializer);
 
@@ -504,6 +549,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_urgency(Urgency self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_urgency_escalation(
+      UrgencyEscalation self, SseSerializer serializer);
 
   @protected
   void sse_encode_vision_field_loss_mode(
@@ -540,6 +589,48 @@ class RustLibWire implements BaseWire {
           wasmModule.wire__crate__api__sensus_bridge__experiences();
 
   JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__hearing_filter_urgency(JSAny filter) =>
+          wasmModule
+              .wire__crate__api__sensus_bridge__hearing_filter_urgency(filter);
+
+  JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__hearing_filter_urgency_escalation(
+              JSAny filter) =>
+          wasmModule
+              .wire__crate__api__sensus_bridge__hearing_filter_urgency_escalation(
+                  filter);
+
+  JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__vision_filter_citation(JSAny filter) =>
+          wasmModule
+              .wire__crate__api__sensus_bridge__vision_filter_citation(filter);
+
+  JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__vision_filter_limitations(
+              JSAny filter) =>
+          wasmModule.wire__crate__api__sensus_bridge__vision_filter_limitations(
+              filter);
+
+  JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__vision_filter_recommended_strength(
+              JSAny filter) =>
+          wasmModule
+              .wire__crate__api__sensus_bridge__vision_filter_recommended_strength(
+                  filter);
+
+  JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__vision_filter_urgency(JSAny filter) =>
+          wasmModule
+              .wire__crate__api__sensus_bridge__vision_filter_urgency(filter);
+
+  JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__vision_filter_urgency_escalation(
+              JSAny filter) =>
+          wasmModule
+              .wire__crate__api__sensus_bridge__vision_filter_urgency_escalation(
+                  filter);
+
+  JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
       wire__crate__api__sensus_bridge__vision_shader_glsl(JSAny filter) =>
           wasmModule
               .wire__crate__api__sensus_bridge__vision_shader_glsl(filter);
@@ -572,6 +663,30 @@ extension type RustLibWasmModule._(JSObject _) implements JSObject {
 
   external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
       wire__crate__api__sensus_bridge__experiences();
+
+  external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__hearing_filter_urgency(JSAny filter);
+
+  external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__hearing_filter_urgency_escalation(
+          JSAny filter);
+
+  external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__vision_filter_citation(JSAny filter);
+
+  external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__vision_filter_limitations(JSAny filter);
+
+  external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__vision_filter_recommended_strength(
+          JSAny filter);
+
+  external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__vision_filter_urgency(JSAny filter);
+
+  external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
+      wire__crate__api__sensus_bridge__vision_filter_urgency_escalation(
+          JSAny filter);
 
   external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
       wire__crate__api__sensus_bridge__vision_shader_glsl(JSAny filter);

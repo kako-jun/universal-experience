@@ -30,14 +30,24 @@ import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/filter_selector.dart';
 
+import 'support/vision_filter_metadata_fixture.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   // ExperiencePresets は実 FRB ブリッジ（experiences()）を要求し、プレーンな
   // `flutter test` では呼べない。widget test 用の fixture に差し替える
   // （i18n_test.dart / home_screen_preview_intensity_test.dart と同じ手法）。
-  setUp(() => experiencesProvider = () => const []);
-  tearDown(() => experiencesProvider = experiences);
+  // VisionFilterState の選択も同様に urgency/recommended_strength（#76/#77）で
+  // 実ブリッジを要求するため、同じフィクスチャで差し替える。
+  setUp(() {
+    experiencesProvider = () => const [];
+    installVisionFilterMetadataFixture();
+  });
+  tearDown(() {
+    experiencesProvider = experiences;
+    resetVisionFilterMetadataProviders();
+  });
 
   testWidgets(
       'advanced カタログでフィルタを選ぶと、プレビューの filter/filterId が追従する（#60）',

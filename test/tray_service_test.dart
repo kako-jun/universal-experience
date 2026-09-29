@@ -7,6 +7,8 @@ import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/tray_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 
+import 'support/vision_filter_metadata_fixture.dart';
+
 /// 文言は i18n 解決済みで [buildTrayMenuSpec] に注入する (#18)。純粋層のテストは
 /// app_ja.arb の ja 訳と同じ文字列を渡し、メニュー構造とラベル配線を検証する。
 const _labels = TrayMenuLabels(
@@ -32,6 +34,9 @@ void main() {
   // 初期化を要する（#60、'TrayService の filterService/visionFilterState
   // listener' グループ参照）。
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(installVisionFilterMetadataFixture);
+  tearDown(resetVisionFilterMetadataProviders);
 
   group('quickColorVisionFilters', () {
     test('よく使う色覚フィルタを含み none を含まない', () {
