@@ -28,7 +28,7 @@ class HotkeyActions {
 
   /// [_lastKeyDownAt] からこの時間内の keyDown はリピートとみなして無視する
   /// (#63)。
-  static const Duration _repeatDebounce = Duration(milliseconds: 400);
+  static const Duration _repeatDebounce = Duration(milliseconds: 1100);
 
   /// filterService.deactivate() + visionFilterState.clear() 相当。
   final void Function() deactivateFilters;
@@ -59,7 +59,7 @@ class HotkeyActions {
   ///   bypassed を true にするだけ（冪等）。keyUp が常に false にするので、
   ///   正しい hold 挙動になる。
   /// - keyUp が一度も届いていない環境: keyDown のたびにトグルするが、直前の
-  ///   keyDown から [_repeatDebounce]（400ms）以内の keyDown は OS のキー
+  ///   keyDown から [_repeatDebounce]（1100ms）以内の keyDown は OS のキー
   ///   リピートとみなして無視する（押しっぱなしで OS が keyDown を連続送出する
   ///   環境でも 1 回のトグルにしかならないようにする、#63）。
   void holdOriginalKeyDown() {

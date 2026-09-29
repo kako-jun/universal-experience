@@ -35,7 +35,7 @@ void main() {
   });
 
   group('HotkeyActions.holdOriginalKeyDown / holdOriginalKeyUp', () {
-    test('keyDown は常にトグルする（400ms 以上間隔を空けた押下として）', () {
+    test('keyDown は常にトグルする（1100ms 以上間隔を空けた押下として）', () {
       var bypassed = false;
       var now = DateTime(2026, 1, 1, 0, 0, 0);
       final actions = HotkeyActions(
@@ -53,7 +53,7 @@ void main() {
 
       actions.holdOriginalKeyDown();
       expect(bypassed, isTrue);
-      now = now.add(const Duration(milliseconds: 500));
+      now = now.add(const Duration(milliseconds: 1200));
 
       actions.holdOriginalKeyDown();
       expect(bypassed, isFalse);
@@ -100,13 +100,13 @@ void main() {
       actions.holdOriginalKeyDown();
       expect(bypassed, isTrue);
 
-      // 400ms 以上空けた 2 回目の押下: OFF に戻る。
-      now = now.add(const Duration(milliseconds: 500));
+      // 1100ms 以上空けた 2 回目の押下: OFF に戻る。
+      now = now.add(const Duration(milliseconds: 1200));
       actions.holdOriginalKeyDown();
       expect(bypassed, isFalse);
     });
 
-    test('#63 M3: keyUp が届かない環境で 400ms 未満の連打は 1 トグルにしかならない', () {
+    test('OS のキーリピート（0ms→500ms→以降33ms間隔）が続く間はトグルが1回だけになる', () {
       var bypassed = false;
       var now = DateTime(2026, 1, 1, 0, 0, 0);
       final actions = HotkeyActions(
@@ -122,42 +122,25 @@ void main() {
         now: () => now,
       );
 
-      // 10ms 間隔で 8 回連打（OS のキーリピートを模す）。
-      for (var i = 0; i < 8; i++) {
-        actions.holdOriginalKeyDown();
-        now = now.add(const Duration(milliseconds: 10));
-      }
-
-      expect(bypassed, isTrue,
-          reason: '400ms 未満の連打はリピートとみなされ、最初の 1 回だけがトグルする');
-    });
-
-    test('#63 M3: 400ms 以上間隔を空けた 2 回目の keyDown は独立した押下として扱われる',
-        () {
-      var bypassed = false;
-      var now = DateTime(2026, 1, 1, 0, 0, 0);
-      final actions = HotkeyActions(
-        deactivateFilters: () {},
-        setClickThrough: (value) async {},
-        setAlwaysOnTop: (value) async {},
-        getClickThrough: () => false,
-        setBypassed: (value) => bypassed = value,
-        getBypassed: () => bypassed,
-        showAndFocusLoupe: () async {},
-        toggleLoupeVisible: () async {},
-        setLoupeVisible: (value) async {},
-        now: () => now,
-      );
-
+      // 最初の押下 (0ms)。
       actions.holdOriginalKeyDown();
       expect(bypassed, isTrue);
 
-      now = now.add(const Duration(milliseconds: 400));
+      // OS のキーリピート開始遅延を模した最初のリピート (500ms 後)。
+      now = now.add(const Duration(milliseconds: 500));
       actions.holdOriginalKeyDown();
-      expect(bypassed, isFalse, reason: '400ms 以上空いたら独立した押下として再度トグルする');
+      expect(bypassed, isTrue, reason: '1100ms 未満のリピートはトグルしない');
+
+      // 以降は一般的なキーリピート速度（33ms 間隔）で連続する。
+      for (var i = 0; i < 10; i++) {
+        now = now.add(const Duration(milliseconds: 33));
+        actions.holdOriginalKeyDown();
+      }
+      expect(bypassed, isTrue,
+          reason: '押しっぱなしの間、トグルは最初の1回だけになる');
     });
 
-    test('#63 M3: 一度 keyUp を受け取った後は keyDown 連打しても常に true のまま', () {
+    test('一度 keyUp を受け取った後は keyDown 連打しても常に true のまま', () {
       var bypassed = false;
       final now = DateTime(2026, 1, 1, 0, 0, 0);
       final actions = HotkeyActions(
@@ -251,7 +234,7 @@ void main() {
           reason: '非常口はトレイの表示状態ブックキーピングも同期するべき');
     });
 
-    test('#63 S2: showAndFocusLoupe が throw しても残りのステップは実行される',
+    test('showAndFocusLoupe が throw しても残りのステップは実行される',
         () async {
       var deactivateCalled = false;
       bool? clickThroughPassed;
@@ -281,7 +264,7 @@ void main() {
           reason: 'showAndFocusLoupe が失敗しても後続の setLoupeVisible は実行される');
     });
 
-    test('#63 S2: setClickThrough が throw しても残りのステップは実行される',
+    test('setClickThrough が throw しても残りのステップは実行される',
         () async {
       var deactivateCalled = false;
       bool? alwaysOnTopPassed;
