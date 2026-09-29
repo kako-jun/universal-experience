@@ -28,10 +28,12 @@ lib/
 │   │                                 # （ライブ画面キャプチャ向けに残置、現状 production 未使用）
 │   └── image_fit.dart               # 任意画像を正準サイズの正方形へレターボックス（#78）
 ├── services/
-│   ├── app_shortcuts.dart           # アプリ内キー操作（/, ↑↓, ←→）の Intent 定義（#63）
+│   ├── app_shortcuts.dart           # アプリ内キー操作（/, ↑↓, ←→, Esc）の Intent 定義（#63/#72）
 │   ├── color_vision_selection.dart  # 色覚クイック選択の唯一の入口（FilterService/
 │   │                                 # VisionFilterState を同時更新、#60）
 │   ├── export_service.dart          # PNG エクスポート（メタ焼き込み）
+│   ├── filter_list_selection.dart   # 統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行）の
+│   │                                 # 検索・選択入口・↑↓ の順送りの純粋ロジック（#72）
 │   ├── filter_service.dart          # 選択状態モデル（sensus VisionFilter へのマッピング）
 │   ├── hotkey_actions.dart          # グローバルホットキー4アクションの実処理（#63）
 │   ├── hotkey_service.dart          # hotkey_manager 登録の副作用層（#63）
@@ -48,11 +50,13 @@ lib/
 ├── src/rust/                        # flutter_rust_bridge 生成コード（sensus-core 連携）
 └── ui/
     ├── screens/home_screen.dart
-    ├── widgets/                     # filter_selector, intensity_slider, before_after_view,
-    │                                 # experience_presets, filter_catalog_selector, filter_param_panel,
+    ├── widgets/                     # filter_browser（左カラム「選ぶ」: 検索・カテゴリ・統合一覧、#72）,
+    │                                 # filter_list_tile（一覧の 1 行）, adjust_panel（右カラム「調整」、#72）,
+    │                                 # intensity_slider, before_after_view,
+    │                                 # experience_presets（体験プリセットの行 ExperiencePresetTile）, filter_param_panel,
     │                                 # consult_notice_block（受診喚起の共有表示ウィジェット、#76）,
     │                                 # window_mode_panel（起動モード・最前面・クリックスルー・
-    │                                 # ホットキー一覧、#63）,
+    │                                 # ホットキー一覧を持つ。AppBar のダイアログで開く、#63/#72）,
     │                                 # loupe_hud（ルーペ窓モード限定の HUD。症状名・強度・
     │                                 # 受診喚起・原画比較・設定を開く、#79）,
     │                                 # image_source_picker（サンプルチップ・ファイル選択・
@@ -83,6 +87,10 @@ DESIGN.md                    # UI 設計原則（カラートークン・タイ�
 test/
 ├── no_hardcoded_colors_test.dart   # lib/ の色ハードコードを検出（例外は DESIGN.md の例外表と一致させる、#72）
 ├── app_theme_test.dart             # ハイコントラストテーマの生成と MaterialApp での切替（#72）
+├── home_screen_layout_test.dart    # 3 カラム/縦積み・プレビューの初回ビューポート・空状態・キー操作（#72）
+├── filter_browser_test.dart        # 統合一覧の検索・カテゴリ切替・行の選択（#72）
+├── filter_list_selection_test.dart # 統合一覧の純粋ロジック（#72）
+├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品
 ├── support/screenshot_harness.dart # スクリーンショット用フォント読込・PNG 書出し（フォントはコミットしない）
 └── ui_screenshots/                 # HomeScreen の PNG 書出し。`UE_SCREENSHOTS=1` のときだけ実行（DESIGN.md §8）
 
