@@ -87,6 +87,16 @@
 > との一致・escalation 条件文の訳漏れ検知は
 > `integration_test/vision_filter_urgency_parity_test.dart` が検証する
 > （レビュー S1）。
+>
+> **再レビュー対応**: escalation は UI（`ConsultNoticeBlock`）だけでなく PNG
+> （`ExportCaption.escalationGroups`）でも emergency/earlyConsultation の
+> 見出しで段を分ける（S-a）。PNG 用の短い免責文は「診断ではない旨」と「根拠」
+> の両方を 1 行に含める（M1'）。体験プリセットの各カードは喚起文・escalation
+> は出すが免責文・根拠 URL は出さず、「体験プリセット」セクション末尾に
+> `ConsultDisclaimerFooter` を 1 回だけ表示する（nit）。emergency の喚起文は
+> `titleMedium` ではなく `bodyLarge`（プリセットカードのタイトルと衝突しない
+> よう、S-b）。根拠 URL には Medical notes 節そのものを指すアンカーを付けた
+> （nit）。
 > 詳細は `docs/sensus-integration.md` §10。
 
 ## ルーペ窓挙動 (#14)

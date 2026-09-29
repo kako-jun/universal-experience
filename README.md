@@ -81,8 +81,8 @@ UI にも「緊急度：高」のような段階名は出しません。喚起�
 ケース（`urgency_escalation()`。例: 「反復・重症の発作なら受診を」）も
 emergency/earlyConsultation の見出しに分けて併記します。喚起文からは診療科名
 を出しません（めまい系フィルタは眼科の話ではないため）。末尾には「医学的な
-診断ではない・医療監修を受けたものではない」旨と、根拠として sensus の
-公開ドキュメント（[Medical notes 節](https://github.com/kako-jun/sensus/blob/main/docs/overview.md)）
+診断ではない・医療監修を受けたものではない」旨と、根拠として
+シミュレーションライブラリ sensus の公開資料（[Medical notes 節](https://github.com/kako-jun/sensus/blob/main/docs/overview.md#medical-notes-when-to-see-a-doctor)）
 への参照を必ず添えます。この喚起の解決（`resolveConsultNotice`）と表示
 ウィジェット（`ConsultNoticeBlock`）は、advanced フィルタのパネル・体験
 プリセットのカード・PNG エクスポートの 3 か所で共有する唯一の経路です。
@@ -102,7 +102,10 @@ emergency/earlyConsultation の見出しに分けて併記します。喚起文�
 「常に 1.0」から「常に推奨値」に変更）。受診喚起の注記も、advanced フィルタと
 全く同じ解決経路・表示ウィジェット（`resolveConsultNotice` /
 `ConsultNoticeBlock`）で表示します（#76）。escalation は体験の視覚フィルタ
-（`Experience.vision`）から取得します。聴覚症状を含む体験
+（`Experience.vision`）から取得します。喚起文・escalation は各プリセット
+カードに出しますが、免責文・根拠 URL はカードごとに繰り返さず、「体験
+プリセット」セクションの末尾に 1 回だけ表示します（同セクション内にどれか
+1 枚でも喚起があるときのみ）。聴覚症状を含む体験
 （メニエール病・迷路炎）には「聴覚症状も含む」注記を出しますが、
 **音声再生は未実装**です。プリセットの選択は体験 id（`meniere` 等）で保持する
 ため、メニエール病と迷路炎（どちらも内部的には同じ vertigo フィルタ）を同時に
@@ -119,12 +122,14 @@ sensus-core の `experiences()` です。
 クリップボードへコピーします。画像そのもののクリップボード書き込み・
 動画エクスポートは非対応です。
 
-> 受診喚起がある場合は、PNG にもプレビューと同じ喚起文・escalation の行・
-> 免責文を焼き込みます（#76）。焼き込む喚起は、実際に export した時点で
-> 描画されていたフィルタの urgency/escalation から決まります（色覚特性は
-> urgency=none かつ escalation も無いため通常は焼き込まれません）。免責文は
-> 帯を圧迫しないよう短い形（「根拠: sensus Medical notes」）にしています
-> （UI の専用ブロックは、医療監修を受けていない旨を含む長い文言 + 参照 URL を
+> 受診喚起がある場合は、PNG にもプレビューと同じ喚起文・escalation の行
+> （emergency/earlyConsultation の見出し付き）・免責文を焼き込みます（#76）。
+> 焼き込む喚起は、実際に export した時点で描画されていたフィルタの
+> urgency/escalation から決まります（色覚特性は urgency=none かつ escalation
+> も無いため通常は焼き込まれません）。免責文は帯を圧迫しないよう、診断では
+> ない旨と根拠の両方を 1 行に収めた短い形（例: "Not a diagnosis; not
+> medically reviewed. Source: sensus Medical notes"）にしています（UI の
+> 専用ブロックは、医療監修を受けていない旨を含む長い文言 + 参照 URL を
 > 表示します）。
 
 ### 多言語（i18n）

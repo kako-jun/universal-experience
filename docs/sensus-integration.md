@@ -602,24 +602,46 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   レビューで「パネル・プリセットカード・export でそれぞれ受診喚起を組み立てて
   いて、3 か所が食い違いうる」という指摘（must）を受け、
   `lib/l10n/l10n_extensions.dart` の `ConsultNotice` / `resolveConsultNotice`
-  （urgency + escalation → 喚起文・escalation の訳・免責文をまとめて解決する
-  唯一の関数）と、`lib/ui/widgets/consult_notice_block.dart` の
-  `ConsultNoticeBlock`（表示ウィジェット）を切り出した。`FilterParamPanel`・
-  `ExperiencePresets` のカード・`before_after_view.dart` の export の 3 か所が
-  これを共有する。export（`ExportCaption` / `export_service.dart`）にも
-  免責文（短い形）と escalation の行を必ず焼き込む。
-- **#76 レビュー M2: 免責文に医療監修の非該当と出典を明記**。免責文
-  （`consultDisclaimer`）に「医療監修を受けたものではありません」を追加し、
-  根拠として sensus の公開ドキュメント（[Medical notes 節](https://github.com/kako-jun/sensus/blob/main/docs/overview.md)）
-  への参照を示す。UI は `ConsultNoticeBlock` が URL を選択可能なテキストとして
-  表示する（新規依存を避けるため、生きたハイパーリンクにはしていない）。PNG
-  焼き込みは帯を圧迫しないよう短い形（`consultDisclaimerShort`、「根拠: sensus
-  Medical notes」）を使う。
-- **#76 レビュー N4: escalation を emergency/earlyConsultation で見出しを
-  分ける**。現状 vision フィルタの escalation は全て earlyConsultation だが、
-  `HearingFilter` の聴力低下系は emergency 段も持つ（§10 冒頭参照）。聴覚側の
-  UI（#80）が同じ `ConsultNoticeBlock` を再利用できるよう、両方の見出しを
-  最初から用意した。
+  （urgency + escalation → 喚起文・段ごとにまとめた escalation
+  （`ConsultEscalationGroup`）・免責文をまとめて解決する唯一の関数）と、
+  `lib/ui/widgets/consult_notice_block.dart` の `ConsultNoticeBlock`
+  （表示ウィジェット）を切り出した。`FilterParamPanel`・`ExperiencePresets`
+  のカード・`before_after_view.dart` の export の 3 か所がこれを共有する。
+  export（`ExportCaption` / `export_service.dart`）にも免責文（短い形）と
+  escalation の行を必ず焼き込む。escalation は PNG でも emergency/
+  earlyConsultation の見出しで段を分ける（`ExportCaption.escalationGroups`、
+  再レビュー S-a: `ConsultNotice.escalationGroups` をそのまま詰め替えるだけで、
+  グルーピングのロジックはブリッジ層だけに置く）。
+- **#76 レビュー M2 / 再レビュー M1'・nit: 免責文に医療監修の非該当と出典を
+  明記**。UI 用の免責文（`consultDisclaimer`）に「医療監修を受けたものでは
+  ありません」を追加し、根拠として「シミュレーションライブラリ sensus の
+  公開資料（[Medical notes 節](https://github.com/kako-jun/sensus/blob/main/docs/overview.md#medical-notes-when-to-see-a-doctor)）」
+  への参照を示す（URL はその節を指すアンカー付き）。UI は
+  `ConsultNoticeBlock`/`ConsultDisclaimerFooter` が URL を選択可能なテキスト
+  として表示する（新規依存を避けるため、生きたハイパーリンクにはしていない）。
+  PNG 焼き込み用の短い形（`consultDisclaimerShort`）は、1 巡目レビューで
+  出典だけの「根拠: sensus Medical notes」にしていたが、2 巡目レビュー（M1'）
+  で「診断ではない旨と根拠の両方を 1 行に」という指摘を受け、
+  en "Not a diagnosis; not medically reviewed. Source: sensus Medical notes" /
+  ja「診断ではありません・医療監修なし。根拠: sensus Medical notes」に改めた。
+- **#76 レビュー N4 / 再レビュー S-a: escalation を emergency/earlyConsultation
+  で見出しを分ける**。現状 vision フィルタの escalation は全て
+  earlyConsultation だが、`HearingFilter` の聴力低下系は emergency 段も持つ
+  （§10 冒頭参照）。聴覚側の UI（#80）が同じグルーピングを再利用できるよう、
+  UI（`ConsultNoticeBlock`）だけでなく PNG（`ExportCaption.escalationGroups`）
+  でも両方の見出しを最初から用意した。
+- **#76 再レビュー nit: 体験プリセットの免責文はセクション単位で 1 回**。
+  `ExperiencePresets` の各カードは喚起文・escalation は出すが、免責文・根拠
+  URL は出さない（`ConsultNoticeBlock(showDisclaimer: false)`）。代わりに
+  「体験プリセット」セクションの末尾に `ConsultDisclaimerFooter` を 1 回だけ
+  表示する（いずれかのカードに喚起があるときのみ）。「免責文を必ず添える」
+  という要件はセクション単位で満たせばよい、という判断による。
+  `FilterParamPanel`（1 フィルタだけを表示する画面）は従来どおり
+  `ConsultNoticeBlock` の既定（`showDisclaimer: true`）のまま。
+- **#76 再レビュー S-b: emergency の文字サイズ**。`ConsultNoticeBlock` の
+  emergency 喚起文は当初 `titleMedium`（16px、太字）にしていたが、
+  `ExperiencePresets` のカードタイトル（同じ `titleMedium` + bold）と見た目が
+  衝突するという指摘を受け、`bodyLarge`（16px、太字）に変更した。
 - **#77: 推奨強度の唯一の正本**。`VisionFilterState` はフィルタ id ごとに
   strength/payload を記憶する（`_strengthById` / `_paramsById`）。初めて
   選ぶフィルタは `recommended_strength()` の値から始まり（旧仕様は全フィルタ
