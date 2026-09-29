@@ -612,7 +612,13 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         strengthLabel: l10n.strengthLabel(strengthPercent),
         isoDate: date,
         urgencyMessage: notice?.message,
-        escalationLines: [for (final e in notice?.escalations ?? const []) e.text],
+        // #76 再レビュー S-a: PNG でも emergency/earlyConsultation の見出しを
+        // 分けて焼き込む。ConsultNotice.escalationGroups をそのまま詰め替える
+        // だけで、グルーピングのロジックはここに複製しない。
+        escalationGroups: [
+          for (final g in notice?.escalationGroups ?? const [])
+            ExportEscalationGroup(header: g.header, lines: g.lines),
+        ],
         disclaimer: notice?.disclaimerShort,
       );
 

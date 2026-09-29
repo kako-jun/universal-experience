@@ -159,13 +159,13 @@
   "@consultEmergency": {
     "description": "Firmer prompt for emergency-urgency conditions. Deliberately names no medical department (#76 review S4). Must be accurate and not alarmist."
   },
-  "consultDisclaimer": "This is general guidance, not a medical diagnosis. It has not been reviewed by a medical professional. Source: sensus Medical notes",
+  "consultDisclaimer": "This is general guidance, not a medical diagnosis. It has not been reviewed by a medical professional. Source: sensus (a simulation library)'s public documentation, Medical notes.",
   "@consultDisclaimer": {
-    "description": "Full disclaimer shown in the UI (advanced filter panel and experience presets) alongside every consult note, stating this app does not diagnose and has not had medical review, with a citation to sensus's own Medical notes doc (#76 review M2). The actual URL is shown separately as selectable text (ConsultNoticeBlock), not embedded in this string."
+    "description": "Full disclaimer shown in the UI (advanced filter panel; shown once per section, not per card, in experience presets — #76 re-review nit) alongside every consult note, stating this app does not diagnose and has not had medical review, with a citation to sensus's own Medical notes doc (#76 review M2, wording clarified in re-review nit: names sensus as a simulation library and its docs as the source). The actual URL is shown separately as selectable text (ConsultNoticeBlock / ConsultDisclaimerFooter), not embedded in this string."
   },
-  "consultDisclaimerShort": "Source: sensus Medical notes",
+  "consultDisclaimerShort": "Not a diagnosis; not medically reviewed. Source: sensus Medical notes",
   "@consultDisclaimerShort": {
-    "description": "Compact disclaimer burned into the exported PNG caption (#76 review M1/M2) — kept short so the caption band stays small. The UI uses the longer consultDisclaimer instead."
+    "description": "Compact disclaimer burned into the exported PNG caption (#76 review M1/M2, re-review M1'). Must fit both the non-diagnosis disclaimer AND the citation in one short line — kept short so the caption band stays small. The UI uses the longer consultDisclaimer instead."
   },
   "escalationHeaderEarly": "Consider seeing a doctor if:",
   "@escalationHeaderEarly": {

@@ -11,21 +11,35 @@ import '../../src/rust/api/sensus_bridge.dart';
 ///
 /// - 段階名（旧「緊急度：高」のような表示）は一切出さない。喚起文
 ///   （[ConsultNotice.message]）だけを、本文サイズ以上で表示する。emergency は
-///   本文より大きい見出しサイズにして目立たせる（#76 レビュー N5）。
+///   [TextTheme.bodyLarge]（w600）で目立たせる（#76 レビュー N5、再レビュー
+///   S-b: プリセットカードのタイトル titleMedium とサイズがぶつからないよう
+///   bodyLarge にした）。
 /// - 色は [ColorScheme] のロールのみ使う（urgency に応じて
 ///   [ColorScheme.tertiaryContainer] / [ColorScheme.errorContainer]。
 ///   [Urgency.none] だが escalation が非空のフィルタは中立の
 ///   [ColorScheme.surfaceContainerHighest]）。
 /// - escalation は emergency → earlyConsultation の順で見出しを分けて表示する
 ///   （#76 レビュー N4。現状 vision フィルタの escalation は全て
-///   earlyConsultation だが、聴覚側（#80）は emergency も持つため備えておく）。
-/// - 末尾に免責文（医療監修を受けていない旨・sensus の Medical notes への
-///   参照）を表示し、参照 URL は選択可能なテキストとして示す（#76 レビュー M2）。
+///   earlyConsultation だが、聴覚側（#80）は emergency も持つため備えておく。
+///   段ごとの構成は [ConsultNotice.escalationGroups]（[resolveConsultNotice]）
+///   が組み立て済みで、PNG export もこれをそのまま使う、再レビュー S-a）。
+/// - 免責文（医療監修を受けていない旨・sensus の Medical notes への参照）は
+///   既定で表示するが、[showDisclaimer] を false にすると省略できる
+///   （体験プリセットのカードは各カードでは出さず、セクション末尾に
+///   [ConsultDisclaimerFooter] で 1 回だけ出す、#76 再レビュー nit）。
 class ConsultNoticeBlock extends StatelessWidget {
-  const ConsultNoticeBlock({super.key, required this.notice, required this.l10n});
+  const ConsultNoticeBlock({
+    super.key,
+    required this.notice,
+    required this.l10n,
+    this.showDisclaimer = true,
+  });
 
   final ConsultNotice notice;
   final AppLocalizations l10n;
+
+  /// false のとき、免責文・根拠 URL を表示しない（#76 再レビュー nit）。
+  final bool showDisclaimer;
 
   @override
   Widget build(BuildContext context) {
@@ -48,22 +62,13 @@ class ConsultNoticeBlock extends StatelessWidget {
         break;
     }
     final bodyStyle = theme.textTheme.bodyMedium?.copyWith(color: foreground);
-    // #76 レビュー N5: emergency は本文（bodyMedium, 14px）より大きい見出し
-    // サイズ（titleMedium, 16px）で目立たせる。Material3 の既定タイプスケール
-    // では titleSmall が bodyMedium と同じ 14px なので、実際にサイズが上がる
-    // titleMedium を使う（太さだけでなくサイズそのものを一段上げる）。
+    // #76 レビュー N5・再レビュー S-b: emergency は本文（bodyMedium, 14px）
+    // より大きい bodyLarge（16px）で目立たせる。titleMedium（16px、プリセット
+    // カードのタイトルと同じスタイル）は使わない — カードの中で喚起文が
+    // タイトルと同格に見えてしまうため。
     final messageStyle =
-        (notice.urgency == Urgency.emergency ? theme.textTheme.titleMedium : theme.textTheme.bodyMedium)
+        (notice.urgency == Urgency.emergency ? theme.textTheme.bodyLarge : theme.textTheme.bodyMedium)
             ?.copyWith(color: foreground, fontWeight: FontWeight.w600);
-
-    final emergencyLines = [
-      for (final e in notice.escalations)
-        if (e.urgency == Urgency.emergency) e.text,
-    ];
-    final earlyLines = [
-      for (final e in notice.escalations)
-        if (e.urgency == Urgency.earlyConsultation) e.text,
-    ];
 
     return Container(
       width: double.infinity,
@@ -90,38 +95,73 @@ class ConsultNoticeBlock extends StatelessWidget {
                 Expanded(child: Text(notice.message!, style: messageStyle)),
               ],
             ),
-          if (emergencyLines.isNotEmpty) ...[
-            if (notice.message != null) const SizedBox(height: 8),
-            _EscalationGroup(
-              header: l10n.escalationHeaderEmergency,
-              lines: emergencyLines,
-              style: bodyStyle,
-            ),
-          ],
-          if (earlyLines.isNotEmpty) ...[
-            if (notice.message != null || emergencyLines.isNotEmpty)
+          for (final group in notice.escalationGroups) ...[
+            if (notice.message != null || group != notice.escalationGroups.first)
               const SizedBox(height: 8),
             _EscalationGroup(
-              header: l10n.escalationHeaderEarly,
-              lines: earlyLines,
+              header: group.header,
+              lines: group.lines,
               style: bodyStyle,
             ),
           ],
-          const SizedBox(height: 8),
-          Text(
-            notice.disclaimer,
-            style: bodyStyle?.copyWith(fontStyle: FontStyle.italic),
-          ),
-          const SizedBox(height: 2),
-          SelectableText(
-            notice.citationUrl.toString(),
-            style: theme.textTheme.bodySmall?.copyWith(
+          if (showDisclaimer) ...[
+            const SizedBox(height: 8),
+            ConsultDisclaimerFooter(
+              disclaimer: notice.disclaimer,
+              citationUrl: notice.citationUrl,
               color: foreground,
-              decoration: TextDecoration.underline,
             ),
-          ),
+          ],
         ],
       ),
+    );
+  }
+}
+
+/// 免責文 + 根拠 URL だけの独立したフッタ（#76 再レビュー nit）。
+///
+/// 体験プリセット（`ExperiencePresets`）は各カードに免責文を繰り返さず、
+/// 「体験プリセット」セクションの末尾にこれを 1 回だけ表示する。
+/// [ConsultNoticeBlock]（`showDisclaimer: true` のとき）も同じ見た目を使う。
+class ConsultDisclaimerFooter extends StatelessWidget {
+  const ConsultDisclaimerFooter({
+    super.key,
+    required this.disclaimer,
+    required this.citationUrl,
+    this.color,
+  });
+
+  /// 免責文（`ConsultNotice.disclaimer`、通常は `l10n.consultDisclaimer`）。
+  final String disclaimer;
+
+  /// 免責文が参照する根拠への URL。
+  final Uri citationUrl;
+
+  /// 文字色。null なら [ColorScheme.onSurfaceVariant]（セクション末尾など、
+  /// urgency に紐づく着色コンテナの外で使うとき）。
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final effectiveColor = color ?? theme.colorScheme.onSurfaceVariant;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          disclaimer,
+          style: theme.textTheme.bodyMedium
+              ?.copyWith(color: effectiveColor, fontStyle: FontStyle.italic),
+        ),
+        const SizedBox(height: 2),
+        SelectableText(
+          citationUrl.toString(),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: effectiveColor,
+            decoration: TextDecoration.underline,
+          ),
+        ),
+      ],
     );
   }
 }

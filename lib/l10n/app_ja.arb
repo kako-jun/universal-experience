@@ -46,8 +46,8 @@
 
   "consultEarly": "このような症状が続くときは、一度医療機関で相談してみてください。",
   "consultEmergency": "このような症状が急に現れたときは、すぐに医療機関を受診してください。",
-  "consultDisclaimer": "これは一般的な案内であり、医学的な診断ではありません。医療監修を受けたものではありません。根拠：sensus の Medical notes",
-  "consultDisclaimerShort": "根拠: sensus Medical notes",
+  "consultDisclaimer": "これは一般的な案内であり、医学的な診断ではありません。医療監修を受けたものではありません。根拠：シミュレーションライブラリ sensus の公開資料（Medical notes）",
+  "consultDisclaimerShort": "診断ではありません・医療監修なし。根拠: sensus Medical notes",
   "escalationHeaderEarly": "次の場合は、医療機関への相談を検討してください：",
   "escalationHeaderEmergency": "次の場合は、すぐに医療機関を受診してください：",
   "escalationConditionPhotophobiaSevere": "急に強いまぶしさを感じ、目の痛みや頭痛を伴う場合",

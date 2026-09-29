@@ -62,7 +62,7 @@ class ExportCaption {
     required this.strengthLabel,
     required this.isoDate,
     this.urgencyMessage,
-    this.escalationLines = const [],
+    this.escalationGroups = const [],
     this.disclaimer,
   });
 
@@ -75,40 +75,60 @@ class ExportCaption {
   /// 受診喚起メッセージ。null = 喚起なし（色覚特性は緊急性 none のため通常 null）。
   final String? urgencyMessage;
 
-  /// 条件付きエスカレーションの条件文（解決済み、#76 レビュー M1）。
+  /// 条件付きエスカレーションを緊急度の段ごとにまとめたもの（解決済み、
+  /// #76 レビュー M1、再レビュー S-a: PNG でも段ごとの見出しを出す）。
   /// [urgencyMessage] が null でも非空になり得る（urgency=none だが
   /// escalation を持つフィルタ、例: BPPV）。
-  final List<String> escalationLines;
+  final List<ExportEscalationGroup> escalationGroups;
 
-  /// 免責文の短い形（`ConsultNotice.disclaimerShort`、#76 レビュー M1/M2）。
-  /// null = 喚起なし（[urgencyMessage] と [escalationLines] がどちらも無い）。
+  /// 免責文の短い形（`ConsultNotice.disclaimerShort`、#76 レビュー M1/M2、
+  /// 再レビュー M1': 診断ではない旨と根拠の両方を 1 行に収める）。
+  /// null = 喚起なし（[urgencyMessage] と [escalationGroups] がどちらも無い）。
   final String? disclaimer;
 
   /// ISO 日付（`YYYY-MM-DD`）。[isoDate] 関数で整形済みの文字列を渡す。
   final String isoDate;
 }
 
+/// [ExportCaption.escalationGroups] の 1 段（見出し + 条件文のリスト）。
+/// `lib/l10n/l10n_extensions.dart` の `ConsultEscalationGroup` と同じ形だが、
+/// service は enum/i18n を引かない（規律2）ため独立した pure データ型として
+/// 持つ。呼び出し側（`before_after_view.dart`）が
+/// `ConsultNotice.escalationGroups` からこれへ詰め替える。
+class ExportEscalationGroup {
+  const ExportEscalationGroup({required this.header, required this.lines});
+
+  /// 見出し（例 "See a doctor right away if:"）。
+  final String header;
+
+  /// 解決済みの条件文。
+  final List<String> lines;
+}
+
 /// [base] 画像の下部にキャプション帯を合成した新しい [ui.Image] を返す。
 ///
 /// `PictureRecorder` + `Canvas` で base をそのまま描き、下に半透明の帯を敷いて
-/// [TextPainter] で症状名 / 強度 / 受診喚起（あれば）/ escalation（あれば）/
-/// 免責文（あれば）/ ISO 日付を描画する。戻り画像の高さは
-/// `base.height + 帯の高さ`、幅は `base.width`。
+/// [TextPainter] で症状名 / 強度 / 受診喚起（あれば）/ escalation（段ごとの
+/// 見出し + 条件文、あれば、#76 レビュー M1・再レビュー S-a）/ 免責文（あれば）
+/// / ISO 日付を描画する。戻り画像の高さは `base.height + 帯の高さ`、幅は
+/// `base.width`。
 ///
 /// **pure**: 引数の解決済み文字列のみを使い、enum/i18n をここで引かない（規律2）。
 /// I/O を持たない（規律3）。
 Future<ui.Image> composeExportImage(
     ui.Image base, ExportCaption caption) async {
   final width = base.width;
-  // 行リストを組む（urgencyMessage/escalationLines/disclaimer はいずれも
+  // 行リストを組む（urgencyMessage/escalationGroups/disclaimer はいずれも
   // 任意。#76 レビュー M1: 免責文と escalation の行も必ず焼き込む）。
   final lines = <_CaptionLine>[
     _CaptionLine(caption.symptomLabel, _Style.title),
     _CaptionLine(caption.strengthLabel, _Style.body),
     if (caption.urgencyMessage != null)
       _CaptionLine(caption.urgencyMessage!, _Style.note),
-    for (final line in caption.escalationLines)
-      _CaptionLine('• $line', _Style.note),
+    for (final group in caption.escalationGroups) ...[
+      _CaptionLine(group.header, _Style.noteHeader),
+      for (final line in group.lines) _CaptionLine('• $line', _Style.note),
+    ],
     if (caption.disclaimer != null)
       _CaptionLine(caption.disclaimer!, _Style.meta),
     _CaptionLine(caption.isoDate, _Style.meta),
@@ -195,6 +215,7 @@ enum _Style {
   title,
   body,
   note,
+  noteHeader,
   meta;
 
   TextStyle get textStyle {
@@ -217,6 +238,15 @@ enum _Style {
           color: Color(0xFFFFD27F),
           fontSize: 13,
           fontStyle: FontStyle.italic,
+          height: 1.25,
+        );
+      // escalation の段見出し（emergency/earlyConsultation、#76 再レビュー
+      // S-a）。note と同じ色だが太字にして、その下の条件文の行と区別する。
+      case _Style.noteHeader:
+        return const TextStyle(
+          color: Color(0xFFFFD27F),
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
           height: 1.25,
         );
       case _Style.meta:

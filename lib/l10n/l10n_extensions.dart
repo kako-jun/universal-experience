@@ -326,20 +326,24 @@ String escalationConditionText(AppLocalizations l10n, String condition) {
 
 /// sensus の公開ドキュメントのうち、受診喚起の根拠（Medical notes 節）を指す URL。
 /// [ConsultNotice.citationUrl] の値。UI（`ConsultNoticeBlock`）はこれを
-/// 選択可能なテキストとして表示する（#76 レビュー M2）。
+/// 選択可能なテキストとして表示する（#76 レビュー M2）。アンカーは節そのもの
+/// を指す（#76 再レビュー nit）。
 const String kSensusMedicalNotesUrl =
-    'https://github.com/kako-jun/sensus/blob/main/docs/overview.md';
+    'https://github.com/kako-jun/sensus/blob/main/docs/overview.md'
+    '#medical-notes-when-to-see-a-doctor';
 
-/// [resolveConsultNotice] が返す、条件付きエスカレーション 1 行（表示用に
-/// 解決済み）。
-class ConsultEscalationLine {
-  const ConsultEscalationLine({required this.urgency, required this.text});
+/// [resolveConsultNotice] が返す、緊急度の段ごとにまとめた escalation
+/// （見出し + 条件文のリスト）。UI（`ConsultNoticeBlock`）と PNG export
+/// （`ExportCaption.escalationGroups`）の両方がこの単位で表示する
+/// （#76 再レビュー S-a: PNG でも段ごとの見出しを出す）。
+class ConsultEscalationGroup {
+  const ConsultEscalationGroup({required this.header, required this.lines});
 
-  /// 条件が満たされたときの緊急度（見出しの出し分けに使う、#76 レビュー N4）。
-  final Urgency urgency;
+  /// 見出し（`escalationHeaderEmergency` / `escalationHeaderEarly`）。
+  final String header;
 
   /// [escalationConditionText] で解決済みの条件文（訳が無ければ英語）。
-  final String text;
+  final List<String> lines;
 }
 
 /// 受診喚起の解決結果（#76 レビュー M1）。
@@ -353,7 +357,7 @@ class ConsultNotice {
   const ConsultNotice({
     required this.urgency,
     required this.message,
-    required this.escalations,
+    required this.escalationGroups,
     required this.disclaimer,
     required this.disclaimerShort,
     required this.citationUrl,
@@ -365,13 +369,15 @@ class ConsultNotice {
   /// 喚起文（[urgency] が `none` なら null）。
   final String? message;
 
-  /// 条件付きで緊急度が上がる場合の一覧（表示用に解決済み）。
-  final List<ConsultEscalationLine> escalations;
+  /// 条件付きで緊急度が上がる場合の一覧。emergency → earlyConsultation の順で
+  /// 段ごとにまとめてある（#76 レビュー N4/再レビュー S-a）。どちらの段も
+  /// 無ければ空リスト。
+  final List<ConsultEscalationGroup> escalationGroups;
 
   /// UI 用の免責文（医療監修を受けていない旨・根拠への言及を含む、#76 レビュー M2）。
   final String disclaimer;
 
-  /// PNG 焼き込み用の短い免責文（`ExportCaption.disclaimer`、#76 レビュー M1）。
+  /// PNG 焼き込み用の短い免責文（`ExportCaption.disclaimer`、#76 レビュー M1/再レビュー M1'）。
   final String disclaimerShort;
 
   /// 免責文が参照する根拠（sensus の Medical notes）への URL。
@@ -391,14 +397,29 @@ ConsultNotice? resolveConsultNotice(
 ) {
   final message = urgencyConsultMessage(l10n, urgency);
   if (message == null && escalation.isEmpty) return null;
+
+  final emergencyLines = [
+    for (final e in escalation)
+      if (e.urgency == Urgency.emergency) escalationConditionText(l10n, e.condition),
+  ];
+  final earlyLines = [
+    for (final e in escalation)
+      if (e.urgency == Urgency.earlyConsultation)
+        escalationConditionText(l10n, e.condition),
+  ];
   return ConsultNotice(
     urgency: urgency,
     message: message,
-    escalations: [
-      for (final e in escalation)
-        ConsultEscalationLine(
-          urgency: e.urgency,
-          text: escalationConditionText(l10n, e.condition),
+    escalationGroups: [
+      if (emergencyLines.isNotEmpty)
+        ConsultEscalationGroup(
+          header: l10n.escalationHeaderEmergency,
+          lines: emergencyLines,
+        ),
+      if (earlyLines.isNotEmpty)
+        ConsultEscalationGroup(
+          header: l10n.escalationHeaderEarly,
+          lines: earlyLines,
         ),
     ],
     disclaimer: l10n.consultDisclaimer,
