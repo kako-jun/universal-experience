@@ -116,8 +116,10 @@ class VisionFilterState extends ChangeNotifier {
 
   /// フィルタを選択する（advanced カタログ UI から。#60: プリセット/色覚
   /// クイック選択の記録は解除する — 手動での advanced 選択は「別のフィルタを
-  /// 手動で選んだ」ことになるため）。パラメータ値は当該フィルタの定義
-  /// defaultValue で初期化する。
+  /// 手動で選んだ」ことになるため）。強度・パラメータはフィルタ id ごとに
+  /// 記憶する（#77、#76 レビュー S5）: 既に選んだことのある id なら記憶値を
+  /// 復元し、初めてなら既定パラメータ + sensus の推奨強度で初期化する
+  /// （[_selectInternal] 参照）。
   void select(String id) {
     _selectedPresetId = null;
     _isColorQuickSelection = false;
@@ -170,29 +172,63 @@ class VisionFilterState extends ChangeNotifier {
 
   /// 体験プリセット（`ExperiencePresets`）からフィルタを選択する（#60）。
   /// [presetId] は `Experience.id`、[catalogId] はその体験の視覚フィルタに
-  /// 対応するカタログ id。色覚クイック選択の記録は解除する。強度は常に
-  /// sensus の推奨値にする（#77。#60 で入れていた「強制的に 1.0 に戻す」を
-  /// 置き換えた — プリセットは『代表的な程度』で体験してもらうのが目的のため、
-  /// advanced カタログ側の強度の記憶（[_strengthById]）より優先して上書きする）。
+  /// 対応するカタログ id。色覚クイック選択の記録は解除する。強度・パラメータは
+  /// 常に推奨値・既定値にする（#76 レビュー N1: advanced 側で当該 id を
+  /// カスタマイズ済みでも、プリセットは常に『代表的な程度』で体験してもらう
+  /// ため、[_selectInternal] の記憶優先ロジックは経由しない。#60 で入れていた
+  /// 「強度を強制的に 1.0 に戻す」を #77 で「常に推奨値」へ置き換えた）。
+  /// notifyListeners は 1 回だけ呼ぶ（#76 レビュー N2）。
   void selectPreset(String presetId, String catalogId) {
+    final entry = kVisionFilterCatalogById[catalogId];
+    if (entry == null) {
+      throw ArgumentError('Unknown vision filter id: $catalogId');
+    }
     _selectedPresetId = presetId;
     _isColorQuickSelection = false;
     _colorVisionType = null;
     _bypassed = false;
-    _selectInternal(catalogId);
+    _selectedId = catalogId;
+    _params
+      ..clear()
+      ..addAll(_defaultParamsFor(entry));
+    _strength = _recommendedStrength();
+    _paramsById[catalogId] = Map<String, Object>.from(_params);
+    _strengthById[catalogId] = _strength;
+    notifyListeners();
+  }
+
+  /// [entry] の payload パラメータを、カタログの defaultValue から組み立てる
+  /// （純粋関数。副作用なし）。seed は sensus u64 なので BigInt 化する
+  /// （int/double を経由させず精度欠落を防ぐ）。[_selectInternal] の初回選択・
+  /// [resetToRecommended]・[selectPreset] が共有する（#76 レビュー N3）。
+  Map<String, Object> _defaultParamsFor(VisionFilterEntry entry) {
+    final params = <String, Object>{};
+    for (final p in entry.parameters) {
+      if (p.defaultValue == null) continue;
+      params[p.name] = p.kind == VisionParamKind.seed
+          ? _toSeedBigInt(p.defaultValue!)
+          : p.defaultValue!;
+    }
+    return params;
+  }
+
+  /// 現在の [_selectedId]/[_params] から組み立てた [VisionFilter] の推奨強度
+  /// （sensus の `recommended_strength()`、[visionFilterRecommendedStrengthProvider]
+  /// 経由）。urgency と同じく payload に依存しないため、呼び出し時点の
+  /// payload（既定値・記憶値のどちらでも）をそのまま [build] してよい。未選択
+  /// なら 1.0。[_selectInternal]・[resetToRecommended]・[selectPreset] が共有
+  /// する（#76 レビュー N3）。
+  double _recommendedStrength() {
     final builtFilter = build();
-    final recommended = builtFilter == null
+    return builtFilter == null
         ? 1.0
         : visionFilterRecommendedStrengthProvider(builtFilter).clamp(0.0, 1.0);
-    _strength = recommended;
-    _strengthById[catalogId] = recommended;
-    notifyListeners();
   }
 
   /// [id] を選択状態にする。強度・パラメータはフィルタ id ごとに記憶する
   /// （#77）: 既に選んだことのある id なら記憶値を復元し、初めてなら
-  /// カタログの既定パラメータ + sensus の推奨強度（
-  /// [visionFilterRecommendedStrengthProvider]）で初期化してから記憶する。
+  /// カタログの既定パラメータ（[_defaultParamsFor]） + sensus の推奨強度
+  /// （[_recommendedStrength]）で初期化してから記憶する。
   void _selectInternal(String id) {
     final entry = kVisionFilterCatalogById[id];
     if (entry == null) {
@@ -206,17 +242,9 @@ class VisionFilterState extends ChangeNotifier {
         ..clear()
         ..addAll(rememberedParams);
     } else {
-      _params.clear();
-      for (final p in entry.parameters) {
-        if (p.defaultValue == null) continue;
-        // seed は sensus u64。カタログの const default は int だが、ここで
-        // BigInt 化して保持する（int/double を経由させず精度欠落を防ぐ）。
-        if (p.kind == VisionParamKind.seed) {
-          _params[p.name] = _toSeedBigInt(p.defaultValue!);
-        } else {
-          _params[p.name] = p.defaultValue!;
-        }
-      }
+      _params
+        ..clear()
+        ..addAll(_defaultParamsFor(entry));
       // 初めて選ぶフィルタ: 今組み立てた既定パラメータをそのまま記憶する。
       _paramsById[id] = Map<String, Object>.from(_params);
     }
@@ -225,15 +253,8 @@ class VisionFilterState extends ChangeNotifier {
     if (rememberedStrength != null) {
       _strength = rememberedStrength;
     } else {
-      // urgency と同じく payload に依存しないため、直前に組み立てた
-      // （既定または記憶済みの）payload のまま build() してよい。
-      final builtFilter = build();
-      final recommended = builtFilter == null
-          ? 1.0
-          : visionFilterRecommendedStrengthProvider(builtFilter)
-              .clamp(0.0, 1.0);
-      _strength = recommended;
-      _strengthById[id] = recommended;
+      _strength = _recommendedStrength();
+      _strengthById[id] = _strength;
     }
     notifyListeners();
   }
@@ -260,21 +281,13 @@ class VisionFilterState extends ChangeNotifier {
     final entry = id == null ? null : kVisionFilterCatalogById[id];
     if (id == null || entry == null) return;
 
-    _params.clear();
-    for (final p in entry.parameters) {
-      if (p.defaultValue == null) continue;
-      _params[p.name] = p.kind == VisionParamKind.seed
-          ? _toSeedBigInt(p.defaultValue!)
-          : p.defaultValue!;
-    }
-    final builtFilter = build();
-    final recommended = builtFilter == null
-        ? 1.0
-        : visionFilterRecommendedStrengthProvider(builtFilter).clamp(0.0, 1.0);
-    _strength = recommended;
+    _params
+      ..clear()
+      ..addAll(_defaultParamsFor(entry));
+    _strength = _recommendedStrength();
 
     _paramsById[id] = Map<String, Object>.from(_params);
-    _strengthById[id] = recommended;
+    _strengthById[id] = _strength;
 
     _bypassed = false;
     _clearPresetSelectionOnCustomize();
