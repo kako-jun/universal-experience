@@ -541,9 +541,9 @@
   "@imageSourceResetToRecommended": {
     "description": "Button that stops following a manually-picked sample (or a user photo) and returns to the current filter's recommended sample (#78)."
   },
-  "imageSourceViewYourPhoto": "View your photo",
-  "@imageSourceViewYourPhoto": {
-    "description": "Button that switches back to a previously-loaded user photo without re-picking, shown after 'Back to recommended' while a photo is still loaded (#78)."
+  "imageSourceClosePhotoTooltip": "Close photo",
+  "@imageSourceClosePhotoTooltip": {
+    "description": "Tooltip for the button that discards the loaded user photo and falls back to a sample (#78)."
   },
   "imageSourcePickFailed": "Couldn't load that image. Try a different file.",
   "@imageSourcePickFailed": {

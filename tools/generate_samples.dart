@@ -22,6 +22,7 @@
 library;
 
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:image/image.dart' as img;
 
@@ -48,8 +49,8 @@ void main() {
   for (final entry in scenes.entries) {
     _write('${entry.key}.png', entry.value());
   }
-  // Depth-map companion for depth_landscape (#78 着手コメント: 深度付き
-  // サンプルの素材だけをこの PR で用意する。depth_aware_blur との配線は別 Issue)。
+  // Depth-map companion for depth_landscape. sensus の depth_aware_blur との
+  // 配線は Issue #98 で対応予定（素材だけをここで用意する）。
   _write('depth_landscape_depth.png', _generateDepthLandscapeDepthMap());
 
   stdout.writeln('Done. Wrote ${scenes.length + 1} PNGs to $_outDir/');
@@ -66,6 +67,36 @@ img.Image _canvas(img.Color background) {
   final image = img.Image(width: kSize, height: kSize, numChannels: 3);
   img.fill(image, color: background);
   return image;
+}
+
+/// Draws a solid thick line as a filled quadrilateral (#78 レビュー S5).
+///
+/// `package:image`'s `drawLine(thickness: ...)` builds a thick line out of
+/// short perpendicular strokes, which leaves a visible "hatched"/striped
+/// artifact on non-axis-aligned (diagonal) segments — each stroke's
+/// anti-aliased edge doesn't line up with its neighbour's. A single filled
+/// polygon (the line's bounding quad) has no such seams at any angle.
+void _fillThickLine(
+  img.Image image,
+  double x1,
+  double y1,
+  double x2,
+  double y2,
+  double thickness,
+  img.Color color,
+) {
+  final dx = x2 - x1;
+  final dy = y2 - y1;
+  final len = math.sqrt(dx * dx + dy * dy);
+  if (len == 0) return;
+  final nx = -dy / len * thickness / 2;
+  final ny = dx / len * thickness / 2;
+  img.fillPolygon(image, vertices: [
+    img.Point(x1 + nx, y1 + ny),
+    img.Point(x2 + nx, y2 + ny),
+    img.Point(x2 - nx, y2 - ny),
+    img.Point(x1 - nx, y1 - ny),
+  ], color: color);
 }
 
 // ── 1. 路線図（色で区別する複数路線、駅名の文字）──────────────────────────
@@ -115,15 +146,18 @@ img.Image _generateRouteMap() {
     final color = img.ColorRgb8(r, g, b);
     final px = points.map((p) => (p[0] * kSize, p[1] * kSize)).toList();
     for (var i = 0; i < px.length - 1; i++) {
-      img.drawLine(
+      // #78 レビュー S5: drawLine(thickness:) の斜め区間の縞模様を避けるため
+      // 太線は塗りつぶしクアッドで描く（_fillThickLine 参照）。butt cap で
+      // 継ぎ目に隙間が出るが、各頂点に駅マーカー（白丸+リング）を重ねて描く
+      // ため隠れる。
+      _fillThickLine(
         image,
-        x1: px[i].$1.round(),
-        y1: px[i].$2.round(),
-        x2: px[i + 1].$1.round(),
-        y2: px[i + 1].$2.round(),
-        color: color,
-        thickness: 12,
-        antialias: true,
+        px[i].$1,
+        px[i].$2,
+        px[i + 1].$1,
+        px[i + 1].$2,
+        12,
+        color,
       );
     }
     // Route code label near the first point, in the route's own colour.
@@ -288,12 +322,21 @@ img.Image _generateTrafficSigns() {
   ];
   img.fillPolygon(image,
       vertices: triPoints, color: img.ColorRgb8(0xFD, 0xD8, 0x35));
+  // #78 レビュー S5: fillPolygon にアンチエイリアスが無いため、塗りの縁が
+  // ジャギーになる。_fillThickLine（塗りつぶしクアッド）で境界を十分太く
+  // 覆って隠す（旧版の drawLine(thickness:10) は縁を覆いきれていなかった）。
   for (var i = 0; i < triPoints.length; i++) {
     final a = triPoints[i];
     final b = triPoints[(i + 1) % triPoints.length];
-    img.drawLine(image,
-        x1: a.xi, y1: a.yi, x2: b.xi, y2: b.yi,
-        color: img.ColorRgb8(0x21, 0x21, 0x21), thickness: 10, antialias: true);
+    _fillThickLine(
+      image,
+      a.x.toDouble(),
+      a.y.toDouble(),
+      b.x.toDouble(),
+      b.y.toDouble(),
+      18,
+      img.ColorRgb8(0x21, 0x21, 0x21),
+    );
   }
   img.drawString(image, '!',
       font: img.arial48,
@@ -301,16 +344,19 @@ img.Image _generateTrafficSigns() {
       y: triCy.round() - 10,
       color: img.ColorRgb8(0x21, 0x21, 0x21));
 
-  // Prohibition circle (white, thick red ring, diagonal bar).
+  // Prohibition circle: a thick ring drawn as the *difference of two filled
+  // circles* (#78 レビュー S5) — a big filled red disc, then a smaller
+  // filled white disc on top, leaving a clean red ring with no stroke
+  // artifacts (the old version stroked two thin drawCircle outlines, which
+  // read as a thin double ring rather than one thick one).
   const proCx = 640, proCy = 620, proR = 150;
+  const proRingThickness = 24;
   img.fillCircle(image,
-      x: proCx, y: proCy, radius: proR, color: img.ColorRgb8(0xFF, 0xFF, 0xFF));
-  img.drawCircle(image,
       x: proCx, y: proCy, radius: proR,
       color: img.ColorRgb8(0xE5, 0x39, 0x35), antialias: true);
-  img.drawCircle(image,
-      x: proCx, y: proCy, radius: proR - 8,
-      color: img.ColorRgb8(0xE5, 0x39, 0x35), antialias: true);
+  img.fillCircle(image,
+      x: proCx, y: proCy, radius: proR - proRingThickness,
+      color: img.ColorRgb8(0xFF, 0xFF, 0xFF), antialias: true);
   img.drawLine(image,
       x1: proCx - 100, y1: proCy - 100, x2: proCx + 100, y2: proCy + 100,
       color: img.ColorRgb8(0xE5, 0x39, 0x35), thickness: 20, antialias: true);
@@ -340,6 +386,8 @@ img.Image _generateInfoBoard() {
   img.drawLine(image,
       x1: 60, y1: 140, x2: kSize - 60, y2: 140, color: ruleColor, thickness: 4);
 
+  // #78 レビュー S5: 本文は最小でも arial24（旧版は補足行だけ arial14 だった）。
+  // 行数はそのぶん高さが要るため 10→8 行に減らし、1024px に収める。
   const rows = <(String, String, String)>[
     ('A1', '08:05', 'CENTRAL'),
     ('A2', '08:20', 'RIVERSIDE'),
@@ -349,22 +397,22 @@ img.Image _generateInfoBoard() {
     ('C2', '09:15', 'MARKET SQ'),
     ('D1', '09:28', 'EAST HILL'),
     ('D2', '09:40', 'GREEN PARK'),
-    ('E1', '09:55', 'WEST END'),
-    ('E2', '10:10', 'AIRPORT'),
   ];
   var y = 180;
-  const rowHeight = 76;
+  const rowHeight = 96;
   for (final (code, time, place) in rows) {
     img.drawString(image, code, font: img.arial24, x: 60, y: y, color: textColor);
     img.drawString(image, time, font: img.arial24, x: 200, y: y, color: textColor);
     img.drawString(image, place, font: img.arial24, x: 380, y: y, color: textColor);
-    // A line of small print under each row (fine detail for blur filters).
+    // A line of small print under each row (still arial24 — #78 レビュー S5:
+    // no body text below that size — fine detail for blur filters instead
+    // comes from the sheer amount of text, not from a smaller font).
     img.drawString(
       image,
-      'platform ${1 + rows.indexOf((code, time, place)) % 4} · via loop line · please mind the gap',
-      font: img.arial14,
+      'PLATFORM ${1 + rows.indexOf((code, time, place)) % 4} - VIA LOOP LINE - MIND THE GAP',
+      font: img.arial24,
       x: 60,
-      y: y + 34,
+      y: y + 40,
       color: img.ColorRgb8(0x5A, 0x54, 0x46),
     );
     img.drawLine(image,
@@ -482,6 +530,37 @@ img.Image _generateNightScene() {
         color: img.ColorRgb8(0x02, 0x02, 0x06));
   }
 
+  // #78 レビュー S5: 低輝度の窓の格子を各ビルに足す（明るい白ではなく暗い
+  // 暖色 — ベタ白は置かない #51 note 3 の方針のまま）。市松状に間引いて
+  // 「消灯した部屋」も混ぜる。
+  final windowColor = img.ColorRgb8(0x3A, 0x32, 0x18);
+  for (final r in buildings) {
+    for (var wx = r[0] + 14; wx < r[2] - 14; wx += 26) {
+      for (var wy = r[1] + 20; wy < kSize - 24; wy += 34) {
+        if ((wx ~/ 26 + wy ~/ 34) % 3 == 0) continue; // 消灯した部屋
+        img.fillRect(image,
+            x1: wx, y1: wy, x2: wx + 12, y2: wy + 18, color: windowColor);
+      }
+    }
+  }
+
+  // #78 レビュー S5: 街路灯（ポール + 小さな暖色の灯り。広い面ではなく点）。
+  const lampXs = [60, 340, 620, 900];
+  for (final lx in lampXs) {
+    img.fillRect(image,
+        x1: lx - 3, y1: 860, x2: lx + 3, y2: kSize,
+        color: img.ColorRgb8(0x08, 0x08, 0x0C));
+    img.fillCircle(image,
+        x: lx, y: 855, radius: 9, color: img.ColorRgb8(0xFF, 0xE3, 0x9E));
+  }
+
+  // #78 レビュー S5: ビルの 1 棟に小さな看板（照明看板、暗い赤地に淡い文字）。
+  img.fillRect(image,
+      x1: 165, y1: 560, x2: 245, y2: 604,
+      color: img.ColorRgb8(0x6E, 0x22, 0x22));
+  img.drawString(image, 'OPEN',
+      font: img.arial14, x: 176, y: 572, color: img.ColorRgb8(0xFF, 0xD8, 0xB0));
+
   // Deterministic point-lights (small LCG so re-running reproduces the same
   // image byte-for-byte).
   var seed = 20260927;
@@ -513,8 +592,8 @@ img.Image _generateNightScene() {
 /// Layered depth cues: pale/desaturated distant mountains, a mid-saturation
 /// midground tree cluster, and a large, sharp, dark foreground silhouette.
 /// Paired with [_generateDepthLandscapeDepthMap] (same layout, encoded as
-/// grayscale depth) for the future depth_aware_blur experience (#1/#78, not
-/// wired up in this PR — see assets/samples/README.md).
+/// grayscale depth) for the future depth_aware_blur experience — wiring
+/// that up is Issue #98 (the material is just prepared here).
 img.Image _generateDepthLandscape() {
   final image = img.Image(width: kSize, height: kSize, numChannels: 3);
   // Sky: hazy near horizon, deeper blue at the top (aerial perspective).
@@ -537,6 +616,11 @@ img.Image _generateDepthLandscape() {
     img.Point(1024.0, 640.0),
     img.Point(0.0, 640.0),
   ], color: img.ColorRgb8(0xA9, 0xB8, 0xC4));
+
+  // #78 レビュー M2: 中景の地面（山並みの裾 y=640 〜 近景の柵 y=760 の間）。
+  // 旧版はここが未描画のまま（Image の既定の黒）で残っていた。中間の緑で塗る。
+  img.fillRect(image,
+      x1: 0, y1: 640, x2: kSize, y2: 760, color: img.ColorRgb8(0x5B, 0x8A, 0x52));
 
   // Midground: a cluster of trees/houses — mid saturation, mid size.
   final midColor = img.ColorRgb8(0x4E, 0x7D, 0x4A);
@@ -582,6 +666,15 @@ img.Image _generateDepthLandscapeDepthMap() {
     img.Point(1024.0, 640.0),
     img.Point(0.0, 640.0),
   ], color: img.ColorRgb8(70, 70, 70));
+
+  // #78 レビュー M2: 中景の地面（y=640〜760）。奥（山並み側、100）から手前
+  // （近景の柵側、140）へのグラデーションで、色版の中間の緑と対になる深度を
+  // 持たせる。
+  for (var y = 640; y < 760; y++) {
+    final t = (y - 640) / (760 - 640);
+    final v = (100 + (140 - 100) * t).round();
+    img.drawLine(image, x1: 0, y1: y, x2: kSize - 1, y2: y, color: img.ColorRgb8(v, v, v));
+  }
 
   // Midground: mid gray.
   final midGray = img.ColorRgb8(140, 140, 140);

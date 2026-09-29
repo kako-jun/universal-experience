@@ -146,7 +146,7 @@ before/after プレビューの原画は、内蔵のサンプル画像集（自�
   `assets/samples/README.md` に記載します。奥行きのある風景だけは深度マップ
   （`depth_landscape_depth.png`）も同梱していますが、これは将来の
   depth_aware_blur 体験向けの素材で、現状のプレビューでは使いません
-  （`docs/ARCHITECTURE.md`「今後の拡張」参照）。
+  （配線は Issue #98、`docs/ARCHITECTURE.md`「今後の拡張」参照）。
 - **フィルタごとの既定サンプル**: フィルタを選ぶと、そのフィルタに相性の良い
   サンプルへ自動で切り替わります（例: 色覚 → 果物・グラフ・路線図、夜盲/
   starbursts → 夜景、屈折異常/視野欠損 → 案内板・奥行きのある風景）。対応表は
@@ -161,7 +161,7 @@ before/after プレビューの原画は、内蔵のサンプル画像集（自�
   — 症状の効果はどこに写っているか分からないため、画像の一部を切り捨てない
   方針です）します。**画像は端末の外に送らず、ディスクにも保存しません**
   （デコードしてメモリ上の画像に変換するだけ）。クリップボードからの
-  貼り付けは今回は未対応です（依存の重さを踏まえ後続 Issue に分離）。
+  貼り付けは今回は未対応です（依存の重さを踏まえ Issue #97 に分離）。
 - **初回起動の空状態**: 2 型 3 色覚（deuteranomaly）を推奨強度で選んだ状態
   から始まり、「ほかの見え方を選ぶ」「自分の画像で試す」の 2 つの行動を
   案内するバナーを 1 回だけ表示します（閉じると二度と出ません）。
@@ -211,9 +211,9 @@ UI は **日本語 / 英語** に対応しています（`flutter_localizations`
   `docs/adr/2026-09-26-loupe-as-single-render-unit.md` 参照。実装時はルーペ窓
   HUD（#79）をキャプチャ対象・フィルタ対象から除外する必要がある
 - **アプリ内の言語ピッカー UI**
-- **クリップボードからの画像貼り付け**（#78） — ファイル選択・ドラッグ＆
-  ドロップは実装済み。貼り付けは依存の重さを踏まえ後続 Issue に分離した
-- **depth_aware_blur の配線**（#78） — `depth_landscape` サンプルの深度マップは
+- **クリップボードからの画像貼り付け**（Issue #97） — ファイル選択・ドラッグ＆
+  ドロップは実装済み。貼り付けは依存の重さを踏まえ分離した
+- **depth_aware_blur の配線**（Issue #98） — `depth_landscape` サンプルの深度マップは
   素材として同梱済みだが、sensus 側の depth_aware_blur 自体が未公開のため
   プレビューでは使っていない
 
@@ -258,6 +258,11 @@ Rust は `rust/` の `cargo test` / clippy、flutter_rust_bridge の codegen に
 `flutter run` / `flutter build macos` / `flutter build linux` でのビルドにも
 必要です（`rust_builder/` の cargokit 統合が同梱まで自動で行う、#55。詳細は
 `docs/GETTING_STARTED.md`）。
+
+`flutter pub get` は `pubspec.lock` に固定したバージョン（`file_selector`/
+`desktop_drop` 等のネイティブ実装込み）を前提にしています。`pubspec.lock`
+を消して解決し直すと、意図しないメジャーバージョンの差分（プラットフォーム
+実装の挙動差など）を踏む可能性があります。
 
 ## 技術スタック
 

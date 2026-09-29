@@ -3,7 +3,6 @@ import 'dart:ui' as ui;
 
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_selector/file_selector.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -15,67 +14,96 @@ import '../../services/image_source_state.dart';
 import '../../services/vision_filter_state.dart';
 
 /// Opens the OS file picker restricted to common image types and returns the
-/// picked file's raw bytes, or `null` if the user cancelled (#78).
+/// picked [XFile], or `null` if the user cancelled (#78).
 ///
 /// Seam for widget tests (mirrors `before_after_view.dart`'s
-/// `sampleImageGenerator` pattern): production uses
-/// [_defaultPickImageBytes], which calls the real `file_selector` plugin
-/// (platform channel — not available in plain `flutter test`).
-typedef ImageBytesPicker = Future<Uint8List?> Function();
+/// `previewSourceImageLoader` pattern): production uses
+/// [_defaultPickImageFile], which calls the real `file_selector` plugin
+/// (platform channel — not available in plain `flutter test`). Returns the
+/// [XFile] itself (not its bytes) so [loadUserImageFile] can check
+/// [XFile.length] **before** reading the file body (#78 レビュー S1).
+typedef ImageFilePicker = Future<XFile?> Function();
 
 @visibleForTesting
-ImageBytesPicker pickImageBytes = _defaultPickImageBytes;
+ImageFilePicker pickImageFile = _defaultPickImageFile;
 
-Future<Uint8List?> _defaultPickImageBytes() async {
+Future<XFile?> _defaultPickImageFile() {
   const typeGroup = XTypeGroup(
     label: 'images',
     extensions: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'],
   );
-  final file = await openFile(acceptedTypeGroups: [typeGroup]);
-  if (file == null) return null;
-  return file.readAsBytes();
+  return openFile(acceptedTypeGroups: [typeGroup]);
 }
 
-/// Decodes [bytes] and hands the result to `ImageSourceState.setUserImage`
-/// — which takes ownership of it (disposes the previous user image,
-/// #58/#85 discipline). A decode failure (unsupported/corrupt file) is
-/// reported via [FlutterError.reportError] (same convention as
-/// `before_after_view.dart`'s generator/renderer errors) and, only if
-/// [context] is still mounted, surfaced with a SnackBar.
-///
-/// Shared by [ImageSourcePicker]'s pick button, its drag-and-drop target,
-/// and the first-run welcome banner's "try it with your photo" action
+/// Maximum accepted user image file size (#78 レビュー S1), checked via
+/// [XFile.length] **before** [loadUserImageFile] reads the file body — an
+/// oversized file is rejected without ever loading its bytes into memory.
+const int kMaxUserImageFileBytes = 50 * 1024 * 1024; // 50MB
+
+/// Reads and decodes [file] into a [ui.Image] and hands it to
+/// `ImageSourceState.setUserImage` — which takes ownership of it (disposes
+/// the previous user image, #58/#85 discipline). Shared by
+/// [ImageSourcePicker]'s pick button, its drag-and-drop target, and the
+/// first-run welcome banner's "try it with your photo" action
 /// (`lib/ui/widgets/welcome_banner.dart`) — every entry point that ends with
-/// raw image bytes goes through this one function.
-Future<void> loadUserImageBytes(BuildContext context, Uint8List bytes) async {
+/// an [XFile] goes through this one function.
+///
+/// #78 レビュー S1: rejects (without reading the file body) anything larger
+/// than [kMaxUserImageFileBytes], and decodes via [decodeUserImageBytes]
+/// (downscales during decode so no dimension exceeds
+/// [kUserImageMaxDimension]).
+///
+/// #78 レビュー S2: the size check, the read, and the decode all run inside
+/// **one** try/catch — any failure along the way (oversized file, unreadable
+/// file, corrupt/unsupported image data) is reported via
+/// [FlutterError.reportError] (same convention as `before_after_view.dart`'s
+/// generator/renderer errors) and, only if [context] is still mounted,
+/// surfaced with the `imageSourcePickFailed` SnackBar. `ImageSourceState` is
+/// left untouched on any failure.
+///
+/// Returns `true` on success, `false` on failure — the welcome banner
+/// (`lib/ui/widgets/welcome_banner.dart`) uses this to decide whether its
+/// "try it with your photo" action should dismiss itself (#78 レビュー Q3:
+/// only on an actual successful load, never on cancel/failure).
+Future<bool> loadUserImageFile(BuildContext context, XFile file) async {
   final imageSourceState = context.read<ImageSourceState>();
   ui.Image decoded;
   try {
-    decoded = await decodeImageBytes(bytes);
+    final length = await file.length();
+    if (length > kMaxUserImageFileBytes) {
+      throw StateError(
+        'user image file too large: $length bytes '
+        '(max $kMaxUserImageFileBytes)',
+      );
+    }
+    final bytes = await file.readAsBytes();
+    decoded = await decodeUserImageBytes(bytes);
   } catch (e, st) {
     FlutterError.reportError(FlutterErrorDetails(
       exception: e,
       stack: st,
       library: 'image_source_picker',
     ));
-    if (!context.mounted) return;
+    if (!context.mounted) return false;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(AppLocalizations.of(context)!.imageSourcePickFailed),
       ),
     );
-    return;
+    return false;
   }
   imageSourceState.setUserImage(decoded);
+  return true;
 }
 
-/// Opens the file picker and loads the result via [loadUserImageBytes]
-/// (#78). No-op if the user cancels the picker.
-Future<void> pickAndLoadUserImage(BuildContext context) async {
-  final bytes = await pickImageBytes();
-  if (bytes == null) return;
-  if (!context.mounted) return;
-  await loadUserImageBytes(context, bytes);
+/// Opens the file picker and loads the result via [loadUserImageFile]
+/// (#78). Returns `false` (without touching `ImageSourceState`) if the user
+/// cancels the picker; otherwise returns [loadUserImageFile]'s result.
+Future<bool> pickAndLoadUserImage(BuildContext context) async {
+  final file = await pickImageFile();
+  if (file == null) return false;
+  if (!context.mounted) return false;
+  return loadUserImageFile(context, file);
 }
 
 /// Sample-picker chips + "choose a photo" button + drag-and-drop target for
@@ -89,8 +117,8 @@ Future<void> pickAndLoadUserImage(BuildContext context) async {
 /// current filter's recommended sample for the chips/"back to recommended"
 /// button); it never touches `BeforeAfterView` internals directly.
 ///
-/// Images are decoded in memory only ([decodeImageBytes]) — never written to
-/// disk, never sent anywhere (#78).
+/// Images are decoded in memory only ([decodeUserImageBytes]) — never
+/// written to disk, never sent anywhere (#78).
 class ImageSourcePicker extends StatefulWidget {
   const ImageSourcePicker({super.key, required this.child});
 
@@ -107,9 +135,8 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
     if (details.files.isEmpty) return;
     // 複数ファイルが同時にドロップされても最初の 1 枚だけを使う（#78:
     // ユーザー画像は常に 1 枚）。残りは黙って無視する。
-    final bytes = await details.files.first.readAsBytes();
     if (!mounted) return;
-    await loadUserImageBytes(context, bytes);
+    await loadUserImageFile(context, details.files.first);
   }
 
   @override
@@ -135,10 +162,12 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 120),
                 decoration: BoxDecoration(
+                  // #78 レビュー nit: Colors.transparent ではなく colorScheme
+                  // のロール（primary、alpha=0）を使う。見た目は同じ透明だが、
+                  // Colors.* を直接参照しない規約に従う。
                   border: Border.all(
-                    color: _dragging
-                        ? theme.colorScheme.primary
-                        : Colors.transparent,
+                    color: theme.colorScheme.primary
+                        .withAlpha(_dragging ? 255 : 0),
                     width: 2,
                   ),
                   borderRadius: BorderRadius.circular(8),
@@ -171,12 +200,21 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
                 imageSourceState.selectedSampleId == entry.id,
             onSelected: (_) => imageSourceState.selectSample(entry.id),
           ),
-        if (imageSourceState.hasUserImage)
+        if (imageSourceState.hasUserImage) ...[
           ChoiceChip(
             label: Text(l10n.imageSourceYourPhotoChipLabel),
             selected: imageSourceState.isUsingUserImage,
             onSelected: (_) => imageSourceState.useLoadedUserImage(),
           ),
+          // #78 レビュー nit: 読み込んだユーザー画像を閉じる UI。
+          IconButton(
+            icon: const Icon(Icons.close, size: 18),
+            tooltip: l10n.imageSourceClosePhotoTooltip,
+            visualDensity: VisualDensity.compact,
+            onPressed: () =>
+                imageSourceState.clearUserImage(recommendedId),
+          ),
+        ],
         OutlinedButton.icon(
           onPressed: () => pickAndLoadUserImage(context),
           icon: const Icon(Icons.photo_outlined, size: 18),

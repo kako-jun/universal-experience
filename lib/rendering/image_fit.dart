@@ -73,3 +73,52 @@ Future<ui.Image> decodeImageBytes(Uint8List bytes) async {
     codec.dispose();
   }
 }
+
+/// Maximum long-edge dimension [decodeUserImageBytes] decodes a user image
+/// to (#78 レビュー S1). A modern phone photo can easily be 4000px+ on the
+/// long edge; decoding (and holding in memory) at full intrinsic resolution
+/// when the canonical preview size is only [1024]（`BeforeAfterView.
+/// canonicalSampleSize`) wastes memory for no visual benefit —
+/// [fitImageToSquare] would immediately downscale it anyway. 2048 leaves
+/// headroom above the canonical size while still bounding memory use.
+const int kUserImageMaxDimension = 2048;
+
+/// Decodes [bytes] into a [ui.Image] the same way [decodeImageBytes] does,
+/// but downscales **during** decode so neither dimension exceeds
+/// [kUserImageMaxDimension] (#78 レビュー S1), preserving aspect ratio.
+/// Unlike [decodeImageBytes] (used for the already-1024px sample assets,
+/// which never need downscaling), this reads the image's intrinsic size
+/// cheaply via [ui.ImageDescriptor] first (`ui.instantiateImageCodecWithSize`)
+/// so the decoder itself only ever materialises the bounded size, rather
+/// than decoding at full resolution and downscaling afterward.
+///
+/// Used only for user-loaded images
+/// (`lib/ui/widgets/image_source_picker.dart`) — sample assets go through
+/// [decodeImageBytes] instead. The caller owns and must dispose the
+/// returned image.
+Future<ui.Image> decodeUserImageBytes(Uint8List bytes) async {
+  final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
+  // instantiateImageCodecWithSize disposes `buffer` itself once it's read
+  // the (cheap, header-only) intrinsic size — the caller must not also
+  // dispose it.
+  final codec = await ui.instantiateImageCodecWithSize(
+    buffer,
+    getTargetSize: (intrinsicWidth, intrinsicHeight) {
+      final longEdge = math.max(intrinsicWidth, intrinsicHeight);
+      if (longEdge <= kUserImageMaxDimension) {
+        return ui.TargetImageSize(width: intrinsicWidth, height: intrinsicHeight);
+      }
+      final scale = kUserImageMaxDimension / longEdge;
+      return ui.TargetImageSize(
+        width: (intrinsicWidth * scale).round(),
+        height: (intrinsicHeight * scale).round(),
+      );
+    },
+  );
+  try {
+    final frame = await codec.getNextFrame();
+    return frame.image;
+  } finally {
+    codec.dispose();
+  }
+}

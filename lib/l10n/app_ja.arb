@@ -206,7 +206,7 @@
   "imageSourcePickButton": "画像を選ぶ…",
   "imageSourceDropHint": "または画像をドロップ",
   "imageSourceResetToRecommended": "おすすめに戻す",
-  "imageSourceViewYourPhoto": "自分の画像を見る",
+  "imageSourceClosePhotoTooltip": "画像を閉じる",
   "imageSourcePickFailed": "その画像を読み込めませんでした。別のファイルをお試しください。",
 
   "welcomeBannerTitle": "はじめての方へ",

@@ -6,7 +6,8 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/models/preview_image_source.dart';
-import 'package:universal_experience/ui/widgets/before_after_view.dart';
+
+import 'support/sample_image_generator.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -31,7 +32,7 @@ void main() {
     });
 
     test('UserPreviewImageSource とは等しくない', () async {
-      final image = await BeforeAfterView.generateSampleImage(4);
+      final image = await generateSampleImage(4);
       addTearDown(image.dispose);
       expect(
         const SamplePreviewImageSource('chart'),
@@ -42,8 +43,8 @@ void main() {
 
   group('UserPreviewImageSource', () {
     test('generation が同じなら image オブジェクトが違っても等しい', () async {
-      final imageA = await BeforeAfterView.generateSampleImage(4);
-      final imageB = await BeforeAfterView.generateSampleImage(4);
+      final imageA = await generateSampleImage(4);
+      final imageB = await generateSampleImage(4);
       addTearDown(imageA.dispose);
       addTearDown(imageB.dispose);
 
@@ -59,7 +60,7 @@ void main() {
     });
 
     test('generation が異なれば等しくない（同じ image オブジェクトでも）', () async {
-      final image = await BeforeAfterView.generateSampleImage(4);
+      final image = await generateSampleImage(4);
       addTearDown(image.dispose);
       expect(
         UserPreviewImageSource(image, 1),

@@ -1,9 +1,7 @@
 /// What the before/after preview's "before" pane should render (#78).
 ///
-/// Replaces the pre-#78 fixed programmatic hue-gradient sample
-/// (`BeforeAfterView.generateSampleImage`, kept only as a legacy fallback for
-/// callers that don't pass a [PreviewImageSource] — see that file's module
-/// doc) with a real choice: one of the built-in sample scenes
+/// Replaces the pre-#78 fixed programmatic hue-gradient sample with a real
+/// choice: one of the built-in sample scenes
 /// (`lib/models/sample_catalog.dart`), or an image the user loaded
 /// (`lib/services/image_source_state.dart`).
 ///

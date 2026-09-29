@@ -23,13 +23,13 @@
 | ファイル | 場面 | 相性の良いフィルタの例 |
 |---|---|---|
 | `route_map.png` | 路線図（色で区別する複数路線、駅・番号のラベル） | 色覚（achromatopsia）・複視・歪視 |
-| `chart.png` | 凡例付きのグラフ（赤・緑・青・橙の 4 系列） | 色覚（tritanopia/tetrachromacy）・きらめき視 |
-| `traffic_signs.png` | 信号（赤が点灯・黄/緑は消灯）・標識（警告三角・禁止円・案内四角） | 色覚・視野 |
-| `info_board.png` | 文字の多い案内板（大見出し + 表形式の小さい本文） | 屈折異常・眼精疲労・白内障・飛蚊症・detail_loss |
-| `fruit_stand.png` | 食べ物・果物（熟した赤 vs 未熟な緑、柑橘の橙・黄、ぶどう・プラムの紫・青） | 色覚（protanopia/deuteranopia） |
-| `night_scene.png` | 夜景（暗いグラデーション + スカイラインのシルエット + 小さな点光源多数。広いベタ白は置いていない） | 夜盲・starbursts・畏光・flickering_stars |
-| `depth_landscape.png` | 奥行きのある風景（遠景の山並み・中景の木立と家・近景のフェンスと茂み） | 視野欠損・前庭系（時間依存フィルタの静止フレーム） |
-| `depth_landscape_depth.png` | `depth_landscape.png` の深度マップ | （下記参照。現状は未配線） |
+| `chart.png` | 凡例付きのグラフ（赤・緑・青・橙の 4 系列） | 色覚（tetrachromacy）・きらめき視 |
+| `traffic_signs.png` | 信号（赤が点灯・黄/緑は消灯）・標識（警告三角・太いリングの禁止円・案内四角） | 色覚（protanopia）・視野 |
+| `info_board.png` | 文字の多い案内板（見出し arial48、本文は最小でも arial24） | 屈折異常（astigmatism 含む）・眼精疲労・白内障・飛蚊症・detail_loss |
+| `fruit_stand.png` | 食べ物・果物（熟した赤 vs 未熟な緑、柑橘の橙・黄、ぶどう・プラムの紫・青） | 色覚（protanopia/deuteranopia/tritanopia） |
+| `night_scene.png` | 夜景（暗いグラデーション + ビルのシルエット + 低輝度の窓の格子 + 街路灯 + 照明看板 + 小さな点光源多数。広いベタ白は置いていない） | 夜盲・starbursts・flickering_stars |
+| `depth_landscape.png` | 奥行きのある風景（遠景の山並み・中景の地面と木立と家・近景のフェンスと茂み） | 視野欠損・畏光（photophobia、明るい空）・前庭系（時間依存フィルタの静止フレーム） |
+| `depth_landscape_depth.png` | `depth_landscape.png` の深度マップ | （下記参照。プレビューでは未消費、Issue #98） |
 
 フィルタごとの既定サンプルの対応表は
 [`lib/models/sample_catalog.dart`](../../lib/models/sample_catalog.dart) の
@@ -42,6 +42,6 @@
 （遠景の山並みは暗いグレー、近景のフェンス・茂みは明るいグレー）。
 
 sensus 側の `depth_aware_blur`（近視・遠視・老視を距離依存のぼけで再現する
-処理）はまだ flutter_rust_bridge 経由で公開されていないため、この PR ではこの
-深度マップは**素材として同梱するだけ**で、プレビューでは消費していません
-（Issue #78 着手コメント、`docs/ARCHITECTURE.md`「今後の拡張」参照）。
+処理）はまだ flutter_rust_bridge 経由で公開されていないため、この深度マップは
+**素材として同梱するだけ**で、プレビューでは消費していません。配線は
+**Issue #98** で対応予定です（`docs/ARCHITECTURE.md`「今後の拡張」参照）。

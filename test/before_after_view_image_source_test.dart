@@ -6,6 +6,7 @@
 // 任せ、CpuVisionRenderer 実ブリッジを踏まずに前段（before 画像の読み込み）
 // だけに集中する。
 
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -14,6 +15,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/models/preview_image_source.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
+
+import 'support/sample_image_generator.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -41,7 +44,7 @@ void main() {
 
     test('UserPreviewImageSource: 渡された image を size×size に fit し、'
         '元の image は dispose しない', () async {
-      final source = await BeforeAfterView.generateSampleImage(10);
+      final source = await generateSampleImage(10);
       addTearDown(source.dispose);
 
       final fitted = await BeforeAfterView.loadPreviewSourceImage(
@@ -80,7 +83,7 @@ void main() {
       final requested = <PreviewImageSource>[];
       late ui.Image stub;
       await tester.runAsync(() async {
-        stub = await BeforeAfterView.generateSampleImage(4);
+        stub = await generateSampleImage(4);
       });
       previewSourceImageLoader = (source, size) {
         requested.add(source);
@@ -105,8 +108,8 @@ void main() {
         '(#58/#85 と同じ規律)', (tester) async {
       late ui.Image imageA, imageB;
       await tester.runAsync(() async {
-        imageA = await BeforeAfterView.generateSampleImage(4);
-        imageB = await BeforeAfterView.generateSampleImage(4);
+        imageA = await generateSampleImage(4);
+        imageB = await generateSampleImage(4);
       });
       final images = {
         'a': imageA,
@@ -147,7 +150,7 @@ void main() {
         '再読み込みしない（before の再利用）', (tester) async {
       late ui.Image stub;
       await tester.runAsync(() async {
-        stub = await BeforeAfterView.generateSampleImage(4);
+        stub = await generateSampleImage(4);
       });
       var callCount = 0;
       previewSourceImageLoader = (source, size) {
@@ -176,25 +179,73 @@ void main() {
       expect(stub.debugDisposed, isFalse);
     });
 
-    testWidgets('imageSource が null（legacy）なら previewSourceImageLoader は呼ばれない',
-        (tester) async {
-      var called = false;
+    testWidgets(
+        'source を読み込み中に imageSource が A→B に切り替わっても、最終的に B が'
+        '読み込まれる (#78 レビュー M1)', (tester) async {
+      // #78 レビュー M1 の回帰テスト: 旧実装は _rebuild の最後で
+      // `_currentImageSource = widget.imageSource`（呼び出し時点の最新値）を
+      // 読んでいた。A の読み込みが in-flight のまま widget.imageSource が B に
+      // 進むと、A の画像を読み込んだのに `_currentImageSource` には B が
+      // 記録されてしまい、その後 B への再読み込みが reuseBefore に「もう
+      // 読み込み済み」と誤認されてスキップされる（実際に表示され続けるのは
+      // A の画像のまま）。修正後は `_rebuild` の冒頭で捕まえた `source` だけを
+      // 使うので、B は正しく再読み込みされる。
+      late ui.Image imageA, imageB;
+      await tester.runAsync(() async {
+        imageA = await generateSampleImage(4);
+        imageB = await generateSampleImage(4);
+      });
+
+      final completers = <String, Completer<ui.Image>>{
+        'a': Completer<ui.Image>(),
+        'b': Completer<ui.Image>(),
+      };
+      final requested = <String>[];
       previewSourceImageLoader = (source, size) {
-        called = true;
-        return BeforeAfterView.loadPreviewSourceImage(source, size);
+        final id = (source as SamplePreviewImageSource).sampleId;
+        requested.add(id);
+        return completers[id]!.future;
       };
 
-      await tester.pumpWidget(localized(const BeforeAfterView(
-        filter: null,
-        filterId: null,
-        strength: 1.0,
-        sampleSize: 16,
-      )));
+      Widget build(String sampleId) => localized(BeforeAfterView(
+            filter: null,
+            filterId: null,
+            strength: 1.0,
+            sampleSize: 16,
+            imageSource: SamplePreviewImageSource(sampleId),
+          ));
+
+      // 1回目: imageSource=a。previewSourceImageLoader('a') が呼ばれるが、
+      // まだ未解決のまま止める。
+      await tester.pumpWidget(build('a'));
+      await tester.pump();
+      expect(requested, ['a']);
+
+      // 2回目: imageSource を a→b に切り替える。1回目がまだ in-flight なので
+      // _scheduleRebuild が集約するだけで、この時点ではまだ b の読み込みは
+      // 始まらない。
+      await tester.pumpWidget(build('b'));
+      await tester.pump();
+      expect(requested, ['a'], reason: '2回目は集約されているだけでまだ呼ばれていない');
+
+      // ここで1回目（a）の読み込みを解決する。widget.imageSource は既に b に
+      // 進んでいるが、_rebuild はこの呼び出しの冒頭で捕まえた a を使うべき。
+      completers['a']!.complete(imageA);
       await tester.pump();
       await tester.pump();
 
-      expect(called, isFalse,
-          reason: 'imageSource==null の legacy パスは sampleImageGenerator のまま');
+      // 集約されていた b への要求が続けて走り始めるはず。
+      expect(requested, ['a', 'b'],
+          reason: '_currentImageSource が正しく a として記録されていれば、b の'
+              '再読み込みが reuseBefore で誤ってスキップされない');
+
+      completers['b']!.complete(imageB);
+      await tester.pump();
+      await tester.pump();
+
+      expect(imageB.debugDisposed, isFalse);
+      expect(imageA.debugDisposed, isTrue,
+          reason: '最終的に b の画像に差し替わり、a は dispose される');
     });
   });
 }

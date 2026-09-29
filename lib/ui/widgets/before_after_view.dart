@@ -17,32 +17,11 @@ import '../../services/export_service.dart';
 import '../../services/vision_filter_metadata.dart';
 import '../../src/rust/api/sensus_bridge.dart';
 
-/// [_BeforeAfterViewState] が内部で使うサンプル画像生成ステップの型。
-///
-/// 実体は [BeforeAfterView.generateSampleImage]。widget test が世代管理
-/// （古い結果は破棄され最新だけが残ること）を検証するために、応答が遅れる
-/// フェイクへ差し替えられるようにするための seam（#58）。
-///
-/// #78: これは [BeforeAfterView.imageSource] が `null` のときだけ使う legacy
-/// パス（この widget の最も古いテスト群が使う、意味を持たない色相グラデー
-/// ション）。production は home_screen.dart が常に非 null の `imageSource`
-/// を渡すため、実際にはもう到達しない — 既存の widget test 群
-/// （`sampleImageGenerator`/`generateSampleImage` を汎用のダミー正方形画像
-/// ファクトリとして使っているものも多い）をそのまま動かし続けるために残して
-/// ある。`imageSource` が非 null のときの供給源は [previewSourceImageLoader]。
-typedef SampleImageGenerator = Future<ui.Image> Function(int size);
-
-/// サンプル画像生成の供給源（テストで差し替え可能）。既定は
-/// [BeforeAfterView.generateSampleImage]。production はそのまま既定値を使う。
-/// fixture 注入専用なので、外部からの書き換えを抑止するため `@visibleForTesting`。
-@visibleForTesting
-SampleImageGenerator sampleImageGenerator = BeforeAfterView.generateSampleImage;
-
 /// [_BeforeAfterViewState] が内部で使う「before 画像を [PreviewImageSource]
 /// から読み込む」ステップの型（#78）。実体は
-/// [BeforeAfterView.loadPreviewSourceImage]。[sampleImageGenerator] と同じ
-/// パターンの widget test 用 seam。[BeforeAfterView.imageSource] が非 null の
-/// ときだけ使う（null のときの legacy パスは [sampleImageGenerator] のまま）。
+/// [BeforeAfterView.loadPreviewSourceImage]。widget test が世代管理
+/// （古い結果は破棄され最新だけが残ること）を検証するために、応答が遅れる
+/// フェイクへ差し替えられるようにするための seam（#58 と同じパターン）。
 typedef PreviewSourceImageLoader = Future<ui.Image> Function(
   PreviewImageSource source,
   int size,
@@ -56,8 +35,8 @@ PreviewSourceImageLoader previewSourceImageLoader =
 
 /// [_BeforeAfterViewState] が内部で使う after 画像描画ステップの型。
 ///
-/// 実体は [BeforeAfterView.renderAfter]。用途は [sampleImageGenerator] と同じ（#58）。
-/// [filter] は `VisionFilterState.build`（#60）が組み立てた、payload 込みの
+/// 実体は [BeforeAfterView.renderAfter]。用途は [previewSourceImageLoader] と
+/// 同じ（#58）。[filter] は `VisionFilterState.build`（#60）が組み立てた、payload 込みの
 /// sensus [VisionFilter]。null は「何も選択されていない」を表し、[source] を
 /// そのまま返す（[BeforeAfterView.renderAfter] 参照）。
 typedef AfterImageRenderer = Future<ui.Image?> Function(
@@ -76,7 +55,7 @@ AfterImageRenderer afterImageRenderer = BeforeAfterView.renderAfter;
 /// 実体は [composeExportImage]。widget test が実ファイル I/O（[pngSaver]）に
 /// 触れずに export の挙動（#85 レビュー S8: caption が描画時の
 /// `(filterId, strength)` から作られること）を検証できるようにするための
-/// seam（#58 の `sampleImageGenerator`/`afterImageRenderer` と同じパターン）。
+/// seam（#58 の `previewSourceImageLoader`/`afterImageRenderer` と同じパターン）。
 typedef ExportImageComposer = Future<ui.Image> Function(
   ui.Image base,
   ExportCaption caption,
@@ -101,10 +80,10 @@ PngSaver pngSaver = savePng;
 /// Side-by-side "before / after" preview for the currently selected
 /// `VisionFilterState` selection (#60).
 ///
-/// The *before* pane shows a generated sample image (a smooth hue gradient with
-/// primary colour swatches — chosen because colour-vision deficiencies are most
-/// visible on saturated reds/greens/blues). The *after* pane shows the same
-/// image with [filter] applied at [strength].
+/// The *before* pane shows [imageSource] (#78: one of the built-in sample
+/// scenes, `lib/models/sample_catalog.dart`, or a user-loaded image —
+/// `home_screen.dart` resolves this from `ImageSourceState`). The *after*
+/// pane shows the same image with [filter] applied at [strength].
 ///
 /// This widget is presentational: it doesn't read `VisionFilterState` or
 /// `FilterService` itself. The caller (`home_screen.dart`) resolves the
@@ -127,9 +106,9 @@ class BeforeAfterView extends StatefulWidget {
     required this.filter,
     required this.filterId,
     required this.strength,
+    required this.imageSource,
     this.colorVisionType,
     this.sampleSize,
-    this.imageSource,
   })  : assert(
           (filter == null) == (filterId == null),
           'filter and filterId must both be null or both be set',
@@ -176,16 +155,12 @@ class BeforeAfterView extends StatefulWidget {
   final int? sampleSize;
 
   /// What the *before* pane should render (#78): one of the built-in sample
-  /// scenes or a user-loaded image. `null` (the default) keeps the pre-#78
-  /// behaviour — the fixed programmatic hue-gradient sample via
-  /// [generateSampleImage]/[sampleImageGenerator] — which only legacy tests
-  /// still rely on; `home_screen.dart` always passes a non-null value in
-  /// production (`ImageSourceState.current`). When non-null,
-  /// [loadPreviewSourceImage]/[previewSourceImageLoader] supplies the image
-  /// instead, fit into the canonical square via
-  /// `lib/rendering/image_fit.dart`'s letterbox (see that file for why
-  /// letterbox over crop).
-  final PreviewImageSource? imageSource;
+  /// scenes or a user-loaded image (`home_screen.dart` resolves this from
+  /// `ImageSourceState.current`). [loadPreviewSourceImage]/
+  /// [previewSourceImageLoader] supplies the image, fit into the canonical
+  /// square via `lib/rendering/image_fit.dart`'s letterbox (see that file
+  /// for why letterbox over crop).
+  final PreviewImageSource imageSource;
 
   /// The fixed resolution (square side, pixels) the CPU preview renders at
   /// when [sampleSize] is `null` (#85 レビュー S4).
@@ -219,63 +194,6 @@ class BeforeAfterView extends StatefulWidget {
   /// rendered image up/down to fit (`_UiImagePainter.paint`,
   /// `FilterQuality.medium`); it never re-renders on resize.
   static const int canonicalSampleSize = 1024;
-
-  /// Builds the deterministic sample image used in the *before* pane.
-  ///
-  /// Programmatically generated (no asset dependency): a horizontal hue sweep
-  /// with a vertical brightness ramp, overlaid with red/green/blue/yellow
-  /// swatches along the bottom. Static + async so tests can obtain the same
-  /// image the widget uses.
-  static Future<ui.Image> generateSampleImage(int size) async {
-    final recorder = ui.PictureRecorder();
-    final canvas = ui.Canvas(recorder);
-    final fSize = size.toDouble();
-
-    // Hue sweep (left→right) with brightness ramp (top→bottom).
-    const columns = 64;
-    final colW = fSize / columns;
-    for (int c = 0; c < columns; c++) {
-      final hue = (c / columns) * 360.0;
-      final color = HSVColor.fromAHSV(1.0, hue, 1.0, 1.0).toColor();
-      canvas.drawRect(
-        Rect.fromLTWH(c * colW, 0, colW + 1, fSize),
-        Paint()..color = color,
-      );
-    }
-    // Brightness ramp as a translucent black gradient over the lower half.
-    canvas.drawRect(
-      Rect.fromLTWH(0, fSize * 0.5, fSize, fSize * 0.5),
-      Paint()
-        ..shader = ui.Gradient.linear(
-          Offset(0, fSize * 0.5),
-          Offset(0, fSize),
-          const [Color(0x00000000), Color(0xCC000000)],
-        ),
-    );
-
-    // Saturated swatches along the bottom — the cases CVD distorts most.
-    const swatches = [
-      Color(0xFFE53935), // red
-      Color(0xFF43A047), // green
-      Color(0xFF1E88E5), // blue
-      Color(0xFFFDD835), // yellow
-    ];
-    final swW = fSize / swatches.length;
-    final swTop = fSize * 0.75;
-    for (int i = 0; i < swatches.length; i++) {
-      canvas.drawRect(
-        Rect.fromLTWH(i * swW, swTop, swW, fSize - swTop),
-        Paint()..color = swatches[i],
-      );
-    }
-
-    final picture = recorder.endRecording();
-    try {
-      return await picture.toImage(size, size);
-    } finally {
-      picture.dispose();
-    }
-  }
 
   /// Loads the canonical-size *before* image for [source] (#78): a built-in
   /// sample scene (decoded from `assets/samples/`) or a user-loaded image.
@@ -356,12 +274,12 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   int? _currentSampleSize;
 
   /// The [PreviewImageSource] (#78) that actually produced the
-  /// currently-held [_before]. `null` until the first generation completes,
-  /// and also stays `null` for the entire legacy-gradient lifetime of a
-  /// widget whose [BeforeAfterView.imageSource] is `null` — so the
-  /// [reuseBefore] check in [_rebuild] (`_currentImageSource ==
-  /// widget.imageSource`) trivially holds across re-renders for that legacy
-  /// path, unchanged from pre-#78 behaviour.
+  /// currently-held [_before]. `null` until the first generation completes.
+  /// Set from the `source` local captured at the start of the [_rebuild]
+  /// call that produced [_before] (#78 レビュー M1) — **not** re-read from
+  /// `widget.imageSource` at assignment time, which could have already moved
+  /// on to a newer value while this call was awaiting the loader (see
+  /// [_rebuild]'s doc).
   PreviewImageSource? _currentImageSource;
 
   /// The `(filterId, colorVisionType, strength)` that actually produced the
@@ -502,12 +420,28 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     }
   }
 
+  /// #78 レビュー M1: [widget.imageSource] はこの関数の冒頭で一度だけ読み、
+  /// [source] に固定する。以後（[previewSourceImageLoader] の呼び出し・
+  /// [_currentImageSource] への記録のどちらも）は必ずこの [source] を使い、
+  /// `widget.imageSource` を読み直さない。
+  ///
+  /// 理由: この関数は `await previewSourceImageLoader(...)` の間 sleep する。
+  /// その間に親が再 build して `didUpdateWidget` が `widget.imageSource` を
+  /// 新しい値へ更新しても、[_scheduleRebuild] は `_rebuildInFlight` が true の
+  /// 間は `_generation` を上げず新しい要求を待避させるだけなので、この呼び出し
+  /// の `generation` は最新のままになり得る（[isLatest] が true のまま）。
+  /// もし `widget.imageSource` を assignment 時点で読み直していたら、実際に
+  /// 読み込んだのは古い source の画像なのに `_currentImageSource` には新しい
+  /// source が記録され、以後の [reuseBefore] 判定が「新しい source の画像は
+  /// もう読み込み済み」と誤認して再読み込みをスキップしてしまう
+  /// （実際に表示されているのは古い source の画像のまま）。
   Future<void> _rebuild(int sampleSize) async {
     if (!mounted) return;
     final generation = ++_generation;
+    final source = widget.imageSource;
     final reuseBefore = _before != null &&
         _currentSampleSize == sampleSize &&
-        _currentImageSource == widget.imageSource;
+        _currentImageSource == source;
     setState(() => _loading = true);
 
     final ui.Image before;
@@ -515,12 +449,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       before = _before!;
     } else {
       try {
-        // #78: imageSource が非 null なら供給源をそちらへ切り替える。null
-        // （production では home_screen.dart が渡さない legacy パス）は従来
-        // 通り sampleImageGenerator を使う。
-        before = widget.imageSource == null
-            ? await sampleImageGenerator(sampleSize)
-            : await previewSourceImageLoader(widget.imageSource!, sampleSize);
+        before = await previewSourceImageLoader(source, sampleSize);
       } catch (e, st) {
         // #58 レビュー nit-1: 静かに握りつぶさず Flutter のエラー報告経路に
         // 乗せる（crash reporting 等が拾えるように）。
@@ -604,7 +533,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       _afterStrength = widget.strength; // #85 レビュー S8
       _afterFilter = widget.filter; // #76
       _currentSampleSize = sampleSize;
-      _currentImageSource = widget.imageSource; // #78
+      _currentImageSource = source; // #78 レビュー M1: widget.imageSource ではなく source
       _loading = false;
       _failed = false; // #58 レビュー SHOULD-1: 成功したら失敗表示を解除する。
     });

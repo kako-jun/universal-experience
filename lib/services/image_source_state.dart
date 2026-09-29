@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../models/preview_image_source.dart';
 import '../models/sample_catalog.dart';
@@ -83,7 +84,17 @@ class ImageSourceState extends ChangeNotifier {
   /// Manually picks a sample (#78: "ユーザーが手でサンプルを選んだ場合").
   /// Switches away from a user image if one was active, and stops
   /// auto-follow until [resetToRecommended] is called.
+  ///
+  /// No-op if [sampleId] is already the manually-pinned selection (#78 レビュー
+  /// nit: re-tapping the already-selected recommended chip shouldn't do
+  /// anything) — but *not* a no-op while auto-follow is still active or a
+  /// user image is showing, since picking the same id in either of those
+  /// cases is still a real state change (pins the sample / switches off the
+  /// photo).
   void selectSample(String sampleId) {
+    if (!_isUsingUserImage && !_autoFollowRecommended && _sampleId == sampleId) {
+      return;
+    }
     _isUsingUserImage = false;
     _sampleId = sampleId;
     _autoFollowRecommended = false;
@@ -124,29 +135,53 @@ class ImageSourceState extends ChangeNotifier {
 
   /// Loads [image] as the user's preview source (file picker / drag & drop,
   /// #78) and switches to it immediately. Disposes the previously-held user
-  /// image (if any) — the caller (picker/drop-target widget) hands over
-  /// ownership of [image] to this state.
+  /// image (if any, deferred — see [_disposeAfterFrame]) — the caller
+  /// (picker/drop-target widget) hands over ownership of [image] to this
+  /// state.
   void setUserImage(ui.Image image) {
-    _userImage?.dispose();
+    final previous = _userImage;
     _userImage = image;
     _userImageGeneration++;
     _isUsingUserImage = true;
     notifyListeners();
+    _disposeAfterFrame(previous);
   }
 
   /// Discards the loaded user image entirely and falls back to
   /// [fallbackSampleId] with auto-follow re-enabled.
   void clearUserImage(String fallbackSampleId) {
-    _userImage?.dispose();
+    final previous = _userImage;
     _userImage = null;
     _isUsingUserImage = false;
     _autoFollowRecommended = true;
     _sampleId = fallbackSampleId;
     notifyListeners();
+    _disposeAfterFrame(previous);
+  }
+
+  /// Disposes [image] after the current frame finishes (#78 レビュー S3),
+  /// instead of synchronously at the point it's replaced/cleared.
+  ///
+  /// `BeforeAfterView`'s `_rebuild` can be mid-`fitImageToSquare` for this
+  /// exact image when it's replaced — that helper records a
+  /// `canvas.drawImageRect` referencing it into a `ui.Picture` and only
+  /// *rasterises* (`picture.toImage()`, reading the image's texture) some
+  /// microtasks later. Disposing the source image synchronously in between
+  /// those two steps risks the rasterisation reading a disposed texture.
+  /// Deferring to `addPostFrameCallback` gives any in-flight recording from
+  /// this frame a chance to finish first — the same dispose-safety
+  /// reasoning as #58/#85, extended to this narrower cross-frame race.
+  void _disposeAfterFrame(ui.Image? image) {
+    if (image == null) return;
+    SchedulerBinding.instance.addPostFrameCallback((_) => image.dispose());
   }
 
   @override
   void dispose() {
+    // Whole-service teardown: no concurrent frame/Picture recording can
+    // still be relying on this image once the provider tree itself is going
+    // away, so an immediate (not post-frame-deferred) dispose is safe here —
+    // same as `BeforeAfterView.dispose()`'s own `_before`/`_after` handling.
     _userImage?.dispose();
     super.dispose();
   }

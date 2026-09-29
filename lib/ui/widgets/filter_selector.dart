@@ -28,7 +28,13 @@ import '../../services/vision_filter_state.dart';
 /// `selectColorVision`/`deactivateColorVision` を経由し、`FilterService` と
 /// `VisionFilterState` の両方を明示的に更新する。
 class FilterSelector extends StatelessWidget {
-  const FilterSelector({super.key});
+  const FilterSelector({super.key, this.focusNode});
+
+  /// ウェルカムバナーの「ほかの見え方を選ぶ」からフォーカスを移すための外部
+  /// 注入 FocusNode（#78 レビュー S8。`FilterCatalogSelector` の `focusNode`
+  /// と同じパターン）。未指定なら通常の（フォーカス移動対象にならない）
+  /// ウィジェットとして振る舞う。
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -36,56 +42,59 @@ class FilterSelector extends StatelessWidget {
     return Consumer2<FilterService, VisionFilterState>(
       builder: (context, filterService, visionState, _) {
         final isColorQuickSelection = visionState.isColorQuickSelection;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: ColorVisionType.values.map((type) {
-                // "Normal vision" は「何も選択されていない」ことそのものを
-                // 表すチップなので、isColorQuickSelection ではなく
-                // selectedId で判定する（#60）。
-                final isSelected = type == ColorVisionType.none
-                    ? visionState.selectedId == null
-                    : isColorQuickSelection &&
-                        filterService.currentFilter == type;
+        return Focus(
+          focusNode: focusNode,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: ColorVisionType.values.map((type) {
+                  // "Normal vision" は「何も選択されていない」ことそのものを
+                  // 表すチップなので、isColorQuickSelection ではなく
+                  // selectedId で判定する（#60）。
+                  final isSelected = type == ColorVisionType.none
+                      ? visionState.selectedId == null
+                      : isColorQuickSelection &&
+                          filterService.currentFilter == type;
 
-                return FilterChip(
-                  label: Text(colorVisionTypeName(l10n, type)),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    if (selected) {
-                      selectColorVision(filterService, visionState, type);
-                    }
-                  },
-                  selectedColor: Colors.indigo.shade100,
-                  checkmarkColor: Colors.indigo.shade700,
-                  labelStyle: TextStyle(
-                    color: isSelected
-                        ? Colors.indigo.shade900
-                        : Colors.grey.shade700,
-                    fontWeight:
-                        isSelected ? FontWeight.bold : FontWeight.normal,
+                  return FilterChip(
+                    label: Text(colorVisionTypeName(l10n, type)),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      if (selected) {
+                        selectColorVision(filterService, visionState, type);
+                      }
+                    },
+                    selectedColor: Colors.indigo.shade100,
+                    checkmarkColor: Colors.indigo.shade700,
+                    labelStyle: TextStyle(
+                      color: isSelected
+                          ? Colors.indigo.shade900
+                          : Colors.grey.shade700,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton.icon(
+                    onPressed: isColorQuickSelection
+                        ? () =>
+                            deactivateColorVision(filterService, visionState)
+                        : null,
+                    icon: const Icon(Icons.clear),
+                    label: Text(l10n.clearFilter),
                   ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton.icon(
-                  onPressed: isColorQuickSelection
-                      ? () =>
-                          deactivateColorVision(filterService, visionState)
-                      : null,
-                  icon: const Icon(Icons.clear),
-                  label: Text(l10n.clearFilter),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         );
       },
     );

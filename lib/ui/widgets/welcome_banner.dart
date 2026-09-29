@@ -7,22 +7,29 @@ import 'image_source_picker.dart' show pickAndLoadUserImage;
 
 /// First-run empty-state banner (#78): shown once, points at the two things
 /// a first-time visitor can do next — pick a different way of seeing, or try
-/// it with their own photo. Dismissing it (the close button or either
-/// action) persists via `SettingsService.dismissWelcomeBanner` and it never
-/// reappears (`SettingsService.welcomeBannerDismissed`).
+/// it with their own photo. Dismissing it (the close button, or a
+/// successful action) persists via `SettingsService.dismissWelcomeBanner`
+/// and it never reappears (`SettingsService.welcomeBannerDismissed`).
 ///
-/// This is purely a guide/nudge, not a required step: both action buttons
-/// dismiss the banner once pressed (the filter chips and the sample/photo
-/// picker it points at are already visible on the same screen — no
-/// additional navigation to wire up), except the "try your photo" action
-/// also opens the file picker ([pickAndLoadUserImage], the exact same path
-/// `ImageSourcePicker`'s own button uses) so it's a real shortcut, not just
-/// a label.
+/// - "Choose another way of seeing" moves focus to the colour-vision chips
+///   ([colorVisionFocusNode], #78 レビュー S8) and dismisses — the chips are
+///   already visible on the same screen, so no navigation is needed, just a
+///   focus handoff.
+/// - "Try it with your photo" opens the file picker ([pickAndLoadUserImage],
+///   the exact same path `ImageSourcePicker`'s own button uses) and
+///   dismisses **only if a photo was actually loaded** (#78 レビュー Q3):
+///   cancelling the picker, or a decode failure, leaves the banner up so the
+///   person can try again.
 ///
 /// Colours come only from `colorScheme` roles (repo convention, no
 /// hardcoded values).
 class WelcomeBanner extends StatelessWidget {
-  const WelcomeBanner({super.key});
+  const WelcomeBanner({super.key, this.colorVisionFocusNode});
+
+  /// Focus target for "choose another way of seeing" (#78 レビュー S8) —
+  /// `home_screen.dart` passes the same `FocusNode` it gives `FilterSelector`.
+  /// `null` (e.g. in isolated widget tests) just skips the focus handoff.
+  final FocusNode? colorVisionFocusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -69,13 +76,16 @@ class WelcomeBanner extends StatelessWidget {
                   runSpacing: 8,
                   children: [
                     OutlinedButton(
-                      onPressed: settings.dismissWelcomeBanner,
+                      onPressed: () {
+                        colorVisionFocusNode?.requestFocus();
+                        settings.dismissWelcomeBanner();
+                      },
                       child: Text(l10n.welcomeBannerChooseOtherAction),
                     ),
                     FilledButton(
                       onPressed: () async {
-                        await pickAndLoadUserImage(context);
-                        if (context.mounted) {
+                        final loaded = await pickAndLoadUserImage(context);
+                        if (loaded && context.mounted) {
                           await settings.dismissWelcomeBanner();
                         }
                       },

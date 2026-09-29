@@ -52,7 +52,7 @@ class CpuVisionRenderer {
   CpuVisionRenderer._();
 
   /// [apply] の供給源。`before_after_view.dart` の `renderAfter` はこれ経由で
-  /// 呼ぶため production コードからも参照される（`sampleImageGenerator` /
+  /// 呼ぶため production コードからも参照される（`previewSourceImageLoader` /
   /// `afterImageRenderer` と同じ seam パターン、#58）。テストはこれをフェイクへ
   /// 差し替えて実ブリッジなしにマッピング契約を検証できる。production は
   /// そのまま既定値（[apply] 自身）を使う。

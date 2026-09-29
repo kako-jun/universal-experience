@@ -37,6 +37,12 @@ class _HomeScreenState extends State<HomeScreen> {
   /// ための FocusNode。検索欄が無い現状は、このカタログが `/` の唯一の対象。
   final FocusNode _catalogFocusNode = FocusNode(debugLabel: 'filterCatalog');
 
+  /// ウェルカムバナーの「ほかの見え方を選ぶ」（#78 レビュー S8）で色覚クイック
+  /// 選択のチップへフォーカスを移すための FocusNode。上の `_catalogFocusNode`
+  /// と同じパターン。
+  final FocusNode _colorVisionFocusNode =
+      FocusNode(debugLabel: 'colorVisionFilter');
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -105,6 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _filterService?.removeListener(_persistFilterState);
     _visionFilterStateForImageSource?.removeListener(_followRecommendedSample);
     _catalogFocusNode.dispose();
+    _colorVisionFocusNode.dispose();
     super.dispose();
   }
 
@@ -188,7 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     _buildHeaderSection(l10n),
                     const SizedBox(height: 24),
-                    const WelcomeBanner(),
+                    WelcomeBanner(colorVisionFocusNode: _colorVisionFocusNode),
                     const SizedBox(height: 8),
                     const WindowModePanel(),
                     const SizedBox(height: 24),
@@ -258,7 +265,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            const FilterSelector(),
+            FilterSelector(focusNode: _colorVisionFocusNode),
             const SizedBox(height: 16),
             Text(
               l10n.colorVisionSectionNote,

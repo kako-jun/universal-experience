@@ -23,6 +23,8 @@ import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 
+import '../test/support/sample_image_generator.dart';
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -60,7 +62,7 @@ void main() {
         // ただし sensus 側で比率定数（`*_MAX_RADIUS_RATIO`）が変わったり、
         // canonical サイズ自体を大きく下げたりすると再び no-op になり得る点は
         // 変わらないので、この定数に依存していることを忘れないこと。
-        final src = await BeforeAfterView.generateSampleImage(
+        final src = await generateSampleImage(
           BeforeAfterView.canonicalSampleSize,
         );
         addTearDown(src.dispose);
@@ -87,7 +89,7 @@ void main() {
 
   group('CpuVisionRenderer.apply(): protanopia の数値的な健全性 (#85 レビュー S7)', () {
     testWidgets('strength=0.0 は原画とバイト単位で一致する', (tester) async {
-      final src = await BeforeAfterView.generateSampleImage(
+      final src = await generateSampleImage(
         BeforeAfterView.canonicalSampleSize,
       );
       addTearDown(src.dispose);
@@ -106,7 +108,7 @@ void main() {
     });
 
     testWidgets('strength=1.0 と strength=0.6 は出力が異なる', (tester) async {
-      final src = await BeforeAfterView.generateSampleImage(
+      final src = await generateSampleImage(
         BeforeAfterView.canonicalSampleSize,
       );
       addTearDown(src.dispose);
@@ -131,7 +133,7 @@ void main() {
     });
 
     testWidgets('strength=1.0 で変化したピクセルの割合が下限を超える', (tester) async {
-      final src = await BeforeAfterView.generateSampleImage(
+      final src = await generateSampleImage(
         BeforeAfterView.canonicalSampleSize,
       );
       addTearDown(src.dispose);
@@ -176,7 +178,7 @@ void main() {
       // ことを実ブリッジで確かめる。
       const width = 96;
       const height = 64;
-      final src = await BeforeAfterView.generateSampleImage(width);
+      final src = await generateSampleImage(width);
       addTearDown(src.dispose);
       // generateSampleImage は正方形しか作れないので、非正方形の入力は
       // straight RGBA8 バッファを直接組み立てて作る（alpha は全て 255）。

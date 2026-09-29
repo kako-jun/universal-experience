@@ -785,34 +785,61 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   変わると `home_screen.dart` のリスナー（`_persistFilterState` と同じ
   subscribe-once パターン）が `followRecommendedSample` を呼び、そのフィルタの
   推奨サンプル（`kRecommendedSampleByFilterId`）に自動で切り替える — ただし
-  ユーザー画像を表示中、または手動でサンプルを選んだ後（`selectSample`）は
-  no-op になる（`resetToRecommended` で自動追従を再開）。ユーザー画像の
-  `ui.Image` は本状態が所有し、差し替え・`clearUserImage`・`dispose()` の
-  いずれでも確実に dispose する（#58/#85 と同じ規律）。`BeforeAfterView` は
-  `imageSource`（nullable）を受け取り、非 null なら
+  ユーザー画像を表示中、または手動でサンプルを選んだ後（`selectSample`。同じ
+  サンプルの選び直しは no-op、#78 レビュー nit）は no-op になる
+  （`resetToRecommended` で自動追従を再開）。
+  ユーザー画像の `ui.Image` は本状態が所有し、差し替え・`clearUserImage`・
+  `dispose()` のいずれでも確実に dispose する（#58/#85 と同じ規律）。ただし
+  差し替え・`clearUserImage` 時の dispose は同期的には行わず
+  `SchedulerBinding.addPostFrameCallback` で次フレームまで遅らせる（#78
+  レビュー S3）— `BeforeAfterView._rebuild` が `fitImageToSquare` でその
+  画像をまだ参照中（`Picture` に描画コマンドとして記録済みだが `toImage()`
+  のラスタライズ待ち）の可能性があるため。`dispose()`（サービス全体の
+  teardown）自体は同期的なまま
+  （並行する `Picture` recording が起きようがないため）。
+  `BeforeAfterView` は `imageSource`（必須パラメータ）を
   `loadPreviewSourceImage`/`previewSourceImageLoader`（サンプルは
   `rootBundle` からデコード、ユーザー画像はそのまま）→
   `lib/rendering/image_fit.dart` の `fitImageToSquare`（縦横比を保った
   レターボックス、中央クロップはしない — 余白の色はブリッジしにくい
-  `photophobia`/`night_blindness` 等への影響を避けた中間グレー固定）で
-  正準サイズへ収めてから既存の世代管理・dispose（#58/#85）に載せる。`null`
-  （production では到達しない legacy パス）は #78 以前からの色相グラデーション
-  （`generateSampleImage`/`sampleImageGenerator`）のまま — 既存 widget test群が
-  汎用のダミー正方形画像ファクトリとしてこれを使い続けられるようにしてある
+  `photophobia`/`night_blindness` 等への影響を避けた中間グレー固定。視野欠損系
+  フィルタ（glaucoma/tunnel_vision/hemianopia）を非正方形画像に適用すると、
+  周辺を暗くする効果がこのレターボックス余白にも均等にかかる — 余白も
+  「見えている画面の一部」として扱う設計）で正準サイズへ収めてから既存の
+  世代管理・dispose（#58/#85）に載せる。`_rebuild` は `widget.imageSource` を
+  冒頭で一度だけ `source` に固定し、読み込み・`_currentImageSource` の記録の
+  どちらにもこの値だけを使う（#78 レビュー M1）— 末尾で `widget.imageSource`
+  を再度読むと、読み込み中に親が別の source へ進んでいた場合に「実際に
+  読み込んだ画像」と「記録される source」が食い違い、以後の
+  `reuseBefore` 判定が新しい source への切替を誤ってスキップしてしまう
+  （`test/before_after_view_image_source_test.dart` の M1 回帰テスト参照）
 - `ImageSourcePicker`（`lib/ui/widgets/image_source_picker.dart`）:
   サンプルチップ・「画像を選ぶ」ボタン（`file_selector`）・drag & drop
-  （`desktop_drop` の `DropTarget`）をまとめた、`BeforeAfterView` を包む
-  プレゼンテーション層。ファイル選択・ドロップのどちらも最終的に
-  `loadUserImageBytes`（デコード → `ImageSourceState.setUserImage`）という
-  同じ 1 本の経路を通る。画像はデコードしてメモリ上の `ui.Image` に変換する
-  だけで、ディスクへの保存や外部送信は一切しない（#78）
+  （`desktop_drop` の `DropTarget`）・「画像を閉じる」ボタン（`clearUserImage`、
+  #78 レビュー nit）をまとめた、`BeforeAfterView` を包むプレゼンテーション層。
+  ファイル選択・ドロップのどちらも最終的に `loadUserImageFile`
+  （サイズ確認 → デコード → `ImageSourceState.setUserImage`）という同じ 1 本の
+  経路を通る（#78 レビュー S2: 取得からデコードまでを単一の try/catch に
+  収め、どこで失敗しても同じ `imageSourcePickFailed` SnackBar に落ちる）。
+  `loadUserImageFile` は `XFile.length()` を読んでから
+  `kMaxUserImageFileBytes`（50MB）を超える場合はファイル本体を読まずに
+  拒否し（#78 レビュー S1）、`decodeUserImageBytes`
+  （`lib/rendering/image_fit.dart`。`ui.instantiateImageCodecWithSize` で
+  `kUserImageMaxDimension`（2048px）を超える長辺をデコード時にダウンスケール
+  する）でデコードする。画像はメモリ上の `ui.Image` に変換するだけで、
+  ディスクへの保存や外部送信は一切しない（#78）
 - `WelcomeBanner`（`lib/ui/widgets/welcome_banner.dart`）: 初回起動時だけ出す
   案内バナー（#78）。表示条件・恒久的な非表示は `SettingsService.
   welcomeBannerDismissed`/`dismissWelcomeBanner()` に永続化する。初期選択
   自体（deuteranomaly を推奨強度で）は `main.dart` の `buildRootApp()` が
   `SettingsService.isFirstRun`（`filterType` が一度も永続化されていないかで
   判定 — 明示的な「Normal vision」選択との区別のため専用の永続化キーは
-  持たない）を見て一度だけシードする
+  持たない）を見て一度だけシードする。「ほかの見え方を選ぶ」は
+  `home_screen.dart` が `FilterSelector` と共有する `FocusNode` へ
+  `requestFocus()` してから dismiss する（#78 レビュー S8）。「自分の画像で
+  試す」は `pickAndLoadUserImage` の成否（`bool`）を見て、キャンセル/失敗では
+  dismiss しない（#78 レビュー Q3。ピッカーをキャンセルしただけなのにバナーが
+  消えると再度の呼び出し手段を失うため）
 
 ### 過去の設計: system-wide プラグイン（#13 で撤去）
 
@@ -898,16 +925,25 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
 - **プレビュー原画（#78）**: `sample_catalog_test.dart`（カタログ完全性・
   `assets/samples/*.png` が `rootBundle` 経由でデコードでき正準サイズと一致
   すること・`kRecommendedSampleByFilterId` が全 30 catalog id を過不足なく
-  カバーすること）、`image_source_state_test.dart`（自動追従/手動選択の相互
-  排他・ユーザー画像の世代管理と dispose）、`image_fit_test.dart`
-  （レターボックスの余白・source を dispose しない契約）、
+  カバーすること・#78 レビュー S6 の割り当て変更）、`image_source_state_test.dart`
+  （自動追従/手動選択の相互排他・同じサンプルの再選択が no-op であること
+  （nit）・ユーザー画像の世代管理と dispose・S3 の遅延 dispose を
+  `SchedulerBinding.scheduleFrame()` を明示的に呼んで検証）、
+  `image_fit_test.dart`（レターボックスの余白・source を dispose しない契約）、
   `before_after_view_image_source_test.dart`（`imageSource` 変更時の
-  世代管理・再利用、#58/#85 と同じ規律を新しい軸で）、
-  `image_source_picker_test.dart`（file_selector/desktop_drop は実
-  platform channel を要するため flutter test では踏めない —
-  `pickImageBytes` seam のフェイクと、`DropTarget.onDragDone` を
-  ウィジェットツリーから見つけて合成 `DropDoneDetails` で直接呼ぶ手法で
-  実ブリッジなしにデコード経路を検証する）、`welcome_banner_test.dart`、
+  世代管理・再利用、#58/#85 と同じ規律を新しい軸で。M1 の回帰テストは
+  `Completer` で読み込みを保留したまま source を切り替え、最終的に新しい
+  source が読み込まれることを検証）、`image_source_picker_test.dart`
+  （file_selector/desktop_drop は実 platform channel を要するため
+  flutter test では踏めない — `pickImageFile` seam のフェイクと、
+  `DropTarget.onDragDone` をウィジェットツリーから見つけて合成
+  `DropDoneDetails` で直接呼ぶ手法で実ブリッジなしにデコード経路を検証する。
+  S1（50MB 超はファイル本体を読まずに拒否）・S2（取得からデコードまでが
+  単一の try/catch であること、`length()` 自体の失敗も同じ経路で拾われる
+  こと）の専用テストを含む）、`welcome_banner_test.dart`（S8 のフォーカス
+  移動・Q3 のキャンセル時 dismiss しない契約）、`home_screen_image_source_test.dart`
+  （S7: フィルタ切替で `selectedSampleId` が追従すること。
+  `home_screen_preview_*.dart` とは別ファイルにしてコンフリクトを避けている）、
   `first_run_seed_test.dart`（`buildRootApp()` の初回シードのみを狙い撃ちで
   検証。共有トップレベル singleton を直接動かすため `tearDown` で明示的に
   ニュートラル状態へ戻す）が担う
