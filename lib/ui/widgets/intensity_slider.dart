@@ -50,7 +50,10 @@ class IntensitySlider extends StatelessWidget {
             Slider(
               value: filterService.intensity,
               onChanged: isEnabled
-                  ? (value) => filterService.setIntensity(value)
+                  ? (value) {
+                      visionState.setBypassed(false);
+                      filterService.setIntensity(value);
+                    }
                   : null,
               min: 0.0,
               max: 1.0,

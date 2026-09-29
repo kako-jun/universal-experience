@@ -72,6 +72,18 @@ void main() {
       expect(visionState.strength, 1.0);
     });
 
+    test('色覚クイック選択で bypassed=true でも呼べば解除される', () {
+      final filterService = FilterService();
+      final visionState = VisionFilterState();
+      selectColorVision(filterService, visionState, ColorVisionType.protanopia);
+      visionState.setBypassed(true);
+      expect(visionState.bypassed, isTrue);
+
+      adjustPreviewStrength(visionState, filterService, kKeyboardStrengthStep);
+
+      expect(visionState.bypassed, isFalse);
+    });
+
     test('advanced 選択なら VisionFilterState.strength を動かす', () {
       final filterService = FilterService();
       final visionState = VisionFilterState();

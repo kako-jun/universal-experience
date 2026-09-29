@@ -55,6 +55,7 @@ void adjustPreviewStrength(
   double delta,
 ) {
   if (visionState.selectedId == null) return;
+  visionState.setBypassed(false);
   if (visionState.isColorQuickSelection) {
     filterService.setIntensity((filterService.intensity + delta).clamp(0.0, 1.0));
   } else {

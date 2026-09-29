@@ -99,4 +99,64 @@ void main() {
     // テストバインディングが失敗させる。確定させておく。
     await filterService.flush();
   });
+
+  testWidgets(
+      '強度スライダーをドラッグすると VisionFilterState.bypassed が解除される（#63）',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1200, 4000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final settings = SettingsService();
+    await settings.load();
+    final filterService = FilterService();
+    final visionState = VisionFilterState();
+    selectColorVision(filterService, visionState, ColorVisionType.protanopia);
+    visionState.setBypassed(true);
+    expect(visionState.bypassed, isTrue);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<SettingsService>.value(value: settings),
+          ChangeNotifierProvider<FilterService>.value(value: filterService),
+          ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
+          ChangeNotifierProvider<LoupeWindowController>.value(
+            value: LoupeWindowController(),
+          ),
+          Provider<WindowModeUiContext>.value(
+            value: const WindowModeUiContext(
+              trayAvailable: false,
+              hotkeyStatus: HotkeyStatus(),
+            ),
+          ),
+        ],
+        child: const MaterialApp(
+          localizationsDelegates: [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: HomeScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // IntensitySlider（色覚クイック選択の強度スライダー、#60）が唯一の Slider。
+    final sliderFinder = find.byType(Slider);
+    await tester.scrollUntilVisible(sliderFinder, 80);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(sliderFinder, findsOneWidget);
+
+    await tester.drag(sliderFinder, const Offset(60, 0));
+    await tester.pump();
+
+    expect(visionState.bypassed, isFalse);
+
+    await filterService.flush();
+  });
 }
