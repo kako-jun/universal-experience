@@ -52,6 +52,26 @@
 > `visionFilterState` の変化を listener で受けて `refresh()` する（#60。
 > ウィンドウ内 UI での選択もトレイのチェックマークに反映されるようにする
 > ため。listener は `TrayService.dispose()` で外す）。
+>
+> **追補（#76 / #77）**: 受診喚起の緊急度（`Urgency`）・条件付きの上振れ
+> （`urgency_escalation()`）・推奨強度（`recommended_strength()`）は
+> sensus-core 0.6.1 が `Filter`/`HearingFilter` に追加した API を唯一の正本
+> にする。ue 独自の段階分類（旧 `vision_filter_catalog.dart` の
+> `VisionFilterUrgency`）は撤去した。`FilterParamPanel` は段階名を出さず、
+> 喚起文だけを `ColorScheme` ロール（`tertiaryContainer`/`errorContainer`/
+> `surfaceContainerHighest`）で塗った専用ブロックに表示し、末尾に「一般的な
+> 案内であり、診断ではない」を必ず添える。`VisionFilterState` はフィルタ id
+> ごとに強度・パラメータを記憶し（`_strengthById`/`_paramsById`）、初めて
+> 選ぶフィルタは推奨強度から始まる。体験プリセットの強度も #60 の「強制的に
+> 1.0」から「常に推奨値」へ置き換えた。`#[frb(sync)]` 関数は native lib を
+> 要求しプレーンな `flutter test` から呼べないため、`lib/services/
+> vision_filter_metadata.dart` の provider seam（`experiencesProvider` 等の
+> 既存 seam と異なり、複数ファイルから正規に production 利用されるため
+> `@visibleForTesting` は付けない）を経由し、widget/unit test は
+> `test/support/vision_filter_metadata_fixture.dart` のフィクスチャに
+> 差し替える。実ブリッジとの一致は
+> `integration_test/vision_filter_urgency_parity_test.dart` が検証する。
+> 詳細は `docs/sensus-integration.md` §10。
 
 ## ルーペ窓挙動 (#14)
 

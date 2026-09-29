@@ -38,7 +38,9 @@ lib/
 │   ├── preview_selection.dart       # プレビュー強度の出どころを一本化する判定（#60/#63）
 │   ├── settings_service.dart
 │   ├── tray_service.dart            # タスクトレイ
-│   └── vision_filter_state.dart
+│   ├── vision_filter_metadata.dart  # urgency/urgency_escalation/recommended_strength の
+│   │                                 # provider seam（sensus ブリッジが唯一の正本、#76/#77）
+│   └── vision_filter_state.dart     # フィルタ id ごとの強度・パラメータの記憶（#77）
 ├── src/rust/                        # flutter_rust_bridge 生成コード（sensus-core 連携）
 └── ui/
     ├── screens/home_screen.dart

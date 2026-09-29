@@ -1,7 +1,7 @@
 # sensus 連携 — シェーダ方言調査と統合方針
 
 感覚障害シミュレーションのアルゴリズム正本は別 crate
-[`sensus-core`](https://crates.io/crates/sensus-core)（Rust, crates.io 公開, v0.6.0）に
+[`sensus-core`](https://crates.io/crates/sensus-core)（Rust, crates.io 公開, v0.6.1）に
 一元化する。universal-experience（ue）は GLSL や行列・半径式を**再実装しない**。
 
 このドキュメントは Issue #7（sensus 連携 1/3）のスコープのうち「シェーダ方言の
@@ -569,3 +569,56 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
     （GPU 経路は現状どこからも呼ばれないため、この差が実際に見えることもない。
     将来ライブ画面キャプチャで GPU 経路が使われる際は従来どおり maxDiff≤8 の
     差が生じうる）。
+
+---
+
+## 10. フィルタ単位のメタデータ API — 受診喚起・推奨強度の単一正本化（#76 / #77）
+
+`sensus-core` を 0.6.0 → 0.6.1 に上げた。追加された `Filter::urgency()` /
+`Filter::urgency_escalation()` / `Filter::recommended_strength()` /
+`Filter::citation()` / `Filter::limitations()`（`HearingFilter` も urgency 系
+2 つを持つ）を `rust/src/api/sensus_bridge.rs` の薄いラッパー（
+`vision_filter_urgency` / `vision_filter_urgency_escalation` /
+`vision_filter_recommended_strength` / `vision_filter_citation` /
+`vision_filter_limitations` / `hearing_filter_urgency` /
+`hearing_filter_urgency_escalation`）で FRB 公開した。
+
+- **#76: 受診喚起の唯一の正本**。ue 独自だった `VisionFilterUrgency`
+  （`vision_filter_catalog.dart` の 4 段階 enum、「初版・要医療監修」と自ら
+  書いていた便宜的な値）は撤去した。プリセット（`Experience.urgency`）も
+  advanced カタログ（`FilterParamPanel`）も、常にこのブリッジ関数を通じて
+  同じ `sensus_core::Urgency` を参照する。旧仕様では BPPV がプリセット側
+  （sensus 由来）で「喚起なし」、advanced 側（ue 独自値）で「早めに受診」と
+  矛盾していたが、正本が 1 つになったことで解消した（`bppv_urgency_matches_
+  between_experience_and_filter`、rust 側テスト）。
+  UI（`FilterParamPanel._buildConsultBlock`）は段階名（「緊急度：高」）を一切
+  出さず、喚起文だけを本文サイズ以上の専用ブロックで表示する。色は
+  `ColorScheme` のロールのみ（`tertiaryContainer`/`errorContainer`/
+  `surfaceContainerHighest`）を使う。`urgency_escalation()` の条件文
+  （英語）は `l10n_extensions.dart` の `escalationConditionText` で ja/en の
+  対応表を引き、訳が無ければ英語のままフォールバックする。喚起の末尾には
+  「一般的な案内であり、診断ではない」（`consultDisclaimer`）を必ず添える。
+- **#77: 推奨強度の唯一の正本**。`VisionFilterState` はフィルタ id ごとに
+  strength/payload を記憶する（`_strengthById` / `_paramsById`）。初めて
+  選ぶフィルタは `recommended_strength()` の値から始まり（旧仕様は全フィルタ
+  一律 1.0 固定で、`tunnel_vision` を初めて選ぶとほぼ画面が真っ黒になっていた
+  — #51 注記1）、以後はフィルタを切り替えても保持される。「推奨値に戻す」
+  ボタン（`resetToRecommended()`）で強度・パラメータの両方を戻せる。体験
+  プリセット（`selectPreset`）は #60 で入れていた「強制的に 1.0 に戻す」を
+  「常に推奨値に戻す」へ置き換えた。色覚のクイック選択（#57）は従来どおり
+  `FilterService`/`recommendedStrength(ColorVisionType)` のタイプ別記憶を使う
+  （sensus 0.6.1 の CVD 3 型の推奨値は 1.0、-omaly 相当の
+  `kAnomalyDefaultSeverity` は 0.6 のままで整合している）。
+- **FFI 制約と provider seam**: `#[frb(sync)]` 関数は native lib を要求し、
+  ネイティブブリッジ未初期化のプレーンな `flutter test` からは呼べない
+  （§7 と同じ制約）。`experiencesProvider` 等の既存 seam は宣言ファイル
+  自身からしか production 利用されない前提で `@visibleForTesting` を付けて
+  いたが、今回のメタデータ seam（`lib/services/vision_filter_metadata.dart`
+  の `visionFilterUrgencyProvider` 等）は `VisionFilterState` /
+  `FilterParamPanel` / `before_after_view.dart` の複数ファイルから正規に
+  production 利用されるため、意図的に `@visibleForTesting` を付けていない。
+  widget/unit test は `test/support/vision_filter_metadata_fixture.dart` の
+  フィクスチャ（既定値は旧挙動と同じ urgency=none・strength=1.0）に差し替える。
+  実ブリッジとの一致自体は
+  `integration_test/vision_filter_urgency_parity_test.dart` が検証する。
+- **citation() / limitations()**: 公開のみ行い、UI 配線は #80 のスコープ。
