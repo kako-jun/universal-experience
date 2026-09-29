@@ -112,4 +112,74 @@ void main() {
       }
     });
   });
+
+  group('isFirstRun (#78)', () {
+    test('filterType が一度も永続化されていなければ true', () async {
+      SharedPreferences.setMockInitialValues({});
+      final settings = SettingsService();
+      await settings.load();
+      expect(settings.isFirstRun, isTrue);
+    });
+
+    test('filterType が永続化済みなら false（none への明示選択も含む）', () async {
+      SharedPreferences.setMockInitialValues({
+        SettingsService.keyFilterType: ColorVisionType.none.name,
+      });
+      final settings = SettingsService();
+      await settings.load();
+      expect(settings.isFirstRun, isFalse);
+    });
+
+    test('setFilterType 後、別インスタンスで load すると isFirstRun は false になる',
+        () async {
+      SharedPreferences.setMockInitialValues({});
+      final a = SettingsService();
+      await a.load();
+      expect(a.isFirstRun, isTrue);
+      await a.setFilterType(ColorVisionType.deuteranomaly);
+
+      final b = SettingsService();
+      await b.load();
+      expect(b.isFirstRun, isFalse);
+    });
+  });
+
+  group('welcomeBannerDismissed / dismissWelcomeBanner (#78)', () {
+    test('既定は false', () async {
+      SharedPreferences.setMockInitialValues({});
+      final settings = SettingsService();
+      await settings.load();
+      expect(settings.welcomeBannerDismissed, isFalse);
+    });
+
+    test('dismissWelcomeBanner は notify し、別インスタンスの load で永続化が復元される',
+        () async {
+      SharedPreferences.setMockInitialValues({});
+      final a = SettingsService();
+      await a.load();
+      var notified = 0;
+      a.addListener(() => notified++);
+
+      await a.dismissWelcomeBanner();
+      expect(a.welcomeBannerDismissed, isTrue);
+      expect(notified, 1);
+
+      final b = SettingsService();
+      await b.load();
+      expect(b.welcomeBannerDismissed, isTrue);
+    });
+
+    test('既に dismissed なら再度呼んでも notify も書き込みもしない', () async {
+      SharedPreferences.setMockInitialValues({
+        SettingsService.keyWelcomeBannerDismissed: true,
+      });
+      final settings = SettingsService();
+      await settings.load();
+      var notified = 0;
+      settings.addListener(() => notified++);
+
+      await settings.dismissWelcomeBanner();
+      expect(notified, 0, reason: '既に true なので no-op であるべき');
+    });
+  });
 }

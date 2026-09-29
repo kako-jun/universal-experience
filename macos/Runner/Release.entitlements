@@ -4,5 +4,8 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
+	<!-- ユーザー画像の読み込み (#78)。DebugProfile.entitlements と同じ理由。 -->
+	<key>com.apple.security.files.user-selected.read-only</key>
+	<true/>
 </dict>
 </plist>

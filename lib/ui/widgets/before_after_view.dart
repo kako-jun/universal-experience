@@ -8,8 +8,11 @@ import 'package:flutter/services.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/disability_type.dart';
+import '../../models/preview_image_source.dart';
+import '../../models/sample_catalog.dart';
 import '../../models/vision_filter_catalog.dart';
 import '../../rendering/cpu_vision_renderer.dart';
+import '../../rendering/image_fit.dart';
 import '../../services/export_service.dart';
 import '../../services/vision_filter_metadata.dart';
 import '../../src/rust/api/sensus_bridge.dart';
@@ -19,6 +22,14 @@ import '../../src/rust/api/sensus_bridge.dart';
 /// 実体は [BeforeAfterView.generateSampleImage]。widget test が世代管理
 /// （古い結果は破棄され最新だけが残ること）を検証するために、応答が遅れる
 /// フェイクへ差し替えられるようにするための seam（#58）。
+///
+/// #78: これは [BeforeAfterView.imageSource] が `null` のときだけ使う legacy
+/// パス（この widget の最も古いテスト群が使う、意味を持たない色相グラデー
+/// ション）。production は home_screen.dart が常に非 null の `imageSource`
+/// を渡すため、実際にはもう到達しない — 既存の widget test 群
+/// （`sampleImageGenerator`/`generateSampleImage` を汎用のダミー正方形画像
+/// ファクトリとして使っているものも多い）をそのまま動かし続けるために残して
+/// ある。`imageSource` が非 null のときの供給源は [previewSourceImageLoader]。
 typedef SampleImageGenerator = Future<ui.Image> Function(int size);
 
 /// サンプル画像生成の供給源（テストで差し替え可能）。既定は
@@ -26,6 +37,22 @@ typedef SampleImageGenerator = Future<ui.Image> Function(int size);
 /// fixture 注入専用なので、外部からの書き換えを抑止するため `@visibleForTesting`。
 @visibleForTesting
 SampleImageGenerator sampleImageGenerator = BeforeAfterView.generateSampleImage;
+
+/// [_BeforeAfterViewState] が内部で使う「before 画像を [PreviewImageSource]
+/// から読み込む」ステップの型（#78）。実体は
+/// [BeforeAfterView.loadPreviewSourceImage]。[sampleImageGenerator] と同じ
+/// パターンの widget test 用 seam。[BeforeAfterView.imageSource] が非 null の
+/// ときだけ使う（null のときの legacy パスは [sampleImageGenerator] のまま）。
+typedef PreviewSourceImageLoader = Future<ui.Image> Function(
+  PreviewImageSource source,
+  int size,
+);
+
+/// [PreviewImageSource] からの画像読み込みの供給源（テストで差し替え可能）。
+/// 既定は [BeforeAfterView.loadPreviewSourceImage]。
+@visibleForTesting
+PreviewSourceImageLoader previewSourceImageLoader =
+    BeforeAfterView.loadPreviewSourceImage;
 
 /// [_BeforeAfterViewState] が内部で使う after 画像描画ステップの型。
 ///
@@ -102,6 +129,7 @@ class BeforeAfterView extends StatefulWidget {
     required this.strength,
     this.colorVisionType,
     this.sampleSize,
+    this.imageSource,
   })  : assert(
           (filter == null) == (filterId == null),
           'filter and filterId must both be null or both be set',
@@ -146,6 +174,18 @@ class BeforeAfterView extends StatefulWidget {
   /// [canonicalSampleSize] for why). Tests that want a small, fast image
   /// regardless of the canonical size pass an explicit (smaller) value here.
   final int? sampleSize;
+
+  /// What the *before* pane should render (#78): one of the built-in sample
+  /// scenes or a user-loaded image. `null` (the default) keeps the pre-#78
+  /// behaviour — the fixed programmatic hue-gradient sample via
+  /// [generateSampleImage]/[sampleImageGenerator] — which only legacy tests
+  /// still rely on; `home_screen.dart` always passes a non-null value in
+  /// production (`ImageSourceState.current`). When non-null,
+  /// [loadPreviewSourceImage]/[previewSourceImageLoader] supplies the image
+  /// instead, fit into the canonical square via
+  /// `lib/rendering/image_fit.dart`'s letterbox (see that file for why
+  /// letterbox over crop).
+  final PreviewImageSource? imageSource;
 
   /// The fixed resolution (square side, pixels) the CPU preview renders at
   /// when [sampleSize] is `null` (#85 レビュー S4).
@@ -237,6 +277,40 @@ class BeforeAfterView extends StatefulWidget {
     }
   }
 
+  /// Loads the canonical-size *before* image for [source] (#78): a built-in
+  /// sample scene (decoded from `assets/samples/`) or a user-loaded image.
+  /// Either way the result is fit into a `size`×`size` square via
+  /// [fitImageToSquare] (letterbox — see that function's doc), so callers
+  /// never need to special-case the source's original aspect ratio.
+  ///
+  /// For [SamplePreviewImageSource], the asset bytes are decoded into a
+  /// transient [ui.Image] that's disposed immediately after fitting (it's
+  /// never shared/cached — [fitImageToSquare] copies pixels into a brand new
+  /// image). For [UserPreviewImageSource], [UserPreviewImageSource.image] is
+  /// only *read*, never disposed here (`ImageSourceState` owns it — see
+  /// `PreviewImageSource`'s doc for the full ownership contract).
+  static Future<ui.Image> loadPreviewSourceImage(
+    PreviewImageSource source,
+    int size,
+  ) async {
+    switch (source) {
+      case SamplePreviewImageSource(:final sampleId):
+        final entry = kSampleCatalogById[sampleId];
+        if (entry == null) {
+          throw ArgumentError('Unknown sample id: $sampleId');
+        }
+        final data = await rootBundle.load(entry.assetPath);
+        final decoded = await decodeImageBytes(data.buffer.asUint8List());
+        try {
+          return await fitImageToSquare(decoded, size);
+        } finally {
+          decoded.dispose();
+        }
+      case UserPreviewImageSource(:final image):
+        return fitImageToSquare(image, size);
+    }
+  }
+
   /// Produces the *after* image for [filter] from [source] at [strength].
   ///
   /// `null` [filter] (nothing selected) returns [source] unchanged (no
@@ -280,6 +354,15 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// changes if [BeforeAfterView.sampleSize] itself changes (test-only in
   /// practice) — production always uses [BeforeAfterView.canonicalSampleSize].
   int? _currentSampleSize;
+
+  /// The [PreviewImageSource] (#78) that actually produced the
+  /// currently-held [_before]. `null` until the first generation completes,
+  /// and also stays `null` for the entire legacy-gradient lifetime of a
+  /// widget whose [BeforeAfterView.imageSource] is `null` — so the
+  /// [reuseBefore] check in [_rebuild] (`_currentImageSource ==
+  /// widget.imageSource`) trivially holds across re-renders for that legacy
+  /// path, unchanged from pre-#78 behaviour.
+  PreviewImageSource? _currentImageSource;
 
   /// The `(filterId, colorVisionType, strength)` that actually produced the
   /// currently-held [_after] (#85 レビュー S8, #60). `null` until the
@@ -349,7 +432,8 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         oldWidget.filterId != widget.filterId ||
         oldWidget.colorVisionType != widget.colorVisionType ||
         oldWidget.strength != widget.strength ||
-        oldWidget.sampleSize != widget.sampleSize) {
+        oldWidget.sampleSize != widget.sampleSize ||
+        oldWidget.imageSource != widget.imageSource) {
       _scheduleRebuild(_effectiveSampleSize);
     }
   }
@@ -421,7 +505,9 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   Future<void> _rebuild(int sampleSize) async {
     if (!mounted) return;
     final generation = ++_generation;
-    final reuseBefore = _before != null && _currentSampleSize == sampleSize;
+    final reuseBefore = _before != null &&
+        _currentSampleSize == sampleSize &&
+        _currentImageSource == widget.imageSource;
     setState(() => _loading = true);
 
     final ui.Image before;
@@ -429,7 +515,12 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       before = _before!;
     } else {
       try {
-        before = await sampleImageGenerator(sampleSize);
+        // #78: imageSource が非 null なら供給源をそちらへ切り替える。null
+        // （production では home_screen.dart が渡さない legacy パス）は従来
+        // 通り sampleImageGenerator を使う。
+        before = widget.imageSource == null
+            ? await sampleImageGenerator(sampleSize)
+            : await previewSourceImageLoader(widget.imageSource!, sampleSize);
       } catch (e, st) {
         // #58 レビュー nit-1: 静かに握りつぶさず Flutter のエラー報告経路に
         // 乗せる（crash reporting 等が拾えるように）。
@@ -513,6 +604,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       _afterStrength = widget.strength; // #85 レビュー S8
       _afterFilter = widget.filter; // #76
       _currentSampleSize = sampleSize;
+      _currentImageSource = widget.imageSource; // #78
       _loading = false;
       _failed = false; // #58 レビュー SHOULD-1: 成功したら失敗表示を解除する。
     });

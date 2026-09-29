@@ -185,5 +185,27 @@
   "hotkeyToggleLoupeVisibility": "ルーペ窓の表示/非表示",
   "hotkeyRegistrationFailed": "登録に失敗しました",
   "hotkeyRegistrationCaveat": "登録に成功したと表示されていても、OS のセッションによっては実際には発火しないことがあります（一部の Linux Wayland セッションなど）。",
-  "bypassedBadgeLabel": "原画表示中"
+  "bypassedBadgeLabel": "原画表示中",
+
+  "sampleRouteMap": "路線図",
+  "sampleChart": "グラフ",
+  "sampleTrafficSigns": "信号・標識",
+  "sampleInfoBoard": "案内板",
+  "sampleFruitStand": "果物",
+  "sampleNightScene": "夜景",
+  "sampleDepthLandscape": "風景",
+
+  "imageSourceSectionLabel": "プレビュー画像",
+  "imageSourceYourPhotoChipLabel": "自分の画像",
+  "imageSourcePickButton": "画像を選ぶ…",
+  "imageSourceDropHint": "または画像をドロップ",
+  "imageSourceResetToRecommended": "おすすめに戻す",
+  "imageSourceViewYourPhoto": "自分の画像を見る",
+  "imageSourcePickFailed": "その画像を読み込めませんでした。別のファイルをお試しください。",
+
+  "welcomeBannerTitle": "はじめての方へ",
+  "welcomeBannerBody": "よくある色覚の見え方（2型3色覚）を推奨の強さで最初に表示しています。ほかの見え方を選んだり、自分の画像で試したりできます。",
+  "welcomeBannerChooseOtherAction": "ほかの見え方を選ぶ",
+  "welcomeBannerTryPhotoAction": "自分の画像で試す",
+  "welcomeBannerDismiss": "閉じる"
 }

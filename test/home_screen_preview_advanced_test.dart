@@ -21,6 +21,7 @@ import 'package:universal_experience/main.dart' show WindowModeUiContext;
 import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/hotkey_service.dart';
+import 'package:universal_experience/services/image_source_state.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
@@ -68,6 +69,9 @@ void main() {
           ChangeNotifierProvider<SettingsService>.value(value: settings),
           ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
+          ChangeNotifierProvider<ImageSourceState>(
+            create: (_) => ImageSourceState(),
+          ),
           ChangeNotifierProvider<LoupeWindowController>.value(
             value: LoupeWindowController(),
           ),
@@ -141,6 +145,9 @@ void main() {
           ChangeNotifierProvider<SettingsService>.value(value: settings),
           ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
+          ChangeNotifierProvider<ImageSourceState>(
+            create: (_) => ImageSourceState(),
+          ),
           ChangeNotifierProvider<LoupeWindowController>.value(
             value: LoupeWindowController(),
           ),
@@ -195,6 +202,9 @@ void main() {
           ChangeNotifierProvider<SettingsService>.value(value: settings),
           ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
+          ChangeNotifierProvider<ImageSourceState>(
+            create: (_) => ImageSourceState(),
+          ),
           ChangeNotifierProvider<LoupeWindowController>.value(
             value: LoupeWindowController(),
           ),
@@ -288,6 +298,9 @@ void main() {
           ChangeNotifierProvider<SettingsService>.value(value: settings),
           ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
+          ChangeNotifierProvider<ImageSourceState>(
+            create: (_) => ImageSourceState(),
+          ),
           ChangeNotifierProvider<LoupeWindowController>.value(
             value: LoupeWindowController(),
           ),
@@ -379,6 +392,9 @@ void main() {
           ChangeNotifierProvider<SettingsService>.value(value: settings),
           ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
+          ChangeNotifierProvider<ImageSourceState>(
+            create: (_) => ImageSourceState(),
+          ),
           ChangeNotifierProvider<LoupeWindowController>.value(
             value: LoupeWindowController(),
           ),

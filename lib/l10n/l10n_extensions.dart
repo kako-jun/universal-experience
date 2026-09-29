@@ -101,6 +101,31 @@ String visionCategoryName(
   }
 }
 
+/// サンプル画像集（#78、`lib/models/sample_catalog.dart`）の id → 表示名を
+/// 解決する。[visionFilterName] と同じパターン（id は識別子のみ、文言は
+/// ここに集約）。未知の id は id をそのまま返す（`test/i18n_test.dart` が
+/// 全 [kSampleCatalog] id をフォールバックなしで解決できることを検証する）。
+String sampleImageName(AppLocalizations l10n, String id) {
+  switch (id) {
+    case 'route_map':
+      return l10n.sampleRouteMap;
+    case 'chart':
+      return l10n.sampleChart;
+    case 'traffic_signs':
+      return l10n.sampleTrafficSigns;
+    case 'info_board':
+      return l10n.sampleInfoBoard;
+    case 'fruit_stand':
+      return l10n.sampleFruitStand;
+    case 'night_scene':
+      return l10n.sampleNightScene;
+    case 'depth_landscape':
+      return l10n.sampleDepthLandscape;
+    default:
+      return id;
+  }
+}
+
 /// Advanced カタログ id（snake_case）→ フィルタ表示名を解決する。
 ///
 /// id は sensus shaders 名と一致する安定識別子。表示名はここで i18n に写像する。

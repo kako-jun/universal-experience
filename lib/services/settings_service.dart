@@ -28,15 +28,36 @@ class SettingsService extends ChangeNotifier {
   static const String keyThemeMode = 'settings.themeMode';
   static const String keyFilterType = 'settings.filterType';
   static const String keyLocale = 'settings.locale';
+  /// #78: whether the first-run welcome banner has been dismissed.
+  static const String keyWelcomeBannerDismissed =
+      'settings.welcomeBannerDismissed';
 
   SharedPreferences? _prefs;
 
   ThemeMode _themeMode = ThemeMode.system;
   ColorVisionType _filterType = ColorVisionType.none;
   Locale? _locale;
+  bool _welcomeBannerDismissed = false;
+  bool _isFirstRun = false;
 
   ThemeMode get themeMode => _themeMode;
   ColorVisionType get filterType => _filterType;
+
+  /// Whether the first-run welcome banner (#78) has been dismissed. Starts
+  /// `false` and never resets — [dismissWelcomeBanner] is a one-way switch.
+  bool get welcomeBannerDismissed => _welcomeBannerDismissed;
+
+  /// True if [keyFilterType] has never been persisted — i.e. this is a
+  /// genuinely first launch, as opposed to a previous explicit "Normal
+  /// vision" (none) pick, which also leaves [filterType] at its `none`
+  /// default but *does* persist the key (#78).
+  ///
+  /// `main.dart`'s `buildRootApp` uses this to seed the deuteranomaly default
+  /// selection exactly once: on a first launch it seeds deuteranomaly instead
+  /// of [filterType] and immediately persists that choice (via
+  /// [setFilterType]), so [isFirstRun] is false on every subsequent launch —
+  /// no separate persisted flag is needed for this seeding decision.
+  bool get isFirstRun => _isFirstRun;
 
   /// The chosen UI language, or null to follow the system locale (#18).
   ///
@@ -57,6 +78,7 @@ class SettingsService extends ChangeNotifier {
     }
 
     final filterName = prefs.getString(keyFilterType);
+    _isFirstRun = filterName == null; // #78: see isFirstRun's doc.
     if (filterName != null) {
       _filterType = _filterTypeFromName(filterName);
     }
@@ -65,6 +87,9 @@ class SettingsService extends ChangeNotifier {
     if (localeCode != null && localeCode.isNotEmpty) {
       _locale = Locale(localeCode);
     }
+
+    _welcomeBannerDismissed =
+        prefs.getBool(keyWelcomeBannerDismissed) ?? false;
 
     notifyListeners();
   }
@@ -80,6 +105,11 @@ class SettingsService extends ChangeNotifier {
   Future<void> setFilterType(ColorVisionType type) async {
     if (type == _filterType) return;
     _filterType = type;
+    // #78: persisting any filterType means this is no longer a first run,
+    // in-memory as well as on disk — covers `buildRootApp`'s first-run seed
+    // (isFirstRun's own getter would otherwise stay stale/true until the
+    // next `load()`, since it's only computed there).
+    _isFirstRun = false;
     notifyListeners();
     final prefs = _prefs ??= await SharedPreferences.getInstance();
     await prefs.setString(keyFilterType, type.name);
@@ -99,6 +129,16 @@ class SettingsService extends ChangeNotifier {
     } else {
       await prefs.setString(keyLocale, locale.languageCode);
     }
+  }
+
+  /// Permanently dismisses the first-run welcome banner (#78). No-op (and no
+  /// write) if already dismissed.
+  Future<void> dismissWelcomeBanner() async {
+    if (_welcomeBannerDismissed) return;
+    _welcomeBannerDismissed = true;
+    notifyListeners();
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    await prefs.setBool(keyWelcomeBannerDismissed, true);
   }
 
   static ThemeMode _themeModeFromName(String name) {
