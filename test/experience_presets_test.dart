@@ -14,6 +14,8 @@
 // 6. escalation は Experience.vision（visionFilterUrgencyEscalationProvider）
 //    から取得し、ConsultNoticeBlock（FilterParamPanel・export と共有）で
 //    表示する（#76 レビュー S3）。
+// 7. 免責文・根拠 URL は各カードには出さず、セクション末尾に 1 回だけ出す
+//    （#76 再レビュー nit）。
 //
 // bridge の experiences() は native lib（FFI）を要求し flutter test では呼べないため、
 // experiencesProvider seam を fixture で差し替える（音声再生は #19 非スコープ）。
@@ -254,5 +256,38 @@ void main() {
       find.textContaining(en.escalationConditionBppvRecurrentSevere),
       findsOneWidget,
     );
+  });
+
+  testWidgets(
+      '免責文・根拠 URL は各カードには出さず、セクション末尾に 1 回だけ出す'
+      '（#76 再レビュー nit）', (tester) async {
+    // 既定の 4 体験フィクスチャは meniere/labyrinthitis（earlyConsultation）・
+    // vestibular_neuritis（emergency）の 3 枚が喚起を持つ。カード側に免責文を
+    // 出していれば 3 件、セクション単位なら 1 件になる。
+    await pumpPresets(tester, const Locale('en'));
+    final en = lookupAppLocalizations(const Locale('en'));
+
+    expect(find.text(en.consultDisclaimer), findsOneWidget);
+    expect(find.textContaining('sensus/blob/main/docs/overview.md'),
+        findsOneWidget);
+    // 喚起文・escalation は引き続き各カードに残る（免責文だけがセクション
+    // 末尾へ移った）ことも確認する。
+    expect(find.text(en.consultEmergency), findsOneWidget);
+    expect(find.text(en.consultEarly), findsNWidgets(2));
+  });
+
+  testWidgets('どのカードにも喚起が無ければセクション末尾の免責文も出ない（#76 再レビュー nit）',
+      (tester) async {
+    experiencesProvider = () => const [
+          Experience(
+            id: 'bppv',
+            vision: VisionFilter.bppvRotation(),
+            urgency: Urgency.none,
+          ),
+        ];
+    await pumpPresets(tester, const Locale('en'));
+    final en = lookupAppLocalizations(const Locale('en'));
+
+    expect(find.text(en.consultDisclaimer), findsNothing);
   });
 }

@@ -144,5 +144,46 @@ void main() {
       expect(png, isNotNull);
       expect(png!.isNotEmpty, isTrue);
     });
+
+    test(
+        'escalationGroups（段ごとの見出し + 条件文）ぶん、無しより高くなる '
+        '（#76 レビュー M1・再レビュー S-a）', () async {
+      final base = await makeBase(80, 60);
+      const withoutGroups = ExportCaption(
+        symptomLabel: 'BPPV Rotation',
+        strengthLabel: 'Strength: 60%',
+        isoDate: '2026-06-23',
+      );
+      const withGroups = ExportCaption(
+        symptomLabel: 'BPPV Rotation',
+        strengthLabel: 'Strength: 60%',
+        isoDate: '2026-06-23',
+        escalationGroups: [
+          ExportEscalationGroup(
+            header: 'See a doctor right away if:',
+            lines: ['a sudden drop in hearing'],
+          ),
+          ExportEscalationGroup(
+            header: 'Consider seeing a doctor if:',
+            lines: ['recurrent or severe episodes'],
+          ),
+        ],
+        disclaimer: 'Not a diagnosis; not medically reviewed. '
+            'Source: sensus Medical notes',
+      );
+      final composedWithout = await composeExportImage(base, withoutGroups);
+      final composedWith = await composeExportImage(base, withGroups);
+      final pngWith = await encodeImagePng(composedWith);
+      addTearDown(() {
+        base.dispose();
+        composedWithout.dispose();
+        composedWith.dispose();
+      });
+
+      // 2 段（見出し 2 行 + 条件文 2 行）+ disclaimer 1 行ぶん、確実に高くなる。
+      expect(composedWith.height, greaterThan(composedWithout.height));
+      expect(pngWith, isNotNull);
+      expect(pngWith!.isNotEmpty, isTrue);
+    });
   });
 }

@@ -1245,8 +1245,19 @@ void main() {
         expect(capturedCaption, isNotNull);
         expect(capturedCaption!.urgencyMessage, en.consultEmergency);
         expect(capturedCaption!.disclaimer, en.consultDisclaimerShort);
+        // #76 再レビュー M1': disclaimer は否定（診断ではない）と根拠の両方を
+        // 1 行に含む。
+        expect(capturedCaption!.disclaimer, contains('diagnos'));
+        expect(capturedCaption!.disclaimer, contains('sensus'));
+        // #76 再レビュー S-a: PNG でも escalation を段（見出し + 条件文）で
+        // 焼き込む。
+        expect(capturedCaption!.escalationGroups, hasLength(1));
         expect(
-          capturedCaption!.escalationLines,
+          capturedCaption!.escalationGroups.first.header,
+          en.escalationHeaderEmergency,
+        );
+        expect(
+          capturedCaption!.escalationGroups.first.lines,
           [en.escalationConditionHearingSuddenOneEar],
         );
       });
