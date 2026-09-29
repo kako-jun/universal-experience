@@ -65,12 +65,6 @@ void main() {
     });
   });
 
-  group('LoupeWindowPolicy.canEnableClickThrough (#63)', () {
-    test('常に true を返す（フォーカス復帰と Esc が常に使える復帰経路のため）', () {
-      expect(LoupeWindowPolicy.canEnableClickThrough(), isTrue);
-    });
-  });
-
   group('LoupeWindowPolicy.isLikelyWaylandNativeSession (#63)', () {
     test('XDG_SESSION_TYPE=wayland なら true', () {
       expect(
@@ -90,14 +84,15 @@ void main() {
       );
     });
 
-    test('GDK_BACKEND=x11 が明示されていれば false（XWayland 経由とみなす）', () {
+    test('GDK_BACKEND=x11 が明示されていても Wayland セッションの兆候があれば true（信頼できない側に倒す）',
+        () {
       expect(
         LoupeWindowPolicy.isLikelyWaylandNativeSession({
           'XDG_SESSION_TYPE': 'wayland',
           'WAYLAND_DISPLAY': 'wayland-0',
           'GDK_BACKEND': 'x11',
         }),
-        isFalse,
+        isTrue,
       );
     });
 
@@ -307,7 +302,7 @@ void main() {
     });
   });
 
-  group('LoupeWindowController.load() 正規化 (#63 S3)', () {
+  group('LoupeWindowController.load() 正規化', () {
     test('settings モードで clickThrough=true が保存されていたら false へ正規化し、'
         '書き直す', () async {
       SharedPreferences.setMockInitialValues({
@@ -341,7 +336,7 @@ void main() {
     });
   });
 
-  group('LoupeWindowController.currentLoupeRect (#63 nit)', () {
+  group('LoupeWindowController.currentLoupeRect', () {
     test('注入した LoupeRectSource の値を返す', () async {
       const rect = Rect.fromLTWH(10, 20, 300, 200);
       final controller = LoupeWindowController(
@@ -349,6 +344,62 @@ void main() {
       );
 
       expect(await controller.currentLoupeRect(), rect);
+    });
+  });
+
+  group(
+      'LoupeWindowController.onWindowFocus / onWindowBlur / '
+      'releaseClickThroughOnFirstKeyPress (#63)', () {
+    Future<LoupeWindowController> buildClickThroughOnController() async {
+      SharedPreferences.setMockInitialValues({});
+      final controller = LoupeWindowController();
+      await controller.load();
+      await controller.setAppMode(AppMode.loupe);
+      await controller.setClickThrough(true);
+      expect(controller.clickThrough, isTrue);
+      return controller;
+    }
+
+    test('ON の状態で onWindowFocus → releaseClickThroughOnFirstKeyPress の順で呼ぶと解除される',
+        () async {
+      final controller = await buildClickThroughOnController();
+
+      controller.onWindowFocus();
+      controller.releaseClickThroughOnFirstKeyPress();
+
+      expect(controller.clickThrough, isFalse);
+    });
+
+    test('onWindowFocus だけを呼んでも解除されない', () async {
+      final controller = await buildClickThroughOnController();
+
+      controller.onWindowFocus();
+
+      expect(controller.clickThrough, isTrue);
+    });
+
+    test('onWindowFocus の後に onWindowBlur を呼ぶと予約は取り消され、その後の'
+        'releaseClickThroughOnFirstKeyPress は何もしない', () async {
+      final controller = await buildClickThroughOnController();
+
+      controller.onWindowFocus();
+      controller.onWindowBlur();
+      controller.releaseClickThroughOnFirstKeyPress();
+
+      expect(controller.clickThrough, isTrue);
+    });
+
+    test('クリックスルーが OFF のときは onWindowFocus → releaseClickThroughOnFirstKeyPress '
+        'の順で呼んでも何も起きない', () async {
+      SharedPreferences.setMockInitialValues({});
+      final controller = LoupeWindowController();
+      await controller.load();
+      expect(controller.clickThrough, isFalse);
+
+      controller.onWindowFocus();
+      controller.releaseClickThroughOnFirstKeyPress();
+
+      expect(controller.clickThrough, isFalse);
     });
   });
 }

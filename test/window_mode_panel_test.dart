@@ -1,9 +1,9 @@
 // WindowModePanel（#63）の widget test。
 //
-// M1（クリックスルーは常に ON にできる。復帰経路はフォーカス復帰 + アプリ内 Esc
-// が常時有効なベースライン）を受けて、クリックスルーのスイッチは settings
-// モードでない限り常に有効であること、および復帰手段のヒントが常に表示される
-// ことを検証する。
+// クリックスルーは常に ON にできる（復帰経路はフォーカス復帰＋最初のキー入力 +
+// アプリ内 Esc が常時有効なベースライン）ことを受けて、クリックスルーのスイッチは
+// settings モードでない限り常に有効であること、および復帰手段のヒントが常に
+// 表示されることを検証する。
 
 import 'dart:io' show Platform;
 
@@ -63,11 +63,11 @@ void main() {
 
     expect(
       find.text(
-        'It turns off automatically when this window regains focus '
-        '(e.g. Alt+Tab)',
+        'Select this window (e.g. with Alt+Tab) and press any key to turn '
+        'it off',
       ),
       findsOneWidget,
-      reason: 'フォーカス復帰は常に使える復帰経路なので常時表示する',
+      reason: 'フォーカス復帰＋最初のキー入力は常に使える復帰経路なので常時表示する',
     );
     expect(
       find.text('You can also press Esc inside the app to turn it off'),

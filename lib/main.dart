@@ -397,10 +397,10 @@ class UniversalExperienceApp extends StatelessWidget {
   /// Pre-loaded settings service (theme mode / last filter type / locale).
   final SettingsService settings;
 
-  /// トレイが使える環境か (#63)。`WindowModePanel` がクリックスルーの安全ガード
-  /// ([LoupeWindowPolicy.canEnableClickThrough]) に使う。デスクトップ初期化を
-  /// 経由しない widget test（`UniversalExperienceApp(settings: settings)`）が
-  /// そのまま動くよう、既定値は「トレイ無し」という最も安全側にしてある。
+  /// トレイが使える環境か (#63)。`WindowModePanel` がクリックスルーの復帰手段
+  /// ヒントの表示判定に使う。デスクトップ初期化を経由しない widget test
+  /// （`UniversalExperienceApp(settings: settings)`）がそのまま動くよう、
+  /// 既定値は「トレイ無し」という最も安全側にしてある。
   final bool trayAvailable;
 
   /// グローバルホットキーの登録結果 (#63)。同じ理由で既定値は「ホットキー無し」。

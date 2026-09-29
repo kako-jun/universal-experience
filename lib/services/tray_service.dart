@@ -498,9 +498,9 @@ class TrayService with TrayListener {
         await refresh();
         break;
       case TrayMenuKind.toggleClickThrough:
-        // settings モード中の ON 拒否は setClickThrough 自身のガードに任せる
-        // （#63）。トレイ自体が復帰手段なので canEnableClickThrough のチェックは
-        // 不要 — トレイ経由のクリックは常に許可してよい。
+        // settings モード中の ON 拒否は setClickThrough 自身のガードに任せる。
+        // クリックスルーはいつでも ON にしてよい（フォーカス復帰＋キー入力・
+        // Esc の復帰経路が常にあるため）(#63)。
         await loupeWindow.setClickThrough(!loupeWindow.clickThrough);
         await refresh();
         break;

@@ -131,7 +131,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ReleaseClickThroughIntent:
               CallbackAction<ReleaseClickThroughIntent>(
             onInvoke: (_) {
-              context.read<LoupeWindowController>().setClickThrough(false);
+              final loupeWindow = context.read<LoupeWindowController>();
+              if (loupeWindow.clickThrough) {
+                loupeWindow.setClickThrough(false);
+              }
               return null;
             },
           ),

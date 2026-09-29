@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show HardwareKeyboard, KeyDownEvent, KeyEvent;
 import 'package:flutter/widgets.dart' show Color, Rect, Size;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
@@ -112,27 +113,15 @@ class LoupeWindowPolicy {
     }
   }
 
-  /// クリックスルーを ON にしてよいか (#63)。
-  ///
-  /// フォーカス復帰時の自動 OFF（[LoupeWindowController.onWindowFocus]）と
-  /// アプリ内 Esc ショートカット（`ReleaseClickThroughIntent`）は、ネイティブ
-  /// プラグイン（hotkey_manager/tray_manager）の登録・作成「成功」表明を信用せず
-  /// アプリ自身が保証できる復帰経路であり、常に有効。この 2 つだけで既に復帰
-  /// 経路は保証されているため、この関数は常に true を返す
-  /// （トレイ・ホットキーは「追加の便利な手段」という位置づけになる。実際に
-  /// どの追加手段が使えるかは UI ヒントの表示判定 — `WindowModePanel` — に
-  /// 個別に使う）。
-  static bool canEnableClickThrough() => true;
-
   /// Linux で、グローバルホットキー（keybinder、X11 依存）が実際には発火しなそうな
   /// セッションかを判定する (#63)。Wayland ネイティブセッションでは hotkey_manager の
-  /// 登録が「成功」を返しても実際には発火しないことがあるため、UI ヒントからホット
-  /// キーの案内を除外する判定に使う（トレイ/ホットキー自体の可否判定には使わない
-  /// — [canEnableClickThrough] は常に true）。GDK_BACKEND=x11 が明示されていれば
-  /// （XWayland 経由の互換動作）使えるとみなす。[environment] は呼び出し側が
-  /// `Platform.environment` を渡す想定（テストではフェイクの Map を渡せる）。
+  /// 登録が「成功」を返しても実際には発火しないことがある。Wayland セッションの兆候
+  /// （`XDG_SESSION_TYPE=wayland` または `WAYLAND_DISPLAY`）が少しでもあれば、
+  /// `GDK_BACKEND=x11`（XWayland 経由の互換動作を示唆する値）が明示されていても
+  /// 信頼できない側に倒す — 判定を誤って「使える」と過信するより、ヒントから
+  /// 除外しすぎる方が安全なため。[environment] は呼び出し側が `Platform.environment`
+  /// を渡す想定（テストではフェイクの Map を渡せる）。
   static bool isLikelyWaylandNativeSession(Map<String, String> environment) {
-    if (environment['GDK_BACKEND'] == 'x11') return false;
     final sessionType = environment['XDG_SESSION_TYPE'];
     final waylandDisplay = environment['WAYLAND_DISPLAY'];
     return sessionType == 'wayland' ||
@@ -232,6 +221,7 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
   /// タイミングを揃えるため変えていないが、ゲート自体はもう無い）。
   Future<void> initialize() async {
     windowManager.addListener(this);
+    HardwareKeyboard.instance.addHandler(_handleAnyKeyEvent);
     await _guard('setMinimumSize', () async {
       await windowManager.setMinimumSize(LoupeWindowPolicy.minimumSize);
     });
@@ -241,9 +231,10 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
   }
 
   /// 永続化されたクリックスルーを window_manager へ適用する (#63)。
-  /// [canEnableClickThrough] が常に true になったため、復帰手段の可用性を待つ
-  /// 必要はもう無い。main() がトレイ・ホットキー初期化の後に呼ぶ構成は
-  /// 変えていないが（診断ログのタイミングを揃えるため）、ゲート自体は無い。
+  /// クリックスルーはいつでも ON にしてよい（フォーカス復帰＋キー入力・Esc の
+  /// 復帰経路が常にあるため）ので、復帰手段の可用性を待つ必要はもう無い。
+  /// main() がトレイ・ホットキー初期化の後に呼ぶ構成は変えていないが
+  /// （診断ログのタイミングを揃えるため）、ゲート自体は無い。
   Future<void> restorePersistedClickThrough() async {
     if (_clickThrough) {
       await setClickThrough(true);
@@ -254,6 +245,7 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
   @override
   void dispose() {
     windowManager.removeListener(this);
+    HardwareKeyboard.instance.removeHandler(_handleAnyKeyEvent);
     super.dispose();
   }
 
@@ -395,17 +387,49 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
 
   // --- WindowListener: リサイズ追従とモード同期 ---
 
+  /// クリックスルー解除が「予約」されているか。フォーカスを得た直後は即座に
+  /// 解除せず、実際にユーザーがこのウィンドウを操作し始めた合図（最初の
+  /// キー入力）まで待つ ([releaseClickThroughOnFirstKeyPress] 参照)。
+  bool _clickThroughReleaseArmed = false;
+
   @override
   void onWindowFocus() {
     if (_clickThrough) {
-      // 復帰経路 (#63): クリックスルー ON のままフォーカスを得たら (Alt+Tab や
-      // タスクバー/Dock クリックでユーザーがこのウィンドウへ戻ってきた)、
-      // OS/プラグインの「登録成功」表明を信用せず、アプリ自身が保証できる
-      // 復帰経路として自動で OFF に戻す。マウスイベントはクリックスルーで
-      // 下へ抜けるが、Alt+Tab 等キーボード操作によるフォーカス移動はクリック
-      // スルーの影響を受けないため、これは OS を問わず常に機能する。
+      // 復帰経路 (#63): クリックスルー ON のままフォーカスを得ても、ここでは
+      // 即座に解除しない。トレイメニューを開いた・OS がユーザー操作を伴わず
+      // フォーカスを移しただけ（Windows の SetForegroundWindow 等）のときに
+      // 意図せず解除されるのを避けるため、実際に最初のキー入力があるまで
+      // 「解除の予約」だけをする。
+      _clickThroughReleaseArmed = true;
+    }
+  }
+
+  @override
+  void onWindowBlur() {
+    // フォーカスを失ったら予約は取り消す。
+    _clickThroughReleaseArmed = false;
+  }
+
+  /// フォーカス復帰後の最初のキー入力でクリックスルーを解除する。
+  /// [onWindowFocus] で予約されていなければ何もしない。`HardwareKeyboard`
+  /// の全キーイベントハンドラ（[initialize] で登録、[dispose] で解除）から
+  /// キー入力ごとに呼ばれる。
+  void releaseClickThroughOnFirstKeyPress() {
+    if (_clickThroughReleaseArmed) {
+      _clickThroughReleaseArmed = false;
       unawaited(setClickThrough(false));
     }
+  }
+
+  /// [HardwareKeyboard] の全キーイベントハンドラ。keyDown のたびに
+  /// [releaseClickThroughOnFirstKeyPress] を呼ぶだけで、イベント自体は消費
+  /// しない（false を返し、通常のフォーカスチェーン・IME 等の処理へそのまま
+  /// 渡す）。
+  bool _handleAnyKeyEvent(KeyEvent event) {
+    if (event is KeyDownEvent) {
+      releaseClickThroughOnFirstKeyPress();
+    }
+    return false;
   }
 
   @override

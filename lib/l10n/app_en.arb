@@ -392,9 +392,9 @@
   "@clickThroughLabel": {
     "description": "Label for the click-through toggle."
   },
-  "clickThroughRecoveryFocusHint": "It turns off automatically when this window regains focus (e.g. Alt+Tab)",
+  "clickThroughRecoveryFocusHint": "Select this window (e.g. with Alt+Tab) and press any key to turn it off",
   "@clickThroughRecoveryFocusHint": {
-    "description": "Recovery-path hint shown under the click-through toggle: focusing back to this window always turns it off."
+    "description": "Recovery-path hint shown under the click-through toggle: selecting this window and then pressing any key turns it off."
   },
   "clickThroughRecoveryEscapeHint": "You can also press Esc inside the app to turn it off",
   "@clickThroughRecoveryEscapeHint": {

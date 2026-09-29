@@ -170,7 +170,7 @@
   "windowModeLoupe": "ルーペ窓",
   "alwaysOnTopLabel": "最前面に固定",
   "clickThroughLabel": "クリックスルー",
-  "clickThroughRecoveryFocusHint": "フォーカスを外して戻ると自動的に解除されます（Alt+Tab など）",
+  "clickThroughRecoveryFocusHint": "Alt+Tab などでこのウィンドウを選び、何かキーを押すと解除されます",
   "clickThroughRecoveryEscapeHint": "アプリ内で Esc キーを押しても解除できます",
   "clickThroughRecoveryTrayHint": "トレイのメニューからも解除できます",
   "clickThroughRecoveryHotkeyHint": "ホットキー {hotkey} でも解除できます",
