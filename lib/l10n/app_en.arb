@@ -490,5 +490,91 @@
   "hudOpenSettingsTooltip": "Open settings",
   "@hudOpenSettingsTooltip": {
     "description": "Tooltip/semantics label for the loupe HUD's settings button (#79). Switches LoupeWindowController.appMode back to AppMode.settings."
+  },
+
+  "sampleRouteMap": "Transit map",
+  "@sampleRouteMap": {
+    "description": "Name of the built-in sample scene: a schematic multi-line transit map (#78)."
+  },
+  "sampleChart": "Chart",
+  "@sampleChart": {
+    "description": "Name of the built-in sample scene: a bar chart with a colour legend (#78)."
+  },
+  "sampleTrafficSigns": "Traffic signs",
+  "@sampleTrafficSigns": {
+    "description": "Name of the built-in sample scene: a traffic light and road signs (#78)."
+  },
+  "sampleInfoBoard": "Info board",
+  "@sampleInfoBoard": {
+    "description": "Name of the built-in sample scene: a text-heavy signage board (#78)."
+  },
+  "sampleFruitStand": "Fruit stand",
+  "@sampleFruitStand": {
+    "description": "Name of the built-in sample scene: rows of fruit for colour discrimination (#78)."
+  },
+  "sampleNightScene": "Night scene",
+  "@sampleNightScene": {
+    "description": "Name of the built-in sample scene: a dark scene with point-lights (#78)."
+  },
+  "sampleDepthLandscape": "Landscape",
+  "@sampleDepthLandscape": {
+    "description": "Name of the built-in sample scene: a layered near/mid/far landscape (#78)."
+  },
+
+  "imageSourceSectionLabel": "Preview image",
+  "@imageSourceSectionLabel": {
+    "description": "Small heading above the sample-image chips and your-photo controls (#78)."
+  },
+  "imageSourceYourPhotoChipLabel": "Your photo",
+  "@imageSourceYourPhotoChipLabel": {
+    "description": "Chip label for the currently-loaded user image, shown alongside the sample chips (#78)."
+  },
+  "imageSourcePickButton": "Choose a photo…",
+  "@imageSourcePickButton": {
+    "description": "Button that opens the file picker to load a user image (#78)."
+  },
+  "imageSourceDropHint": "Or drop an image here",
+  "@imageSourceDropHint": {
+    "description": "Hint next to the picker button that the preview area also accepts drag-and-drop (#78)."
+  },
+  "imageSourceResetToRecommended": "Back to recommended",
+  "@imageSourceResetToRecommended": {
+    "description": "Button that stops following a manually-picked sample (or a user photo) and returns to the current filter's recommended sample (#78)."
+  },
+  "imageSourceClosePhotoTooltip": "Close photo",
+  "@imageSourceClosePhotoTooltip": {
+    "description": "Tooltip for the button that discards the loaded user photo and falls back to a sample (#78)."
+  },
+  "imageSourcePickFailed": "Couldn't load that image. Try a different file.",
+  "@imageSourcePickFailed": {
+    "description": "SnackBar shown when a picked or dropped file couldn't be decoded as an image (#78)."
+  },
+  "imageSourceFileTooLarge": "That image is too large (max {maxMegabytes} MB). Try a smaller file.",
+  "@imageSourceFileTooLarge": {
+    "description": "SnackBar shown when a picked or dropped file exceeds kMaxUserImageFileBytes (#78 レビュー nit) — shown instead of the generic imageSourcePickFailed so the person knows it's a size problem, not a corrupt/unsupported file. The file's body is never read in this case (checked via XFile.length() first).",
+    "placeholders": {
+      "maxMegabytes": { "type": "int" }
+    }
+  },
+
+  "welcomeBannerTitle": "New here?",
+  "@welcomeBannerTitle": {
+    "description": "Title of the first-run welcome banner (#78)."
+  },
+  "welcomeBannerBody": "This starts with a common colour-vision difference (deuteranomaly) at its typical strength. Try another way of seeing, or test it with your own photo.",
+  "@welcomeBannerBody": {
+    "description": "Body text of the first-run welcome banner, explaining the default selection and the two suggested next actions (#78)."
+  },
+  "welcomeBannerChooseOtherAction": "Choose another way of seeing",
+  "@welcomeBannerChooseOtherAction": {
+    "description": "First-run welcome banner action that points at the filter selection UI (#78)."
+  },
+  "welcomeBannerTryPhotoAction": "Try it with your photo",
+  "@welcomeBannerTryPhotoAction": {
+    "description": "First-run welcome banner action that points at the user-image picker (#78)."
+  },
+  "welcomeBannerDismiss": "Got it",
+  "@welcomeBannerDismiss": {
+    "description": "Button that permanently dismisses the first-run welcome banner (#78)."
   }
 }

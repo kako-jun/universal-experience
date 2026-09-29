@@ -120,4 +120,134 @@ void main() {
     expect(chipSelected(tester, ColorVisionType.none), isTrue);
     expect(chipSelected(tester, ColorVisionType.protanopia), isFalse);
   });
+
+  group('focusSelectedChip（#78 レビュー nit: ウェルカムバナーからのフォーカス移動を'
+      '見えるようにする）', () {
+    FocusNode? chipFocusNode(WidgetTester tester, ColorVisionType type) =>
+        tester
+            .widget<FilterChip>(find.ancestor(
+              of: find.text(colorVisionTypeName(en, type)),
+              matching: find.byType(FilterChip),
+            ))
+            .focusNode;
+
+    testWidgets('選択中のチップへ実際にフォーカスを移す', (tester) async {
+      selectColorVision(filterService, visionState, ColorVisionType.protanopia);
+      final key = GlobalKey<FilterSelectorState>();
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<FilterService>.value(value: filterService),
+            ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
+          ],
+          child: MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(body: FilterSelector(key: key)),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(chipFocusNode(tester, ColorVisionType.protanopia)!.hasFocus, isFalse);
+
+      key.currentState!.focusSelectedChip();
+      await tester.pump();
+
+      expect(chipFocusNode(tester, ColorVisionType.protanopia)!.hasFocus, isTrue);
+      expect(chipFocusNode(tester, ColorVisionType.none)!.hasFocus, isFalse);
+    });
+
+    testWidgets('advanced 選択中（どのチップも点灯していない）は先頭のチップへフォーカスする',
+        (tester) async {
+      visionState.select('starbursts');
+      final key = GlobalKey<FilterSelectorState>();
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<FilterService>.value(value: filterService),
+            ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
+          ],
+          child: MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(body: FilterSelector(key: key)),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      key.currentState!.focusSelectedChip();
+      await tester.pump();
+
+      expect(
+        chipFocusNode(tester, ColorVisionType.values.first)!.hasFocus,
+        isTrue,
+        reason: 'どのチップも選択されていないので先頭（${ColorVisionType.values.first}）へ',
+      );
+    });
+
+    testWidgets('画面外にあるチップは Scrollable.ensureVisible でスクロールして見えるようにする',
+        (tester) async {
+      selectColorVision(filterService, visionState, ColorVisionType.tritanopia);
+      final key = GlobalKey<FilterSelectorState>();
+      final scrollController = ScrollController();
+      addTearDown(scrollController.dispose);
+
+      // 十分に狭いビューポートで FilterSelector をスクロール範囲の下の方に置き、
+      // 初期状態ではチップが画面外（スクロールオフセット 0）になるようにする。
+      tester.view.physicalSize = const Size(400, 300);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<FilterService>.value(value: filterService),
+            ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
+          ],
+          child: MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: SingleChildScrollView(
+                controller: scrollController,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 1000),
+                    FilterSelector(key: key),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(scrollController.offset, 0);
+
+      key.currentState!.focusSelectedChip();
+      await tester.pumpAndSettle();
+
+      expect(scrollController.offset, greaterThan(0),
+          reason: 'ensureVisible がスクロールして選択中のチップを画面内に入れるべき');
+    });
+  });
 }

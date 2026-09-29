@@ -7,12 +7,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/models/preview_image_source.dart';
 import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
 import 'package:universal_experience/services/export_service.dart';
 import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 
+import 'support/sample_image_generator.dart';
 import 'support/vision_filter_metadata_fixture.dart';
 
 /// BeforeAfterView の before/after 生成ロジックと描画カバレッジのテスト（#17）。
@@ -41,7 +43,7 @@ import 'support/vision_filter_metadata_fixture.dart';
 ///   デバウンス）はこの仕様変更で丸ごと不要になったため削除した。
 /// - 連続する `_rebuild` 要求は 1 本だけ実行し、後続は最新の 1 件だけ保留する
 ///   （[BeforeAfterView] の `_scheduleRebuild`）。これにより、旧
-///   `sampleImageGenerator`/`afterImageRenderer` を使った「複数の要求が本当に
+///   `previewSourceImageLoader`/`afterImageRenderer` を使った「複数の要求が本当に
 ///   同時に実行中」を前提にしたテスト（追い越し・discard 経路）の一部は、
 ///   その状況自体がもう production コードから起こり得なくなったため、
 ///   直列化を確認する形に書き換えるか削除した（該当箇所にコメントで残す）。
@@ -67,7 +69,7 @@ void main() {
 
   group('generateSampleImage', () {
     test('指定サイズの正方形画像を生成し PNG 化できる', () async {
-      final img = await BeforeAfterView.generateSampleImage(64);
+      final img = await generateSampleImage(64);
       expect(img.width, 64);
       expect(img.height, 64);
       final png = await encodeImagePng(img);
@@ -82,8 +84,8 @@ void main() {
     late ui.Image fakeOut;
 
     setUp(() async {
-      src = await BeforeAfterView.generateSampleImage(4);
-      fakeOut = await BeforeAfterView.generateSampleImage(4);
+      src = await generateSampleImage(4);
+      fakeOut = await generateSampleImage(4);
     });
 
     tearDown(() {
@@ -181,9 +183,14 @@ void main() {
       // 検証は integration_test/cpu_preview_all_filters_test.dart の役割）。
       setUp(() {
         CpuVisionRenderer.applier = (source, filter, strength) async => source;
+        // このグループはラベル表示だけを見たいので、imageSource には実在しない
+        // ダミー id（'test'）を渡す。previewSourceImageLoader を実アセット
+        // デコード不要のフェイクに差し替える。
+        previewSourceImageLoader = (source, size) => generateSampleImage(size);
       });
       tearDown(() {
         CpuVisionRenderer.applier = CpuVisionRenderer.apply;
+        previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
       });
 
       testWidgets('protanopia で原画ラベルとフィルタ名ラベルの両ペインを出す', (tester) async {
@@ -193,6 +200,7 @@ void main() {
               filter: VisionFilter.protanopia(),
               filterId: 'protanopia',
               strength: 1.0,
+              imageSource: SamplePreviewImageSource('test'),
               sampleSize: 32,
             ),
           ),
@@ -213,6 +221,7 @@ void main() {
               filter: VisionFilter.deuteranopia(),
               filterId: 'deuteranopia',
               strength: 1.0,
+              imageSource: SamplePreviewImageSource('test'),
               sampleSize: 32,
             ),
           ),
@@ -231,6 +240,7 @@ void main() {
               filter: null,
               filterId: null,
               strength: 1.0,
+              imageSource: SamplePreviewImageSource('test'),
               sampleSize: 32,
             ),
           ),
@@ -254,6 +264,7 @@ void main() {
               filterId: 'deuteranopia',
               colorVisionType: ColorVisionType.deuteranomaly,
               strength: 0.6,
+              imageSource: SamplePreviewImageSource('test'),
               sampleSize: 32,
             ),
           ),
@@ -275,9 +286,11 @@ void main() {
     group('時間依存フィルタの注記 (#60)', () {
       setUp(() {
         CpuVisionRenderer.applier = (source, filter, strength) async => source;
+        previewSourceImageLoader = (source, size) => generateSampleImage(size);
       });
       tearDown(() {
         CpuVisionRenderer.applier = CpuVisionRenderer.apply;
+        previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
       });
 
       testWidgets('vertigo（時間依存）は静止フレームの注記を出す', (tester) async {
@@ -287,6 +300,7 @@ void main() {
               filter: VisionFilter.vertigo(),
               filterId: 'vertigo',
               strength: 1.0,
+              imageSource: SamplePreviewImageSource('test'),
               sampleSize: 32,
             ),
           ),
@@ -302,6 +316,7 @@ void main() {
               filter: VisionFilter.protanopia(),
               filterId: 'protanopia',
               strength: 1.0,
+              imageSource: SamplePreviewImageSource('test'),
               sampleSize: 32,
             ),
           ),
@@ -314,7 +329,7 @@ void main() {
     // #58: プレビューが GPU 画像をリークする／古い結果で上書きされる／Retina で
     // ぼける、の3点を再現・固定するリグレッションテスト。
     //
-    // `sampleImageGenerator` / `afterImageRenderer`（`before_after_view.dart` が
+    // `previewSourceImageLoader` / `afterImageRenderer`（`before_after_view.dart` が
     // 公開する widget test 用 seam）をフェイクに差し替え、応答の順序・タイミング・
     // 内容をテスト側で完全に制御する。dispose 検知は `ui.Image.debugDisposed` を使う
     // （実 GPU/toImage() が必要な画像生成そのものは `tester.runAsync` の中で1回だけ
@@ -322,7 +337,7 @@ void main() {
     // 中でも安全に awaiter できるようにする）。
     group('生成の世代管理とリソース破棄 (#58)', () {
       tearDown(() {
-        sampleImageGenerator = BeforeAfterView.generateSampleImage;
+        previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
         afterImageRenderer = BeforeAfterView.renderAfter;
       });
 
@@ -337,11 +352,11 @@ void main() {
         late ui.Image before1;
         late ui.Image afterA, afterB;
         await tester.runAsync(() async {
-          before1 = await BeforeAfterView.generateSampleImage(4);
-          afterA = await BeforeAfterView.generateSampleImage(4);
-          afterB = await BeforeAfterView.generateSampleImage(4);
+          before1 = await generateSampleImage(4);
+          afterA = await generateSampleImage(4);
+          afterB = await generateSampleImage(4);
         });
-        sampleImageGenerator = (size) => Future.value(before1);
+        previewSourceImageLoader = (source, size) => Future.value(before1);
 
         final completers = <Completer<ui.Image?>>[];
         final capturedStrengths = <double>[];
@@ -357,6 +372,7 @@ void main() {
                 filter: const VisionFilter.protanopia(),
                 filterId: 'protanopia',
                 strength: strength,
+                imageSource: const SamplePreviewImageSource('test'),
                 sampleSize: 16,
               ),
             );
@@ -400,12 +416,12 @@ void main() {
         late ui.Image before1;
         final afterImages = <double, ui.Image>{};
         await tester.runAsync(() async {
-          before1 = await BeforeAfterView.generateSampleImage(4);
+          before1 = await generateSampleImage(4);
           for (final v in [0.1, 0.2, 0.3, 0.4, 0.5]) {
-            afterImages[v] = await BeforeAfterView.generateSampleImage(4);
+            afterImages[v] = await generateSampleImage(4);
           }
         });
-        sampleImageGenerator = (size) => Future.value(before1);
+        previewSourceImageLoader = (source, size) => Future.value(before1);
 
         var activeCount = 0;
         var maxActiveCount = 0;
@@ -426,6 +442,7 @@ void main() {
                 filter: const VisionFilter.protanopia(),
                 filterId: 'protanopia',
                 strength: strength,
+                imageSource: const SamplePreviewImageSource('test'),
                 sampleSize: 16,
               ),
             );
@@ -449,11 +466,11 @@ void main() {
           (tester) async {
         late ui.Image before1, after1, after2;
         await tester.runAsync(() async {
-          before1 = await BeforeAfterView.generateSampleImage(4);
-          after1 = await BeforeAfterView.generateSampleImage(4);
-          after2 = await BeforeAfterView.generateSampleImage(4);
+          before1 = await generateSampleImage(4);
+          after1 = await generateSampleImage(4);
+          after2 = await generateSampleImage(4);
         });
-        sampleImageGenerator = (size) => Future.value(before1);
+        previewSourceImageLoader = (source, size) => Future.value(before1);
 
         final responses = <Future<ui.Image?> Function(ui.Image)>[
           (source) =>
@@ -473,6 +490,7 @@ void main() {
           filter: null,
           filterId: null,
           strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -484,6 +502,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -498,6 +517,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 0.5,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -512,10 +532,10 @@ void main() {
           (tester) async {
         late ui.Image before1, afterImg;
         await tester.runAsync(() async {
-          before1 = await BeforeAfterView.generateSampleImage(4);
-          afterImg = await BeforeAfterView.generateSampleImage(4);
+          before1 = await generateSampleImage(4);
+          afterImg = await generateSampleImage(4);
         });
-        sampleImageGenerator = (size) => Future.value(before1);
+        previewSourceImageLoader = (source, size) => Future.value(before1);
 
         final completer = Completer<ui.Image?>();
         afterImageRenderer = (source, filter, strength) => completer.future;
@@ -524,6 +544,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -556,10 +577,10 @@ void main() {
           '(#58 レビュー S2)', (tester) async {
         late ui.Image before1, realAfter;
         await tester.runAsync(() async {
-          before1 = await BeforeAfterView.generateSampleImage(4);
-          realAfter = await BeforeAfterView.generateSampleImage(4);
+          before1 = await generateSampleImage(4);
+          realAfter = await generateSampleImage(4);
         });
-        sampleImageGenerator = (size) => Future.value(before1);
+        previewSourceImageLoader = (source, size) => Future.value(before1);
 
         ui.Image? capturedRendererInput;
         var callIndex = 0;
@@ -577,6 +598,7 @@ void main() {
           filter: null,
           filterId: null,
           strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -589,6 +611,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -620,9 +643,9 @@ void main() {
           '(#85 レビュー N12)', (tester) async {
         late ui.Image before1;
         await tester.runAsync(() async {
-          before1 = await BeforeAfterView.generateSampleImage(4);
+          before1 = await generateSampleImage(4);
         });
-        sampleImageGenerator = (size) => Future.value(before1);
+        previewSourceImageLoader = (source, size) => Future.value(before1);
 
         var rendererCallCount = 0;
         final completer = Completer<ui.Image?>();
@@ -635,6 +658,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -646,6 +670,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 0.5,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -670,10 +695,10 @@ void main() {
           '呼ばれる (#85 レビュー N12)', (tester) async {
         late ui.Image stub;
         await tester.runAsync(() async {
-          stub = await BeforeAfterView.generateSampleImage(4);
+          stub = await generateSampleImage(4);
         });
         final requestedSizes = <int>[];
-        sampleImageGenerator = (size) {
+        previewSourceImageLoader = (source, size) {
           requestedSizes.add(size);
           return Future.value(stub);
         };
@@ -683,6 +708,7 @@ void main() {
           filter: null,
           filterId: null,
           strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
         )));
         await tester.pump();
         await tester.pump();
@@ -693,7 +719,7 @@ void main() {
 
     group('例外処理と復帰 (#58 レビュー S1)', () {
       tearDown(() {
-        sampleImageGenerator = BeforeAfterView.generateSampleImage;
+        previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
         afterImageRenderer = BeforeAfterView.renderAfter;
       });
 
@@ -701,7 +727,7 @@ void main() {
           'generator/renderer の例外は FlutterError.reportError で報告される '
           '(#58 レビュー nit-1)', (tester) async {
         final reportedErrors = suppressFlutterErrorReporting();
-        sampleImageGenerator = (size) => Future<ui.Image>.error(
+        previewSourceImageLoader = (source, size) => Future<ui.Image>.error(
               StateError('boom: generator'),
               StackTrace.current,
             );
@@ -710,6 +736,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -722,9 +749,9 @@ void main() {
         // renderer 側の例外も同様に報告される。
         late ui.Image goodBefore;
         await tester.runAsync(() async {
-          goodBefore = await BeforeAfterView.generateSampleImage(4);
+          goodBefore = await generateSampleImage(4);
         });
-        sampleImageGenerator = (size) => Future.value(goodBefore);
+        previewSourceImageLoader = (source, size) => Future.value(goodBefore);
         afterImageRenderer = (source, filter, strength) =>
             Future<ui.Image?>.error(StateError('boom: renderer'));
 
@@ -732,6 +759,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 0.5,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -747,11 +775,11 @@ void main() {
         suppressFlutterErrorReporting();
         late ui.Image goodBefore, goodAfter;
         await tester.runAsync(() async {
-          goodBefore = await BeforeAfterView.generateSampleImage(4);
-          goodAfter = await BeforeAfterView.generateSampleImage(4);
+          goodBefore = await generateSampleImage(4);
+          goodAfter = await generateSampleImage(4);
         });
         var generatorCallCount = 0;
-        sampleImageGenerator = (size) {
+        previewSourceImageLoader = (source, size) {
           generatorCallCount++;
           if (generatorCallCount == 1) {
             return Future<ui.Image>.error(StateError('boom'));
@@ -767,6 +795,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -780,6 +809,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 0.5,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -794,14 +824,14 @@ void main() {
         suppressFlutterErrorReporting();
         late ui.Image before1, before2, goodAfter;
         await tester.runAsync(() async {
-          before1 = await BeforeAfterView.generateSampleImage(4);
-          before2 = await BeforeAfterView.generateSampleImage(4);
-          goodAfter = await BeforeAfterView.generateSampleImage(4);
+          before1 = await generateSampleImage(4);
+          before2 = await generateSampleImage(4);
+          goodAfter = await generateSampleImage(4);
         });
         final generatedBefores = [before1, before2];
         var generatorCallCount = 0;
-        sampleImageGenerator =
-            (size) => Future.value(generatedBefores[generatorCallCount++]);
+        previewSourceImageLoader =
+            (source, size) => Future.value(generatedBefores[generatorCallCount++]);
 
         var rendererCallCount = 0;
         afterImageRenderer = (source, filter, strength) {
@@ -818,6 +848,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -832,6 +863,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 0.5,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -852,11 +884,11 @@ void main() {
         suppressFlutterErrorReporting();
         late ui.Image goodBefore, goodAfter;
         await tester.runAsync(() async {
-          goodBefore = await BeforeAfterView.generateSampleImage(4);
-          goodAfter = await BeforeAfterView.generateSampleImage(4);
+          goodBefore = await generateSampleImage(4);
+          goodAfter = await generateSampleImage(4);
         });
         var generatorCallCount = 0;
-        sampleImageGenerator = (size) {
+        previewSourceImageLoader = (source, size) {
           generatorCallCount++;
           if (generatorCallCount == 1) {
             // アセットが無い/シェーダのコンパイルが失敗する、のような
@@ -872,6 +904,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -892,6 +925,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 0.5,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -904,7 +938,7 @@ void main() {
 
     group('失敗の表示と復帰 (#58 レビュー SHOULD-1)', () {
       tearDown(() {
-        sampleImageGenerator = BeforeAfterView.generateSampleImage;
+        previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
         afterImageRenderer = BeforeAfterView.renderAfter;
       });
 
@@ -914,11 +948,11 @@ void main() {
         suppressFlutterErrorReporting();
         late ui.Image goodBefore, goodAfter1, goodAfter2;
         await tester.runAsync(() async {
-          goodBefore = await BeforeAfterView.generateSampleImage(4);
-          goodAfter1 = await BeforeAfterView.generateSampleImage(4);
-          goodAfter2 = await BeforeAfterView.generateSampleImage(4);
+          goodBefore = await generateSampleImage(4);
+          goodAfter1 = await generateSampleImage(4);
+          goodAfter2 = await generateSampleImage(4);
         });
-        sampleImageGenerator = (size) => Future.value(goodBefore);
+        previewSourceImageLoader = (source, size) => Future.value(goodBefore);
 
         var rendererCallCount = 0;
         afterImageRenderer = (source, filter, strength) {
@@ -937,6 +971,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -948,6 +983,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 0.5,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -963,6 +999,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 0.6,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -979,7 +1016,7 @@ void main() {
       // flutter test ではフィクスチャに差し替える。
       setUp(installVisionFilterMetadataFixture);
       tearDown(() {
-        sampleImageGenerator = BeforeAfterView.generateSampleImage;
+        previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
         afterImageRenderer = BeforeAfterView.renderAfter;
         exportImageComposer = composeExportImage;
         pngSaver = savePng;
@@ -991,11 +1028,11 @@ void main() {
           '描画時の強度になる', (tester) async {
         late ui.Image before1, after1, composedStub;
         await tester.runAsync(() async {
-          before1 = await BeforeAfterView.generateSampleImage(4);
-          after1 = await BeforeAfterView.generateSampleImage(4);
-          composedStub = await BeforeAfterView.generateSampleImage(4);
+          before1 = await generateSampleImage(4);
+          after1 = await generateSampleImage(4);
+          composedStub = await generateSampleImage(4);
         });
-        sampleImageGenerator = (size) => Future.value(before1);
+        previewSourceImageLoader = (source, size) => Future.value(before1);
 
         // 1回目（intensity=1.0）はすぐ解決する。2回目（intensity=0.5、
         // コアレス後に走る）は意図的に未解決のまま止め、「表示中の _after は
@@ -1031,6 +1068,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -1045,6 +1083,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 0.5,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -1084,10 +1123,10 @@ void main() {
           '(#60)', (tester) async {
         late ui.Image before1, composedStub;
         await tester.runAsync(() async {
-          before1 = await BeforeAfterView.generateSampleImage(4);
-          composedStub = await BeforeAfterView.generateSampleImage(4);
+          before1 = await generateSampleImage(4);
+          composedStub = await generateSampleImage(4);
         });
-        sampleImageGenerator = (size) => Future.value(before1);
+        previewSourceImageLoader = (source, size) => Future.value(before1);
         afterImageRenderer = (source, filter, strength) =>
             Future.value(source); // filter=null: そのまま返す
 
@@ -1108,6 +1147,7 @@ void main() {
           filter: null,
           filterId: null,
           strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -1133,11 +1173,11 @@ void main() {
           'ファイル名とも deuteranomaly になる（#60）', (tester) async {
         late ui.Image before1, after1, composedStub;
         await tester.runAsync(() async {
-          before1 = await BeforeAfterView.generateSampleImage(4);
-          after1 = await BeforeAfterView.generateSampleImage(4);
-          composedStub = await BeforeAfterView.generateSampleImage(4);
+          before1 = await generateSampleImage(4);
+          after1 = await generateSampleImage(4);
+          composedStub = await generateSampleImage(4);
         });
-        sampleImageGenerator = (size) => Future.value(before1);
+        previewSourceImageLoader = (source, size) => Future.value(before1);
         afterImageRenderer = (source, filter, strength) => Future.value(after1);
 
         ExportCaption? capturedCaption;
@@ -1162,6 +1202,7 @@ void main() {
           filterId: 'deuteranopia',
           colorVisionType: ColorVisionType.deuteranomaly,
           strength: 0.6,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -1191,11 +1232,11 @@ void main() {
           '(#76 レビュー M1/S2)', (tester) async {
         late ui.Image before1, after1, composedStub;
         await tester.runAsync(() async {
-          before1 = await BeforeAfterView.generateSampleImage(4);
-          after1 = await BeforeAfterView.generateSampleImage(4);
-          composedStub = await BeforeAfterView.generateSampleImage(4);
+          before1 = await generateSampleImage(4);
+          after1 = await generateSampleImage(4);
+          composedStub = await generateSampleImage(4);
         });
-        sampleImageGenerator = (size) => Future.value(before1);
+        previewSourceImageLoader = (source, size) => Future.value(before1);
         afterImageRenderer = (source, filter, strength) => Future.value(after1);
 
         visionFilterUrgencyProvider = (_) => Urgency.emergency;
@@ -1227,6 +1268,7 @@ void main() {
           ),
           filterId: 'hemianopia',
           strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -1268,11 +1310,11 @@ void main() {
           '(#76 レビュー S2、#85 レビュー S8 と同じ規律)', (tester) async {
         late ui.Image before1, after1, composedStub;
         await tester.runAsync(() async {
-          before1 = await BeforeAfterView.generateSampleImage(4);
-          after1 = await BeforeAfterView.generateSampleImage(4);
-          composedStub = await BeforeAfterView.generateSampleImage(4);
+          before1 = await generateSampleImage(4);
+          after1 = await generateSampleImage(4);
+          composedStub = await generateSampleImage(4);
         });
-        sampleImageGenerator = (size) => Future.value(before1);
+        previewSourceImageLoader = (source, size) => Future.value(before1);
 
         // protanopia(urgency=none) → hemianopia(urgency=emergency) への
         // 切替を想定する。
@@ -1313,6 +1355,7 @@ void main() {
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
           strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();
@@ -1325,6 +1368,7 @@ void main() {
           filter: hemianopia,
           filterId: 'hemianopia',
           strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
         )));
         await tester.pump();

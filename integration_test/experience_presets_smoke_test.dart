@@ -20,6 +20,8 @@ import 'package:provider/provider.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/models/preview_image_source.dart';
+import 'package:universal_experience/models/sample_catalog.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/native_bridge_service.dart';
@@ -112,6 +114,9 @@ class _PreviewFromState extends StatelessWidget {
           filter: visionState.build(),
           filterId: visionState.selectedId,
           strength: previewStrength(visionState, filterService),
+          // #78: imageSource は必須。実アセットからデコードできる既知の
+          // サンプル id を使う（kDefaultSampleId、rootBundle 経由）。
+          imageSource: const SamplePreviewImageSource(kDefaultSampleId),
           // integration_test では実ブリッジの CPU apply() を正準サイズ
           // （1024px）で 4 回走らせると重いため、実測に十分な小さめサイズで
           // 描画確認する（描画そのものは cpu_preview_all_filters_test.dart が

@@ -18,9 +18,11 @@ import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/main.dart' show WindowModeUiContext;
+import 'package:universal_experience/models/sample_catalog.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/hotkey_service.dart';
+import 'package:universal_experience/services/image_source_state.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
@@ -80,6 +82,17 @@ void main() {
         // フォールバックは id をそのまま返すので、id と異なれば解決済み。
         expect(visionFilterName(en, entry.id), isNot(entry.id),
             reason: entry.id);
+      }
+    });
+
+    test('全サンプル id が ja/en ともフォールバックなしで名前解決できる（#78 レビュー S7）',
+        () {
+      final en = lookupAppLocalizations(const Locale('en'));
+      final ja = lookupAppLocalizations(const Locale('ja'));
+      for (final entry in kSampleCatalog) {
+        // フォールバックは id をそのまま返すので、id と異なれば解決済み。
+        expect(sampleImageName(en, entry.id), isNot(entry.id), reason: entry.id);
+        expect(sampleImageName(ja, entry.id), isNot(entry.id), reason: entry.id);
       }
     });
 
@@ -254,6 +267,8 @@ void main() {
                 create: (_) => FilterService()),
             ChangeNotifierProvider<VisionFilterState>(
                 create: (_) => VisionFilterState()),
+            ChangeNotifierProvider<ImageSourceState>(
+                create: (_) => ImageSourceState()),
             ChangeNotifierProvider<LoupeWindowController>(
                 create: (_) => LoupeWindowController()),
             Provider<WindowModeUiContext>.value(

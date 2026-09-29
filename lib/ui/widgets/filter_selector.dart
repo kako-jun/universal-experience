@@ -27,8 +27,69 @@ import '../../services/vision_filter_state.dart';
 /// 選択・解除はどちらも `lib/services/color_vision_selection.dart` の
 /// `selectColorVision`/`deactivateColorVision` を経由し、`FilterService` と
 /// `VisionFilterState` の両方を明示的に更新する。
-class FilterSelector extends StatelessWidget {
+class FilterSelector extends StatefulWidget {
   const FilterSelector({super.key});
+
+  @override
+  State<FilterSelector> createState() => FilterSelectorState();
+}
+
+/// [FilterSelector.createState] の状態。`GlobalKey<FilterSelectorState>`
+/// 経由で外部（`home_screen.dart`、ウェルカムバナーの「ほかの見え方を選ぶ」）
+/// から [focusSelectedChip] を呼べるよう public にしてある（#78 レビュー
+/// nit: フォーカス移動を目に見えるようにする）。
+class FilterSelectorState extends State<FilterSelector> {
+  /// 色覚型ごとの FocusNode（チップ 1 枚ずつに固有）。`ColorVisionType.values`
+  /// は固定リストなので、State の生存期間中は同じインスタンスを使い回す。
+  final Map<ColorVisionType, FocusNode> _chipFocusNodes = {
+    for (final type in ColorVisionType.values)
+      type: FocusNode(debugLabel: 'colorVisionChip_${type.name}'),
+  };
+
+  @override
+  void dispose() {
+    for (final node in _chipFocusNodes.values) {
+      node.dispose();
+    }
+    super.dispose();
+  }
+
+  /// 現在点灯しているチップの [ColorVisionType]。advanced/プリセット選択中
+  /// （どのチップも点灯していない）は null。build() の `isSelected` 判定と
+  /// 同じロジック（#60）。
+  ColorVisionType? _currentlySelectedType(
+    FilterService filterService,
+    VisionFilterState visionState,
+  ) {
+    if (visionState.selectedId == null) return ColorVisionType.none;
+    if (visionState.isColorQuickSelection) return filterService.currentFilter;
+    return null;
+  }
+
+  /// 選択中のチップ（無ければ先頭のチップ）へ実際にフォーカスを移し、
+  /// スクロールして画面内に入るようにする（#78 レビュー nit）。
+  ///
+  /// `FocusNode.requestFocus()` だけでは、コンテナ全体に付けた単一の
+  /// FocusNode にフォーカスが移っても見た目には何も起きない
+  /// （個々の `FilterChip` が視覚的なフォーカスリングを持たないため）。
+  /// チップ 1 枚ずつに [FocusNode] を持たせ、実際にそのチップへフォーカスを
+  /// 移すことで、Material のフォーカスインジケータが表示される。
+  void focusSelectedChip() {
+    final filterService = context.read<FilterService>();
+    final visionState = context.read<VisionFilterState>();
+    final selected = _currentlySelectedType(filterService, visionState);
+    final target = (selected != null ? _chipFocusNodes[selected] : null) ??
+        _chipFocusNodes[ColorVisionType.values.first]!;
+    target.requestFocus();
+    final chipContext = target.context;
+    if (chipContext != null) {
+      Scrollable.ensureVisible(
+        chipContext,
+        duration: const Duration(milliseconds: 200),
+        alignment: 0.5,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +113,7 @@ class FilterSelector extends StatelessWidget {
                         filterService.currentFilter == type;
 
                 return FilterChip(
+                  focusNode: _chipFocusNodes[type],
                   label: Text(colorVisionTypeName(l10n, type)),
                   selected: isSelected,
                   onSelected: (selected) {
