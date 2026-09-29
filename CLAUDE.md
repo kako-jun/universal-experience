@@ -88,6 +88,7 @@ test/
 ├── no_hardcoded_colors_test.dart   # lib/ の色ハードコードを検出（例外は DESIGN.md の例外表と一致させる、#72）
 ├── app_theme_test.dart             # ハイコントラストテーマの生成と MaterialApp での切替（#72）
 ├── home_screen_layout_test.dart    # 3 カラム/縦積み・プレビューの初回ビューポート・空状態・キー操作（#72）
+├── tap_target_size_test.dart       # macOS 指定で操作領域が 48dp 以上（padded + standard、#72）
 ├── filter_browser_test.dart        # 統合一覧の検索・カテゴリ切替・行の選択（#72）
 ├── filter_list_selection_test.dart # 統合一覧の純粋ロジック（#72）
 ├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品
