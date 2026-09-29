@@ -187,12 +187,14 @@ img.Image _generateRouteMap() {
         color: color,
         antialias: true,
       );
+      // #78 レビュー nit: 駅ラベルは arial14 では小さすぎるため arial24 にする
+      // （案内板と同じ最小文字サイズの方針、#78 レビュー S5 参照）。
       img.drawString(
         image,
         '${String.fromCharCode(65 + stationIndex % 26)}${stationIndex ~/ 26 + 1}',
-        font: img.arial14,
-        x: x.round() + 18,
-        y: y.round() + 4,
+        font: img.arial24,
+        x: x.round() + 20,
+        y: y.round() - 4,
         color: img.ColorRgb8(0x21, 0x21, 0x21),
       );
       stationIndex++;
@@ -325,6 +327,8 @@ img.Image _generateTrafficSigns() {
   // #78 レビュー S5: fillPolygon にアンチエイリアスが無いため、塗りの縁が
   // ジャギーになる。_fillThickLine（塗りつぶしクアッド）で境界を十分太く
   // 覆って隠す（旧版の drawLine(thickness:10) は縁を覆いきれていなかった）。
+  final triBorderColor = img.ColorRgb8(0x21, 0x21, 0x21);
+  const triBorderThickness = 18.0;
   for (var i = 0; i < triPoints.length; i++) {
     final a = triPoints[i];
     final b = triPoints[(i + 1) % triPoints.length];
@@ -334,8 +338,21 @@ img.Image _generateTrafficSigns() {
       a.y.toDouble(),
       b.x.toDouble(),
       b.y.toDouble(),
-      18,
-      img.ColorRgb8(0x21, 0x21, 0x21),
+      triBorderThickness,
+      triBorderColor,
+    );
+  }
+  // #78 レビュー nit: 各辺を独立した矩形として描くと、頂点（特に鋭角な頂点
+  // トップ）で継ぎ目がマイターされず、スパイク状の突起として飛び出て見える。
+  // 各頂点に太さと同じ直径の円を重ねて継ぎ目を丸め、突起を隠す。
+  for (final p in triPoints) {
+    img.fillCircle(
+      image,
+      x: p.xi,
+      y: p.yi,
+      radius: (triBorderThickness / 2).round(),
+      color: triBorderColor,
+      antialias: true,
     );
   }
   img.drawString(image, '!',
@@ -357,9 +374,19 @@ img.Image _generateTrafficSigns() {
   img.fillCircle(image,
       x: proCx, y: proCy, radius: proR - proRingThickness,
       color: img.ColorRgb8(0xFF, 0xFF, 0xFF), antialias: true);
-  img.drawLine(image,
-      x1: proCx - 100, y1: proCy - 100, x2: proCx + 100, y2: proCy + 100,
-      color: img.ColorRgb8(0xE5, 0x39, 0x35), thickness: 20, antialias: true);
+  // #78 レビュー nit: drawLine(thickness:) は端に projecting cap が付き、
+  // 対角線の端点（中心から約141px）+ cap 分（約10px）でリングの外径
+  // （150px）をわずかに超えてしまっていた。_fillThickLine（端がちょうど
+  // 指定座標で切れる塗りつぶしクアッド）に替えて、リングの内側に収める。
+  _fillThickLine(
+    image,
+    (proCx - 100).toDouble(),
+    (proCy - 100).toDouble(),
+    (proCx + 100).toDouble(),
+    (proCy + 100).toDouble(),
+    20,
+    img.ColorRgb8(0xE5, 0x39, 0x35),
+  );
 
   // Information rectangle (blue, rounded, white "P").
   img.fillRect(image,
