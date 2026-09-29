@@ -12,6 +12,10 @@
 //   {wide|narrow}-{light|dark}-{ja|en}.png        — ウィンドウ 1 枚ぶん
 //                                                    （wide=1280x800、narrow=800x700）
 //   wide-{light|dark}-ja-hc.png                    — ハイコントラストテーマ
+//   {wide|wide-low|default-window}-light-ja-clickthrough.png
+//                                                  — クリックスルー ON の復帰バナー
+//                                                    （wide-low=1280x480、default-window=800x600）
+//   wide-light-ja-dialog.png                       — 起動モードのダイアログ（ON にする前）
 //   narrow-{light|dark}-{ja|en}-full.png          — 縦に十分長い画面で全体を撮ったもの
 //                                                    （狭幅の縦積みのスクロール量の確認用）
 //
@@ -152,6 +156,8 @@ void main() {
     required String locale,
     required String suffix,
     bool highContrast = false,
+    bool clickThrough = false,
+    bool viaDialog = false,
   }) async {
     tester.view.physicalSize = Size(width, height);
     tester.view.devicePixelRatio = 1.0;
@@ -173,6 +179,7 @@ void main() {
       recommendedSampleIdForFilter(visionState.selectedId),
     );
 
+    final loupe = LoupeWindowController();
     final boundaryKey = GlobalKey();
     await tester.pumpWidget(
       RepaintBoundary(
@@ -185,13 +192,11 @@ void main() {
             ChangeNotifierProvider<ImageSourceState>.value(
               value: imageSourceState,
             ),
-            ChangeNotifierProvider<LoupeWindowController>.value(
-              value: LoupeWindowController(),
-            ),
+            ChangeNotifierProvider<LoupeWindowController>.value(value: loupe),
             Provider<WindowModeUiContext>.value(
-              value: const WindowModeUiContext(
-                trayAvailable: false,
-                hotkeyStatus: HotkeyStatus(),
+              value: WindowModeUiContext(
+                trayAvailable: clickThrough,
+                hotkeyStatus: const HotkeyStatus(),
               ),
             ),
           ],
@@ -228,13 +233,36 @@ void main() {
       await tester.pump();
     }
 
-    final path = await writeScreenshot(
-      tester,
-      boundaryKey,
-      '$widthLabel-${dark ? 'dark' : 'light'}-$locale$suffix',
-    );
+    final base = '$widthLabel-${dark ? 'dark' : 'light'}-$locale';
+    if (clickThrough) {
+      // クリックスルー ON（復帰方法の案内バナー）の状態。viaDialog は、起動モードの
+      // ダイアログを開いてそのスイッチで ON にする（ON でダイアログが自動で閉じる）。
+      await tester.runAsync(() => loupe.setAppMode(AppMode.loupe));
+      if (viaDialog) {
+        await tester.tap(find.byIcon(Icons.window_outlined));
+        await tester.pumpAndSettle();
+        final dialogPath =
+            await writeScreenshot(tester, boundaryKey, '$base-dialog');
+        // ignore: avoid_print
+        print('[ui_screenshots] wrote $dialogPath');
+        await tester.runAsync(() async {
+          await tester.tap(find.byType(SwitchListTile).last);
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        });
+        await tester.pumpAndSettle();
+      } else {
+        await tester.runAsync(() => loupe.setClickThrough(true));
+        await tester.pump();
+      }
+    }
+
+    final path = await writeScreenshot(tester, boundaryKey, '$base$suffix');
     // ignore: avoid_print
     print('[ui_screenshots] wrote $path');
+    if (clickThrough) {
+      await tester.runAsync(() => loupe.setClickThrough(false));
+      await tester.runAsync(() => loupe.setAppMode(AppMode.settings));
+    }
   }
 
   // ハイコントラスト（OS 設定が有効なときに切り替わるテーマ）。ファイル名は
@@ -251,6 +279,36 @@ void main() {
         locale: 'ja',
         suffix: '-hc',
         highContrast: true,
+      ),
+      skip: !screenshotsEnabled,
+    );
+  }
+
+  // クリックスルー ON の復帰バナー（#63, #72）。ダイアログのスイッチで ON にすると
+  // ダイアログが自動で閉じ、主画面の案内が見える。低い広幅（1280x480）と既定
+  // ウィンドウ（800x600）でも、一覧とプレビューが破綻しないことを確認する。
+  for (final (label, width, height, viaDialog) in const <(
+    String,
+    double,
+    double,
+    bool
+  )>[
+    ('wide', 1280, 800, true),
+    ('wide-low', 1280, 480, false),
+    ('default-window', 800, 600, false),
+  ]) {
+    testWidgets(
+      'screenshot $label click-through banner',
+      (tester) => shoot(
+        tester,
+        widthLabel: label,
+        width: width,
+        height: height,
+        dark: false,
+        locale: 'ja',
+        suffix: '-clickthrough',
+        clickThrough: true,
+        viaDialog: viaDialog,
       ),
       skip: !screenshotsEnabled,
     );
