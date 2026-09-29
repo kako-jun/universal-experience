@@ -114,15 +114,17 @@
 - **クリックスルー**: 既定 **OFF**、切替式。起動直後は窓を掴んで移動・リサイズ
   したいのでイベントを受け取り、下のアプリを操作したいときユーザーが ON する。
   実装は `setIgnoreMouseEvents(true, forward: true)`。**ON にする操作は常に許可
-  する (#63)**: `LoupeWindowPolicy.canEnableClickThrough()` は常に true を返す。
-  トレイ・ホットキーというネイティブプラグイン依存の手段は「登録・作成成功」が
-  実際にユーザーが復帰操作できることを保証しないため、アプリ自身が保証できる
-  2 つの復帰経路を常に用意している: (a) クリックスルー ON のままウィンドウが
-  フォーカスを得たら自動で OFF にする（`LoupeWindowController.onWindowFocus`）、
-  (b) アプリ内で Esc を押したら解除する（`ReleaseClickThroughIntent`、
-  `app_shortcuts.dart`）。トレイ・ホットキーはこの上に乗る追加の便利な手段という
-  位置づけで、`WindowModePanel` はクリックスルーのスイッチ横に利用可能な復帰
-  手段をすべて併記する。
+  する (#63)**: クリックスルーはいつでも ON にしてよい（2 つの復帰経路が常に
+  あるため）。トレイ・ホットキーというネイティブプラグイン依存の手段は「登録・
+  作成成功」が実際にユーザーが復帰操作できることを保証しないため、アプリ自身が
+  保証できる 2 つの復帰経路を常に用意している: (a) クリックスルー ON のまま
+  ウィンドウがフォーカスを得たら「解除の予約」をし、実際に最初のキー入力が
+  あった時点で解除する（`LoupeWindowController.onWindowFocus` /
+  `releaseClickThroughOnFirstKeyPress`）、(b) アプリ内で Esc を押したら即座に
+  解除する（`ReleaseClickThroughIntent`、`app_shortcuts.dart`）。トレイ・
+  ホットキーはこの上に乗る追加の便利な手段という位置づけで、`WindowModePanel`
+  はクリックスルーのスイッチ横に利用可能な復帰手段をすべて併記する。詳細は
+  下記「クリックスルーの復帰経路」節。
 - **起動モード・最前面・クリックスルーは独立して永続化する (#63)**:
   `LoupeWindowController` 自身が `SharedPreferences`
   (`loupeWindow.appMode` / `loupeWindow.alwaysOnTop` / `loupeWindow.clickThrough`)
@@ -172,8 +174,8 @@ main.dart が `windowManager.show()` / `hide()` を `onShowLoupe` / `onHideLoupe
 3. **起動モード切替** — `LoupeWindowController.setAppMode()`（settings/loupe をトグル、#63）
 4. **最前面固定** — `LoupeWindowController.setAlwaysOnTop()`（#63）
 5. **クリックスルー** — `LoupeWindowController.setClickThrough()`（#63。settings
-   モード中の ON 拒否は `setClickThrough` 自身のガードに任せる。`canEnableClickThrough`
-   は常に true なので可否チェックは不要）
+   モード中の ON 拒否は `setClickThrough` 自身のガードに任せる。クリックスルーは
+   いつでも ON にしてよい（2 つの復帰経路が常にあるため）ので可否チェックは不要）
 6. (区切り線)
 7. **即切替フィルタ** (`quickColorVisionFilters()`) — よく使う色覚シミュレーションを
    直接適用: Protanopia / Deuteranopia / Tritanopia / Achromatopsia。
@@ -267,10 +269,10 @@ Linux debug ビルド成功で代替している:
 3 経路。起動モード・最前面・クリックスルーはいずれも `LoupeWindowController` 自身が
 `SharedPreferences` へ即時永続化し、次回起動時に復元する（詳細は上記
 「透過・最前面・クリックスルー」節）。永続化されたクリックスルーの起動時復元は
-`LoupeWindowController.restorePersistedClickThrough()` が担う。`canEnableClickThrough`
-が常に true になったため復帰手段の可用性を待つ必要はもう無いが、`main()` は
-診断ログのタイミングを揃えるため、引き続きトレイ/ホットキーの初期化が終わった
-あとにこれを呼ぶ構成のままにしている。
+`LoupeWindowController.restorePersistedClickThrough()` が担う。クリックスルーは
+いつでも ON にしてよい（2 つの復帰経路が常にあるため）ので復帰手段の可用性を
+待つ必要はもう無いが、`main()` は診断ログのタイミングを揃えるため、引き続き
+トレイ/ホットキーの初期化が終わったあとにこれを呼ぶ構成のままにしている。
 
 ## グローバルホットキー (#63)
 
@@ -316,7 +318,7 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
 
 - **keyUp が届く環境（macOS）**: 押す→ON、離す→OFF という正しい hold 挙動になる。
 - **keyUp が届かない環境（Windows・Linux）**: 毎回の押下が単純なトグルとして機能する。OS の
-  キーリピートで keyDown が連続送出されても、直前の keyDown から 400ms 未満の keyDown は
+  キーリピートで keyDown が連続送出されても、直前の keyDown から 1100ms 未満の keyDown は
   リピートとみなして無視するため、1 回の押下（連打）につき 1 回のトグルになる
   （`HotkeyActions._repeatDebounce`、#63）。
 
@@ -336,17 +338,35 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
 
 ### クリックスルーの復帰経路
 
-ネイティブプラグイン（hotkey_manager/tray_manager）の「登録・作成成功」は実際に
-ユーザーが復帰操作できることを保証しない。そのため、アプリ自身が保証できる
-2 つの復帰経路を常に実装し、これを「常に使える」ベースラインとする: (a) クリック
-スルー ON のままウィンドウがフォーカスを得たら自動で OFF にする
-（`LoupeWindowController.onWindowFocus`）、(b) アプリ内で Esc を押したら解除する
-（`ReleaseClickThroughIntent`、`app_shortcuts.dart`）。この 2 つが常に有効なため、
-`LoupeWindowPolicy.canEnableClickThrough()` は常に true を返し、クリックスルーを
-ON にする操作を禁止する必要はもう無い。トレイ・ホットキーは追加の便利な手段という
-位置づけで、`WindowModePanel` はクリックスルーのスイッチ横に、そのとき実際に使える
-復帰手段（フォーカス復帰・Esc は常時、トレイ・ホットキーは可用性に応じて）を
-すべて併記する。
+ネイティブプラグイン（hotkey_manager/tray_manager）の「登録・作成成功」は実際にユーザーが復帰操作できる
+ことを保証しない。そのため、アプリ自身が制御できる 2 つの復帰経路を実装し、これを「常に使える」ベース
+ラインとする:
+
+- **(a) フォーカス復帰＋最初のキー入力**: クリックスルー ON のままウィンドウがフォーカスを得ると
+  （`LoupeWindowController.onWindowFocus`）、即座には解除せず「解除の予約」だけする。予約中にアプリ内で
+  最初のキー入力を受け取った時点で解除する（`releaseClickThroughOnFirstKeyPress()`、`HardwareKeyboard` の
+  全イベントハンドラ経由）。フォーカスを失うと予約は取り消す（`onWindowBlur`）。フォーカスを得ただけで
+  即解除しないのは、トレイメニューを開いた・OS がユーザー操作を伴わずフォーカスを移しただけ（Windows の
+  `SetForegroundWindow` 等）のときに意図せず解除されるのを避けるため。
+- **(b) アプリ内 Esc**: クリックスルーが ON のとき、Esc を押すと即座に解除する
+  （`ReleaseClickThroughIntent`、`app_shortcuts.dart`）。
+
+この 2 つが揃っているため、クリックスルーはいつでも ON にしてよい（可否のチェックは不要）。トレイ・
+ホットキーは追加の便利な手段という位置づけで、`WindowModePanel` はクリックスルーのスイッチ横に、そのとき
+実際に使える復帰手段をすべて併記する（フォーカス復帰＋最初のキー入力・Esc は常時、トレイ・ホットキーは
+可用性に応じて）。
+
+> **実機未検証の注意**: フォーカス復帰＋最初のキー入力と Esc の組み合わせが、実際にすべてのプラット
+> フォーム（macOS/Linux/Windows）で意図どおり動くかは、この実装段階では実機確認していない。特に
+> Windows はトレイアイコンのクリックが `SetForegroundWindow` でこのウィンドウを前面化することがあり、
+> その挙動が「解除の予約」にどう影響するかは Windows 対応時に確認が必要（トレイ操作そのものではクリック
+> スルーは解除されず、その後アプリ内で最初のキー入力があった時点で解除される設計だが、実機での動作は
+> 未検証）。
+
+> **起動時の復元とフォーカスの競合の注意**: `restorePersistedClickThrough()` は起動時にクリックスルーを
+> `setClickThrough(true)` で直接復元するため、「解除の予約」は経由しない。起動直後、ウィンドウがまだ
+> フォーカスを得ていない状態で復元が走った場合、その後の最初のフォーカス取得＋キー入力で意図せず解除
+> されうる（初回起動直後のみに限られる特殊ケースで、通常のトグル操作には影響しない）。
 
 ## アプリ内キー操作 (#63)
 
