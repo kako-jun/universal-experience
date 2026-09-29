@@ -11,9 +11,7 @@ import '../../services/loupe_window_controller.dart';
 
 /// 起動モード・最前面固定・クリックスルー・グローバルホットキー一覧 (#63)。
 ///
-/// **色は `Theme.of(context).colorScheme` のロールだけを使う**（`home_screen.dart`
-/// の既存セクションはまだ `Colors.xxx` をハードコードしているが、この新しい
-/// ウィジェットだけは colorScheme ロールに従う、#63 の指示）。
+/// **色は `Theme.of(context).colorScheme` のロールだけを使う**（DESIGN.md）。
 class WindowModePanel extends StatelessWidget {
   const WindowModePanel({super.key});
 

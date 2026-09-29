@@ -234,7 +234,7 @@ class _HomeScreenState extends State<HomeScreen> {
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: Colors.indigo.shade700,
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
         const SizedBox(height: 8),
@@ -242,7 +242,7 @@ class _HomeScreenState extends State<HomeScreen> {
           l10n.headerSubtitle,
           style: TextStyle(
             fontSize: 16,
-            color: Colors.grey.shade600,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
       ],
@@ -258,7 +258,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.visibility, color: Colors.indigo.shade600),
+                Icon(Icons.visibility, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 12),
                 Text(
                   l10n.colorVisionSectionTitle,
@@ -276,7 +276,7 @@ class _HomeScreenState extends State<HomeScreen> {
               l10n.colorVisionSectionNote,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey.shade600,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -295,7 +295,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.tune, color: Colors.indigo.shade600),
+                Icon(Icons.tune, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 12),
                 Text(
                   l10n.intensitySectionTitle,
@@ -388,7 +388,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.science_outlined, color: Colors.indigo.shade600),
+                Icon(Icons.science_outlined, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -406,7 +406,7 @@ class _HomeScreenState extends State<HomeScreen> {
               l10n.advancedSectionNote,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey.shade600,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -432,7 +432,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.auto_awesome, color: Colors.indigo.shade600),
+                Icon(Icons.auto_awesome, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -450,7 +450,7 @@ class _HomeScreenState extends State<HomeScreen> {
               l10n.experienceSectionNote,
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey.shade600,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -473,7 +473,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         final l10n = AppLocalizations.of(context)!;
         return Card(
-          color: Colors.blue.shade50,
+          color: Theme.of(context).colorScheme.primaryContainer,
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -481,7 +481,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.info, color: Colors.blue.shade700),
+                    Icon(Icons.info, color: Theme.of(context).colorScheme.onPrimaryContainer),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -489,7 +489,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade900,
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
                         ),
                       ),
                     ),
@@ -500,7 +500,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   colorVisionTypeDescription(l10n, filter),
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.blue.shade800,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -508,7 +508,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   l10n.prevalenceLabel(colorVisionTypePrevalence(l10n, filter)),
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.blue.shade700,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
                     fontStyle: FontStyle.italic,
                   ),
                 ),

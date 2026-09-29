@@ -819,7 +819,9 @@ class _ImageView extends StatelessWidget {
   Widget build(BuildContext context) {
     final img = image;
     if (img == null) {
-      return const ColoredBox(color: Color(0x11000000));
+      return ColoredBox(
+        color: Theme.of(context).colorScheme.onSurface.withAlpha(0x11),
+      );
     }
     return CustomPaint(painter: _UiImagePainter(img), size: Size.infinite);
   }

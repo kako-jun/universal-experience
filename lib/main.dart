@@ -296,6 +296,8 @@ void main() async {
       size: LoupeWindowPolicy.defaultSize,
       minimumSize: LoupeWindowPolicy.minimumSize,
       center: true,
+      // 色の例外（DESIGN.md）: OS ウィンドウの下地色。Flutter のテーマが
+      // 立ち上がる前に window_manager へ渡す値で、ロールを引けない。
       backgroundColor: LoupeWindowPolicy.transparentForMode(loupeWindow.appMode)
           ? Colors.transparent
           : Colors.black,

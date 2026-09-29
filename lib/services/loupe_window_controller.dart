@@ -255,6 +255,8 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
   Future<void> setAppMode(AppMode mode) async {
     _appMode = mode;
     await _guard('setBackgroundColor', () async {
+      // 色の例外（DESIGN.md）: OS ウィンドウの下地色（透過/不透明黒）。
+      // Flutter のテーマの外側にあり、colorScheme のロールを引けない。
       await windowManager.setBackgroundColor(
         LoupeWindowPolicy.transparentForMode(mode)
             ? const Color(0x00000000)

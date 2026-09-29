@@ -501,8 +501,9 @@ class _CompareOriginalButtonState extends State<_CompareOriginalButton> {
                 height: 48,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color:
-                      comparing ? scheme.primaryContainer : Colors.transparent,
+                  // 非比較時は同じロールの alpha=0（Colors.transparent を使わない）。
+                  color: scheme.primaryContainer
+                      .withAlpha(comparing ? 255 : 0),
                   borderRadius: BorderRadius.circular(24),
                   border: _hasFocus
                       ? Border.all(color: scheme.primary, width: 2)

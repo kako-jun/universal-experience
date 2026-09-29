@@ -41,7 +41,7 @@ class FilterParamPanel extends StatelessWidget {
             l10n.advancedParamPanelHint,
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey.shade600,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontStyle: FontStyle.italic,
             ),
           );

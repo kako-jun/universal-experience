@@ -14,6 +14,7 @@ class IntensitySlider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final colorScheme = Theme.of(context).colorScheme;
     return Consumer2<FilterService, VisionFilterState>(
       builder: (context, filterService, visionState, _) {
         final isEnabled = visionState.isColorQuickSelection;
@@ -28,7 +29,9 @@ class IntensitySlider extends StatelessWidget {
                   l10n.intensityValue((filterService.intensity * 100).toInt()),
                   style: TextStyle(
                     fontSize: 16,
-                    color: isEnabled ? Colors.black87 : Colors.grey,
+                    color: isEnabled
+                        ? colorScheme.onSurface
+                        : colorScheme.onSurface.withValues(alpha: 0.38),
                   ),
                 ),
                 if (isEnabled)
@@ -39,8 +42,8 @@ class IntensitySlider extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14,
                       color: filterService.isActive
-                          ? Colors.green.shade700
-                          : Colors.orange.shade700,
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -67,7 +70,7 @@ class IntensitySlider extends StatelessWidget {
                   l10n.intensityHint,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey.shade600,
+                    color: colorScheme.onSurfaceVariant,
                     fontStyle: FontStyle.italic,
                   ),
                 ),

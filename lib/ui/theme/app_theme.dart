@@ -10,6 +10,8 @@ class AppTheme {
 
   /// Brand seed color. A calm teal/cyan that reads well for an
   /// accessibility-focused colour-vision tool.
+  ///
+  /// 色の例外（DESIGN.md）: カラートークン（colorScheme）の生成元そのもの。
   static const Color seedColor = Color(0xFF00897B);
 
   static ThemeData get lightTheme => _build(Brightness.light);

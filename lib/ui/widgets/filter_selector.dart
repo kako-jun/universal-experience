@@ -121,12 +121,7 @@ class FilterSelectorState extends State<FilterSelector> {
                       selectColorVision(filterService, visionState, type);
                     }
                   },
-                  selectedColor: Colors.indigo.shade100,
-                  checkmarkColor: Colors.indigo.shade700,
                   labelStyle: TextStyle(
-                    color: isSelected
-                        ? Colors.indigo.shade900
-                        : Colors.grey.shade700,
                     fontWeight:
                         isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
