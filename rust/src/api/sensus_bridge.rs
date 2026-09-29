@@ -1811,25 +1811,81 @@ pub(crate) mod tests {
     /// HearingFilter 側のメタデータも全 14 バリアントで panic せず呼べる。
     #[test]
     fn hearing_filter_metadata_covers_all_variants() {
-        let all: [HearingFilter; 14] = [
-            HearingFilter::HearingLoss,
-            HearingFilter::SuddenHearingLoss { freq_hz: 2000.0 },
-            HearingFilter::NoiseInducedHearingLoss,
-            HearingFilter::Tinnitus { freq_hz: 4000.0 },
-            HearingFilter::Hyperacusis,
-            HearingFilter::Misophonia { freq_hz: 1000.0 },
-            HearingFilter::Paracusis,
-            HearingFilter::Amusia,
-            HearingFilter::Dysmelodia,
-            HearingFilter::PitchShift { semitones: -2.0 },
-            HearingFilter::Diplacusis,
-            HearingFilter::AuditoryProcessingDisorder,
-            HearingFilter::Meniere,
-            HearingFilter::Labyrinthitis,
-        ];
-        for f in all {
+        for f in ALL_HEARING_FILTERS {
             let _ = hearing_filter_urgency(f);
             let _ = hearing_filter_urgency_escalation(f);
         }
+    }
+
+    /// 全 14 バリアントを列挙するヘルパ（#76 レビュー N7 で
+    /// `hearing_filter_metadata_covers_all_variants` /
+    /// `hearing_filter_to_sensus_roundtrips_from_sensus` の重複を避けるために抽出）。
+    const ALL_HEARING_FILTERS: [HearingFilter; 14] = [
+        HearingFilter::HearingLoss,
+        HearingFilter::SuddenHearingLoss { freq_hz: 2000.0 },
+        HearingFilter::NoiseInducedHearingLoss,
+        HearingFilter::Tinnitus { freq_hz: 4000.0 },
+        HearingFilter::Hyperacusis,
+        HearingFilter::Misophonia { freq_hz: 1000.0 },
+        HearingFilter::Paracusis,
+        HearingFilter::Amusia,
+        HearingFilter::Dysmelodia,
+        HearingFilter::PitchShift { semitones: -2.0 },
+        HearingFilter::Diplacusis,
+        HearingFilter::AuditoryProcessingDisorder,
+        HearingFilter::Meniere,
+        HearingFilter::Labyrinthitis,
+    ];
+
+    /// HearingFilter::to_sensus は from_sensus の逆写像（#76 レビュー N7。
+    /// VisionFilter 側の `vision_filter_from_sensus_roundtrips_to_sensus` と対）。
+    #[test]
+    fn hearing_filter_to_sensus_roundtrips_from_sensus() {
+        for f in ALL_HEARING_FILTERS {
+            let back = HearingFilter::from_sensus(f.to_sensus());
+            assert_eq!(back, f, "{f:?}: from_sensus(to_sensus) mismatch");
+        }
+    }
+
+    /// #76 レビュー S1: sensus 側の escalation 条件文が変わったら検知できるよう、
+    /// ブリッジが返す全条件文が既知の集合と一致することを固定する。ue 側の
+    /// `escalationConditionText`（l10n_extensions.dart）はこの集合をキーに
+    /// ja/en 訳を引くため、ここで変化を検知できればすぐ Dart 側の対応漏れに
+    /// 気付ける。
+    #[test]
+    fn escalation_condition_strings_match_known_set() {
+        use std::collections::BTreeSet;
+
+        let mut vision_conditions = BTreeSet::new();
+        for f in ALL_FILTERS {
+            for e in vision_filter_urgency_escalation(f) {
+                vision_conditions.insert(e.condition);
+            }
+        }
+        let expected_vision: BTreeSet<String> = [
+            "sudden, severe photophobia with eye pain or a headache (e.g. iritis)",
+            "recurrent or severe episodes",
+            "persistent pain or a change in vision",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        assert_eq!(vision_conditions, expected_vision);
+
+        let mut hearing_conditions = BTreeSet::new();
+        for f in ALL_HEARING_FILTERS {
+            for e in hearing_filter_urgency_escalation(f) {
+                hearing_conditions.insert(e.condition);
+            }
+        }
+        let expected_hearing: BTreeSet<String> = [
+            "a sudden drop in hearing, especially in one ear (possible sudden \
+             sensorineural hearing loss)",
+            "a new or worsening change, particularly in one ear",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        assert_eq!(hearing_conditions, expected_hearing);
     }
 }
