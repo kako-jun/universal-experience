@@ -206,7 +206,7 @@ class _LoupeHudBar extends StatelessWidget {
             bottom: Radius.circular(12),
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
