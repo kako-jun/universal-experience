@@ -87,7 +87,7 @@ VisionFilter? visionFilterForColorVisionType(ColorVisionType type) {
 /// このサービスは UI の選択状態（どのフィルタを・どの強度で選んでいるか）だけを
 /// 管理する。実描画のフィルタ適用は sensus 経路（`lib/rendering/
 /// cpu_vision_renderer.dart` の CPU `apply()`、#85）の役割で、このサービス
-/// 自身は呼ばない。色覚のクイック選択（`FilterSelector`/トレイ）は
+/// 自身は呼ばない。色覚のクイック選択（`FilterBrowser`/トレイ）は
 /// `lib/services/color_vision_selection.dart` の `selectColorVision` を経由
 /// してこのサービスと [VisionFilterState] の両方を明示的に更新し、before/after
 /// プレビュー（`before_after_view.dart`）は常に [VisionFilterState] だけを
@@ -102,7 +102,7 @@ VisionFilter? visionFilterForColorVisionType(ColorVisionType type) {
 /// [recommendedStrength] を初期値として返す（-opia は 1.0、-omaly は弱め）。
 /// [applyFilter] にわざわざ `intensity:` を渡さない限り、フィルタを切り替えても
 /// **切替前のタイプの強度は上書きされない** — 元のバグ（#52 監査 must）は
-/// `FilterSelector` / トレイの両方が `applyFilter(type)` を既定 intensity 1.0
+/// `FilterBrowser` / トレイの両方が `applyFilter(type)` を既定 intensity 1.0
 /// で呼んでいたため、フィルタを選ぶたびに保存済み強度が 1.0 に戻り、かつ
 /// protanomaly が protanopia と全く同じ見た目になっていたことだった。
 ///

@@ -1,6 +1,6 @@
 // `lib/services/color_vision_selection.dart` の単体テスト（#60）。
 //
-// `selectColorVision`/`deactivateColorVision` は FilterSelector・トレイ（両方
+// `selectColorVision`/`deactivateColorVision` は FilterBrowser・トレイ（両方
 // とも `TrayService._handleClick` から同じ関数を呼ぶ、`lib/services/
 // tray_service.dart` 参照）共通の唯一の入口。ここでは widget を介さず、
 // サービス 2 つの状態遷移だけを直接検証する。
@@ -9,7 +9,7 @@
 // 「FilterService.currentFilter が変わったときだけ」VisionFilterState へ
 // 反映していたため、advanced/プリセットを経由したあとに *同じ* 色覚型を
 // 再選択しても（型そのものは変わっていないので）反映されなかった。
-// FilterSelector のチップ・トレイのメニューはどちらもこの関数を直接呼ぶだけ
+// FilterBrowser のチップ・トレイのメニューはどちらもこの関数を直接呼ぶだけ
 // なので、この関数が「呼ばれるたびに無条件で反映する」ことさえ検証すれば、
 // トレイから再選択した場合も同じように直る。
 
@@ -88,7 +88,7 @@ void main() {
         '回帰: advanced を経由したあとに同じ色覚型を再選択しても正しく反映される '
         '（#60。以前の listener ミラーは currentFilter が変わらないため反応しなかった）',
         () {
-      // 1. protanopia を選ぶ（FilterSelector のチップ、またはトレイのメニュー
+      // 1. protanopia を選ぶ（FilterBrowser のチップ、またはトレイのメニュー
       //    どちらも selectColorVision を呼ぶだけなので区別なく再現できる）。
       selectColorVision(filterService, visionState, ColorVisionType.protanopia);
       expect(visionState.isColorQuickSelection, isTrue);
@@ -101,7 +101,7 @@ void main() {
       expect(visionState.isColorQuickSelection, isFalse);
 
       // 3. 同じ protanopia を再選択する（トレイのチェックボックスを再クリック
-      //    する操作、または FilterSelector の同じチップを再タップする操作に
+      //    する操作、または FilterBrowser の同じチップを再タップする操作に
       //    相当）。FilterService.currentFilter は型としては変化しない
       //    （protanopia → protanopia）が、選択操作そのものは行われている。
       selectColorVision(filterService, visionState, ColorVisionType.protanopia);

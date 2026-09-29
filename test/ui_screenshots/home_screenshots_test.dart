@@ -12,8 +12,8 @@
 //   {wide|narrow}-{light|dark}-{ja|en}.png        — ウィンドウ 1 枚ぶん
 //                                                    （wide=1280x800、narrow=800x700）
 //   wide-{light|dark}-ja-hc.png                    — ハイコントラストテーマ
-//   {wide|narrow}-{light|dark}-{ja|en}-full.png   — 縦に十分長い画面で全体を撮ったもの
-//                                                    （スクロール量の確認用）
+//   narrow-{light|dark}-{ja|en}-full.png          — 縦に十分長い画面で全体を撮ったもの
+//                                                    （狭幅の縦積みのスクロール量の確認用）
 //
 // 注意: after ペインは実ブリッジ（sensus の CPU `apply()`）を呼べないため、
 // レイアウト確認用の簡易フェイク（輝度への単純なブレンド）に差し替えている。
@@ -111,13 +111,14 @@ void main() {
     ('wide', 1280, 800),
     ('narrow', 800, 700),
   ];
-  // 組み合わせ: 広幅 × {light,dark} × {ja,en} + 狭幅 × light × ja。
+  // 組み合わせ: 広幅 × {light,dark} × {ja,en} + 狭幅 × light×ja / dark×en。
   final combos = <(String, bool, String)>[
     ('wide', false, 'ja'),
     ('wide', false, 'en'),
     ('wide', true, 'ja'),
     ('wide', true, 'en'),
     ('narrow', false, 'ja'),
+    ('narrow', true, 'en'),
   ];
 
   setUpAll(() async {
@@ -273,18 +274,21 @@ void main() {
       skip: !screenshotsEnabled,
     );
 
-    testWidgets(
-      'screenshot $tag (full length)',
-      (tester) => shoot(
-        tester,
-        widthLabel: widthLabel,
-        width: size.$2,
-        height: 4200,
-        dark: dark,
-        locale: locale,
-        suffix: '-full',
-      ),
-      skip: !screenshotsEnabled,
-    );
+    // 縦長の全体撮りは狭幅（縦積み）だけ。広幅は 3 カラムが 1 枚に収まる。
+    if (widthLabel == 'narrow') {
+      testWidgets(
+        'screenshot $tag (full length)',
+        (tester) => shoot(
+          tester,
+          widthLabel: widthLabel,
+          width: size.$2,
+          height: 4200,
+          dark: dark,
+          locale: locale,
+          suffix: '-full',
+        ),
+        skip: !screenshotsEnabled,
+      );
+    }
   }
 }

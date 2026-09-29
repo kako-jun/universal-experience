@@ -240,7 +240,7 @@ enum _Style {
         return const TextStyle(
           color: Color(0xFFFFD27F),
           fontSize: 13,
-          fontStyle: FontStyle.italic,
+          fontWeight: FontWeight.w500,
           height: 1.25,
         );
       // escalation の段見出し（emergency/earlyConsultation、#76 再レビュー

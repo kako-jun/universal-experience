@@ -5,8 +5,6 @@
 
   "nativeBridgeInitFailed": "ネイティブライブラリの読み込みに失敗しました。アプリを再インストールしてください。",
 
-  "headerTagline": "すべての感覚を、すべての人に。",
-  "headerSubtitle": "あらゆる視点を体験し、あらゆる困難を理解する。",
 
   "aboutTooltip": "このアプリについて",
   "aboutBody": "Universal Experience は、さまざまな障害への理解と共感を助けるアクセシビリティ・シミュレーションツールです。",
@@ -17,14 +15,10 @@
   "themeTooltipDark": "テーマ：ダーク",
   "themeTooltipHint": "{themeLabel}（タップで切り替え）",
 
-  "colorVisionSectionTitle": "色覚シミュレーション",
-  "colorVisionSectionNote": "フィルタの見え方は sensus（色覚アルゴリズムの正本）で計算します。ライブ画面への適用は画面キャプチャ経路の実装後に対応予定です。",
 
-  "intensitySectionTitle": "フィルタの強さ",
   "intensityValue": "強さ：{percent}%",
   "intensityActive": "適用中",
   "intensityInactive": "未適用",
-  "intensityHint": "フィルタを選ぶと強さを調整できます。",
 
   "clearFilter": "フィルタを解除",
   "clear": "クリア",
@@ -35,9 +29,6 @@
   "previewFailed": "プレビューの描画に失敗しました",
   "previewStaticFrameNote": "時間の経過で変化する見え方です。プレビューは動きのない1コマの静止画で表示しています。",
 
-  "advancedSectionTitle": "アドバンスト（sensus の全フィルタ）",
-  "advancedSectionNote": "sensus が公開する全 30 種の見え方を、カテゴリ別に選んでパラメータを調整できます。選んだ内容は上のプレビューに反映されます。",
-  "advancedParamPanelHint": "フィルタを選ぶとパラメータを調整できます。",
   "randomize": "ランダム生成",
 
   "prevalenceLabel": "有病率：{value}",
@@ -61,7 +52,6 @@
   "exportFailure": "エクスポートに失敗しました。もう一度お試しください。",
 
   "experienceSectionTitle": "体験プリセット",
-  "experienceSectionNote": "sensus が用意した複合的な体験です。タップするとその視覚フィルタが適用されます。聴覚症状を含むものもあります（音声再生は未対応です）。",
   "experienceMeniere": "メニエール病",
   "experienceMeniereDesc": "回転性めまいを繰り返し、低音域の難聴・耳のつまり感・低い唸るような耳鳴りを伴います。",
   "experienceBppv": "良性発作性頭位めまい症",
@@ -214,5 +204,19 @@
   "welcomeBannerBody": "よくある色覚の見え方（2型3色覚）を推奨の強さで最初に表示しています。ほかの見え方を選んだり、自分の画像で試したりできます。",
   "welcomeBannerChooseOtherAction": "ほかの見え方を選ぶ",
   "welcomeBannerTryPhotoAction": "自分の画像で試す",
-  "welcomeBannerDismiss": "閉じる"
+  "welcomeBannerDismiss": "閉じる",
+
+  "filterSearchLabel": "見え方を検索",
+  "filterSearchHint": "日本語・英語の名前で検索（/ キーでここへ移動）",
+  "filterSearchClearTooltip": "検索を消去",
+  "filterListHeading": "見え方を選ぶ",
+  "filterCategoryAll": "すべて",
+  "filterCategoryLabel": "カテゴリ",
+  "filterListNoResults": "一致する見え方がありません。",
+  "filterListSelectedSemantics": "選択中",
+  "adjustHeading": "調整",
+  "selectionEmptyTitle": "何も選択されていません",
+  "selectionEmptyBody": "一覧から見え方を選ぶと、ここに強さやパラメータが表示されます。",
+  "clickThroughOnBannerTitle": "クリックスルーが ON です。解除するには:",
+  "windowModeCloseButton": "閉じる"
 }

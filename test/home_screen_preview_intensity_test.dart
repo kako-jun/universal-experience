@@ -32,7 +32,7 @@ import 'support/vision_filter_metadata_fixture.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  // ExperiencePresets は実 FRB ブリッジ（experiences()）を要求し、プレーンな
+  // 体験プリセットの行は実 FRB ブリッジ（experiences()）を要求し、プレーンな
   // `flutter test` では呼べない。widget test 用の fixture に差し替える
   // （i18n_test.dart と同じ手法）。VisionFilterState の選択も urgency/
   // recommended_strength（#76/#77）で実ブリッジを要求するため同様に差し替える。
@@ -164,8 +164,8 @@ void main() {
 
     // IntensitySlider（色覚クイック選択の強度スライダー、#60）が唯一の Slider。
     final sliderFinder = find.byType(Slider);
-    await tester.scrollUntilVisible(sliderFinder, 80);
-    await tester.pump(const Duration(milliseconds: 300));
+    // 1200x4000 の 3 カラム（#72）では右カラム「調整」の先頭付近にあり、
+    // スクロールせずに hit test できる。
     expect(sliderFinder, findsOneWidget);
 
     await tester.drag(sliderFinder, const Offset(60, 0));

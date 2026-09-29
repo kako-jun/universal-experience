@@ -11,14 +11,6 @@
     "description": "Shown full-screen at startup when the Rust native bridge (RustLib.init(), #55) fails to load, instead of crashing."
   },
 
-  "headerTagline": "Every sense, for everyone.",
-  "@headerTagline": {
-    "description": "Hero headline on the home screen."
-  },
-  "headerSubtitle": "Experience every perspective, understand every challenge.",
-  "@headerSubtitle": {
-    "description": "Hero sub-headline on the home screen."
-  },
 
   "aboutTooltip": "About",
   "@aboutTooltip": {
@@ -53,19 +45,7 @@
     }
   },
 
-  "colorVisionSectionTitle": "Color Vision Simulation",
-  "@colorVisionSectionTitle": {
-    "description": "Title of the color-vision filter card."
-  },
-  "colorVisionSectionNote": "How the filter looks is computed by sensus (the source of truth for the color-vision algorithm). Live application to the screen will follow once the screen-capture path is implemented.",
-  "@colorVisionSectionNote": {
-    "description": "Explanatory note under the color-vision filter card."
-  },
 
-  "intensitySectionTitle": "Filter Intensity",
-  "@intensitySectionTitle": {
-    "description": "Title of the intensity-slider card."
-  },
   "intensityValue": "Intensity: {percent}%",
   "@intensityValue": {
     "description": "Current filter intensity as a percentage.",
@@ -80,10 +60,6 @@
   "intensityInactive": "Inactive",
   "@intensityInactive": {
     "description": "Status label when a filter is selected but not active."
-  },
-  "intensityHint": "Select a filter to adjust its intensity.",
-  "@intensityHint": {
-    "description": "Hint shown when no filter is selected so the slider is disabled."
   },
 
   "clearFilter": "Clear filter",
@@ -116,18 +92,6 @@
     "description": "Shown under the preview panes when the selected filter is time-dependent (e.g. vertigo, BPPV rotation) and the static preview can't show its motion (#60)."
   },
 
-  "advancedSectionTitle": "Advanced (all sensus filters)",
-  "@advancedSectionTitle": {
-    "description": "Title of the advanced section listing all 30 sensus filters."
-  },
-  "advancedSectionNote": "Pick from all 30 ways of seeing that sensus exposes, grouped by category, and adjust their parameters. What you pick is reflected in the preview above.",
-  "@advancedSectionNote": {
-    "description": "Explanatory note under the advanced section."
-  },
-  "advancedParamPanelHint": "Select a filter to adjust its parameters.",
-  "@advancedParamPanelHint": {
-    "description": "Hint shown in the parameter panel when no advanced filter is selected."
-  },
   "randomize": "Randomize",
   "@randomize": {
     "description": "Button that regenerates a random seed for a seed parameter."
@@ -161,7 +125,7 @@
   },
   "consultDisclaimer": "This is general guidance, not a medical diagnosis. It has not been reviewed by a medical professional. Source: sensus (a simulation library)'s public documentation, Medical notes.",
   "@consultDisclaimer": {
-    "description": "Full disclaimer shown in the UI (advanced filter panel; shown once per section, not per card, in experience presets — #76 re-review nit) alongside every consult note, stating this app does not diagnose and has not had medical review, with a citation to sensus's own Medical notes doc (#76 review M2, wording clarified in re-review nit: names sensus as a simulation library and its docs as the source). The actual URL is shown separately as selectable text (ConsultNoticeBlock / ConsultDisclaimerFooter), not embedded in this string."
+    "description": "Full disclaimer shown in the UI (right-hand adjustment column, always shown with the consult note for both advanced filters and experience presets) alongside every consult note, stating this app does not diagnose and has not had medical review, with a citation to sensus's own Medical notes doc (#76 review M2, wording clarified in re-review nit: names sensus as a simulation library and its docs as the source). The actual URL is shown separately as selectable text (ConsultNoticeBlock / ConsultDisclaimerFooter), not embedded in this string."
   },
   "consultDisclaimerShort": "Not a diagnosis; not medically reviewed. Source: sensus Medical notes",
   "@consultDisclaimerShort": {
@@ -215,10 +179,6 @@
   "experienceSectionTitle": "Experience Presets",
   "@experienceSectionTitle": {
     "description": "Title of the experience-presets section that lists composite vestibular experiences from the sensus bridge."
-  },
-  "experienceSectionNote": "Curated composite experiences from sensus. Tap one to apply its vision filter. Some include hearing symptoms (audio playback is not yet supported).",
-  "@experienceSectionNote": {
-    "description": "Explanatory note under the experience-presets section. Must not over-promise; audio is out of scope here."
   },
   "experienceMeniere": "Ménière's disease",
   "@experienceMeniere": {
@@ -576,5 +536,58 @@
   "welcomeBannerDismiss": "Got it",
   "@welcomeBannerDismiss": {
     "description": "Button that permanently dismisses the first-run welcome banner (#78)."
+  },
+
+  "filterSearchLabel": "Search ways of seeing",
+  "@filterSearchLabel": {
+    "description": "Label of the incremental search field above the unified filter list (#72). Names in both Japanese and English are searched."
+  },
+  "filterSearchHint": "Name in Japanese or English (press / to jump here)",
+  "@filterSearchHint": {
+    "description": "Hint inside the filter search field; mentions the / shortcut (#72)."
+  },
+  "filterSearchClearTooltip": "Clear search",
+  "@filterSearchClearTooltip": {
+    "description": "Tooltip of the button that empties the filter search field (#72)."
+  },
+  "filterListHeading": "Choose a way of seeing",
+  "@filterListHeading": {
+    "description": "Heading of the left column (selection) on the home screen (#72)."
+  },
+  "filterCategoryAll": "All",
+  "@filterCategoryAll": {
+    "description": "Category chip that shows every filter (#72)."
+  },
+  "filterCategoryLabel": "Category",
+  "@filterCategoryLabel": {
+    "description": "Semantics label of the group of category chips above the filter list (#72)."
+  },
+  "filterListNoResults": "No matching ways of seeing.",
+  "@filterListNoResults": {
+    "description": "Shown in the filter list when the search matches nothing (#72)."
+  },
+  "filterListSelectedSemantics": "Selected",
+  "@filterListSelectedSemantics": {
+    "description": "Semantics hint appended to the currently selected row of the filter list (#72)."
+  },
+  "adjustHeading": "Adjust",
+  "@adjustHeading": {
+    "description": "Heading of the right column (adjustment) on the home screen (#72)."
+  },
+  "selectionEmptyTitle": "Nothing selected",
+  "@selectionEmptyTitle": {
+    "description": "Empty state title of the adjustment column when no filter is selected (#72)."
+  },
+  "selectionEmptyBody": "Pick a way of seeing from the list, and its strength and parameters will appear here.",
+  "@selectionEmptyBody": {
+    "description": "Empty state body of the adjustment column when no filter is selected (#72)."
+  },
+  "clickThroughOnBannerTitle": "Click-through is ON. To turn it off:",
+  "@clickThroughOnBannerTitle": {
+    "description": "Heading of the always-visible recovery banner shown on the home screen while click-through is ON (#63, #72)."
+  },
+  "windowModeCloseButton": "Close",
+  "@windowModeCloseButton": {
+    "description": "Button that closes the launch-mode dialog (#72)."
   }
 }

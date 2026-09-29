@@ -217,7 +217,7 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
   // Seed the shared FilterService and VisionFilterState (#15/#60) from the
   // restored settings (#17) so the previously selected filter is reflected on
   // startup — through selectColorVision (#60), the single entry point that
-  // keeps both services in sync, same as FilterSelector/tray. No explicit
+  // keeps both services in sync, same as FilterBrowser/tray. No explicit
   // intensity override here (#57): the type's own remembered/recommended
   // strength (just loaded above) is used instead of resetting it.
   //

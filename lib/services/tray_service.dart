@@ -336,7 +336,7 @@ class TrayService with TrayListener {
 
   /// プレビューの選択の唯一の正本（#60）。トレイの色覚クイック選択は
   /// `lib/services/color_vision_selection.dart` の `selectColorVision` /
-  /// `deactivateColorVision` を経由してこれも更新する（#60。FilterSelector
+  /// `deactivateColorVision` を経由してこれも更新する（#60。FilterBrowser
   /// と同じ入口を通す）。
   final VisionFilterState visionFilterState;
 
@@ -391,7 +391,7 @@ class TrayService with TrayListener {
   /// 握り潰してアプリはウィンドウのみで動き続ける。
   ///
   /// [filterService]/[visionFilterState]/[loupeWindow] に listener を付け、
-  /// ウィンドウ内 UI（[FilterSelector]・advanced カタログ・体験プリセット・
+  /// ウィンドウ内 UI（[FilterBrowser]・advanced カタログ・体験プリセット・
   /// `WindowModePanel`）での選択・切替もトレイのチェックマークに反映される
   /// ようにする（#60/#63。トレイのチェックマークは [_rebuildMenu] が
   /// `visionFilterState.isColorQuickSelection` や `loupeWindow.appMode` 等から
@@ -448,7 +448,7 @@ class TrayService with TrayListener {
       alwaysOnTop: loupeWindow.alwaysOnTop,
       clickThrough: loupeWindow.clickThrough,
       // advanced/プリセットを選んでいる間は、色覚クイック選択のチェックマークを
-      // 出さない（#60。FilterSelector のチップ点灯と同じ判定）。
+      // 出さない（#60。FilterBrowser のチップ点灯と同じ判定）。
       activeFilter: visionFilterState.isColorQuickSelection
           ? filterService.currentFilter
           : ColorVisionType.none,

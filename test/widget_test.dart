@@ -22,9 +22,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/main.dart';
 import 'package:universal_experience/services/settings_service.dart';
+import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
+import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart';
 
 void main() {
+  // 統合フィルタ一覧（#72）は起動直後から体験プリセットの行を組むため、実 FRB
+  // ブリッジ（experiences()、FFI 未ロードの flutter test では呼べない）を
+  // fixture に差し替える。
+  setUp(() => experiencesProvider = () => const <Experience>[]);
+  tearDown(() => experiencesProvider = experiences);
+
   testWidgets('UniversalExperienceApp が例外なく起動し HomeScreen を表示する',
       (WidgetTester tester) async {
     // 永続化レイヤをモックして実ディスクを触らない（main() の settings.load()

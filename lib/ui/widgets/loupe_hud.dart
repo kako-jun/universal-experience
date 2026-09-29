@@ -190,7 +190,7 @@ class _LoupeHudBar extends StatelessWidget {
             (selectedStrength(visionState, filterService).clamp(0.0, 1.0) * 100)
                 .round();
         // #76 と同じく、喚起の解決は resolveConsultNotice 1 箇所に集約する
-        // （FilterParamPanel・ExperiencePresets・export と同じ経路）。
+        // （FilterParamPanel・ExperiencePresetTile・export と同じ経路）。
         final notice = filter == null
             ? null
             : resolveConsultNotice(

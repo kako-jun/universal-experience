@@ -22,16 +22,29 @@ import 'package:universal_experience/main.dart';
 import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/settings_service.dart';
+import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
+import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
 import 'support/vision_filter_metadata_fixture.dart';
 
 void main() {
-  setUp(installVisionFilterMetadataFixture);
-  tearDown(resetVisionFilterMetadataProviders);
+  setUp(() {
+    installVisionFilterMetadataFixture();
+    // 統合フィルタ一覧（#72）が体験プリセットの行を組むため、実ブリッジ
+    // （experiences()）を fixture に差し替える。
+    experiencesProvider = () => const <Experience>[];
+  });
+  tearDown(() {
+    experiencesProvider = experiences;
+    resetVisionFilterMetadataProviders();
+  });
 
   testWidgets(
       'スライダーをドラッグしている間、SettingsService は notifyListeners されない（MaterialApp 再構築なし、#57）',
       (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final settings = SettingsService();
     await settings.load();
@@ -51,21 +64,11 @@ void main() {
     await tester.pumpWidget(UniversalExperienceApp(settings: settings));
     await tester.pump();
 
-    // HomeScreen は縦に長い ListView（複数カード）。強度スライダーのカードは
-    // デフォルトのテストビューポートだとスクロール外で Element 化されておらず、
-    // かつ厳密に画面内に収まってもいない（hit test できない）ため、
-    // scrollUntilVisible で「見つかる かつ 実際に見える」ところまで動かす。
-    // ExperiencePresets カードのような、より下の（flutter_rust_bridge 初期化を
-    // 要求する）カードまでは踏み込まない範囲で止まる。
-    //
-    // advanced セクションの FilterParamPanel は、色覚クイック選択
-    // 由来のときは strength スライダーを出さないため（showsAdvancedStrengthSlider、#60）、
-    // Slider は IntensitySlider の 1 本だけになる。find.byType(Slider) のままでよい。
+    // 幅 1200 の 3 カラム（#72）では、強度スライダーは右カラム「調整」の先頭付近に
+    // あり、スクロールせずに hit test できる。色覚クイック選択由来のときは
+    // FilterParamPanel が strength スライダーを出さない（showsAdvancedStrengthSlider、
+    // #60）ため、Slider は IntensitySlider の 1 本だけ。
     final sliderFinder = find.byType(Slider);
-    await tester.scrollUntilVisible(sliderFinder, 80);
-    // scrollUntilVisible が仕込むスクロールはアニメーションのため、実際に位置が
-    // 収まるまで数フレーム進める（進めないと直後の drag が off-screen 判定になる）。
-    await tester.pump(const Duration(milliseconds: 300));
     expect(sliderFinder, findsOneWidget);
 
     // ここから先（実際に強度を動かす区間）だけを計測する。
