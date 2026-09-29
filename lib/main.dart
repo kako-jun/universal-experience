@@ -10,8 +10,11 @@ import 'dart:ui' show AppExitResponse;
 
 import 'l10n/app_localizations.dart';
 import 'l10n/l10n_extensions.dart';
+import 'models/disability_type.dart';
+import 'models/sample_catalog.dart';
 import 'services/color_vision_selection.dart';
 import 'services/filter_service.dart';
+import 'services/image_source_state.dart';
 import 'services/vision_filter_state.dart';
 import 'services/hotkey_actions.dart';
 import 'services/hotkey_service.dart';
@@ -45,6 +48,13 @@ final VisionFilterState visionFilterState = VisionFilterState();
 /// holder を持つため、ルーペ HUD（`loupe_hud.dart`）側の holder と衝突しない
 /// よう、ホットキー用に 1 つだけ生成して使い回す。
 final Object _hotkeyBypassSource = Object();
+
+/// トレイとウィンドウ UI で共有する [ImageSourceState]（プレビュー原画の選択の
+/// 唯一の正本、#78）。[filterService]/[visionFilterState] と同じ理由で
+/// アプリ最上位に 1 つだけ生成する。初期サンプルは [buildRootApp] が
+/// 起動時の選択済みフィルタ（[selectColorVision] でシードした直後の
+/// `visionFilterState.selectedId`）の推奨サンプルに合わせる。
+final ImageSourceState imageSourceState = ImageSourceState();
 
 /// トレイアイコンの Flutter アセットパス。`tray_manager` の `setIcon` が
 /// `data/flutter_assets/` 配下のこのパスを解決する。Windows でより精細に
@@ -210,7 +220,29 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
   // keeps both services in sync, same as FilterSelector/tray. No explicit
   // intensity override here (#57): the type's own remembered/recommended
   // strength (just loaded above) is used instead of resetting it.
-  selectColorVision(filterService, visionFilterState, s.filterType);
+  //
+  // #78: on a genuine first launch (s.isFirstRun — see that getter's doc),
+  // seed deuteranomaly (at its recommended strength, same mechanism as any
+  // other type) instead of s.filterType, and persist that choice immediately
+  // so isFirstRun is false on every later launch. A later explicit "Normal
+  // vision" pick persists `none` normally from then on (setFilterType's
+  // no-op guard no longer short-circuits once the in-memory type has moved
+  // off its struct default).
+  final seedType =
+      s.isFirstRun ? ColorVisionType.deuteranomaly : s.filterType;
+  selectColorVision(filterService, visionFilterState, seedType);
+  if (s.isFirstRun) {
+    await s.setFilterType(seedType);
+  }
+
+  // #78: seed the initial sample from the just-restored/seeded filter
+  // selection's recommendation, so the preview never starts on a sample that
+  // doesn't match the selected filter. followRecommendedSample (not
+  // selectSample) — this is auto-follow doing its normal job, not a manual
+  // pick, so auto-follow must stay enabled afterward.
+  imageSourceState.followRecommendedSample(
+    recommendedSampleIdForFilter(visionFilterState.selectedId),
+  );
 
   return (app: UniversalExperienceApp(settings: s), bridgeReady: true);
 }
@@ -437,6 +469,11 @@ class UniversalExperienceApp extends StatelessWidget {
         // selectColorVision (#60) update.
         ChangeNotifierProvider<VisionFilterState>.value(
           value: visionFilterState,
+        ),
+        // プレビュー原画（サンプル/ユーザー画像）の選択 (#78)。同じ理由で
+        // トップレベルの 1 個を使い回す。
+        ChangeNotifierProvider<ImageSourceState>.value(
+          value: imageSourceState,
         ),
         // ルーペ窓のモード/最前面/クリックスルー (#63)。同じ理由でトップレベルの
         // 1 個を使い回す（トレイ・main() の起動シーケンスと同じインスタンス）。

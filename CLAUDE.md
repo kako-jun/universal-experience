@@ -18,12 +18,15 @@ lib/
 ├── l10n/                   # 多言語化（ARB: app_en.arb / app_ja.arb、ja/en。生成物は非コミット）
 ├── models/
 │   ├── disability_type.dart
-│   └── vision_filter_catalog.dart   # sensus カタログ（30種）の Dart 側定義
+│   ├── vision_filter_catalog.dart   # sensus カタログ（30種）の Dart 側定義
+│   ├── sample_catalog.dart          # サンプル画像集（7種）+ フィルタ id ごとの推奨サンプル（#78）
+│   └── preview_image_source.dart    # プレビュー原画の値型（サンプル/ユーザー画像、#78）
 ├── rendering/
 │   ├── cpu_vision_renderer.dart     # sensus CPU apply() 経由、プレビュー描画の正本（#85）
 │   ├── color_matrices.g.dart        # sensus 由来 Machado 11段テーブルの生成物（GPU 経路専用）
-│   └── shader_filter.dart           # sensus 由来 GLSL → Impeller FragmentProgram 適用
-│                                     # （ライブ画面キャプチャ向けに残置、現状 production 未使用）
+│   ├── shader_filter.dart           # sensus 由来 GLSL → Impeller FragmentProgram 適用
+│   │                                 # （ライブ画面キャプチャ向けに残置、現状 production 未使用）
+│   └── image_fit.dart               # 任意画像を正準サイズの正方形へレターボックス（#78）
 ├── services/
 │   ├── app_shortcuts.dart           # アプリ内キー操作（/, ↑↓, ←→）の Intent 定義（#63）
 │   ├── color_vision_selection.dart  # 色覚クイック選択の唯一の入口（FilterService/
@@ -32,11 +35,12 @@ lib/
 │   ├── filter_service.dart          # 選択状態モデル（sensus VisionFilter へのマッピング）
 │   ├── hotkey_actions.dart          # グローバルホットキー4アクションの実処理（#63）
 │   ├── hotkey_service.dart          # hotkey_manager 登録の副作用層（#63）
+│   ├── image_source_state.dart      # プレビュー原画（サンプル/ユーザー画像）の選択の唯一の正本（#78）
 │   ├── loupe_rect_source.dart       # ルーペ矩形決定元のインターフェース（#44 向け seam、#63）
 │   ├── loupe_window_controller.dart # ルーペ窓のモード/透過/最前面/クリックスルー（#63）
 │   ├── native_bridge_service.dart   # flutter_rust_bridge（sensus-core）の bootstrap 初期化
 │   ├── preview_selection.dart       # プレビュー強度の出どころを一本化する判定（#60/#63）
-│   ├── settings_service.dart
+│   ├── settings_service.dart        # isFirstRun/welcomeBannerDismissed も持つ（#78）
 │   ├── tray_service.dart            # タスクトレイ
 │   ├── vision_filter_metadata.dart  # urgency/urgency_escalation/recommended_strength の
 │   │                                 # provider seam（sensus ブリッジが唯一の正本、#76/#77）
@@ -50,7 +54,9 @@ lib/
     │                                 # window_mode_panel（起動モード・最前面・クリックスルー・
     │                                 # ホットキー一覧、#63）,
     │                                 # loupe_hud（ルーペ窓モード限定の HUD。症状名・強度・
-    │                                 # 受診喚起・原画比較・設定を開く、#79）
+    │                                 # 受診喚起・原画比較・設定を開く、#79）,
+    │                                 # image_source_picker（サンプルチップ・ファイル選択・
+    │                                 # drag&drop、#78）, welcome_banner（初回案内、#78）
     └── theme/app_theme.dart
 
 rust/                        # sensus-core を FRB で公開する Rust crate
@@ -63,7 +69,9 @@ rust_builder/                 # cargokit 統合（#55）。flutter build/run 時
                                # macOS/Linux アプリへ同梱する FFI plugin（生成物、直接編集しない）
 
 tools/                       # シェーダ codegen（sensus の .frag → Impeller サブセットへ機械変換）
+                              # + generate_samples.dart（サンプル画像集の生成、#78）
 shaders/                     # 変換済み .frag（ビルド時 impellerc がコンパイル）
+assets/samples/              # サンプル画像集（自作・手続き生成、#78）。出典は README.md
 
 macos/                       # macOS ランナー（現行対応）
 linux/                       # Linux ランナー（現行対応）

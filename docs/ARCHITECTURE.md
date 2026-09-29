@@ -774,6 +774,45 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
 - `ExportService`: フィルタ適用後（after）画像のメタ焼き込み PNG エクスポート
 - `ExperiencePresets`（`lib/ui/widgets/experience_presets.dart`）: sensus の
   `experiences()` をワンタップ適用 UI として消費する（複合体験、#19）
+- `ImageSourceState`（`lib/services/image_source_state.dart`）: プレビューの
+  **原画**（before ペインの元画像）の選択状態を持つ、唯一の正本（#78）。
+  `VisionFilterState`（フィルタの選択）とは独立した軸で、内蔵サンプル 7 種
+  （`lib/models/sample_catalog.dart`）か、ユーザーが読み込んだ画像
+  （`ui.Image`、ファイル選択/ドラッグ＆ドロップ）のどちらかを指す
+  `PreviewImageSource`（`lib/models/preview_image_source.dart`。サンプルは
+  `sampleId` の値型、ユーザー画像は単調増加する `generation` で世代を区別する
+  値型 — `ui.Image` 自体に意味のある値等価性が無いため）を返す。フィルタが
+  変わると `home_screen.dart` のリスナー（`_persistFilterState` と同じ
+  subscribe-once パターン）が `followRecommendedSample` を呼び、そのフィルタの
+  推奨サンプル（`kRecommendedSampleByFilterId`）に自動で切り替える — ただし
+  ユーザー画像を表示中、または手動でサンプルを選んだ後（`selectSample`）は
+  no-op になる（`resetToRecommended` で自動追従を再開）。ユーザー画像の
+  `ui.Image` は本状態が所有し、差し替え・`clearUserImage`・`dispose()` の
+  いずれでも確実に dispose する（#58/#85 と同じ規律）。`BeforeAfterView` は
+  `imageSource`（nullable）を受け取り、非 null なら
+  `loadPreviewSourceImage`/`previewSourceImageLoader`（サンプルは
+  `rootBundle` からデコード、ユーザー画像はそのまま）→
+  `lib/rendering/image_fit.dart` の `fitImageToSquare`（縦横比を保った
+  レターボックス、中央クロップはしない — 余白の色はブリッジしにくい
+  `photophobia`/`night_blindness` 等への影響を避けた中間グレー固定）で
+  正準サイズへ収めてから既存の世代管理・dispose（#58/#85）に載せる。`null`
+  （production では到達しない legacy パス）は #78 以前からの色相グラデーション
+  （`generateSampleImage`/`sampleImageGenerator`）のまま — 既存 widget test群が
+  汎用のダミー正方形画像ファクトリとしてこれを使い続けられるようにしてある
+- `ImageSourcePicker`（`lib/ui/widgets/image_source_picker.dart`）:
+  サンプルチップ・「画像を選ぶ」ボタン（`file_selector`）・drag & drop
+  （`desktop_drop` の `DropTarget`）をまとめた、`BeforeAfterView` を包む
+  プレゼンテーション層。ファイル選択・ドロップのどちらも最終的に
+  `loadUserImageBytes`（デコード → `ImageSourceState.setUserImage`）という
+  同じ 1 本の経路を通る。画像はデコードしてメモリ上の `ui.Image` に変換する
+  だけで、ディスクへの保存や外部送信は一切しない（#78）
+- `WelcomeBanner`（`lib/ui/widgets/welcome_banner.dart`）: 初回起動時だけ出す
+  案内バナー（#78）。表示条件・恒久的な非表示は `SettingsService.
+  welcomeBannerDismissed`/`dismissWelcomeBanner()` に永続化する。初期選択
+  自体（deuteranomaly を推奨強度で）は `main.dart` の `buildRootApp()` が
+  `SettingsService.isFirstRun`（`filterType` が一度も永続化されていないかで
+  判定 — 明示的な「Normal vision」選択との区別のため専用の永続化キーは
+  持たない）を見て一度だけシードする
 
 ### 過去の設計: system-wide プラグイン（#13 で撤去）
 
@@ -856,6 +895,22 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
 - **タスクトレイ常駐**（#15、完了）: 実機でのトレイ表示・メニュー操作は環境制約
   （Wayland + grim、GNOME のトレイ拡張要件）のため未検証。純粋ロジックの単体テストと
   ビルド成功で代替している（上記「実機目視について」）
+- **プレビュー原画（#78）**: `sample_catalog_test.dart`（カタログ完全性・
+  `assets/samples/*.png` が `rootBundle` 経由でデコードでき正準サイズと一致
+  すること・`kRecommendedSampleByFilterId` が全 30 catalog id を過不足なく
+  カバーすること）、`image_source_state_test.dart`（自動追従/手動選択の相互
+  排他・ユーザー画像の世代管理と dispose）、`image_fit_test.dart`
+  （レターボックスの余白・source を dispose しない契約）、
+  `before_after_view_image_source_test.dart`（`imageSource` 変更時の
+  世代管理・再利用、#58/#85 と同じ規律を新しい軸で）、
+  `image_source_picker_test.dart`（file_selector/desktop_drop は実
+  platform channel を要するため flutter test では踏めない —
+  `pickImageBytes` seam のフェイクと、`DropTarget.onDragDone` を
+  ウィジェットツリーから見つけて合成 `DropDoneDetails` で直接呼ぶ手法で
+  実ブリッジなしにデコード経路を検証する）、`welcome_banner_test.dart`、
+  `first_run_seed_test.dart`（`buildRootApp()` の初回シードのみを狙い撃ちで
+  検証。共有トップレベル singleton を直接動かすため `tearDown` で明示的に
+  ニュートラル状態へ戻す）が担う
 
 ## 今後の拡張
 
@@ -868,3 +923,13 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   advanced フィルタとして選択・パラメータ調整はできる。live GPU 描画・専用 UI の
   拡張は個別 Issue（#59 等）で順次対応する。運動障害・認知障害は非目標
   （`README.md`「やらないこと（非目標）」参照）
+- **クリップボードからの画像貼り付け**（#78）: ファイル選択・ドラッグ＆
+  ドロップは実装済みだが、クリップボード貼り付け（`pasteboard`/
+  `super_clipboard` 等）は依存の重さ・スコープの見合いから後続 Issue に
+  分離した
+- **depth_aware_blur の配線**（#78 着手コメント参照）: `depth_landscape` の
+  深度マップ（`assets/samples/depth_landscape_depth.png`）は素材として同梱
+  済みだが、sensus の `depth_aware_blur`（近視/遠視/老視を距離依存のぼけで
+  表現する）自体はまだブリッジ経由で公開されておらず、現状のプレビューは
+  深度マップを消費しない。ユーザー画像がポートレート写真の場合の XMP 深度
+  読み込みも同じ後続 Issue の対象

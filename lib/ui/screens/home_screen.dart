@@ -4,8 +4,10 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/disability_type.dart';
+import '../../models/sample_catalog.dart';
 import '../../services/app_shortcuts.dart';
 import '../../services/filter_service.dart';
+import '../../services/image_source_state.dart';
 import '../../services/loupe_window_controller.dart';
 import '../../services/preview_selection.dart';
 import '../../services/settings_service.dart';
@@ -13,9 +15,11 @@ import '../../services/vision_filter_state.dart';
 import '../widgets/before_after_view.dart';
 import '../widgets/experience_presets.dart';
 import '../widgets/filter_selector.dart';
+import '../widgets/image_source_picker.dart';
 import '../widgets/intensity_slider.dart';
 import '../widgets/filter_catalog_selector.dart';
 import '../widgets/filter_param_panel.dart';
+import '../widgets/welcome_banner.dart';
 import '../widgets/window_mode_panel.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -27,6 +31,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   FilterService? _filterService;
+  VisionFilterState? _visionFilterStateForImageSource;
 
   /// `/`（アプリ内ショートカット、#63）で advanced カタログへフォーカスを移す
   /// ための FocusNode。検索欄が無い現状は、このカタログが `/` の唯一の対象。
@@ -58,6 +63,27 @@ class _HomeScreenState extends State<HomeScreen> {
       _filterService = filterService;
       _filterService!.addListener(_persistFilterState);
     }
+
+    // #78: switch the preview's sample to the newly-selected filter's
+    // recommendation whenever the selection changes (`ImageSourceState`
+    // itself no-ops unless auto-follow is active and no user image is
+    // loaded — see that class's doc). Same subscribe-once pattern as
+    // `_filterService` above, on `VisionFilterState` instead.
+    final visionState = context.read<VisionFilterState>();
+    if (!identical(visionState, _visionFilterStateForImageSource)) {
+      _visionFilterStateForImageSource
+          ?.removeListener(_followRecommendedSample);
+      _visionFilterStateForImageSource = visionState;
+      visionState.addListener(_followRecommendedSample);
+    }
+  }
+
+  void _followRecommendedSample() {
+    final visionState = _visionFilterStateForImageSource;
+    if (visionState == null) return;
+    context.read<ImageSourceState>().followRecommendedSample(
+          recommendedSampleIdForFilter(visionState.selectedId),
+        );
   }
 
   // Only filterType is persisted through SettingsService. Intensity is owned
@@ -77,6 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _filterService?.removeListener(_persistFilterState);
+    _visionFilterStateForImageSource?.removeListener(_followRecommendedSample);
     _catalogFocusNode.dispose();
     super.dispose();
   }
@@ -160,7 +187,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   padding: const EdgeInsets.all(24),
                   children: [
                     _buildHeaderSection(l10n),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
+                    const WelcomeBanner(),
+                    const SizedBox(height: 8),
                     const WindowModePanel(),
                     const SizedBox(height: 24),
                     _buildFilterSection(l10n),
@@ -286,8 +315,8 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 名前を正しく出す（#60。カタログは色覚を 5 種しか持たず、-omaly は
   /// base の -opia と同じカタログ id に写るため id だけでは区別できない）。
   Widget _buildPreviewSection() {
-    return Consumer2<VisionFilterState, FilterService>(
-      builder: (context, visionState, filterService, _) {
+    return Consumer3<VisionFilterState, FilterService, ImageSourceState>(
+      builder: (context, visionState, filterService, imageSourceState, _) {
         final theme = Theme.of(context);
         final l10n = AppLocalizations.of(context)!;
         return Card(
@@ -320,11 +349,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                BeforeAfterView(
-                  filter: visionState.build(),
-                  filterId: visionState.selectedId,
-                  strength: previewStrength(visionState, filterService),
-                  colorVisionType: visionState.colorVisionType,
+                ImageSourcePicker(
+                  child: BeforeAfterView(
+                    filter: visionState.build(),
+                    filterId: visionState.selectedId,
+                    strength: previewStrength(visionState, filterService),
+                    colorVisionType: visionState.colorVisionType,
+                    imageSource: imageSourceState.current,
+                  ),
                 ),
               ],
             ),
