@@ -57,7 +57,8 @@ lib/
     │                                 # 受診喚起・原画比較・設定を開く、#79）,
     │                                 # image_source_picker（サンプルチップ・ファイル選択・
     │                                 # drag&drop、#78）, welcome_banner（初回案内、#78）
-    └── theme/app_theme.dart
+    └── theme/app_theme.dart         # light/dark に加え highContrastTheme / highContrastDarkTheme
+                                      # （contrastLevel 1.0。OS のハイコントラスト設定で MaterialApp が自動選択、#72）
 
 rust/                        # sensus-core を FRB で公開する Rust crate
 ├── Cargo.toml
@@ -76,6 +77,14 @@ assets/samples/              # サンプル画像集（自作・手続き生成�
 macos/                       # macOS ランナー（現行対応）
 linux/                       # Linux ランナー（現行対応）
 # Android / Windows ランナーは計画中（未作成）
+
+DESIGN.md                    # UI 設計原則（カラートークン・タイポ・余白・コンポーネント・画面構成・検証方法、#72）
+
+test/
+├── no_hardcoded_colors_test.dart   # lib/ の色ハードコードを検出（例外は DESIGN.md の例外表と一致させる、#72）
+├── app_theme_test.dart             # ハイコントラストテーマの生成と MaterialApp での切替（#72）
+├── support/screenshot_harness.dart # スクリーンショット用フォント読込・PNG 書出し（フォントはコミットしない）
+└── ui_screenshots/                 # HomeScreen の PNG 書出し。`UE_SCREENSHOTS=1` のときだけ実行（DESIGN.md §8）
 
 docs/
 ├── adr/                     # 設計判断の正本（Architecture Decision Records）
@@ -181,6 +190,9 @@ flutter analyze
 flutter test
 flutter run
 ```
+
+UI を変える場合は先に `DESIGN.md` を読む（色は `colorScheme` のロールのみ、余白は 4 の倍数、
+画面構成の目標状態など）。スクリーンショットで確認する手順は DESIGN.md §8。
 
 ## CI
 

@@ -269,7 +269,8 @@ Rust は `rust/` の `cargo test` / clippy、flutter_rust_bridge の codegen に
 - Flutter 3.38.4+（`pubspec.lock` の `sdks` 準拠。`pubspec.yaml` の
   `sdk: '>=3.3.0 <4.0.0'` は flutter_rust_bridge の生成物が要求する下限にすぎない）
 - Provider (状態管理)
-- Material Design 3
+- Material Design 3（色は `colorScheme` のロールのみ。OS のハイコントラスト設定に追従するテーマあり。
+  UI 設計原則は [`DESIGN.md`](DESIGN.md)）
 - 多言語化は `flutter_localizations` + ARB（`lib/l10n/app_en.arb` / `app_ja.arb`、ja/en）
 - 色覚・複合症状のアルゴリズム正本は [`sensus-core`](https://crates.io/crates/sensus-core)（Rust crate）。
   ue は flutter_rust_bridge 経由で消費（フィルタ・`experiences()` 等。詳細は `docs/sensus-integration.md`）
