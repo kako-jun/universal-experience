@@ -6,13 +6,21 @@
 #
 # - build_runner は走らせない（--no-build-runner）。CI の新しい Dart SDK と
 #   freezed 2.x が使う analyzer が噛み合わず、build_runner が例外後に応答しなく
-#   なるため（#88）。`*.freezed.dart` は生成物をコミットしてあるので、FRB の
-#   Dart 出力との食い違いは後続の `flutter analyze` / `flutter test` で落ちる。
+#   なるため（#88）。`*.freezed.dart` はコミット済みの生成物で、この検証の比較対象
+#   外。FRB の Dart 出力と構造的に食い違えば `flutter analyze` / `flutter test` が
+#   落とすが、freezed のバージョンだけ上げて出力が stale になった場合は検出できない。
 # - Dart のフォーマッタは SDK のバージョンで出力が変わる（折り返し位置・末尾カンマ）。
 #   コミット済みの整形結果は新旧どちらの SDK でも不動点にならないため、Dart ファイルは
 #   空白と閉じ括弧直前の末尾カンマを除いた字句列で比較する。Rust 側（rustfmt）は
-#   そのまま比較する。
-# - 比較が終わったら（差分の有無に関わらず）作業ツリーを実行前の内容に戻す。
+#   そのまま比較する。この正規化は次の差を隠しうる: 文字列リテラル・コメント内の空白、
+#   1 要素レコード `(T,)` と括弧式 `(T)` の違い。
+# - 結果は CI の Flutter SDK に依存する（generate が内部で通す `dart fix` /
+#   `dart format` の挙動）。SDK 更新で空白・末尾カンマ以外の書き換えが起きれば偽陽性に
+#   なりうる（CI の Flutter は stable 浮動）。
+# - 比較・復元の対象は lib/src/rust/ と rust/src/frb_generated.rs のみ。codegen が
+#   それ以外（rust/src/lib.rs の `mod frb_generated;` 追記など）を書き換えても
+#   検出できず、復元もされない。
+# - 比較が終わったら（差分の有無に関わらず）対象を実行前の内容に戻す。
 #
 # 使い方: tools/check_frb_drift.sh  （差分があれば非 0 で終了）
 set -euo pipefail
@@ -44,6 +52,7 @@ status=0
 
 # ファイル集合の差（生成物の増減）。
 if ! diff <(cd "$orig/dart" && find . -type f | sort) <(cd "$DART_DIR" && find . -type f | sort); then
+  echo "DRIFT: file set changed（生成ファイルが増減）"
   status=1
 fi
 
