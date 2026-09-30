@@ -65,6 +65,7 @@ jobs:
             echo "手元で次を実行し、差分をコミットしてください（アトラスを変えたら PNG も再生成）:"
             echo "  uv run --with pillow==12.3.0 python3 tools/generate_font_atlases.py"
             echo "  dart run tools/generate_samples.dart"
+            echo "差分に D（削除）が出ている古いアトラスは、スクリプトが作らなくなったものです。手元でも git rm してください。"
             echo
             echo "$changed"
             exit 1

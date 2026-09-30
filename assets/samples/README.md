@@ -20,7 +20,8 @@
 この PNG が生成スクリプトの出力と一致していることは CI（`samples-sync`
 ワークフロー、`.github/workflows/samples-sync.yml`）が検証します。スクリプトや
 `tools/fonts/` を変えたら、必ず `dart run tools/generate_samples.dart` を実行して
-差分の PNG をコミットしてください（PNG だけを手で差し替えると CI が落ちます）。
+差分の PNG をコミットしてください（PNG だけを手で差し替えると CI が落ちます）。スクリプトが作らなくなった古い PNG が
+差分（削除）に出た場合は、手元でも `git rm` してください。
 
 ## 文字の出典（#99）
 

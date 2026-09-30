@@ -74,6 +74,7 @@ jobs:
             echo "::error::assets/samples が tools/generate_samples.dart の生成結果と一致しません。"
             echo "手元で次を実行し、差分の PNG をコミットしてください:"
             echo "  dart run tools/generate_samples.dart"
+            echo "差分に D（削除）が出ている古い PNG は、スクリプトが作らなくなったものです。手元でも git rm してください。"
             echo
             echo "$changed"
             exit 1

@@ -60,7 +60,8 @@ dart run tools/generate_samples.dart
 
 この再生成結果とコミット済みの `*.fnt` / `*.png` が一致することは CI
 （`font-atlas-sync` ワークフロー、`.github/workflows/font-atlas-sync.yml`）が
-検証します。`tools/generate_font_atlases.py` や `tools/fonts/` を変えた push/PR だけで
+検証します。`tools/generate_font_atlases.py` や `tools/fonts/` を変えた push/PR と手動実行（`workflow_dispatch`）だけで
 起動します。落ちたら上のコマンドで再生成して差分をコミットし、アトラスが変わったときは
 `dart run tools/generate_samples.dart` で `assets/samples/*.png` も更新します
-（こちらは `samples-sync` ワークフローが検証します）。
+（こちらは `samples-sync` ワークフローが検証します）。スクリプトが作らなくなった古い
+アトラスが差分（削除）に出た場合は、手元でも `git rm` します。
