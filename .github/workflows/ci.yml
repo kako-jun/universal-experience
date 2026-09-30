@@ -12,6 +12,9 @@ concurrency:
 
 jobs:
   check:
+    env:
+      # FRB codegen が cargo expand で使う（CI 実績のある版に固定）。
+      CARGO_EXPAND_VERSION: 1.0.126
     # Flutter golden テストはゴールデン生成時のプラットフォーム (macOS) と揃える必要が
     # あるため macos-latest。
     runs-on: macos-latest
@@ -50,15 +53,59 @@ jobs:
         run: flutter pub get
 
       # FRB codegen のドリフト検証（lib/src/rust/ と rust/src/frb_generated.rs が
-      # rust/src/api/ の Rust コードと同期していること）は
-      # 一度追加したが、CI (macOS runner) の `flutter_rust_bridge_codegen
-      # generate` が原因未特定のまま毎回ハングする（cargo-expand の自動
-      # インストール成功後、MIR パーサのログ行まで到達した直後から応答が
-      # 完全に止まる。ローカルでは同じコマンドが2秒未満で完了し再現しない。
-      # `timeout-minutes: 10` を付けても短縮されるだけで解消しなかった）ため、
-      # ステップごと撤去した。詳細な調査結果・再挑戦の方針は #88 を参照。
-      # 現状 CI ではこのドリフトを検知しない（手動での
-      # `flutter_rust_bridge_codegen generate` 実行と差分の目視確認に依存する）。
+      # rust/src/api/ の Rust コードと同期していること）。
+      #
+      # 以前は `flutter_rust_bridge_codegen generate` が CI でだけログ無しのまま
+      # ハングした（#88）。原因は codegen が内部で走らせる build_runner（freezed 用）:
+      # CI の新しい Dart SDK が書くコード（dot shorthand）を freezed 2.x が使う
+      # analyzer が解釈できず、例外のあと build_runner が終了しなくなる。そのため
+      # tools/check_frb_drift.sh は `--no-build-runner` で generate する
+      # （`*.freezed.dart` は比較対象外。構造的な不一致は後続の analyze/test が
+      # 落とすが、freezed のバージョンだけ上げた stale は検出できない）。
+      #
+      # cargo-expand と flutter_rust_bridge_codegen はソースビルドに約 4.5 分
+      # かかる。Rust cache（Swatinem/rust-cache）は完全ヒット時に保存し直さず、
+      # 実測で毎回ビルドになっていた。そこで 2 つのバイナリを actions/cache で
+      # 別途保存し、ヒット時は install をスキップする。キーは OS・アーキテクチャと
+      # 両ツールの版。保存は install 直後（restore と save を分けている）に行い、
+      # 後段のステップが落ちても次回以降に効くようにする。
+      - name: Resolve FRB codegen tool versions
+        id: frb
+        run: |
+          # codegen の版は rust/Cargo.toml の `flutter_rust_bridge = "=X.Y.Z"` から
+          # 取る（pubspec.yaml の flutter_rust_bridge と揃える版と同一。二重管理しない）。
+          version=$(sed -nE 's/^flutter_rust_bridge = "=([0-9.]+)".*/\1/p' rust/Cargo.toml)
+          test -n "$version"
+          echo "codegen=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Restore FRB codegen tools
+        id: frb-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-expand
+            ~/.cargo/bin/flutter_rust_bridge_codegen
+          key: frb-tools-${{ runner.os }}-${{ runner.arch }}-cargo-expand-${{ env.CARGO_EXPAND_VERSION }}-codegen-${{ steps.frb.outputs.codegen }}
+
+      - name: Install FRB codegen tools
+        if: steps.frb-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 15
+        run: |
+          cargo install cargo-expand --version "$CARGO_EXPAND_VERSION" --locked
+          cargo install flutter_rust_bridge_codegen --version "${{ steps.frb.outputs.codegen }}" --locked
+
+      - name: Save FRB codegen tools
+        if: steps.frb-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-expand
+            ~/.cargo/bin/flutter_rust_bridge_codegen
+          key: ${{ steps.frb-cache.outputs.cache-primary-key }}
+
+      - name: Verify FRB codegen has no drift
+        timeout-minutes: 15
+        run: tools/check_frb_drift.sh
 
       # shaders/*.frag・pubspec.yaml の shaders: ブロックが tools/sensus_shaders.g.json
       # と同期していることを明示的に確認する（#56）。test/shader_codegen_test.dart
@@ -190,7 +237,7 @@ jobs:
       - name: Flutter build linux
         run: flutter build linux --debug
 
-      # 完了条件: Rust ライブラリが実際に Linux バンドルの
+      # 完了条件（#55）: Rust ライブラリが実際に Linux バンドルの
       # lib/ に同梱されていることを確認する。ls -la でバンドル内容を可視化した上で、
       # 同じステップ内の test -f が対象ファイルの有無を判定し、無ければこの
       # ステップ自体が fail する。

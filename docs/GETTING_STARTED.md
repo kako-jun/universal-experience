@@ -129,7 +129,7 @@ universal-experience/
 │   └── ui/                # UIコンポーネント
 ├── rust/                  # sensus-core を FRB で公開する Rust crate（Dart バインディング lib/src/rust/ の生成元）
 ├── rust_builder/          # cargokit 統合（#55）。flutter build/run 時に rust/ をビルドし同梱する FFI plugin
-├── tools/                 # シェーダ codegen（sensus の .frag → Impeller サブセット変換）
+├── tools/                 # シェーダ codegen（sensus の .frag → Impeller サブセット変換）、FRB 生成物のドリフト検証（check_frb_drift.sh）
 ├── shaders/               # 変換済み .frag（ビルド時 impellerc がコンパイル）
 ├── macos/                 # macOS固有コード（現行対応）
 ├── linux/                 # Linux固有コード（現行対応）
@@ -162,6 +162,26 @@ flutter test
 
 # 特定のテスト実行
 flutter test test/filter_service_test.dart
+```
+
+### FRB 生成物のドリフト検証
+
+`rust/src/api/` を変えたら `flutter_rust_bridge_codegen generate` を実行して `lib/src/rust/`
+と `rust/src/frb_generated.rs` の差分をコミットする。同期しているかは次で確認でき、
+CI の `check` job でも同じスクリプトを実行する（#88）。差分があれば非 0 で終了し、
+実行後に作業ツリーは元の内容へ戻る。
+
+```bash
+tools/check_frb_drift.sh
+```
+
+前提は次の 2 つのインストール（版は CI と揃える。cargo-expand は
+`.github/workflows/ci.yml` の `CARGO_EXPAND_VERSION`、codegen は `rust/Cargo.toml` の
+`flutter_rust_bridge = "=X.Y.Z"` が正。下記は 2026-09 時点の値）。
+
+```bash
+cargo install cargo-expand --version 1.0.126 --locked
+cargo install flutter_rust_bridge_codegen --version 2.11.1 --locked
 ```
 
 ### コードフォーマット
