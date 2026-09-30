@@ -4,11 +4,13 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_catalog.dart';
+import '../../models/vision_filter_contract_notes.dart';
 import '../../services/preview_selection.dart';
 import '../../services/vision_filter_metadata.dart';
 import '../../services/vision_filter_state.dart';
 import '../../src/rust/api/sensus_bridge.dart';
 import 'consult_notice_block.dart';
+import 'strength_caution.dart';
 
 /// 選択中フィルタの [VisionParam] 定義から動的にパラメータ UI を生成するパネル。
 ///
@@ -89,6 +91,15 @@ class FilterParamPanel extends StatelessWidget {
     VisionFilterState state,
   ) {
     final percent = (state.strength * 100).toInt();
+    final caution = kStrengthCautionByFilterId[state.selectedId];
+    final slider = Slider(
+      value: state.strength,
+      min: 0.0,
+      max: 1.0,
+      divisions: 20,
+      label: '$percent%',
+      onChanged: (v) => state.setStrength(v),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -109,14 +120,23 @@ class FilterParamPanel extends StatelessWidget {
             ),
           ],
         ),
-        Slider(
-          value: state.strength,
-          min: 0.0,
-          max: 1.0,
-          divisions: 20,
-          label: '$percent%',
-          onChanged: (v) => state.setStrength(v),
-        ),
+        if (caution == null)
+          slider
+        else
+          // 上限付近の注意（#66）: 閾値の位置に印を描き、下に注記を出す。
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackShape: StrengthCautionTrackShape(
+                threshold: caution.threshold,
+                markColor: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            child: slider,
+          ),
+        if (caution != null) ...[
+          const SizedBox(height: 8),
+          StrengthCautionNote(caution: caution, strength: state.strength),
+        ],
       ],
     );
   }
