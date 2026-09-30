@@ -16,6 +16,7 @@
 //                                                  — クリックスルー ON の復帰バナー
 //                                                    （wide-low=1280x480、default-window=800x600）
 //   wide-light-ja-dialog.png                       — 起動モードのダイアログ（ON にする前）
+//   wide-{light|dark}-{ja|en}-languagedialog.png   — 言語ダイアログ（#82）
 //   narrow-{light|dark}-{ja|en}-full.png          — 縦に十分長い画面で全体を撮ったもの
 //                                                    （狭幅の縦積みのスクロール量の確認用）
 //
@@ -158,6 +159,7 @@ void main() {
     bool highContrast = false,
     bool clickThrough = false,
     bool viaDialog = false,
+    bool languageDialog = false,
   }) async {
     tester.view.physicalSize = Size(width, height);
     tester.view.devicePixelRatio = 1.0;
@@ -234,6 +236,11 @@ void main() {
     }
 
     final base = '$widthLabel-${dark ? 'dark' : 'light'}-$locale';
+    if (languageDialog) {
+      // AppBar の言語ボタンから開く言語ダイアログ（#82）。
+      await tester.tap(find.byIcon(Icons.language));
+      await tester.pumpAndSettle();
+    }
     if (clickThrough) {
       // クリックスルー ON（復帰方法の案内バナー）の状態。viaDialog は、起動モードの
       // ダイアログを開いてそのスイッチで ON にする（ON でダイアログが自動で閉じる）。
@@ -309,6 +316,27 @@ void main() {
         suffix: '-clickthrough',
         clickThrough: true,
         viaDialog: viaDialog,
+      ),
+      skip: !screenshotsEnabled,
+    );
+  }
+
+  // 言語ダイアログ（#82）。ファイル名は wide-{light|dark}-{ja|en}-languagedialog.png。
+  for (final (dark, locale) in const <(bool, String)>[
+    (false, 'ja'),
+    (true, 'en'),
+  ]) {
+    testWidgets(
+      'screenshot wide/${dark ? 'dark' : 'light'}/$locale language dialog',
+      (tester) => shoot(
+        tester,
+        widthLabel: 'wide',
+        width: 1280,
+        height: 800,
+        dark: dark,
+        locale: locale,
+        suffix: '-languagedialog',
+        languageDialog: true,
       ),
       skip: !screenshotsEnabled,
     );
