@@ -632,6 +632,32 @@ void main() {
     });
   });
 
+  group('-opia の強度だけを持つ版 1（旧実装は非空として復元していた）', () {
+    test('復元され、先にシードした色覚選択は解除される（未選択で始まる）', () async {
+      SharedPreferences.setMockInitialValues({
+        VisionFilterStore.keySnapshot: jsonEncode({
+          'version': 1,
+          'selectedId': null,
+          'filters': {
+            'protanopia': {'strength': 1.0},
+          },
+        }),
+      });
+      final state = VisionFilterState()
+        ..selectColorVisionType(ColorVisionType.protanopia, 'protanopia');
+
+      final store = VisionFilterStore();
+      final migrated = await store.migrateLegacyStrengths(
+          seedType: ColorVisionType.protanopia);
+      final restored = await store.restoreAndBind(state, snapshot: migrated);
+
+      expect(migrated, isNull, reason: '旧キーが無いので移行は何もしない');
+      expect(restored, isTrue);
+      expect(state.layers, isEmpty);
+      expect(state.selectedId, isNull);
+    });
+  });
+
   group('migrateLegacyStrengths（旧 settings.intensityByType の取り込み）', () {
     late VisionFilterState state;
 

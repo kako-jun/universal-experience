@@ -120,6 +120,7 @@ class VisionFilterSnapshot {
     this.strengthByKey = const {},
     this.paramsById = const {},
     this.fromLegacy = false,
+    this.legacyHadContent = false,
   });
 
   /// 適用順に並んだレイヤー列。
@@ -142,9 +143,17 @@ class VisionFilterSnapshot {
   /// （[VisionFilterStore] が、旧 per-type 強度の取り込みの要否の判断に使う）。
   final bool fromLegacy;
 
-  /// 何も保存すべきものが無い（層なし・記憶なし）か。
+  /// 版 1 の保存値が、変換で落とした記憶（-opia 4 種の強度）を含め何かを持っていたか。
+  /// 変換後の見かけが空でも、旧実装は「空でない保存値」として復元していた（未選択で
+  /// 始まった）。その挙動を保つため、[isEmpty] はこれも見る。
+  final bool legacyHadContent;
+
+  /// 何も保存すべきものが無い（層なし・記憶なし・版 1 の内容なし）か。
   bool get isEmpty =>
-      layers.isEmpty && strengthByKey.isEmpty && paramsById.isEmpty;
+      layers.isEmpty &&
+      strengthByKey.isEmpty &&
+      paramsById.isEmpty &&
+      !legacyHadContent;
 
   Map<String, Object?> toJson() => {
         'version': kVisionFilterSnapshotVersion,
@@ -228,15 +237,17 @@ class VisionFilterSnapshot {
         final id = raw['id'];
         final entry = id is String ? kVisionFilterCatalogById[id] : null;
         if (entry == null) continue;
-        final variant = raw['variantId'];
-        final variantId =
-            variant is String && isValidVariantFor(entry.id, variant)
-                ? variant
-                : null;
         final origin = raw['origin'] == VisionLayerOrigin.quick.name &&
                 _quickCapableIds.contains(entry.id)
             ? VisionLayerOrigin.quick
             : VisionLayerOrigin.advanced;
+        // 別名（-omaly）は quick 層だけが持つ。advanced 層に付いていたら捨てる。
+        final variant = raw['variantId'];
+        final variantId = origin == VisionLayerOrigin.quick &&
+                variant is String &&
+                isValidVariantFor(entry.id, variant)
+            ? variant
+            : null;
         // 層の params が無い・壊れているときは、id ごとの記憶 → 既定値の順で補う。
         final params = entry.parameters.isEmpty
             ? const <String, Object>{}
@@ -286,6 +297,7 @@ class VisionFilterSnapshot {
   static VisionFilterSnapshot _fromV1(Map json) {
     final strengthByKey = <String, double>{};
     final paramsById = <String, Map<String, Object>>{};
+    var droppedStrength = false;
     final filters = json['filters'];
     if (filters is Map) {
       for (final e in filters.entries) {
@@ -294,10 +306,12 @@ class VisionFilterSnapshot {
         final body = e.value;
         if (entry == null || body is! Map) continue;
         final strength = body['strength'];
-        if (strength is num &&
-            strength.isFinite &&
-            !_quickCapableIds.contains(entry.id)) {
-          strengthByKey[entry.id] = strength.toDouble().clamp(0.0, 1.0);
+        if (strength is num && strength.isFinite) {
+          if (_quickCapableIds.contains(entry.id)) {
+            droppedStrength = true;
+          } else {
+            strengthByKey[entry.id] = strength.toDouble().clamp(0.0, 1.0);
+          }
         }
         if (entry.parameters.isNotEmpty && body.containsKey('params')) {
           paramsById[entry.id] = sanitizeVisionParams(entry, body['params']);
@@ -340,6 +354,7 @@ class VisionFilterSnapshot {
       strengthByKey: strengthByKey,
       paramsById: paramsById,
       fromLegacy: true,
+      legacyHadContent: droppedStrength,
     );
   }
 }

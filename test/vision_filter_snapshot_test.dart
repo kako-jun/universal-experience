@@ -329,11 +329,21 @@ void main() {
       expect(orders, [...orders]..sort());
     });
 
-    test('別名（variantId）は対応する -opia の層にだけ付く', () {
+    test('別名（variantId）は対応する -opia の quick 層にだけ付く', () {
       final s = VisionFilterSnapshot.fromJson(_json(layers: [
-        _layer('protanopia', variantId: 'protanomaly'),
+        _layer('protanopia', variantId: 'protanomaly', origin: 'quick'),
       ]))!;
       expect(s.layers.single.variantId, 'protanomaly');
+      expect(s.layers.single.origin, VisionLayerOrigin.quick);
+
+      // advanced 層（origin が無い・advanced）に付いた別名は捨てる。
+      for (final origin in [null, 'advanced']) {
+        final a = VisionFilterSnapshot.fromJson(_json(layers: [
+          _layer('protanopia', variantId: 'protanomaly', origin: origin),
+        ]))!;
+        expect(a.layers.single.origin, VisionLayerOrigin.advanced);
+        expect(a.layers.single.variantId, isNull, reason: 'origin=$origin');
+      }
 
       for (final bad in [
         ('deuteranopia', 'protanomaly'), // 対応しない別名
@@ -343,7 +353,7 @@ void main() {
         ('achromatopsia', 'tritanomaly'),
       ]) {
         final t = VisionFilterSnapshot.fromJson(_json(layers: [
-          _layer(bad.$1, variantId: bad.$2),
+          _layer(bad.$1, variantId: bad.$2, origin: 'quick'),
         ]))!;
         expect(t.layers.single.variantId, isNull, reason: '$bad');
       }
@@ -710,6 +720,21 @@ void main() {
       expect(unknown.layers, isEmpty);
       expect(unknown.presetId, isNull);
       expect(unknown.isEmpty, isTrue);
+    });
+
+    test('-opia の強度だけを持つ版 1 は、強度を持ち越さなくても空として扱わない', () {
+      final s = VisionFilterSnapshot.fromJson(_v1(filters: {
+        'protanopia': {'strength': 1.0},
+      }))!;
+
+      expect(s.layers, isEmpty);
+      expect(s.strengthByKey, isEmpty);
+      expect(s.legacyHadContent, isTrue);
+      expect(s.isEmpty, isFalse, reason: '旧実装は非空の保存値として復元した');
+
+      final truly = VisionFilterSnapshot.fromJson(_v1())!;
+      expect(truly.legacyHadContent, isFalse);
+      expect(truly.isEmpty, isTrue);
     });
 
     test('選択中フィルタの payload は層と id ごとの記憶の両方に入る', () {
