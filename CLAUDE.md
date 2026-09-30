@@ -233,6 +233,14 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 再利用する（専用レンダラを持たない）。Before / After との関係と理由は
 `docs/adr/2026-09-30-color-vision-2x2-compare.md`。
 
+### 状態モデルの統一と多症状の同時適用（設計のみ）
+
+状態が 2 系統（`FilterService` の `ColorVisionType` 8 値（none + 7 型）/ `VisionFilterState` の 30 フィルタ）並行し、
+選択も 1 つだけという現状を、「カタログ id ごとに 1 つのレイヤー」の順序つき列（最大 5、色覚は排他、
+適用順は段で固定）に統一し、sensus の `Pipeline` で合成する方針。実装は Issue #117〜#125 の段階移行で、
+`ColorVisionType` / `FilterService` の削除は最後。判断・代替案は
+`docs/adr/2026-09-30-multi-select-filter-state-model.md`。実装が入るまでは現行の単一選択の記述が正。
+
 ### iOS非対応
 
 目標とする方式（ルーペ窓のライブキャプチャ。`docs/adr/2026-09-26-loupe-as-single-render-unit.md`、
