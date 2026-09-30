@@ -363,7 +363,6 @@ void main() {
 
     final holder = Object();
     renderedStrengths.clear();
-    final composedBeforeBypass = pipelineCalls.length;
     h.visionState.acquireBypass(holder);
     await tester.pump();
     for (var i = 0; i < 20; i++) {

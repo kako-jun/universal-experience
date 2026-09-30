@@ -929,9 +929,9 @@ void main() {
       await settleCells(tester, fakes.cellCalls, 4);
 
       // 空の間にソースを替える → 古い土台は捨てる。
-      await tester.pumpWidget(localized(ColorVisionCompareView(
+      await tester.pumpWidget(localized(const ColorVisionCompareView(
         strength: 0,
-        imageSource: const SamplePreviewImageSource('other'),
+        imageSource: SamplePreviewImageSource('other'),
         sampleSize: _kSize,
       )));
       await settleCells(tester, fakes.cellCalls, 8);
