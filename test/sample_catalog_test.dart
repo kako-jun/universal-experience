@@ -63,8 +63,7 @@ void main() {
       });
     }
 
-    test('日本語の案内板 info_board_ja がカタログにあり、文字素材として読める（#99）',
-        () async {
+    test('日本語の案内板 info_board_ja がカタログにあり、文字素材として読める（#99）', () async {
       final entry = kSampleCatalogById['info_board_ja'];
       expect(entry, isNotNull);
       expect(entry!.assetPath, 'assets/samples/info_board_ja.png');
@@ -85,10 +84,12 @@ void main() {
       expect(px(360, 150), 0x1E5AA8, reason: '駅の看板（青）');
       expect(px(580, 150), 0xC62828, reason: '営業中の看板（赤）');
 
-      // 看板の文字（白）が実際に描かれている: 各看板の中に白画素が十分ある。
-      int whiteIn(int x1, int x2) {
+      // 看板の文字（白）が実際に描かれている。範囲は文字の部分だけ（y 40〜200。
+      // 「出口」の下の矢印 y 200〜280 は含めない）に絞り、閾値は実測
+      // （出口 6369・駅 4177・営業中 11328）の 8 割前後にして、文字が無ければ落ちる。
+      int whiteIn(int x1, int x2, int y1, int y2) {
         var n = 0;
-        for (var y = 40; y < 280; y++) {
+        for (var y = y1; y < y2; y++) {
           for (var x = x1; x < x2; x++) {
             if (px(x, y) == 0xFFFFFF) n++;
           }
@@ -96,9 +97,10 @@ void main() {
         return n;
       }
 
-      expect(whiteIn(40, 320), greaterThan(2000), reason: '出口');
-      expect(whiteIn(340, 540), greaterThan(1000), reason: '駅');
-      expect(whiteIn(560, 984), greaterThan(3000), reason: '営業中');
+      expect(whiteIn(40, 320, 40, 200), greaterThan(5000), reason: '出口（文字）');
+      expect(whiteIn(40, 320, 200, 280), greaterThan(2000), reason: '出口の下の矢印');
+      expect(whiteIn(340, 540, 40, 280), greaterThan(3400), reason: '駅');
+      expect(whiteIn(560, 984, 40, 280), greaterThan(9000), reason: '営業中');
 
       // 表の小さな文字（24px）も描かれている: 表の領域に暗い画素が多数ある。
       var dark = 0;
@@ -109,7 +111,7 @@ void main() {
           if (lum < 300) dark++;
         }
       }
-      expect(dark, greaterThan(3000), reason: 'のりば案内の表の文字');
+      expect(dark, greaterThan(12000), reason: 'のりば案内の表の文字（実測 15928）');
     });
 
     test('depth_landscape の深度マップも同じ正準サイズでデコードできる', () async {
