@@ -36,7 +36,7 @@ import 'support/vision_filter_metadata_fixture.dart';
 /// [CpuVisionRenderer.applier] をフェイクに差し替える。実ブリッジでの実描画は
 /// `integration_test/cpu_preview_all_filters_test.dart`（CI）が担う。
 ///
-/// #85 レビュー S3/S4 で以下を変更した:
+/// #85 で以下を変更した:
 /// - CPU プレビューは固定の正準サイズ（[BeforeAfterView.canonicalSampleSize]）
 ///   で描画し、ペインの論理サイズ・devicePixelRatio には依存しない。旧
 ///   `group('自動サイズ調整 (#58: Retina 対策)', ...)`（DPR 連動・リサイズの
@@ -49,7 +49,7 @@ import 'support/vision_filter_metadata_fixture.dart';
 ///   直列化を確認する形に書き換えるか削除した（該当箇所にコメントで残す）。
 
 /// `_rebuild` は例外を `FlutterError.reportError` で報告するようになった
-/// （#58 レビュー nit-1）。意図的に失敗を起こすテストがそれで落ちないよう、
+/// （#58）。意図的に失敗を起こすテストがそれで落ちないよう、
 /// `FlutterError.onError` を収集用に差し替えて元に戻すためのヘルパ。
 ///
 /// `group`/`setUp` ではなく各テスト本体の中で呼ぶこと:
@@ -341,14 +341,14 @@ void main() {
         afterImageRenderer = BeforeAfterView.renderAfter;
       });
 
-      // #85 レビュー S3: `_scheduleRebuild` が実行を直列化する（同時に走る
+      // #85: `_scheduleRebuild` が実行を直列化する（同時に走る
       // ジョブは常に1本）ようになったため、以前このテストが前提にしていた
       // 「3件が本当に同時に in-flight」という状況はもう production コードから
       // 起こり得ない。2回目・3回目の要求は最新の1件だけが集約され、1回目が
       // 完了してから走る。
       testWidgets(
           '連続更新では中間の要求は集約され、最終的に最新の結果だけが残る '
-          '(#85 レビュー S3)', (tester) async {
+          '(#85)', (tester) async {
         late ui.Image before1;
         late ui.Image afterA, afterB;
         await tester.runAsync(() async {
@@ -412,7 +412,7 @@ void main() {
 
       testWidgets(
           'スライダーを連続で変化させても、同時に実行される afterImageRenderer は '
-          '1本を超えない (#85 レビュー S3)', (tester) async {
+          '1本を超えない (#85)', (tester) async {
         late ui.Image before1;
         final afterImages = <double, ui.Image>{};
         await tester.runAsync(() async {
@@ -562,19 +562,19 @@ void main() {
       });
 
       // 旧 "auto モードで初回生成が完了する前に filterType が変わっても..."
-      // (#58 レビュー M1) テストは削除した: M1 が守っていたのは「sampleSize
+      // (#58) テストは削除した: そのテストが守っていたのは「sampleSize
       // 未指定＝ペインのレイアウトから決まる auto モードで、初回生成が終わる
       // 前は _currentSampleSize が null のままなので didUpdateWidget が
       // 再生成をスキップしてしまう」という auto モード特有の不具合で、#85
-      // レビュー S4 で auto モード自体（レイアウト依存のサイズ決定）を撤去した
+      // #85 で auto モード自体（レイアウト依存のサイズ決定）を撤去した
       // ため前提が消滅した。「初期生成中に filter が変わっても最新の結果
       // だけが残る」という一般的な不変条件自体は、上の
-      // 「連続更新では中間の要求は集約され…」(#85 レビュー S3) テストで
+      // 「連続更新では中間の要求は集約され…」(#85) テストで
       // 別の切り口から検証済み。
 
       testWidgets(
           '_before を再利用するとき renderer には複製が渡され、複製は正しく dispose される '
-          '(#58 レビュー S2)', (tester) async {
+          '(#58)', (tester) async {
         late ui.Image before1, realAfter;
         await tester.runAsync(() async {
           before1 = await generateSampleImage(4);
@@ -628,11 +628,11 @@ void main() {
         expect(realAfter.debugDisposed, isFalse);
       });
 
-      // 旧 "捨てられる経路では複製が無条件に dispose される…" (#58 レビュー
-      // SHOULD-2) テストは削除した: このテストは「2件目・3件目の要求が本当に
+      // 旧 "捨てられる経路では複製が無条件に dispose される…" (#58)
+      // テストは削除した: このテストは「2件目・3件目の要求が本当に
       // 同時に in-flight で、3件目が先に解決し2件目（追い越された方）が後から
       // 解決する」という状況を作って `_rebuild` の discard 分岐（`isLatest ==
-      // false` の経路）を突く内容だった。#85 レビュー S3 で `_scheduleRebuild`
+      // false` の経路）を突く内容だった。#85 で `_scheduleRebuild`
       // が実行を直列化した結果、production コードからはそもそも2本の
       // `_rebuild` が同時に in-flight になり得なくなったため、この状況を
       // widget test から再現できなくなった（`_rebuild` 内の discard 分岐自体は
@@ -640,7 +640,7 @@ void main() {
 
       testWidgets(
           '保留中の要求がある状態で dispose したら、renderer は再び呼ばれない '
-          '(#85 レビュー N12)', (tester) async {
+          '(#85)', (tester) async {
         late ui.Image before1;
         await tester.runAsync(() async {
           before1 = await generateSampleImage(4);
@@ -692,7 +692,7 @@ void main() {
 
       testWidgets(
           'sampleSize 未指定のとき generator は canonicalSampleSize（1024）で'
-          '呼ばれる (#85 レビュー N12)', (tester) async {
+          '呼ばれる (#85)', (tester) async {
         late ui.Image stub;
         await tester.runAsync(() async {
           stub = await generateSampleImage(4);
@@ -717,7 +717,7 @@ void main() {
       });
     });
 
-    group('例外処理と復帰 (#58 レビュー S1)', () {
+    group('例外処理と復帰 (#58)', () {
       tearDown(() {
         previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
         afterImageRenderer = BeforeAfterView.renderAfter;
@@ -725,7 +725,7 @@ void main() {
 
       testWidgets(
           'generator/renderer の例外は FlutterError.reportError で報告される '
-          '(#58 レビュー nit-1)', (tester) async {
+          '(#58)', (tester) async {
         final reportedErrors = suppressFlutterErrorReporting();
         previewSourceImageLoader = (source, size) => Future<ui.Image>.error(
               StateError('boom: generator'),
@@ -873,14 +873,14 @@ void main() {
         expect(goodAfter.debugDisposed, isFalse);
       });
 
-      // 旧タイトルの「auto モードで」は #85 レビュー S4 で auto モード
+      // 旧タイトルの「auto モードで」は #85 で auto モード
       // （レイアウト依存のサイズ決定）自体を撤去したため取れたが、検証内容
       // （恒久的な失敗は busy loop にならず、ユーザー操作でのみ再試行される）
       // 自体は canonical サイズ描画でもそのまま成り立つ普遍的な不変条件。
       testWidgets(
           '恒久的な失敗が続いても busy loop にならず、'
           'ユーザー操作（intensity 変更）で再試行して成功する '
-          '(#58 レビュー MUST-1)', (tester) async {
+          '(#58)', (tester) async {
         suppressFlutterErrorReporting();
         late ui.Image goodBefore, goodAfter;
         await tester.runAsync(() async {
@@ -913,7 +913,7 @@ void main() {
         expect(generatorCallCount, 1);
 
         // 何もしなくても busy loop で再試行し続けない
-        // （1秒分ポンプしても呼び出し回数は変わらない。#85 レビュー S4 で
+        // （1秒分ポンプしても呼び出し回数は変わらない。#85 で
         // 自動リサイズのタイマー自体が無くなったため、そもそも自動で再試行
         // する経路が存在しない）。
         await tester.pump(const Duration(seconds: 1));
@@ -936,7 +936,7 @@ void main() {
       });
     });
 
-    group('失敗の表示と復帰 (#58 レビュー SHOULD-1)', () {
+    group('失敗の表示と復帰 (#58)', () {
       tearDown(() {
         previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
         afterImageRenderer = BeforeAfterView.renderAfter;
@@ -1010,7 +1010,7 @@ void main() {
       });
     });
 
-    group('export の caption (#85 レビュー S8)', () {
+    group('export の caption (#85)', () {
       // #76: _export は urgencyConsultMessage 用に visionFilterUrgencyProvider
       // （sensus ブリッジ）を呼ぶ。実ブリッジは native lib を要求するため
       // flutter test ではフィクスチャに差し替える。
@@ -1077,7 +1077,7 @@ void main() {
         expect(rendererCallCount, 1);
 
         // intensity を 0.5 に変える。_scheduleRebuild は実行中でなければ
-        // 即座に2回目を起動する（#85 レビュー S3）が、その2回目は上の
+        // 即座に2回目を起動する（#85）が、その2回目は上の
         // フェイクで意図的に未解決のまま止めてあるので、_after はまだ
         // 1回目（after1, strength=1.0）のままになる。
         await tester.pumpWidget(localized(const BeforeAfterView(
@@ -1093,7 +1093,7 @@ void main() {
         // ここで export をタップする。表示されている _after はまだ1回目の
         // 結果なので、caption も1回目の strength（100%）になるべき——
         // widget.strength の現在値（0.5 → 50%）を使ってはいけない
-        // （#85 レビュー S8）。
+        // （#85）。
         await tester.tap(find.byTooltip(en.exportButtonTooltip));
         // encodeImagePng は実エンジンの PNG エンコードを行う（フェイクにして
         // いない）ため、素の pump() だけでは終わらないことがある。他の
@@ -1420,7 +1420,7 @@ void main() {
 
       testWidgets(
           'emergency フィルタで export すると urgencyMessage・escalation・disclaimer を焼き込む '
-          '(#76 レビュー M1/S2)', (tester) async {
+          '(#76)', (tester) async {
         late ui.Image before1, after1, composedStub;
         await tester.runAsync(() async {
           before1 = await generateSampleImage(4);
@@ -1478,12 +1478,12 @@ void main() {
         expect(capturedCaption, isNotNull);
         expect(capturedCaption!.urgencyMessage, en.consultEmergency);
         expect(capturedCaption!.disclaimer, en.consultDisclaimerShort);
-        // #76 再レビュー M1': disclaimer は否定（診断ではない）・医療監修なし・
-        // 根拠の三つを 1 行に含む（最終レビュー nit）。
+        // #76: disclaimer は否定（診断ではない）・医療監修なし・根拠の三つを
+        // 1 行に含む。
         expect(capturedCaption!.disclaimer, contains('diagnos'));
         expect(capturedCaption!.disclaimer, contains('review'));
         expect(capturedCaption!.disclaimer, contains('sensus'));
-        // #76 再レビュー S-a: PNG でも escalation を段（見出し + 条件文）で
+        // #76: PNG でも escalation を段（見出し + 条件文）で
         // 焼き込む。
         expect(capturedCaption!.escalationGroups, hasLength(1));
         expect(
@@ -1498,7 +1498,7 @@ void main() {
 
       testWidgets(
           '描画中に filter が変わっても、export の caption は描画時点の filter の urgency になる '
-          '(#76 レビュー S2、#85 レビュー S8 と同じ規律)', (tester) async {
+          '(#76、#85 と同じ規律)', (tester) async {
         late ui.Image before1, after1, composedStub;
         await tester.runAsync(() async {
           before1 = await generateSampleImage(4);

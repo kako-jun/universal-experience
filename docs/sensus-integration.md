@@ -421,12 +421,12 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   0.25/0.75 はグリッド区間のちょうど中間（frac=0.5）にあたり、グリッド点だけでは
   検出できない「補間の式そのもの」の一致を確認できる。0.125/0.875（frac=0.25/0.75、
   2進で正確な 1/8・7/8）は、frac=0.5 だけでは検出できない lo/hi 取り違えバグを
-  捕まえる（`lerp(lo, hi, 0.5)` は lo/hi を入れ替えても同じ値になるため。#86
-  レビュー should-1、`rust/src/golden_gen.rs` のコメントで実際に取り違えて
+  捕まえる（`lerp(lo, hi, 0.5)` は lo/hi を入れ替えても同じ値になるため。#86、
+  `rust/src/golden_gen.rs` のコメントで実際に取り違えて
   再現・確認済み）。`test/protanopia_golden_test.dart` の strength=0.5 期待値も、
   この生成物由来のグリッド + `resolveSeverityMatrix` を使うよう更新した
   （手書きの `_lerpProtanopiaMatrix` を撤去）。
-- **高レベル API 自体の golden（#86 レビュー should-4）**:
+- **高レベル API 自体の golden（#86）**:
   `test/vision_filter_golden_test.dart` は `applyColorFilterGpu` に JSON 由来の
   生 uniform を直接流し込む経路のテストで、`before_after_view.dart` が実際に
   呼ぶ `applyDeuteranopiaGpu`/`applyTritanopiaGpu`/`applyAchromatopsiaGpu`
@@ -441,7 +441,7 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   暫定実装で、後に #85 で sensus の CPU `apply()` に置き換わった（§9 参照。GPU は
   将来のライブ画面キャプチャ（#1/#3/#4）向けに残るが、現状 production からは
   呼ばれない）。
-- **YAGNI 撤去（#86 レビュー should-3）**: 上記の結果、`canRender`（常に `true`
+- **YAGNI 撤去（#86）**: 上記の結果、`canRender`（常に `true`
   を返すだけになっていた）・「描画は近日対応」のプレースホルダ
   （`_ComingSoonPlaceholder` / ARB の `previewComingSoon`）・`home_screen.dart`
   の `previewUnsupportedNote` 分岐は、どの `ColorVisionType` からも到達しない
@@ -462,7 +462,7 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   `ColorVisionType` を `VisionFilter` へ写像し、`CpuVisionRenderer.applier`
   （production からも直接呼ぶ seam。`sampleImageGenerator`/
   `afterImageRenderer` と同じパターンだが、production コード自身が参照するため
-  `@visibleForTesting` は付けていない、#85 レビュー N1）へ委譲する形に置き換えた。
+  `@visibleForTesting` は付けていない、#85）へ委譲する形に置き換えた。
   レンダラ自体は任意の `VisionFilter`（payload 込み）を受け取れるため、advanced
   カタログ 30 種すべてを描画できる。
   **#60 での追補**: advanced カタログ・体験プリセットの UI 結線を終えた際、
@@ -489,7 +489,7 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   `FilterService` と `VisionFilterState` の両方を更新する形にした。
   `VisionFilterState` はこれに伴い `filterService` と同じくトップレベル
   singleton（`main.dart` の `visionFilterState`）に昇格した。
-- **alpha の扱い（レビュー S1、初版の誤り）**: Flutter の `ui.Image` は
+- **alpha の扱い（初版の誤り）**: Flutter の `ui.Image` は
   premultiplied alpha で GPU テクスチャを保持するが、sensus（`image` crate）は
   straight alpha を前提にした画素処理を行う。初版はこの違いを踏まえず
   `ImageByteFormat.rawRgba`（premultiplied を返す）で読み、
@@ -502,7 +502,7 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   premultiplied 前提が閉じたレイヤー）で行う。`test/cpu_vision_renderer_test.dart`
   が既知の透過ピクセル（alpha=128）を含む往復と `premultiplyStraightRgba8` の
   変換式そのものを検証する。
-- **デコードのハング（レビュー S2、初版の欠陥）**: 初版は `ui.decodeImageFromPixels`
+- **デコードのハング（初版の欠陥）**: 初版は `ui.decodeImageFromPixels`
   （コールバック API）で出力バイト列から `ui.Image` を組み立てていたが、この API
   はデコードに失敗した場合にコールバックが一度も呼ばれず `Future` が永久に
   解決しないことがある。`CpuVisionRenderer.rgba8ToImage` を
@@ -512,7 +512,7 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   `codec` は `finally` で必ず dispose する）。これにより既存の `_rebuild` の
   try/catch・失敗表示（#58）にそのまま乗る。`test/cpu_vision_renderer_test.dart`
   が、サイズの合わないバッファを渡すと（ハングせず）例外になることを検証する。
-- **実行の集約（レビュー S3）**: CPU `apply()` は GPU シェーダより重いため、
+- **実行の集約**: CPU `apply()` は GPU シェーダより重いため、
   スライダーの連続操作で `_rebuild` を何本も同時に実行すると実ブリッジ呼び出しが
   積み上がる。`_BeforeAfterViewState._scheduleRebuild` を新設し、`_rebuild` が
   実行中なら新しい要求は「最新の1件」だけを `_pendingRebuildSampleSize` に
@@ -520,7 +520,7 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   `_rebuild` 自体の世代管理・dispose・失敗表示（#58）は変更していない。
   `test/before_after_view_test.dart` が、連続更新で中間の要求が集約される
   ことと、同時に実行される `afterImageRenderer` が1本を超えないことを検証する。
-- **正準サイズでの描画（レビュー S4）**: 旧 GPU 時代（#58）はプレビューをペインの
+- **正準サイズでの描画**: 旧 GPU 時代（#58）はプレビューをペインの
   論理サイズ × `devicePixelRatio` に自動で追従させ、リサイズをデバウンスして
   いた。CPU プレビューではこれをやめ、常に固定の正準サイズ
   （`BeforeAfterView.canonicalSampleSize` = 1024）で描画し、表示側で
@@ -535,7 +535,7 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   余裕があるが、sensus 側の比率定数や canonical サイズ自体を変えるとこの余裕は
   変わる点に注意（`integration_test/cpu_preview_all_filters_test.dart` の
   コメント参照）。ペインサイズ連動の auto-sizing（#58）とそのテスト群は
-  丸ごと撤去した。トレードオフ（レビュー N11）: HiDPI で大きなペイン
+  丸ごと撤去した。トレードオフ: HiDPI で大きなペイン
   （物理ピクセル数が 1024 を超える）では逆に 1024px の画像を拡大表示する
   ことになり、`FilterQuality.medium` でも旧 auto-sizing 時代よりわずかに
   ぼやける。
@@ -597,10 +597,9 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   `surfaceContainerHighest`）を使う。`urgency_escalation()` の条件文
   （英語）は `l10n_extensions.dart` の `escalationConditionText` で ja/en の
   対応表を引き、訳が無ければ英語のままフォールバックする。喚起文からは診療科名
-  を外した（めまい系フィルタは眼科の話ではないため。Opus レビュー S4）。
-- **#76 レビュー M1: 喚起の解決とその表示を 1 箇所に共有化**。1 巡目の Opus
-  レビューで「パネル・プリセットカード・export でそれぞれ受診喚起を組み立てて
-  いて、3 か所が食い違いうる」という指摘（must）を受け、
+  を外した（めまい系フィルタは眼科の話ではないため）。
+- **喚起の解決とその表示を 1 箇所に共有化（#76）**。パネル・プリセットカード・
+  export でそれぞれ受診喚起を組み立てていると 3 か所が食い違いうるため、
   `lib/l10n/l10n_extensions.dart` の `ConsultNotice` / `resolveConsultNotice`
   （urgency + escalation → 喚起文・段ごとにまとめた escalation
   （`ConsultEscalationGroup`）・免責文をまとめて解決する唯一の関数）と、
@@ -610,27 +609,25 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   export（`ExportCaption` / `export_service.dart`）にも免責文（短い形）と
   escalation の行を必ず焼き込む。escalation は PNG でも emergency/
   earlyConsultation の見出しで段を分ける（`ExportCaption.escalationGroups`、
-  再レビュー S-a: `ConsultNotice.escalationGroups` をそのまま詰め替えるだけで、
+  `ConsultNotice.escalationGroups` をそのまま詰め替えるだけで、
   グルーピングのロジックはブリッジ層だけに置く）。
-- **#76 レビュー M2 / 再レビュー M1'・nit: 免責文に医療監修の非該当と出典を
-  明記**。UI 用の免責文（`consultDisclaimer`）に「医療監修を受けたものでは
+- **免責文に医療監修の非該当と出典を明記（#76）**。UI 用の免責文（`consultDisclaimer`）に「医療監修を受けたものでは
   ありません」を追加し、根拠として「シミュレーションライブラリ sensus の
   公開資料（[Medical notes 節](https://github.com/kako-jun/sensus/blob/main/docs/overview.md#medical-notes-when-to-see-a-doctor)）」
   への参照を示す（URL はその節を指すアンカー付き）。UI は
   `ConsultNoticeBlock`/`ConsultDisclaimerFooter` が URL を選択可能なテキスト
   として表示する（新規依存を避けるため、生きたハイパーリンクにはしていない）。
-  PNG 焼き込み用の短い形（`consultDisclaimerShort`）は、1 巡目レビューで
-  出典だけの「根拠: sensus Medical notes」にしていたが、2 巡目レビュー（M1'）
-  で「診断ではない旨と根拠の両方を 1 行に」という指摘を受け、
+  PNG 焼き込み用の短い形（`consultDisclaimerShort`）は、出典だけの
+  「根拠: sensus Medical notes」では診断ではない旨が伝わらないため、
+  診断ではない旨と根拠の両方を 1 行に入れた。
   en "Not a diagnosis; not medically reviewed. Source: sensus Medical notes" /
   ja「診断ではありません・医療監修なし。根拠: sensus Medical notes」に改めた。
-- **#76 レビュー N4 / 再レビュー S-a: escalation を emergency/earlyConsultation
-  で見出しを分ける**。現状 vision フィルタの escalation は全て
+- **escalation を emergency/earlyConsultation で見出しを分ける（#76）**。現状 vision フィルタの escalation は全て
   earlyConsultation だが、`HearingFilter` の聴力低下系は emergency 段も持つ
   （§10 冒頭参照）。聴覚側の UI（聴覚モードを足すかは #20 で判断）が同じグルーピングを再利用できるよう、
   UI（`ConsultNoticeBlock`）だけでなく PNG（`ExportCaption.escalationGroups`）
   でも両方の見出しを最初から用意した。
-- **#76 再レビュー nit: 体験プリセットの免責文はセクション単位で 1 回**。
+- **体験プリセットの免責文はセクション単位で 1 回（#76）**。
   体験プリセットの各カード（旧 `ExperiencePresets`。#72 で一覧は行のみになり喚起は右カラムが出す）は喚起文・escalation は出すが、免責文・根拠
   URL は出さない（`ConsultNoticeBlock(showDisclaimer: false)`）。代わりに
   「体験プリセット」セクションの末尾に `ConsultDisclaimerFooter` を 1 回だけ
@@ -638,10 +635,10 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   という要件はセクション単位で満たせばよい、という判断による。
   `FilterParamPanel`（1 フィルタだけを表示する画面）は従来どおり
   `ConsultNoticeBlock` の既定（`showDisclaimer: true`）のまま。
-- **#76 再レビュー S-b: emergency の文字サイズ**。`ConsultNoticeBlock` の
+- **emergency の文字サイズ（#76）**。`ConsultNoticeBlock` の
   emergency 喚起文は当初 `titleMedium`（16px、太字）にしていたが、
   体験プリセットのカードタイトル（旧 `ExperiencePresets`）（同じ `titleMedium` + bold）と見た目が
-  衝突するという指摘を受け、`bodyLarge`（16px、太字）に変更した。
+  衝突するため、`bodyLarge`（16px、太字）に変更した。
 - **#77: 推奨強度の唯一の正本**。`VisionFilterState` はフィルタ id ごとに
   strength/payload を記憶する（`_strengthById` / `_paramsById`）。初めて
   選ぶフィルタは `recommended_strength()` の値から始まり（旧仕様は全フィルタ
@@ -650,13 +647,13 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   ボタン（`resetToRecommended()`）で強度・パラメータの両方を戻せる。体験
   プリセット（`selectPreset`）は #60 で入れていた「強制的に 1.0 に戻す」を
   「常に推奨値に戻す」へ置き換え、パラメータも常にカタログ既定値へ戻す
-  （#76 レビュー N1）。既定値の組み立て（`_defaultParamsFor`）と推奨強度の
+  （#76）。既定値の組み立て（`_defaultParamsFor`）と推奨強度の
   解決（`_recommendedStrength`）は `_selectInternal`/`resetToRecommended`/
-  `selectPreset` の 3 箇所が共有する（#76 レビュー N3）。色覚のクイック選択
+  `selectPreset` の 3 箇所が共有する（#76）。色覚のクイック選択
   （#57）は従来どおり `FilterService`/`recommendedStrength(ColorVisionType)`
   のタイプ別記憶を使う（sensus 0.6.1 の CVD 3 型の推奨値は 1.0、-omaly 相当の
   `kAnomalyDefaultSeverity` は 0.6 のままで整合している）。
-  **既知の限界（#76 レビュー N8）**: `recommended_strength()` は sensus 側で
+  **既知の限界（#76）**: `recommended_strength()` は sensus 側で
   `f32` として計算される。FRB は `f32` をそのまま Dart の `double`（f64）へ
   渡すため、ビット拡張時の丸め誤差（実用上は無視できる程度、1e-7 未満）が
   乗る可能性がある。厳密な決定論的値（例えば永続化した値の再比較）が必要に
@@ -674,7 +671,7 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   実ブリッジとの一致自体は
   `integration_test/vision_filter_urgency_parity_test.dart` が検証する
   （sensus の escalation 条件文が変わっても、ja 訳が対応表に無ければこの
-  integration test が検知する、#76 レビュー S1）。
+  integration test が検知する、#76）。
 - **citation() / limitations()**: #80 で UI に配線した（右カラム最下段の
   `FilterProvenanceSection`。provider seam は `visionFilterCitationProvider` /
   `visionFilterLimitationsProvider`、実ブリッジとの一致と「出典を持つ 10 種」の
@@ -699,7 +696,7 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
     `axis_deg` は「ぼやける向き」ではなく**シャープ方向**（ぼかし方向は +90°）。
     ARB の言い換えを変えるときは `test/filter_explanations_test.dart` の対応表
     （sensus の定義の所在を注記）に合わせる。
-- **#65（永続化）向けの注意点（#76 レビュー N9）**: `VisionFilterState` の
+- **#65（永続化）向けの注意点（#76）**: `VisionFilterState` の
   `_strengthById`/`_paramsById` はそのまま永続化できる構造にしてあるが、
   `_paramsById` の値は seed パラメータを [BigInt] で持つ（`kSeedMax` 参照）。
   `BigInt` は `jsonEncode` が標準ではシリアライズできないため、#65 で永続化

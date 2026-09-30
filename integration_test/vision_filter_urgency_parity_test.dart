@@ -24,7 +24,7 @@ import 'package:universal_experience/services/native_bridge_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 
-/// [HearingFilter] の全 14 バリアント（#76 レビュー S1）。
+/// [HearingFilter] の全 14 バリアント（#76）。
 ///
 /// カタログ（[kVisionFilterCatalog]）は視覚フィルタしか持たないため、聴覚側は
 /// ここで直接列挙する。payload 付きバリアントは urgency/urgency_escalation が
@@ -177,7 +177,7 @@ void main() {
     });
   });
 
-  group('escalation 条件文の訳漏れ検知（#76 レビュー S1）', () {
+  group('escalation 条件文の訳漏れ検知（#76）', () {
     // sensus 側の条件文（英語）が変わる／増えると、escalationConditionText
     // （l10n_extensions.dart）の対応表に無いキーになり、デフォルト分岐で
     // 英語のまま返ってしまう。ここでは実ブリッジから集めた「今実際に存在する
