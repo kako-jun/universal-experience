@@ -221,7 +221,7 @@
   "clickThroughOnBannerTitle": "クリックスルーが ON です。解除するには:",
   "windowModeCloseButton": "閉じる",
   "languageSectionTitle": "言語",
-  "languageOptionSystem": "システムに合わせる",
-  "languageDialogNote": "トレイのメニューの言語も変わります。「システムに合わせる」は端末の言語を使い、未対応の言語のときは英語になります。",
+  "languageOptionSystem": "自動",
+  "languageDialogNote": "「自動」は端末の言語に合わせます（未対応の言語のときは英語）。トレイのメニューの言語も変わります。",
   "languageCloseButton": "閉じる"
 }
