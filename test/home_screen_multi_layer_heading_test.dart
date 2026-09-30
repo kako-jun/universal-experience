@@ -9,6 +9,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
+import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/preview_image_source.dart';
 import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
@@ -244,6 +245,23 @@ void main() {
           // 見出しが 64dp（3 行分の最小の高さ）を超えて折り返している場合も測れている。
           expect(tester.getTopLeft(images.at(0)).dy, greaterThan(64 + 8));
         }
+      });
+
+      testWidgets('名前の長さ $length 文字: 左右の見出しのラベルの先頭行も同じ高さ', (tester) async {
+        final name = List.filled(length, 'W').join();
+        final names = [name, name, name];
+        await pumpPanes(tester, names);
+        final l10n =
+            AppLocalizations.of(tester.element(find.byType(BeforeAfterView)))!;
+
+        final before = find.text(l10n.previewPaneOriginal);
+        final after = find.text(layerNamesSummary(l10n, names));
+        expect(before, findsOneWidget);
+        expect(after, findsOneWidget);
+        expect(tester.getTopLeft(before).dy, tester.getTopLeft(after).dy);
+        // 書き出しボタンは見出しの行の先頭（ラベルの上の余白 14dp と同じ高さ）に置く。
+        expect(tester.getTopLeft(find.byType(IconButton)).dy,
+            tester.getTopLeft(before).dy - 14);
       });
     }
   });

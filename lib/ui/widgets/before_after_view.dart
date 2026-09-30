@@ -812,8 +812,8 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                 false;
         final afterPane = _Pane(
           label: afterName,
-          // 複数層の見出しは切らずに折り返す。左右の見出し行の高さを揃えるため、
-          // 両ペインに同じ最小の高さを与える（[_Pane.wrapLabel]）。
+          // 複数層の見出しは切らずに折り返す。両ペインとも折り返し方式にして、
+          // ラベルの縦位置を揃える（[_Pane.wrapLabel]）。
           wrapLabel: multiLayer,
           // Export is only meaningful when a real "after" image exists.
           // The failed state (null _after) gets no button.
@@ -837,19 +837,17 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                 children: [beforePane, const SizedBox(height: 12), afterPane],
               )
             // 横並びは、見出しの行と画像の行を別々に組む。見出しが折り返して片方だけ高くなっても
-            // 左右の画像の上端が揃う（見出しの行は高い方に揃える）。
+            // 画像の行は見出しの行の下から始まるので、左右の画像の上端が揃う。
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(child: beforePane.buildHeading(context)),
-                        const SizedBox(width: 12),
-                        Expanded(child: afterPane.buildHeading(context)),
-                      ],
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: beforePane.buildHeading(context)),
+                      const SizedBox(width: 12),
+                      Expanded(child: afterPane.buildHeading(context)),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -1034,22 +1032,29 @@ class _Pane extends StatelessWidget {
     // 書き出しボタン（after 側だけ）を含む行は 48dp（タップ領域の下限、#45）。
     // before 側にも同じ高さを使うのは、左右の見出し行の高さを揃えて
     // 画像の上端をずらさないため。
+    final text = Text(
+      label,
+      style: theme.textTheme.labelLarge,
+      overflow: wrapLabel ? null : TextOverflow.ellipsis,
+    );
     return ConstrainedBox(
       constraints: BoxConstraints(
-        // 折り返す見出しは 3 行（labelLarge 14sp × 行高 1.43 ≒ 20dp の 3 行 = 60dp）まで
-        // 収まる高さ 64 を下限にする。4 行以上になる見出しの高さは、横並びでは
-        // [IntrinsicHeight] が左右で揃える。
-        minHeight: wrapLabel ? 64 : 48,
+        minHeight: 48,
         maxHeight: wrapLabel ? double.infinity : 48,
       ),
       child: Row(
+        // 折り返す見出し（複数層）は、ラベルの先頭行を左右で同じ高さに置く。左右で行数が違っても
+        // 縦位置がずれない。1 行の見出しは 48dp の中央（上下 14dp = (48 - 行高 20) / 2）。
+        crossAxisAlignment:
+            wrapLabel ? CrossAxisAlignment.start : CrossAxisAlignment.center,
         children: [
           Expanded(
-            child: Text(
-              label,
-              style: theme.textTheme.labelLarge,
-              overflow: wrapLabel ? null : TextOverflow.ellipsis,
-            ),
+            child: wrapLabel
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: text,
+                  )
+                : text,
           ),
           if (trailing != null) trailing!,
         ],
