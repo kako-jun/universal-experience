@@ -289,4 +289,4 @@ Rust は `rust/` の `cargo test` / clippy、flutter_rust_bridge の codegen に
 
 ## ライセンス
 
-MIT
+[MIT](LICENSE)

@@ -12,9 +12,8 @@ cargokit and bundles it into the Universal Experience macOS app (#55).
 Not a standalone plugin; not published.
                        DESC
   s.homepage         = 'https://github.com/kako-jun/universal-experience'
-  # README.md の「ライセンス」節と同じ MIT（リポジトリ直下に LICENSE ファイルは
-  # 無いため、:file 参照ではなく :type で明示する）。
-  s.license          = { :type => 'MIT' }
+  # リポジトリ直下の LICENSE（MIT）を参照する。
+  s.license          = { :type => 'MIT', :file => '../../LICENSE' }
   s.author           = 'kako-jun'
 
   # This will ensure the source files in Classes/ are included in the native
