@@ -85,7 +85,10 @@ class _FilterListTileState extends State<FilterListTile> {
         alignmentPolicy: isBeforeViewport
             ? ScrollPositionAlignmentPolicy.keepVisibleAtStart
             : ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
-        duration: const Duration(milliseconds: 150),
+        // OS の「視差効果を減らす」等（disableAnimations）ではスクロールを瞬時に（#45）。
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 150),
         curve: Curves.easeOut,
       );
     });
