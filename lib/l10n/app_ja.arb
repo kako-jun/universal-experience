@@ -35,6 +35,8 @@
   "prevalenceLabel": "有病率：{value}",
   "strengthLabel": "強さ：{percent}%",
   "resetToRecommendedStrength": "推奨値に戻す",
+  "strengthCautionMarkerNote": "スライダーの印（{percent}%）より先は、最も進行した段階の見え方です。強さ100%では視野のほぼすべてが失われ、中央のごく一部しか見えません。",
+  "strengthCautionNearLimit": "上限に近づいています。ほぼ真っ暗になるのは、視野のほぼすべてを失った、最も進行した段階を再現しているためで、故障ではありません。",
 
   "consultEarly": "このような症状が続くときは、一度医療機関で相談してみてください。",
   "consultEmergency": "このような症状が急に現れたときは、すぐに医療機関を受診してください。",
@@ -50,6 +52,8 @@
 
   "exportButtonTooltip": "PNG でエクスポート",
   "exportSuccess": "エクスポートしました：{path}",
+  "exportRevealAction": "フォルダで表示",
+  "exportRevealFailure": "フォルダを開けませんでした。",
   "exportFailure": "エクスポートに失敗しました。もう一度お試しください。",
 
   "experienceSectionTitle": "体験プリセット",

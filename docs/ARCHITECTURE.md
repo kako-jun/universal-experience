@@ -68,7 +68,7 @@
 > `surfaceContainerHighest`）で塗った専用ブロックに表示し、emergency は
 > earlyConsultation より大きい文字サイズにする。escalation は emergency/
 > earlyConsultation で見出しを分ける（vision フィルタは全て earlyConsultation
-> だが、`HearingFilter` の聴力低下系は emergency も持つため、聴覚側 UI #80 に
+> だが、`HearingFilter` の聴力低下系は emergency も持つため、聴覚側 UI（#20 で聴覚モードを足すか判断、FRB 公開は #10）に
 > 備える）。末尾には「医学的な診断ではない・医療監修を受けたものではない」旨と
 > sensus の Medical notes への参照を必ず添える（レビュー M2）。喚起文からは
 > 診療科名を外した（レビュー S4。めまい系フィルタは眼科の話ではないため）。
@@ -98,6 +98,14 @@
 > よう、S-b）。根拠 URL には Medical notes 節そのものを指すアンカーを付けた
 > （nit）。
 > 詳細は `docs/sensus-integration.md` §10。
+>
+> **追補（#66）**: sensus の API 契約上ユーザーに知らせるべき挙動（#51 の契約注記）のうち、
+> UI に出すものは `lib/models/vision_filter_contract_notes.dart`（定義: フィルタ id →
+> 強度の上限付近の注意の閾値）と `lib/ui/widgets/strength_caution.dart`（閾値位置の印
+> `StrengthCautionTrackShape` と注記 `StrengthCautionNote`）が担い、`FilterParamPanel` の
+> 強度スライダが使う。sensus-core 0.6.1 のメタデータ API には該当項目が無いので、
+> 対象・閾値は ue が持ち、文言は ARB（ja/en 対称）。受診喚起（`ConsultNoticeBlock`）の
+> 位置・表現は変えない。処理状況は `docs/sensus-integration.md` §11。
 
 ## ルーペ窓挙動 (#14)
 
@@ -807,7 +815,18 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   あるが、その機能自体が未実装のため**現状 production コードから呼ばれることは
   ない**。GPU と CPU の等価性は `test/vision_filter_golden_test.dart` 等の
   GPU golden テストが（production の呼び出しとは独立に）担保する
-- `ExportService`: フィルタ適用後（after）画像のメタ焼き込み PNG エクスポート
+- `ExportService`: フィルタ適用後（after）画像のメタ焼き込み PNG エクスポート。
+  書き出し先は Downloads。macOS のサンドボックスでは `getDownloadsDirectory()` が
+  コンテナ内 `Data/Downloads`（実 `~/Downloads` へのシンボリックリンク）を返し、
+  `files.downloads.read-write` entitlement が無いとリンク先への書き込みが拒否される
+  想定（#64。修正前の実機挙動は未検証）。`savePngInto` は保存先とファイルの最終パスを `resolveSymbolicLinks` で
+  実パスにして返す（SnackBar・クリップボード・「フォルダで表示」用）。ファイル名は
+  日付＋時刻（`exportFilename`）で、同名があっても `writeBytesWithoutOverwrite` が
+  `File.create(exclusive: true)` で連番にし上書きしない（書き込み失敗時は作りかけの
+  ファイルを消す）。成功 SnackBar の「フォルダで表示」は `revealInFolder`
+  （コマンドと成功条件の決定は pure な `revealCommandFor`。macOS は終了コード 0、
+  Windows は終了コード無視、Linux は `xdg-open` を切り離して起動）。判断の経緯は
+  `docs/adr/2026-09-30-export-png-to-downloads.md`
 - `ExperiencePresetTile`（`lib/ui/widgets/experience_presets.dart`）: sensus の
   `experiences()` をワンタップ適用の行として消費する（複合体験、#19）。統合一覧
   `FilterBrowser` の最上段に並ぶ（#72）

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
+import '../../models/vision_filter_contract_notes.dart';
 import '../../services/filter_service.dart';
 import '../../services/vision_filter_state.dart';
 
@@ -36,7 +37,7 @@ class IntensitySlider extends StatelessWidget {
               spacing: 8,
               children: [
                 Text(
-                  l10n.intensityValue((filterService.intensity * 100).toInt()),
+                  l10n.intensityValue(strengthPercent(filterService.intensity)),
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: isEnabled
                         ? colorScheme.onSurface
@@ -69,7 +70,7 @@ class IntensitySlider extends StatelessWidget {
               min: 0.0,
               max: 1.0,
               divisions: 20,
-              label: '${(filterService.intensity * 100).toInt()}%',
+              label: '${strengthPercent(filterService.intensity)}%',
             ),
           ],
         );

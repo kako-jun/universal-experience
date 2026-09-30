@@ -19,6 +19,7 @@ lib/
 ├── models/
 │   ├── disability_type.dart
 │   ├── vision_filter_catalog.dart   # sensus カタログ（30種）の Dart 側定義
+│   ├── vision_filter_contract_notes.dart # sensus API 契約上の注意の定義（強度の上限付近の警告の対象・閾値、#66）
 │   ├── sample_catalog.dart          # サンプル画像集（7種）+ フィルタ id ごとの推奨サンプル（#78）
 │   └── preview_image_source.dart    # プレビュー原画の値型（サンプル/ユーザー画像、#78）
 ├── rendering/
@@ -32,7 +33,7 @@ lib/
 │   ├── clipboard_image_reader.dart  # クリップボード画像取得の seam（実体は pasteboard、#97）
 │   ├── color_vision_selection.dart  # 色覚クイック選択の唯一の入口（FilterService/
 │   │                                 # VisionFilterState を同時更新、#60）
-│   ├── export_service.dart          # PNG エクスポート（メタ焼き込み）
+│   ├── export_service.dart          # PNG エクスポート（メタ焼き込み・Downloads へ非上書き保存・フォルダで表示、#43/#64）
 │   ├── filter_list_selection.dart   # 統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行）の
 │   │                                 # 検索・選択入口・↑↓ の順送りの純粋ロジック（#72）
 │   ├── filter_service.dart          # 選択状態モデル（sensus VisionFilter へのマッピング）
@@ -56,6 +57,7 @@ lib/
     │                                 # intensity_slider, before_after_view,
     │                                 # experience_presets（体験プリセットの行 ExperiencePresetTile）, filter_param_panel,
     │                                 # consult_notice_block（受診喚起の共有表示ウィジェット、#76）,
+    │                                 # strength_caution（強度スライダの上限付近の印・注記、#66）,
     │                                 # window_mode_panel（起動モード・最前面・クリックスルー・
     │                                 # ホットキー一覧を持つ。AppBar のダイアログで開く、#63/#72）,
     │                                 # loupe_hud（ルーペ窓モード限定の HUD。症状名・強度・

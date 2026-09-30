@@ -119,6 +119,17 @@
   "@resetToRecommendedStrength": {
     "description": "Button that resets the selected filter's strength and parameters back to sensus's recommended_strength and the catalog's default parameter values (#77)."
   },
+  "strengthCautionMarkerNote": "Past the mark at {percent}%, the image shows the most advanced stage. At 100% strength almost the whole visual field is lost and only a small central area stays visible.",
+  "@strengthCautionMarkerNote": {
+    "description": "Always-visible caption under the strength slider of a filter with an upper-limit caution (currently tunnel_vision, #51 note 1 / #66). Explains the tick mark drawn at the caution threshold.",
+    "placeholders": {
+      "percent": { "type": "int" }
+    }
+  },
+  "strengthCautionNearLimit": "Approaching the upper limit. The image goes almost black because this reproduces the most advanced stage, where nearly all of the visual field is lost. It is not a malfunction.",
+  "@strengthCautionNearLimit": {
+    "description": "Warning that replaces the caption when strength is at or above the caution threshold (#66). Must make clear the near-black image is by design."
+  },
   "consultEarly": "If these symptoms continue, consider talking to a healthcare professional.",
   "@consultEarly": {
     "description": "Gentle prompt for early-consultation-urgency conditions. Deliberately names no medical department (many of these filters, e.g. vertigo, aren't an eye complaint) — #76 review S4. Must not alarm or over-promise."
@@ -170,10 +181,18 @@
   },
   "exportSuccess": "Exported to {path}",
   "@exportSuccess": {
-    "description": "SnackBar shown after a successful PNG export. The file path is also copied to the clipboard.",
+    "description": "SnackBar shown after a successful PNG export. {path} is the full path of the saved file (the user's Downloads folder; a numbered name if the name was taken). The file path is also copied to the clipboard.",
     "placeholders": {
       "path": { "type": "String" }
     }
+  },
+  "exportRevealAction": "Show in folder",
+  "@exportRevealAction": {
+    "description": "Action button on the export-success SnackBar that opens the file manager at the exported PNG (#64)."
+  },
+  "exportRevealFailure": "Couldn't open the folder.",
+  "@exportRevealFailure": {
+    "description": "SnackBar shown when the file manager could not be launched from the export-success action (#64)."
   },
   "exportFailure": "Export failed. Please try again.",
   "@exportFailure": {
