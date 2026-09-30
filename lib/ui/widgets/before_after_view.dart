@@ -688,7 +688,9 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
           return SizedBox(
             height: 180,
             child: Center(
-              // 準備中→完了の切り替わりを、見えない人にも伝える（#45）。
+              // 「準備中」が現れた瞬間だけ読み上げられる（#45）。完了すると
+              // この liveRegion のノード自体が消えるので、完了は読まれない
+              // （完了は画像の代替テキストが現れることで伝わる）。
               child: Semantics(
                 liveRegion: true,
                 child: Text(
@@ -704,10 +706,9 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
 
         final beforePane = _Pane(
           label: l10n.previewPaneOriginal,
-          child: PreviewImageView(
-            image: _before,
-            semanticLabel: l10n.previewPaneOriginal,
-          ),
+          // 見出し「元の画像」が説明を担うので、画像には代替テキストを付けない
+          // （同じ文言の二重読み上げを避ける、#45）。
+          child: PreviewImageView(image: _before),
         );
         // 最新世代が失敗した場合は _failed が立ち、
         // _after は null にされている。stale/不整合な画像を出し続けるより
@@ -723,11 +724,14 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
             ? PreviewErrorPlaceholder(theme: theme, label: l10n.previewFailed)
             : PreviewImageView(
                 image: _after,
-                // 何も選んでいないとき after は原画と同じなので、名前だけを読む。
-                semanticLabel:
-                    widget.filterId == null && widget.colorVisionType == null
-                        ? afterName
-                        : l10n.previewImageFilteredSemantics(afterName),
+                // 画像があるときだけ付ける（読み込み中の空枠には付けない）。
+                // 何も選んでいないとき after は原画と同じで、見出し（afterName）が
+                // 説明を担うので付けない（二重読み上げの回避）。
+                semanticLabel: _after == null ||
+                        (widget.filterId == null &&
+                            widget.colorVisionType == null)
+                    ? null
+                    : l10n.previewImageFilteredSemantics(afterName),
               );
         // #60: 時間依存の注記は widget.filterId（カタログ id）からカタログを
         // 引いて解決する。after ペインの見出しは widget.colorVisionType が
@@ -825,8 +829,8 @@ ExportCaption buildExportCaption(
     simulationNotice: l10n.exportSimulationNotice,
     experimentalNotice:
         (kVisionFilterCatalogById[filterId]?.isExperimental ?? false)
-            ? l10n.exportExperimentalNotice
-            : null,
+        ? l10n.exportExperimentalNotice
+        : null,
     urgencyMessage: notice?.message,
     escalationGroups: [
       for (final g in notice?.escalationGroups ?? const [])
@@ -908,7 +912,9 @@ class _Pane extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // 書き出しボタンを含む行は 48dp（タップ領域の下限、#45）。
+        // 書き出しボタン（after 側だけ）を含む行は 48dp（タップ領域の下限、#45）。
+        // before 側にも同じ高さを使うのは、左右の見出し行の高さを揃えて
+        // 画像の上端をずらさないため。
         SizedBox(
           height: 48,
           child: Row(
