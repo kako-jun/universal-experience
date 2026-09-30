@@ -383,7 +383,7 @@ Linux debug ビルド成功で代替している:
 `VisionFilterState`（プレビューの選択の唯一の正本）を再起動をまたいで残す。
 
 - **保存するもの**: 重ねている層の列（各層はカタログ id・payload・別名 `variantId`
-  （-omaly）・起源 `origin`（quick / advanced））・フォーカス中の層の id・体験プリセット
+  （-omaly。quick 層だけが持つ）・起源 `origin`（quick / advanced））・フォーカス中の層の id・体験プリセット
   id・強度の記憶（キー `variantId ?? id` ごと）・カタログ id ごとの payload の記憶
   （#117。層自身は強度を持たない）。原画比較（bypass）など一時的な状態は保存しない。
   JSON は `version`（現在 2）つきで、seed（u64）は double を経由して精度が落ちないよう
@@ -394,7 +394,8 @@ Linux debug ビルド成功で代替している:
   `VisionFilterSnapshot.fromJson` / `sanitizeVisionParams` がカタログに照らして補正する
   — 未知のフィルタ id・定義に無いパラメータは捨て、範囲外は min/max に丸め、
   型違い・NaN・未知の選択肢・範囲外の seed は既定値に戻し、欠けたパラメータは既定値で
-  埋める。版が違う・JSON が壊れている・旧形式のときは丸ごと捨てて既定で起動する。
+  埋める。版 1（旧形式）は v2 の形へ変換して復元する。未知の版（新しすぎる・古すぎる・
+  版なし）・Map でない値・JSON が壊れているときだけ丸ごと捨てて既定で起動する。
   したがって sensus 側でフィルタ id やパラメータが変わっても起動は止まらない
   （`test/vision_filter_snapshot_test.dart` が固定）。
 - **復元の順序（`buildRootApp`）**: `VisionFilterStore.migrateLegacyStrengths`（旧
@@ -402,7 +403,8 @@ Linux debug ビルド成功で代替している:
   起動は deuteranomaly）→ `VisionFilterStore.restoreAndBind`。復元できる保存値があれば
   それが勝つ（「解除して終了」した場合、設定側に前回の色覚が残っていても
   未選択で始まる。読める v2 は層が空でも復元する）。保存値が無い・壊れている・空の版 1
-  のときは state に触れず、色覚シードのまま。色覚クイック選択が復元されたときは `FilterService.applyFilter` も呼び、
+  （選択も強度も payload も持たない。-opia の強度だけを持つ版 1 は、変換で強度を落としても
+  旧実装どおり空とみなさず復元する）のときは state に触れず、色覚シードのまま。色覚クイック選択が復元されたときは `FilterService.applyFilter` も呼び、
   トレイとウィンドウ内 UI が同じ `FilterService` を見るようにする。advanced 選択中の
   `FilterService` は従来どおり古いまま（消費側は `isColorQuickSelection` で判定する）。
 - **体験プリセット**: 保存された体験 id が今の体験一覧にあり、かつそのフィルタが

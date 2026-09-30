@@ -17,7 +17,7 @@ import 'vision_filter_state.dart';
 /// 3 型（protanomaly / deuteranomaly / tritanomaly）。色覚 4 型（protanopia /
 /// deuteranopia / tritanopia / achromatopsia）はカタログにも同名の行があるが、
 /// 一覧では 1 行にまとめ、選ぶと従来どおり色覚クイック選択の入口
-/// （[selectColorVision]、`FilterService` のタイプ別強度記憶 #57 込み）を通る。
+/// （[selectColorVision]。強度は `VisionFilterState` のキーごとの記憶、#117）を通る。
 /// カタログだけにあるもの（tetrachromacy 等）は `VisionFilterState.select`。
 /// **書き込みの入口は変えない**（`VisionFilterState` が唯一の正本のまま）。
 @immutable
@@ -71,7 +71,9 @@ List<FilterListEntry> _buildEntries() {
     for (final catalogEntry in visionFilterEntriesByCategory(category)) {
       final baseType = baseTypeByCatalogId[catalogEntry.id];
       entries.add(FilterListEntry(
-        key: baseType != null ? 'cv:${baseType.id}' : 'catalog:${catalogEntry.id}',
+        key: baseType != null
+            ? 'cv:${baseType.id}'
+            : 'catalog:${catalogEntry.id}',
         category: category,
         catalogId: catalogEntry.id,
         colorVisionType: baseType,
