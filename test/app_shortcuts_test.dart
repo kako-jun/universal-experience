@@ -143,7 +143,8 @@ void main() {
     await tester.pump();
     // 強度の正本は VisionFilterState のキーごとの記憶 1 つ。別名の層は別名 id をキーにする。
     expect(visionFilterState.strength, closeTo(0.55, 1e-9));
-    expect(visionFilterState.strengthForKey('protanomaly'), closeTo(0.55, 1e-9));
+    expect(
+        visionFilterState.strengthForKey('protanomaly'), closeTo(0.55, 1e-9));
     expect(visionFilterState.strengthForKey('protanopia'), isNull,
         reason: '別名の強度は対応する -opia の記憶と混ざらない');
   });

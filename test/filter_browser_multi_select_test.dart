@@ -282,8 +282,7 @@ void main() {
       expect(layerIds(), ['myopia']);
     });
 
-    testWidgets(
-        'カタログ側の色覚グループの行（tetrachromacy）が色覚層を置き換えると色覚の層は消える',
+    testWidgets('カタログ側の色覚グループの行（tetrachromacy）が色覚層を置き換えると色覚の層は消える',
         (tester) async {
       await pumpBrowser(tester);
       await tapRow(tester, 'cv:protanopia');

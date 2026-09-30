@@ -28,8 +28,8 @@ void main() {
       // 色覚（-opia）の層でも同様。
       selectColorVisionKey(visionState, 'protanopia');
       visionState.acquireBypass('test');
-      expect(isColorVisionQuickKey(visionState.focusedLayer!.strengthKey),
-          isTrue);
+      expect(
+          isColorVisionQuickKey(visionState.focusedLayer!.strengthKey), isTrue);
       expect(previewStrength(visionState), 0.0);
 
       // 解除すれば直前の強度（-opia の既定 1.0）に戻る。

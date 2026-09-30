@@ -83,8 +83,8 @@ void main() {
 
     test('既定強度は -opia が 1.0、-omaly が 0.6、それ以外は null', () {
       expect(colorVisionDefaultStrength('protanopia'), 1.0);
-      expect(colorVisionDefaultStrength('deuteranomaly'),
-          kAnomalyDefaultSeverity);
+      expect(
+          colorVisionDefaultStrength('deuteranomaly'), kAnomalyDefaultSeverity);
       expect(colorVisionDefaultStrength('myopia'), isNull);
     });
 

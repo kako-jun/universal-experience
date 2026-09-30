@@ -433,16 +433,14 @@ void main() {
 
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pump();
-      expect(h.visionState.strength, before,
-          reason: '行から出る 1 回目の → は強度を動かさない');
+      expect(h.visionState.strength, before, reason: '行から出る 1 回目の → は強度を動かさない');
       expect(focusedTile(), isNull);
       expect(tester.binding.focusManager.primaryFocus?.debugLabel,
           'homeShortcuts');
 
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
       await tester.pump();
-      expect(h.visionState.strength, lessThan(before),
-          reason: '次の ← から強度が動く');
+      expect(h.visionState.strength, lessThan(before), reason: '次の ← から強度が動く');
     });
   }
 }

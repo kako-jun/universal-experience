@@ -347,7 +347,8 @@ void main() {
           _layer('myopia', origin: origin),
         ]))!;
         expect(_ids(s), ['myopia', 'protanopia'], reason: 'origin=$origin');
-        expect(s.layers.last.variantId, 'protanomaly', reason: 'origin=$origin');
+        expect(s.layers.last.variantId, 'protanomaly',
+            reason: 'origin=$origin');
         expect(s.layers.first.variantId, isNull, reason: 'origin=$origin');
       }
 

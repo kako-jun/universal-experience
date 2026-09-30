@@ -69,7 +69,9 @@ void main() {
     addTearDown(store.dispose);
 
     final result = await buildRootApp(
-        initBridge: () async => true, settings: SettingsService(), store: store);
+        initBridge: () async => true,
+        settings: SettingsService(),
+        store: store);
 
     expect(result.bridgeReady, isTrue);
     expect(visionFilterState.layers, hasLength(1));

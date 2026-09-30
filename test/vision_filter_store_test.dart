@@ -727,7 +727,11 @@ void main() {
     });
 
     test('壊れた保存だけがある（旧キー無し）なら null で、保存は触らない', () async {
-      for (final raw in ['{not json', jsonEncode({'version': 99}), 'null']) {
+      for (final raw in [
+        '{not json',
+        jsonEncode({'version': 99}),
+        'null'
+      ]) {
         SharedPreferences.setMockInitialValues({
           VisionFilterStore.keySnapshot: raw,
         });
@@ -772,15 +776,13 @@ void main() {
           await store.restoreAndBind(restoredState, snapshot: migrated);
           expect(restoredState.strength, colorVisionDefaultStrength(key),
               reason: key);
-          expect(restoredState.focusedVariantId, target.variantId,
-              reason: key);
+          expect(restoredState.focusedVariantId, target.variantId, reason: key);
 
           final saved = (await _storedJson())!;
           expect(saved['version'], 2, reason: key);
           expect((saved['layers'] as List).single['id'], target.id,
               reason: key);
-          expect(await hasKey(typeKey), isFalse,
-              reason: '$key: 書けたので旧キーは消す');
+          expect(await hasKey(typeKey), isFalse, reason: '$key: 書けたので旧キーは消す');
         }
       });
 
@@ -804,7 +806,14 @@ void main() {
       });
 
       test('none・未知の名前・色覚でない id・文字列でない値は層なしにする', () async {
-        for (final Object bad in ['none', 'bogus', 'myopia', 'tetrachromacy', '', 3]) {
+        for (final Object bad in [
+          'none',
+          'bogus',
+          'myopia',
+          'tetrachromacy',
+          '',
+          3
+        ]) {
           SharedPreferences.setMockInitialValues({typeKey: bad});
 
           final result = await migrate();
@@ -849,8 +858,7 @@ void main() {
         final saved = (await _storedJson())!;
         expect(saved['version'], 2);
         expect((saved['layers'] as List).single['variantId'], 'protanomaly');
-        expect(saved['strengthByKey'],
-            {'protanopia': 0.4, 'protanomaly': 0.7});
+        expect(saved['strengthByKey'], {'protanopia': 0.4, 'protanomaly': 0.7});
         expect(await hasKey(intensityKey), isFalse,
             reason: '書き込みに成功したので旧キーは消す');
         expect(await hasKey(typeKey), isFalse);
@@ -1091,15 +1099,13 @@ void main() {
 
         final result = await migrate();
 
-        expect(result!.strengthByKey,
-            {'protanopia': 0.2, 'deuteranopia': 0.4});
-        expect(layerKeys(result), ['vertigo'],
-            reason: 'filterType の層は足さない');
+        expect(result!.strengthByKey, {'protanopia': 0.2, 'deuteranopia': 0.4});
+        expect(layerKeys(result), ['vertigo'], reason: 'filterType の層は足さない');
         expect(result.focusedId, 'vertigo');
         expect(result.presetId, 'labyrinthitis');
         final saved = (await _storedJson())!;
-        expect(saved['strengthByKey'],
-            {'protanopia': 0.2, 'deuteranopia': 0.4});
+        expect(
+            saved['strengthByKey'], {'protanopia': 0.2, 'deuteranopia': 0.4});
         expect(saved['presetId'], 'labyrinthitis');
         expect(await hasKey(intensityKey), isFalse);
         expect(await hasKey(typeKey), isFalse);
@@ -1152,7 +1158,11 @@ void main() {
               'variantId': 'protanomaly',
               'origin': 'quick',
             },
-            {'id': 'myopia', 'params': <String, Object?>{}, 'origin': 'advanced'},
+            {
+              'id': 'myopia',
+              'params': <String, Object?>{},
+              'origin': 'advanced'
+            },
           ],
           'focusedId': 'protanopia',
           'strengthByKey': {'protanomaly': 0.35},
@@ -1179,8 +1189,8 @@ void main() {
         });
         final migrated = await migrate();
         expect(layerKeys(migrated!), ['myopia', 'protanomaly']);
-        expect(migrated.strengthByKey,
-            {'protanopia': 0.4, 'protanomaly': 0.35});
+        expect(
+            migrated.strengthByKey, {'protanopia': 0.4, 'protanomaly': 0.35});
         final prefs = await SharedPreferences.getInstance();
         expect(
           prefs.getString(VisionFilterStore.keySnapshot)!.contains('origin'),

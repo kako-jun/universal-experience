@@ -340,8 +340,7 @@ void main() {
       expect(layerIds().toSet(), {'myopia', 'deuteranopia'});
       expect(checked(colorVisionEntryKey('protanopia')), isFalse);
       expect(checked('list_cv:protanopia'), isFalse);
-      expect(
-          checked(colorVisionEntryKey('deuteranopia')), isTrue);
+      expect(checked(colorVisionEntryKey('deuteranopia')), isTrue);
       expect(checked('list_catalog:myopia'), isTrue);
     });
 
@@ -425,8 +424,7 @@ void main() {
       test('足せない行は灰色になり、チェック済みの行は外せる', () async {
         expect(disabled('list_catalog:floaters'), isTrue);
         // 色覚も、色覚の層が無いので足せない。
-        expect(
-            disabled(colorVisionEntryKey('protanopia')), isTrue);
+        expect(disabled(colorVisionEntryKey('protanopia')), isTrue);
         expect(disabled('list_cv:tritanomaly'), isTrue);
         // チェック済みの行は灰色にしない。
         expect(disabled('list_catalog:starbursts'), isFalse);
@@ -455,8 +453,7 @@ void main() {
 
         // 色覚以外の足せない行は灰色、色覚の行は置き換えになるので灰色にしない。
         expect(disabled('list_catalog:floaters'), isTrue);
-        expect(disabled(colorVisionEntryKey('deuteranopia')),
-            isFalse);
+        expect(disabled(colorVisionEntryKey('deuteranopia')), isFalse);
         expect(disabled('list_cv:tritanomaly'), isFalse);
 
         await click(colorVisionEntryKey('deuteranopia'));

@@ -129,7 +129,8 @@ void main() {
   // シード・受診喚起・2×2 比較を順に出して、ガイドラインを当てる。
   group('選択ごとの調整パネル', () {
     final cases = <String, void Function(HomeScreenHarness h)>{
-      '色覚 + 2×2 比較の切替': (h) => selectColorVisionKey(h.visionState, 'protanopia'),
+      '色覚 + 2×2 比較の切替': (h) =>
+          selectColorVisionKey(h.visionState, 'protanopia'),
       'advanced（列挙 + 小数のパラメータ）': (h) => h.visionState.replaceWith('glaucoma'),
       'advanced（整数のパラメータ）': (h) => h.visionState.replaceWith('starbursts'),
       'advanced（シード）': (h) => h.visionState.replaceWith('floaters'),

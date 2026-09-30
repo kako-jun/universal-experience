@@ -173,9 +173,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
-        checkedListEntryKeys: {
-          colorVisionListEntryKey('deuteranopia')
-        },
+        checkedListEntryKeys: {colorVisionListEntryKey('deuteranopia')},
         hasLayers: true,
       );
 
@@ -227,9 +225,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
-        checkedListEntryKeys: {
-          colorVisionListEntryKey('protanopia')
-        },
+        checkedListEntryKeys: {colorVisionListEntryKey('protanopia')},
         hasLayers: true,
       );
       String labelOf(TrayMenuKind kind) =>
@@ -397,8 +393,7 @@ void main() {
       );
     });
 
-    test('init() のあと visionFilterState の変化で listener が発火する',
-        () async {
+    test('init() のあと visionFilterState の変化で listener が発火する', () async {
       await trayService.init();
       expect(trayService.selectionChangedCallCount, 0);
 
@@ -417,8 +412,7 @@ void main() {
       await trayService.dispose();
     });
 
-    test('dispose() のあとは visionFilterState の変化で listener が発火しない',
-        () async {
+    test('dispose() のあとは visionFilterState の変化で listener が発火しない', () async {
       await trayService.init();
       await trayService.dispose();
 
@@ -567,7 +561,7 @@ void main() {
 
     final vs = VisionFilterState();
     TrayService buildTray() => TrayService(
-            visionFilterState: vs,
+          visionFilterState: vs,
           loupeWindow: LoupeWindowController(),
           iconPath: 'assets/tray/tray_icon.png',
           labels: _labels,
