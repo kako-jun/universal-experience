@@ -56,6 +56,61 @@ class VisionLayer {
       'VisionLayer($id${variantId == null ? '' : '/$variantId'}, $origin)';
 }
 
+/// 多選択の操作（[VisionFilterState.toggle]）が層の集合に何をしたか。
+enum VisionLayerChange {
+  /// 層を 1 つ足した。
+  added,
+
+  /// 選択済みの層を外した。
+  removed,
+
+  /// 色覚グループの既存の層を別の色覚に置き換えた（層数は増えない）。
+  replaced,
+
+  /// 上限のため何もしなかった（状態は変わらない。理由は [VisionLayerResult.blockedBy]）。
+  blocked,
+}
+
+/// 未選択の層を足せない理由（UI が行を無効化するときの文言の出どころ）。
+enum VisionLayerBlockReason {
+  /// 層の数が上限 [kMaxVisionLayers] に達している。
+  layerLimit,
+}
+
+/// [VisionFilterState.toggle] の結果。[change] が [VisionLayerChange.blocked] のとき
+/// だけ [blockedBy] が非 null で、その操作は状態を変えていない（no-op）。
+class VisionLayerResult {
+  const VisionLayerResult._(this.change, this.blockedBy);
+
+  const VisionLayerResult.blocked(VisionLayerBlockReason reason)
+    : this._(VisionLayerChange.blocked, reason);
+
+  static const added = VisionLayerResult._(VisionLayerChange.added, null);
+  static const removed = VisionLayerResult._(VisionLayerChange.removed, null);
+  static const replaced = VisionLayerResult._(VisionLayerChange.replaced, null);
+
+  final VisionLayerChange change;
+
+  /// [change] が blocked のときの理由。それ以外は null。
+  final VisionLayerBlockReason? blockedBy;
+
+  /// 状態が変わったか（blocked でなければ true）。
+  bool get changed => change != VisionLayerChange.blocked;
+
+  @override
+  bool operator ==(Object other) =>
+      other is VisionLayerResult &&
+      other.change == change &&
+      other.blockedBy == blockedBy;
+
+  @override
+  int get hashCode => Object.hash(change, blockedBy);
+
+  @override
+  String toString() =>
+      'VisionLayerResult($change${blockedBy == null ? '' : ', $blockedBy'})';
+}
+
 /// -omaly の別名 id 一覧（[ColorVisionType.name]）。
 const List<String> kVisionVariantIds = [
   'protanomaly',

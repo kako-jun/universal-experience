@@ -50,7 +50,8 @@ lib/
 │   ├── loupe_rect_source.dart       # ルーペ矩形決定元のインターフェース（#44 向け seam、#63）
 │   ├── loupe_window_controller.dart # ルーペ窓のモード/透過/最前面/クリックスルー（#63）
 │   ├── native_bridge_service.dart   # flutter_rust_bridge（sensus-core）の bootstrap 初期化
-│   ├── preview_selection.dart       # プレビュー強度の出どころを一本化する判定（#60/#63）
+│   ├── preview_selection.dart       # プレビュー強度の出どころを一本化する判定（#60/#63）・
+│   │                                 # 複数層のプレビューに渡すステップ列 previewPipelineSteps（#119）
 │   ├── settings_service.dart        # isFirstRun/welcomeBannerDismissed も持つ（#78）
 │   ├── tray_menu_labels.dart        # トレイの i18n 解決済み文言 TrayMenuLabels・クイック色覚一覧（#65）
 │   ├── tray_service.dart            # タスクトレイ（updateLocalization で文言を差し替える #82・
@@ -62,12 +63,15 @@ lib/
 │   │                                 # 300ms デバウンス・flush（#65）・旧 settings.intensityByType の
 │   │                                 # 取り込み migrateLegacyStrengths（#117）
 │   ├── vision_layer.dart            # VisionLayer（id・payload・別名・起源）・強度の記憶キー・
-│   │                                 # 層の列の不変条件 normalizeVisionLayers（#117）
+│   │                                 # 層の列の不変条件 normalizeVisionLayers（#117）・
+│   │                                 # 多選択の結果 VisionLayerResult（added/removed/replaced/blocked、#119）
 │   ├── vision_filter_metadata.dart  # urgency/urgency_escalation/recommended_strength の
 │   │                                 # provider seam（sensus ブリッジが唯一の正本、#76/#77）。
-│   │                                 # citation/limitations も同じ seam（#80）
+│   │                                 # citation/limitations も同じ seam（#80）。複数層の相談喚起の
+│   │                                 # 入力の統合 mergeConsultInputs / consultInputForFilters（#119。UI 適用は #121）
 │   └── vision_filter_state.dart     # 層の列・フォーカス・強度の記憶（キー variantId ?? id）・
-│                                     # パラメータの記憶（#77/#117）
+│                                     # パラメータの記憶（#77/#117）・多選択 API
+│                                     # toggle/remove/setLayerStrength/setLayerParams/replaceWith（#119）
 ├── src/rust/                        # flutter_rust_bridge 生成コード（sensus-core 連携）
 └── ui/
     ├── screens/home_screen.dart
@@ -138,6 +142,9 @@ test/
 ├── vision_filter_persistence_app_test.dart # 実アプリ（buildRootApp）を作り直して選択が復元される・旧強度の取り込み（#65/#117）
 ├── vision_filter_stage_test.dart   # 段の表（30 フィルタがちょうど 1 段・段内は sensus 宣言順）と適用順・色覚の排他グループ（#117）
 ├── vision_layer_test.dart          # 強度の記憶キー・別名の検証・層の列の正規化（上限・排他・重複・適用順）（#117）
+├── vision_filter_multi_select_test.dart # 多選択 API: toggle/remove・色覚の排他と置き換え・上限 5 と例外・プリセット置換と破棄・強度/パラメータ・単一選択の互換・pipelineSteps・上限ちょうど 5 層・同段 3 層の pipelineSteps 列のリテラル固定・永続化 v2 の往復（#119）
+├── home_screen_multi_layer_preview_test.dart # 複数層のプレビュー: pipelineApplier をフェイクにして段順・強度・payload・強度 0 除外・単一層の従来経路・bypass・steps だけ変わる更新での再合成・合成失敗の表示と旧結果の dispose を確認、推奨サンプルの focusedId 追従（#119）
+├── consult_input_merge_test.dart   # 複数層の相談喚起入力の統合: urgency は最大・escalation は段ごとに重複除去（#119）
 ├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品（プレビューの読み込み/適用は Rust 非依存のフェイクに固定）
 ├── support/screenshot_harness.dart # スクリーンショット用フォント読込・PNG 書出し（フォントはコミットしない）
 └── ui_screenshots/                 # HomeScreen の PNG 書出し。`UE_SCREENSHOTS=1` のときだけ実行（DESIGN.md §8）
@@ -244,7 +251,7 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 再利用する（専用レンダラを持たない）。Before / After との関係と理由は
 `docs/adr/2026-09-30-color-vision-2x2-compare.md`。
 
-### 状態モデルの統一と多症状の同時適用（第 2 段 #118 まで実装）
+### 状態モデルの統一と多症状の同時適用（第 3 段 #119 まで実装）
 
 状態が 2 系統（`FilterService` の `ColorVisionType` 8 値（none + 7 型）/ `VisionFilterState` の 30 フィルタ。強度の記憶は #117 で後者に一本化済み）並行し、
 選択も 1 つだけという現状を、「カタログ id ごとに 1 つのレイヤー」の順序つき列（最大 5、色覚は排他、
@@ -253,7 +260,21 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 `docs/adr/2026-09-30-multi-select-filter-state-model.md`。第 1 段（#117）で層の列・強度の記憶の一本化・
 永続化 v2 が入った（選択はまだ常に 1 層。複数層の API・合成は #119）。第 2 段（#118）で bridge に
 `apply_vision_pipeline_cpu_rgba8`（`VisionStep` 列を並びの順に適用。空列は入力を返す）と
-`CpuVisionRenderer.applyPipeline` が入った（呼び出し側の配線は #119）。
+`CpuVisionRenderer.applyPipeline` が入った。第 3 段（#119）で `VisionFilterState` に多選択の API
+（`toggle` / `remove` / `setLayerStrength` / `setLayerParams` / `replaceWith` / `clear`）が入り、
+`HomeScreen._previewCard` が層を段順で `BeforeAfterView.steps` 経由の 1 回の合成へ渡す:
+
+- 色覚は排他（新しい色覚が既存の色覚を置き換える。層数は増えない）。層は最大 5 で、上限での未選択の
+  追加は何もせず `VisionLayerResult.blocked(layerLimit)` を返す（色覚の置き換えと体験プリセットは例外）。
+  体験プリセットは層全体を置き換え、層集合がそのプリセット単体でなくなったら破棄し、戻っても復元しない。
+- 強度 0 の層は合成から除く（ただし上限には数える）。層が 0〜1 のときは従来の単一フィルタの経路
+  （`afterImageRenderer`）のままで、2 層以上のときだけ `pipelineApplier`（#118）を使う。
+- 推奨サンプル（#78）は `focusedId` の層に追従する。フォーカスが外れたら適用順で最後の層へ移る。
+- 複数層の相談喚起の入力は `mergeConsultInputs`（urgency は最大・escalation は段ごとに重複除去）で作る
+  （UI・書き出しへの適用は #121）。
+- 見出し・書き出し・2×2 比較（`canCompare`）・トレイは #120〜#122 まで単一（フォーカス層）の意味のまま。
+- 制約: `toggle(..., origin: quick)` で色覚を足しても `FilterService` の色覚型・`settings.filterType`・
+  色覚の強度スライダーは更新されない（`selectColorVision` 経由でだけ同期）。UI からの `toggle` は #120 で入るので同期はそこで決める。
 
 ### iOS非対応
 

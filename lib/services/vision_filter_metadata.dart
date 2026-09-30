@@ -57,3 +57,48 @@ VisionFilterCitationFn visionFilterCitationProvider =
 /// 訳すと誤情報になりうるので原文のまま出す）。
 VisionFilterLimitationsFn visionFilterLimitationsProvider =
     (filter) => visionFilterLimitations(filter: filter);
+
+/// [resolveConsultNotice] に渡す受診喚起の入力（緊急度と escalation の一覧）。
+///
+/// 層が 1 つなら、その層の [visionFilterUrgencyProvider] と
+/// [visionFilterUrgencyEscalationProvider] の値そのもの。複数層のときは
+/// [mergeConsultInputs] で 1 つにまとめたもの（#119）。
+typedef ConsultInput = ({Urgency urgency, List<UrgencyEscalation> escalation});
+
+/// 複数の層の受診喚起の入力を、[resolveConsultNotice] に渡す 1 つにまとめる（#119）。
+///
+/// - **緊急度は最大**（none < earlyConsultation < emergency）。1 つでも emergency が
+///   あれば emergency。[inputs] が空なら none。
+/// - **escalation は段（緊急度）ごとに併合し、重複行を除く**。同じ段・同じ条件文は
+///   1 行にする（複数の層が同じ条件を持つとき、同じ注意書きを繰り返し出さない）。
+///   段ごとの並べ替え・見出しは [resolveConsultNotice] が行うので、ここは入力順
+///   （層の適用順）で最初に現れたものを残すだけ。
+///
+/// 純粋関数。UI・書き出しへの適用は #121。
+ConsultInput mergeConsultInputs(Iterable<ConsultInput> inputs) {
+  var urgency = Urgency.none;
+  final seen = <(Urgency, String)>{};
+  final merged = <UrgencyEscalation>[];
+  for (final input in inputs) {
+    if (input.urgency.index > urgency.index) urgency = input.urgency;
+    for (final e in input.escalation) {
+      if (seen.add((e.urgency, e.condition))) merged.add(e);
+    }
+  }
+  return (urgency: urgency, escalation: List.unmodifiable(merged));
+}
+
+/// [filters]（層の適用順）の受診喚起の入力を、現在の provider から読んで
+/// [mergeConsultInputs] でまとめる（#119）。
+///
+/// 渡された [filters] はすべて数える。**強度 0 の層も含めるかどうかはこの関数では決めない**
+/// （呼び出し側が [VisionFilterState.buildAll] か `pipelineSteps().map((s) => s.filter)` のどちらを
+/// 渡すかで変わる。描画されない層の喚起を出すかの最終決定は #121）。
+ConsultInput consultInputForFilters(Iterable<VisionFilter> filters) =>
+    mergeConsultInputs([
+      for (final f in filters)
+        (
+          urgency: visionFilterUrgencyProvider(f),
+          escalation: visionFilterUrgencyEscalationProvider(f),
+        ),
+    ]);

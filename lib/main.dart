@@ -65,7 +65,7 @@ final Object _hotkeyBypassSource = Object();
 /// 唯一の正本、#78）。[filterService]/[visionFilterState] と同じ理由で
 /// アプリ最上位に 1 つだけ生成する。初期サンプルは [buildRootApp] が
 /// 起動時の選択済みフィルタ（[selectColorVision] でシードした直後の
-/// `visionFilterState.selectedId`）の推奨サンプルに合わせる。
+/// `visionFilterState.focusedId`）の推奨サンプルに合わせる。
 final ImageSourceState imageSourceState = ImageSourceState();
 
 /// トレイアイコンの Flutter アセットパス。`tray_manager` の `setIcon` が
@@ -255,7 +255,7 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
   // selectSample) — this is auto-follow doing its normal job, not a manual
   // pick, so auto-follow must stay enabled afterward.
   imageSourceState.followRecommendedSample(
-    recommendedSampleIdForFilter(visionFilterState.selectedId),
+    recommendedSampleIdForFilter(visionFilterState.focusedId),
   );
 
   return (app: UniversalExperienceApp(settings: s), bridgeReady: true);

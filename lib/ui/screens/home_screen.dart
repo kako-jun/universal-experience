@@ -108,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final visionState = _visionFilterStateForImageSource;
     if (visionState == null) return;
     context.read<ImageSourceState>().followRecommendedSample(
-          recommendedSampleIdForFilter(visionState.selectedId),
+          recommendedSampleIdForFilter(visionState.focusedId),
         );
   }
 
@@ -378,6 +378,8 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, visionState, imageSourceState, _) {
         final theme = Theme.of(context);
         final l10n = AppLocalizations.of(context)!;
+        // 暫定（#119）: 複数層でもフォーカス中の層だけで判定する。層集合が色覚 1 つのときだけ
+        // 出す方針への切り替えは #122（ADR の暫定挙動）。
         final canCompare = isColorVisionFilterId(visionState.selectedId);
         final comparing = canCompare && _compareColorVision;
         final strength = previewStrength(visionState);
@@ -435,6 +437,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           filterId: visionState.selectedId,
                           strength: strength,
                           colorVisionType: visionState.colorVisionType,
+                          // 層が複数のときだけ合成経路（#119）。1 層以下は従来の
+                          // 単一フィルタ経路のまま。
+                          steps: visionState.layers.length > 1
+                              ? previewPipelineSteps(visionState)
+                              : null,
                           imageSource: imageSourceState.current,
                         ),
                 ),

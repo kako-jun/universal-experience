@@ -313,7 +313,7 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
     return Consumer2<ImageSourceState, VisionFilterState>(
       builder: (context, imageSourceState, visionState, _) {
         final recommendedId =
-            recommendedSampleIdForFilter(visionState.selectedId);
+            recommendedSampleIdForFilter(visionState.focusedId);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
