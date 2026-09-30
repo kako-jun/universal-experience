@@ -8,10 +8,12 @@ name: Font atlas sync
 # 通常の CI とは別ワークフローにし、対象ファイルが変わった push/PR と手動実行
 # （workflow_dispatch）のときだけ走らせる。サンプル画像との同期は samples-sync.yml。
 #
-# アトラスのバイト列は Pillow に同梱される FreeType に依存する。生成スクリプトは
-# Pillow を固定しているが、OS/CPU をまたいだ一致は保証されない（tools/fonts/README.md）。
-# 手元（macOS）でコミットしたアトラスがここ（ubuntu-latest）で一致しない場合は、
-# このジョブのランナーを手元と同じ OS に合わせること。
+# アトラスのバイト列は Pillow に同梱される FreeType / PNG エンコードに依存し、OS をまたぐと
+# 変わる（ubuntu-latest では *.fnt は一致するが *.png が 6 本とも食い違うことを #115 の
+# CI で確認した）。コミット済みのアトラスは macOS（Apple Silicon）で生成しているため、
+# このジョブも macos-latest で走らせる。対象ファイルを変えたときだけ起動するので、macOS
+# ランナーの分は通常の PR には乗らない。
+# 環境差で落ちるようになったら、デコード後の画素一致での比較への切り替えを検討する。
 
 on:
   push:
@@ -34,7 +36,7 @@ concurrency:
 
 jobs:
   font-atlas-sync:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
