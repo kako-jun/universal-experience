@@ -566,9 +566,9 @@
   "@imageSourcePasteUnsupported": {
     "description": "SnackBar shown when the clipboard has image data that can't be decoded (#97)."
   },
-  "imageSourcePasteUnsupportedFile": "That file is in a format that can't be read. Copy a PNG, JPEG, GIF, BMP, or WebP image instead.",
+  "imageSourcePasteUnsupportedFile": "The copied file(s) are in a format that can't be read. Copy a PNG, JPEG, GIF, BMP, or WebP image instead.",
   "@imageSourcePasteUnsupportedFile": {
-    "description": "SnackBar shown when the clipboard holds only files that aren't a readable image format (e.g. a HEIC copied in a file manager) (#97)."
+    "description": "SnackBar shown when the clipboard holds only files that aren't a readable image format (e.g. a HEIC or a folder copied in a file manager) (#97)."
   },
   "imageSourcePasteFailed": "Couldn't read the clipboard. Please try again.",
   "@imageSourcePasteFailed": {

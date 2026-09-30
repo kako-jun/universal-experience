@@ -153,7 +153,8 @@ class ClipboardImageUnsupportedException implements Exception {
 }
 
 /// Thrown by [pasteUserImageFromClipboard] when the clipboard holds only files
-/// that aren't an image format we read (#97, e.g. a HEIC copied in Finder) —
+/// or folders with no readable image in them (#97, e.g. a HEIC or a folder
+/// copied in Finder) —
 /// "no image on the clipboard" would be untrue, so it gets its own SnackBar
 /// (`imageSourcePasteUnsupportedFile`).
 class ClipboardFileUnsupportedException implements Exception {
@@ -165,9 +166,10 @@ class ClipboardFileUnsupportedException implements Exception {
 
 /// How long [pasteUserImageFromClipboard] waits for [clipboardImageReader] (#97).
 /// A clipboard owner that never answers (a hung app on X11, say) would
-/// otherwise leave the in-flight guard set forever. A timeout is reported like
+/// otherwise leave the in-flight guard set forever. 30s (not shorter) so a
+/// permission prompt that blocks the read synchronously isn't cut off. A timeout is reported like
 /// any read failure (`imageSourcePasteFailed`). Mutable only for tests.
-Duration clipboardReadTimeout = const Duration(seconds: 5);
+Duration clipboardReadTimeout = const Duration(seconds: 30);
 
 /// Pastes the clipboard's image as the preview's user image (#97, Cmd/Ctrl+V
 /// and the "Paste" button). Goes through the **same** decode + hand-over
@@ -185,8 +187,8 @@ Duration clipboardReadTimeout = const Duration(seconds: 5);
 /// before decoding), bytes the codec can't read
 /// ([ClipboardImageUnsupportedException], `imageSourcePasteUnsupported`), or
 /// the clipboard read itself failing or taking longer than
-/// [clipboardReadTimeout] (`imageSourcePasteFailed`), or only files of a format
-/// we don't read being copied ([ClipboardFileUnsupportedException],
+/// [clipboardReadTimeout] (`imageSourcePasteFailed`), or only files/folders with no
+/// readable image being copied ([ClipboardFileUnsupportedException],
 /// `imageSourcePasteUnsupportedFile`).
 ///
 /// If the clipboard holds an image **file** (copied in a file manager) the
@@ -219,7 +221,7 @@ Future<bool> _pasteUserImageFromClipboard(BuildContext context) async {
       // ファイルをコピーした場合（#97）: 選択・ドロップと同じ経路（サイズの
       // 事前判定・縮小デコード・失敗の SnackBar は loadUserImageFile が持つ）。
       if (!context.mounted) return false;
-      return loadUserImageFile(context, XFile(content.path));
+      return await loadUserImageFile(context, XFile(content.path));
     }
     if (content is ClipboardUnsupportedFiles) {
       throw const ClipboardFileUnsupportedException();

@@ -916,11 +916,11 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   `pasteboard` パッケージ（macOS: NSPasteboard、Linux: GtkClipboard。画像は PNG
   バイト列）、テストは `clipboardImageReader` をフェイクへ差し替える。
   **ファイルを先に見る**（`resolveClipboardContent`）: ファイラでファイルをコピーすると
-  OS がアイコン画像も載せるため、**実在するローカルファイル**（`fileExists` を注入して判定。
-  ブラウザの画像コピーで載る http(s) URL など実在しないパスは無視して画像データへ）に画像拡張子の
-  ものがあれば先頭 1 枚を `loadUserImageFile`（選択・ドロップと同じ経路）に回す。拡張子つきの
-  非対応形式（HEIC 等）だけなら画像データへ進まず「非対応ファイルのみ」、拡張子のないものだけなら
-  種類を決められないので画像データへ進む。読み取りには 5 秒のタイムアウトがあり、超えたら読み取り
+  OS がアイコン画像も載せるため、**ローカルに実在するパス**（`existsLocally` を注入して判定。ファイル・
+  フォルダとも真。ブラウザの画像コピーで載る http(s) URL など実在しないパスは無視）のうち画像拡張子の
+  ものがあれば先頭 1 枚を `loadUserImageFile`（選択・ドロップと同じ経路）に回す。実在するものはあるが
+  画像が 1 枚も無い（HEIC 等・フォルダ・.app・拡張子なし）なら画像データ（アイコン）へ進まず
+  「非対応ファイルのみ」、実在するものが無いときだけ画像データへ進む。読み取りには 30 秒のタイムアウトがあり、超えたら読み取り
   失敗として扱う（in-flight ガードも解除される）。失敗は 5 種
   （画像なし `imageSourcePasteNoImage` / 巨大 `imageSourcePasteTooLarge` /
   デコード不能 `imageSourcePasteUnsupported` / 非対応ファイルのみ

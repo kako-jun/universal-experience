@@ -23,12 +23,16 @@ Flutter 標準の `Clipboard` はテキストしか扱えないため、画像�
    背後に置く。既存の `pickImageFile`（#78）と同じ seam パターンで、テストは
    `clipboardImageReader` をフェイクに差し替える。プラグインは素の `flutter test` では動かない。
 3. **ファイルを先に見る**。`ClipboardImageReader.read()` は `Pasteboard.files` を先に読み、
-   **実在するローカルファイル**（`File(path).exists()`。判定は `resolveClipboardContent` に注入する
-   ので純粋関数のまま）だけを対象にする。画像拡張子（png/jpg/jpeg/gif/bmp/webp）のものがあれば先頭の
-   1 枚を `ClipboardImageFile` として返し、選択・ドロップと同じ `loadUserImageFile`（50MB の事前判定付き）
-   に回す。拡張子つきの非対応形式（HEIC 等）だけなら、画像データ取得へ進まず
-   `ClipboardUnsupportedFiles`（「そのファイルは読み込めない形式」）にする。実在しないパス
-   （ディレクトリ・URL）と拡張子のないパスは無視し、画像データへ進む。macOS の上流実装は
+   各パスを 2 段で見る。(a) **ローカルに何かしら実在するか**（`FileSystemEntity.type` が `notFound`
+   でない。ファイルでもフォルダでも `.app` でも真。判定は `resolveClipboardContent` に
+   `existsLocally` として注入するので純粋関数のまま）、(b) 画像拡張子（png/jpg/jpeg/gif/bmp/webp）か。
+   実在するもののうち画像のものがあれば先頭の 1 枚を `ClipboardImageFile` として返し、選択・ドロップと
+   同じ `loadUserImageFile`（50MB の事前判定付き）に回す。実在するものはあるが画像が 1 枚も無い
+   （HEIC 等の非対応形式・フォルダ・`.app`・拡張子なしのファイル）ときは、画像データ取得へ進まず
+   `ClipboardUnsupportedFiles`（「コピーしたファイルは読み込めない形式」）にする。Finder はフォルダや
+   アプリのアイコンも一緒に載せるため、ここで画像データへ進むとアイコンが原画になってしまう。
+   画像データへ進むのは、ローカルに**実在しない**パス（URL 等）しか無いとき（またはパスが無いとき）だけ。
+   macOS の上流実装は
    `files()` が options なしの `readObjects(NSURL)` で http(s) URL も返し得るため、ブラウザの
    「イメージをコピー」で URL と画像データが両方載る場合に、実在しない URL に引っ張られて画像が
    貼り付けられなくなる退行を避ける（どのブラウザが URL を載せるかは実機未確認）。
@@ -44,7 +48,7 @@ Flutter 標準の `Clipboard` はテキストしか扱えないため、画像�
    （`includeRepeats: false`）、貼り付けの実行中に再度呼ばれても無視する（in-flight ガード、
    例外でも解除）。
 6. 失敗は SnackBar で 5 種に分けて示す（画像なし / 大きすぎる / 読めない形式 / 非対応ファイルのみ /
-   読み取り失敗）。失敗しても現在の原画は変えない。読み取りには 5 秒のタイムアウトを付け、
+   読み取り失敗）。失敗しても現在の原画は変えない。読み取りには 30 秒のタイムアウトを付け、
    `TimeoutException` は読み取り失敗として扱う（返事をしないクリップボード所有者で in-flight ガードが
    残らないように）。
 
@@ -88,7 +92,8 @@ Flutter 標準の `Clipboard` はテキストしか扱えないため、画像�
 - **ファイルのコピー経路は実機未確認**: `Pasteboard.files` が Finder（macOS）・Nautilus 等（Linux）で
   実際にどう返るか（macOS は Finder が載せるアイコンの TIFF を避けられるか、Linux は URI のみの
   クリップボードからパスを取れるか）は、コード上の想定であり実機で確認していない。実機確認が要る。
-- **macOS のプライバシー警告は実機未確認**: 新しい macOS には、他アプリのクリップボードを
+- **macOS のプライバシー警告は実機未確認**（確認ダイアログが同期的に読み取りを止める場合、
+  許可待ちとタイムアウトが衝突しうるため、`clipboardReadTimeout` は 30 秒にした。実機確認の対象）: 新しい macOS には、他アプリのクリップボードを
   プログラムが読むときに確認を出す仕組み（「他のアプリからのペーストを許可」）がある。本アプリの
   貼り付けボタン・Cmd+V で警告が出るか、出た場合の文言と挙動は実機でしか確認できない。
 - `pasteboard` は PNG を返すため、元のクリップボードの形式（JPEG 等）は保たれず、

@@ -92,7 +92,7 @@ void main() {
 
   tearDown(() {
     clipboardImageReader = const PasteboardClipboardImageReader();
-    clipboardReadTimeout = const Duration(seconds: 5);
+    clipboardReadTimeout = const Duration(seconds: 30);
   });
 
   group('pasteUserImageFromClipboard', () {
@@ -425,7 +425,7 @@ void main() {
       required List<String> log,
     }) {
       return resolveClipboardContent(
-        fileExists: exists == null ? null : (p) async => exists(p),
+        existsLocally: exists == null ? null : (p) async => exists(p),
         files: () async {
           log.add('files');
           return files;
@@ -496,16 +496,27 @@ void main() {
       expect(content, isA<ClipboardImageData>());
     });
 
-    test('拡張子のない実在パスだけなら、種類を決められないので画像データへ', () async {
+    test('拡張子のない実在パス（フォルダ・.app・拡張子なしファイル）だけなら、アイコンは貼らず非対応', () async {
       final log = <String>[];
       final content = await resolve(
-        files: ['/x/noextension', '/x/Makefile'],
+        files: ['/x/noextension', '/x/Makefile', '/Applications/Foo.app'],
         image: pngBytes,
         log: log,
       );
 
-      expect(content, isA<ClipboardImageData>());
-      expect(log, ['files', 'image']);
+      expect(content, isA<ClipboardUnsupportedFiles>());
+      expect(log, ['files'], reason: 'Finder が載せるフォルダ・アプリのアイコンを拾わない');
+    });
+
+    test('実在するフォルダだけ、または実在しない URL とフォルダの混在でも非対応（URL は無視）', () async {
+      final content = await resolve(
+        files: ['https://example.com/cat.png', '/x/some folder'],
+        image: pngBytes,
+        exists: (p) => p == '/x/some folder',
+        log: [],
+      );
+
+      expect(content, isA<ClipboardUnsupportedFiles>());
     });
 
     test('実在するパスだけが数えられる（実在しない画像より、実在する画像）', () async {
@@ -529,7 +540,65 @@ void main() {
         log: [],
       );
 
-      expect(asked, contains('/a/1.png'));
+      expect(asked, equals(['/a/1.png', '/b/2.txt']));
+    });
+
+    group('本番の実在判定（localPathExists）を通す', () {
+      late Directory dir;
+
+      setUp(() {
+        dir = Directory.systemTemp.createTempSync('ue97_exists_');
+      });
+      tearDown(() {
+        dir.deleteSync(recursive: true);
+      });
+
+      Future<ClipboardContent> resolveReal(List<String> files) {
+        return resolveClipboardContent(
+          files: () async => files,
+          imageBytes: () async => pngBytes,
+          existsLocally: localPathExists,
+        );
+      }
+
+      test('実ファイル・実ディレクトリ・存在しないパスを正しく見分ける', () async {
+        final image = File('${dir.path}/real.png')..writeAsBytesSync([1]);
+        final plain = File('${dir.path}/noextension')..writeAsBytesSync([1]);
+        final folder = Directory('${dir.path}/folder')..createSync();
+
+        expect(await localPathExists(image.path), isTrue);
+        expect(await localPathExists(plain.path), isTrue);
+        expect(await localPathExists(folder.path), isTrue);
+        expect(await localPathExists('${dir.path}/missing.png'), isFalse);
+        expect(await localPathExists('https://example.com/cat.png'), isFalse);
+      });
+
+      test('実在する画像ファイルはファイルとして返る', () async {
+        final image = File('${dir.path}/real.png')..writeAsBytesSync([1]);
+
+        final content = await resolveReal([image.path]);
+
+        expect((content as ClipboardImageFile).path, image.path);
+      });
+
+      test('実ディレクトリだけ・拡張子なしの実ファイルだけなら、アイコンではなく非対応', () async {
+        final folder = Directory('${dir.path}/folder')..createSync();
+        final plain = File('${dir.path}/noextension')..writeAsBytesSync([1]);
+
+        expect(
+            await resolveReal([folder.path]), isA<ClipboardUnsupportedFiles>());
+        expect(
+            await resolveReal([plain.path]), isA<ClipboardUnsupportedFiles>());
+      });
+
+      test('実在しないパス（URL・消えたファイル）だけなら画像データへ', () async {
+        final content = await resolveReal([
+          'https://example.com/cat.png',
+          '${dir.path}/gone.png',
+        ]);
+
+        expect(content, isA<ClipboardImageData>());
+      });
     });
 
     test('ファイルが無ければ画像データを返す', () async {
