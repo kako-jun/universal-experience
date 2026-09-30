@@ -37,6 +37,7 @@ Universal Experience（ue）の主要な設計判断を記録する正本ディ�
 | ファイル | タイトル | 決定日 | ステータス |
 |---|---|---|---|
 | [2026-09-30-language-picker-endonyms-and-single-resolution.md](2026-09-30-language-picker-endonyms-and-single-resolution.md) | 言語ピッカーは自称名で並べ、言語の解決を 1 つの関数に一本化する | 2026-09-30 | Accepted |
+| [2026-09-30-export-png-to-downloads.md](2026-09-30-export-png-to-downloads.md) | PNG エクスポートは保存ダイアログを使わず Downloads へ直接保存する | 2026-09-30 | Accepted |
 | [2026-09-30-home-screen-unified-list-and-three-columns.md](2026-09-30-home-screen-unified-list-and-three-columns.md) | 主画面を「統合一覧 + 3 カラム（広幅）/ 縦積み（狭幅）」にする | 2026-09-30 | Accepted |
 | [2026-09-26-loupe-as-single-render-unit.md](2026-09-26-loupe-as-single-render-unit.md) | ルーペ窓を唯一の描画単位にする（対象アプリ指定は自動配置モード） | 2026-09-26 | Accepted |
 | [2026-05-31-sensus-core-consolidation.md](2026-05-31-sensus-core-consolidation.md) | sensus-core への色変換一元化（plugin/simulator 撤去） | 2026-05-31 | Accepted |

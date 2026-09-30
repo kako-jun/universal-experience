@@ -77,6 +77,14 @@ typedef PngSaver = Future<String> Function(Uint8List bytes, String filename);
 @visibleForTesting
 PngSaver pngSaver = savePng;
 
+/// 保存したファイルの場所を開く処理の型。実体は [revealInFolder]。
+/// 実 OS のファイルマネージャを起動するので、widget test ではフェイクに差し替える。
+typedef FolderRevealer = Future<bool> Function(String path);
+
+/// 「フォルダで表示」の供給源（テストで差し替え可能）。既定は [revealInFolder]。
+@visibleForTesting
+FolderRevealer folderRevealer = revealInFolder;
+
 /// Side-by-side "before / after" preview for the currently selected
 /// `VisionFilterState` selection (#60).
 ///
@@ -597,7 +605,8 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       final strengthPercent = (strength.clamp(0.0, 1.0) * 100).round();
-      final date = isoDate(DateTime.now());
+      final now = DateTime.now();
+      final date = isoDate(now);
       // #76 レビュー M1: プレビューの注記（FilterParamPanel・
       // ExperiencePresetTile）と同じ正本・同じ解決経路（resolveConsultNotice）を
       // export の焼き込みにも使う。色覚 7 型は urgency=none かつ escalation も
@@ -641,12 +650,34 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         symptomId: colorVisionType?.id ?? filterId ?? 'none',
         strengthPercent: strengthPercent,
         isoDate: date,
+        // #64: 同じ日に何度書き出しても別名になるよう時刻も入れる（それでも
+        // 衝突したら savePng が連番にする）。焼き込むキャプションは日付のみ。
+        time: compactTime(now),
       );
       final path = await pngSaver(bytes, filename);
       await Clipboard.setData(ClipboardData(text: path));
 
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text(l10n.exportSuccess(path))));
+      messenger.showSnackBar(SnackBar(
+        content: Text(l10n.exportSuccess(path)),
+        // #64: 保存先はユーザーが実際に辿れる場所（Downloads）。パスを読ませる
+        // だけでなく、その場でファイルマネージャを開けるようにする。アクション
+        // 付きの SnackBar は既定で消えないので、時間で閉じるよう明示する。
+        persist: false,
+        duration: const Duration(seconds: 10),
+        action: SnackBarAction(
+          label: l10n.exportRevealAction,
+          onPressed: () async {
+            final opened = await folderRevealer(path);
+            // messenger は export 開始時に取ってあり context を使わないので、
+            // ビューが外れた後でも失敗を必ず知らせる。
+            if (!opened) {
+              messenger
+                  .showSnackBar(SnackBar(content: Text(l10n.exportRevealFailure)));
+            }
+          },
+        ),
+      ));
     } catch (_) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(content: Text(l10n.exportFailure)));

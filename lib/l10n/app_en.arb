@@ -170,10 +170,18 @@
   },
   "exportSuccess": "Exported to {path}",
   "@exportSuccess": {
-    "description": "SnackBar shown after a successful PNG export. The file path is also copied to the clipboard.",
+    "description": "SnackBar shown after a successful PNG export. {path} is the full path of the saved file (the user's Downloads folder; a numbered name if the name was taken). The file path is also copied to the clipboard.",
     "placeholders": {
       "path": { "type": "String" }
     }
+  },
+  "exportRevealAction": "Show in folder",
+  "@exportRevealAction": {
+    "description": "Action button on the export-success SnackBar that opens the file manager at the exported PNG (#64)."
+  },
+  "exportRevealFailure": "Couldn't open the folder.",
+  "@exportRevealFailure": {
+    "description": "SnackBar shown when the file manager could not be launched from the export-success action (#64)."
   },
   "exportFailure": "Export failed. Please try again.",
   "@exportFailure": {
