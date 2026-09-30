@@ -836,12 +836,30 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
             ? Column(
                 children: [beforePane, const SizedBox(height: 12), afterPane],
               )
-            : Row(
+            // 横並びは、見出しの行と画像の行を別々に組む。見出しが折り返して片方だけ高くなっても
+            // 左右の画像の上端が揃う（見出しの行は高い方に揃える）。
+            : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: beforePane),
-                  const SizedBox(width: 12),
-                  Expanded(child: afterPane),
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: beforePane.buildHeading(context)),
+                        const SizedBox(width: 12),
+                        Expanded(child: afterPane.buildHeading(context)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: beforePane.buildImage()),
+                      const SizedBox(width: 12),
+                      Expanded(child: afterPane.buildImage()),
+                    ],
+                  ),
                 ],
               );
 
@@ -1010,43 +1028,55 @@ class _Pane extends StatelessWidget {
   /// Optional action shown to the right of the label (e.g. the export button).
   final Widget? trailing;
 
+  /// 見出しの行（ラベル + 右の操作）。
+  Widget buildHeading(BuildContext context) {
+    final theme = Theme.of(context);
+    // 書き出しボタン（after 側だけ）を含む行は 48dp（タップ領域の下限、#45）。
+    // before 側にも同じ高さを使うのは、左右の見出し行の高さを揃えて
+    // 画像の上端をずらさないため。
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        // 折り返す見出しは 3 行（labelLarge 14sp × 行高 1.43 ≒ 20dp の 3 行 = 60dp）まで
+        // 収まる高さ 64 を下限にする。4 行以上になる見出しの高さは、横並びでは
+        // [IntrinsicHeight] が左右で揃える。
+        minHeight: wrapLabel ? 64 : 48,
+        maxHeight: wrapLabel ? double.infinity : 48,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: theme.textTheme.labelLarge,
+              overflow: wrapLabel ? null : TextOverflow.ellipsis,
+            ),
+          ),
+          if (trailing != null) trailing!,
+        ],
+      ),
+    );
+  }
+
+  /// 画像（正方形）。
+  Widget buildImage() {
+    return AspectRatio(
+      aspectRatio: 1,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // 書き出しボタン（after 側だけ）を含む行は 48dp（タップ領域の下限、#45）。
-        // before 側にも同じ高さを使うのは、左右の見出し行の高さを揃えて
-        // 画像の上端をずらさないため。
-        ConstrainedBox(
-          constraints: BoxConstraints(
-            // 折り返す見出しは 3 行（labelLarge の 20dp × 3）まで高さを揃える。
-            minHeight: wrapLabel ? 64 : 48,
-            maxHeight: wrapLabel ? double.infinity : 48,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  style: theme.textTheme.labelLarge,
-                  overflow: wrapLabel ? null : TextOverflow.ellipsis,
-                ),
-              ),
-              if (trailing != null) trailing!,
-            ],
-          ),
-        ),
+        buildHeading(context),
         const SizedBox(height: 8),
-        AspectRatio(
-          aspectRatio: 1,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: child,
-          ),
-        ),
+        buildImage(),
       ],
     );
   }

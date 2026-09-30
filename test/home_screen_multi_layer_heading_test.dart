@@ -9,7 +9,9 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
+import 'package:universal_experience/models/preview_image_source.dart';
 import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
+import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 
 import 'support/home_screen_harness.dart';
@@ -194,5 +196,55 @@ void main() {
       await settle(tester);
       expect(find.text(l10n.previewStaticFrameNote), findsNothing);
     });
+  });
+
+  group('見出しが長く折り返しても、左右の画像の上端は揃う', () {
+    // 横並びになる最小幅（420）の半分のペインで、長い名前 2 つ + 「…（+N）」。見出しは 4 行以上に
+    // なりうる。
+    Future<void> pumpPanes(WidgetTester tester, List<String> names) async {
+      await installFakes(tester);
+      tester.view.physicalSize = const Size(440, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: BeforeAfterView(
+                filter: const VisionFilter.myopia(),
+                filterId: 'myopia',
+                strength: 1.0,
+                imageSource: const SamplePreviewImageSource('test'),
+                sampleSize: 32,
+                layerNames: names,
+                layerIds: const ['myopia', 'glaucoma', 'protanopia'],
+                steps: const [],
+              ),
+            ),
+          ),
+        ),
+      );
+      await settle(tester);
+    }
+
+    for (final length in [10, 40, 120]) {
+      testWidgets('名前の長さ $length 文字: 原画ペインと after ペインの画像の上端が同じ',
+          (tester) async {
+        final name = List.filled(length, 'W').join();
+        await pumpPanes(tester, [name, name, name]);
+
+        final images = find.byType(PreviewImageView);
+        expect(images, findsNWidgets(2));
+        expect(tester.getTopLeft(images.at(0)).dy,
+            tester.getTopLeft(images.at(1)).dy);
+        if (length == 120) {
+          // 見出しが 64dp（3 行分の最小の高さ）を超えて折り返している場合も測れている。
+          expect(tester.getTopLeft(images.at(0)).dy, greaterThan(64 + 8));
+        }
+      });
+    }
   });
 }
