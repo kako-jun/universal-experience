@@ -13,7 +13,7 @@ import 'package:path_provider/path_provider.dart';
 /// `AppLocalizations` で解決し、[ExportCaption] として渡す。これによりサービスは
 /// pure（テスト容易・ロケール非依存）に保たれる。
 ///
-/// 規律3（I/O 隔離）に従い、ファイル書き込み（[savePng] /
+/// 規律3（I/O 隔離）に従い、ファイル書き込み（[savePng] / [savePngInto] /
 /// [writeBytesWithoutOverwrite]）と保存先を示す [revealInFolder] だけを I/O とし、
 /// 画像合成 [composeExportImage]・文字列生成（[isoDate] / [compactTime] /
 /// [exportFilename] / [numberedFilename]）・コマンド決定（[revealCommandFor]）は
@@ -214,17 +214,28 @@ Future<ui.Image> composeExportImage(
 /// [numberedFilename] で空きを探す上限。これを超えたら [StateError]。
 const int kMaxExportNumbering = 1000;
 
+/// [file] に [bytes] を書く既定の書き込み処理（[writeBytesWithoutOverwrite] の差し替え口）。
+Future<void> _defaultWriteFile(File file, Uint8List bytes) async {
+  await file.writeAsBytes(bytes, flush: true);
+}
+
 /// [dir] に [filename] で [bytes] を書く。**既存のファイルは決して上書きしない**（#64）。
 ///
 /// 同名があれば [numberedFilename] の連番（`-2`, `-3`, ...）で空きを探す。
 /// 存在確認と作成は `File.create(exclusive: true)` で 1 操作にしてあるので、
 /// 同時に 2 回書き出しても、確認と作成の間に割り込まれて上書きすることがない。
+/// 作成に成功したあと書き込みに失敗したら、0 バイトなど中途半端なファイルを残さず
+/// 削除してから元の例外を投げる（削除自体の失敗は握りつぶす）。
 /// 書き込んだファイルのフルパスを返す。規律3: I/O はここと [savePng] だけ。
+///
+/// [writeFile] はテスト用の差し替え口（書き込み失敗の再現）。
 Future<String> writeBytesWithoutOverwrite(
   Directory dir,
   Uint8List bytes,
-  String filename,
-) async {
+  String filename, {
+  Future<void> Function(File file, Uint8List bytes) writeFile =
+      _defaultWriteFile,
+}) async {
   for (var attempt = 1; attempt <= kMaxExportNumbering; attempt++) {
     final file = File(
       '${dir.path}${Platform.pathSeparator}${numberedFilename(filename, attempt)}',
@@ -240,62 +251,164 @@ Future<String> writeBytesWithoutOverwrite(
       if (await file.exists()) continue;
       rethrow;
     }
-    await file.writeAsBytes(bytes, flush: true);
+    try {
+      await writeFile(file, bytes);
+    } catch (_) {
+      try {
+        await file.delete();
+      } catch (_) {
+        // 掃除の失敗で元の例外を隠さない。
+      }
+      rethrow;
+    }
     return file.path;
   }
   throw StateError('No free file name for $filename in ${dir.path}');
 }
 
-/// PNG バイト列をダウンロード or ドキュメントディレクトリへ書き出し、フルパスを返す。
+/// [dir] のシンボリックリンクを解決した実ディレクトリを返す。解決できなければ
+/// （リンク切れ・存在しない・権限なし）[dir] をそのまま返す。
+Future<Directory> resolveDirectoryOrSelf(Directory dir) async {
+  try {
+    return Directory(await dir.resolveSymbolicLinks());
+  } on FileSystemException {
+    return dir;
+  }
+}
+
+/// [path] のシンボリックリンクを解決した実パスを返す。解決できなければ [path]。
+Future<String> resolvePathOrSelf(String path) async {
+  try {
+    return await File(path).resolveSymbolicLinks();
+  } on FileSystemException {
+    return path;
+  }
+}
+
+/// [dir] に PNG を書き、**実パス**を返す（[savePng] の本体。テスト可能にするため分離）。
 ///
-/// 規律3: I/O はこの関数と [writeBytesWithoutOverwrite] だけに閉じ込める。
-/// デスクトップでは [getDownloadsDirectory]、取得できない環境では
+/// macOS のサンドボックスでは `getDownloadsDirectory()` がコンテナ内のパス
+/// （`~/Library/Containers/<bundle>/Data/Downloads`）を返し、実機ではそれが
+/// `~/Downloads` へのシンボリックリンクになっている。書き込みはリンク越しに実
+/// `~/Downloads` へ入るが、そのまま返すと SnackBar・クリップボード・「フォルダで
+/// 表示」がコンテナ側のパスになる。ユーザーに見せる／Finder に渡すパスは
+/// [resolveSymbolicLinks] で実パスに揃える（解決できなければ元のパス）。
+Future<String> savePngInto(
+  Directory dir,
+  Uint8List bytes,
+  String filename,
+) async {
+  final realDir = await resolveDirectoryOrSelf(dir);
+  final written = await writeBytesWithoutOverwrite(realDir, bytes, filename);
+  return resolvePathOrSelf(written);
+}
+
+/// PNG バイト列をダウンロード or ドキュメントディレクトリへ書き出し、フルパス
+/// （シンボリックリンク解決済みの実パス）を返す。
+///
+/// 規律3: I/O はこの関数・[savePngInto]・[writeBytesWithoutOverwrite] だけに
+/// 閉じ込める。デスクトップでは [getDownloadsDirectory]、取得できない環境では
 /// [getApplicationDocumentsDirectory] にフォールバックする。macOS のサンドボックス
-/// では `com.apple.security.files.downloads.read-write` entitlement が無いと
-/// [getDownloadsDirectory] がアプリのコンテナ内（ユーザーに見えない場所）を返す
-/// ため、`macos/Runner/*.entitlements` にその entitlement を入れてある（#64）。
-/// 同名ファイルは上書きせず連番にする（[writeBytesWithoutOverwrite]）。
+/// では、`com.apple.security.files.downloads.read-write` entitlement が無いと
+/// コンテナ内 `Data/Downloads` のリンク先（実 `~/Downloads`）への書き込みが
+/// サンドボックスに拒否される。付けるとリンク経由で実 `~/Downloads` に書ける
+/// ため、`macos/Runner/*.entitlements` に入れてある（#64）。同名ファイルは
+/// 上書きせず連番にする（[writeBytesWithoutOverwrite]）。
 Future<String> savePng(Uint8List bytes, String filename) async {
   final dir = (await getDownloadsDirectory()) ??
       (await getApplicationDocumentsDirectory());
-  return writeBytesWithoutOverwrite(dir, bytes, filename);
+  return savePngInto(dir, bytes, filename);
 }
 
-/// 保存したファイルをファイルマネージャで示すコマンド（実行ファイルと引数）。
-typedef RevealCommand = ({String executable, List<String> arguments});
+/// [revealCommandFor] のコマンドをどう実行し、何を成功とみなすか。
+enum RevealMode {
+  /// 実行して終了を待ち、終了コード 0 を成功とする（macOS の `open -R`。短命）。
+  runAndCheckExit,
+
+  /// 実行して終了を待つが、終了コードは見ない。Windows の `explorer` は
+  /// 成功しても終了コード 1 を返すことがあるため。
+  runIgnoreExit,
+
+  /// 切り離して起動し、起動できたことだけを成功とする。Linux の `xdg-open` は
+  /// 環境によってファイルマネージャが終了するまで戻らないことがあり、切り離すと
+  /// 終了コードが取れないため。
+  startDetached,
+}
+
+/// 保存したファイルをファイルマネージャで示すコマンド。
+typedef RevealCommand = ({
+  String executable,
+  List<String> arguments,
+  RevealMode mode,
+});
 
 /// [path] をファイルマネージャで示すコマンドを OS ごとに決める（#64）。
 ///
-/// macOS は Finder でファイルを選択状態にする `open -R`、Windows は
-/// `explorer /select,`、それ以外（Linux）は選択の標準手段が無いので
-/// 含むフォルダを `xdg-open` で開く。pure（[platform] は
-/// `Platform.operatingSystem` の値を渡す）。未対応 OS は null。
+/// macOS は Finder でファイルを選択状態にする `/usr/bin/open -R`、Windows は
+/// `explorer /select,`、それ以外（Linux）は選択の標準手段が無いので含むフォルダを
+/// `xdg-open` で開く。pure（[platform] は `Platform.operatingSystem` の値を渡す）。
+/// 未対応 OS は null。
+///
+/// 未確認: Windows でパスにスペースやカンマを含むときの `/select,` の解釈
+/// （引数の引用の仕方）は Windows 実機で確認が要る。
 RevealCommand? revealCommandFor(String platform, String path) {
   switch (platform) {
     case 'macos':
-      return (executable: 'open', arguments: ['-R', path]);
+      return (
+        executable: '/usr/bin/open',
+        arguments: ['-R', path],
+        mode: RevealMode.runAndCheckExit,
+      );
     case 'windows':
-      return (executable: 'explorer', arguments: ['/select,$path']);
+      return (
+        executable: 'explorer',
+        arguments: ['/select,$path'],
+        mode: RevealMode.runIgnoreExit,
+      );
     case 'linux':
       final sep = path.lastIndexOf('/');
       final parent = sep > 0 ? path.substring(0, sep) : '/';
-      return (executable: 'xdg-open', arguments: [parent]);
+      return (
+        executable: 'xdg-open',
+        arguments: [parent],
+        mode: RevealMode.startDetached,
+      );
     default:
       return null;
   }
 }
 
+/// [RevealCommand] を実行し、終了コードを返す。[RevealMode.startDetached] は
+/// 終了コードが無いので null。起動できなければ [ProcessException]。
+typedef RevealRunner = Future<int?> Function(RevealCommand command);
+
+Future<int?> _defaultRevealRunner(RevealCommand command) async {
+  if (command.mode == RevealMode.startDetached) {
+    await Process.start(
+      command.executable,
+      command.arguments,
+      mode: ProcessStartMode.detached,
+    );
+    return null;
+  }
+  final result = await Process.run(command.executable, command.arguments);
+  return result.exitCode;
+}
+
 /// 保存したファイルの場所をファイルマネージャで開く。開けなかったら false。
 ///
-/// 規律3: I/O。コマンドの決定は [revealCommandFor]（pure）。Windows の
-/// `explorer` は成功でも終了コード 1 を返すので終了コードは見ず、起動できたか
-/// だけで判定する。
-Future<bool> revealInFolder(String path) async {
-  final cmd = revealCommandFor(Platform.operatingSystem, path);
+/// 規律3: I/O。コマンドと成功条件の決定は [revealCommandFor]（pure）。
+/// [platform] と [runner] はテスト用の差し替え口。
+Future<bool> revealInFolder(
+  String path, {
+  String? platform,
+  RevealRunner runner = _defaultRevealRunner,
+}) async {
+  final cmd = revealCommandFor(platform ?? Platform.operatingSystem, path);
   if (cmd == null) return false;
   try {
-    await Process.run(cmd.executable, cmd.arguments);
-    return true;
+    final exitCode = await runner(cmd);
+    return cmd.mode == RevealMode.runAndCheckExit ? exitCode == 0 : true;
   } on ProcessException {
     return false;
   }

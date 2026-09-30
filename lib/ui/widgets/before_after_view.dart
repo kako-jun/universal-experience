@@ -669,7 +669,9 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
           label: l10n.exportRevealAction,
           onPressed: () async {
             final opened = await folderRevealer(path);
-            if (!opened && mounted) {
+            // messenger は export 開始時に取ってあり context を使わないので、
+            // ビューが外れた後でも失敗を必ず知らせる。
+            if (!opened) {
               messenger
                   .showSnackBar(SnackBar(content: Text(l10n.exportRevealFailure)));
             }
