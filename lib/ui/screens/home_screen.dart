@@ -108,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final visionState = _visionFilterStateForImageSource;
     if (visionState == null) return;
     context.read<ImageSourceState>().followRecommendedSample(
-          recommendedSampleIdForFilter(visionState.selectedId),
+          recommendedSampleIdForFilter(visionState.focusedId),
         );
   }
 
@@ -435,6 +435,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           filterId: visionState.selectedId,
                           strength: strength,
                           colorVisionType: visionState.colorVisionType,
+                          // 層が複数のときだけ合成経路（#119）。1 層以下は従来の
+                          // 単一フィルタ経路のまま。
+                          steps: visionState.layers.length > 1
+                              ? previewPipelineSteps(visionState)
+                              : null,
                           imageSource: imageSourceState.current,
                         ),
                 ),

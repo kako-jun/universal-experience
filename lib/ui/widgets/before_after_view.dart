@@ -51,6 +51,18 @@ typedef AfterImageRenderer = Future<ui.Image?> Function(
 @visibleForTesting
 AfterImageRenderer afterImageRenderer = BeforeAfterView.renderAfter;
 
+/// 複数層のときの after 画像描画ステップの型（[AfterImageRenderer] の複数ステップ版、
+/// #119）。実体は [BeforeAfterView.renderAfterPipeline]。[steps] は適用順で、強度 0 の層は
+/// 既に除かれている。テストでフェイクに差し替えて「どのステップ列を渡したか」を検証する。
+typedef AfterPipelineRenderer =
+    Future<ui.Image?> Function(ui.Image source, List<VisionStep> steps);
+
+/// 複数層の after 画像描画の供給源（テストで差し替え可能）。既定は
+/// [BeforeAfterView.renderAfterPipeline]。
+@visibleForTesting
+AfterPipelineRenderer afterPipelineRenderer =
+    BeforeAfterView.renderAfterPipeline;
+
 /// [_BeforeAfterViewState._export] が使うキャプション合成ステップの型。
 ///
 /// 実体は [composeExportImage]。widget test が実ファイル I/O（[pngSaver]）に
@@ -141,6 +153,7 @@ class BeforeAfterView extends StatefulWidget {
     required this.imageSource,
     this.colorVisionType,
     this.sampleSize,
+    this.steps,
   }) : assert(
           (filter == null) == (filterId == null),
           'filter and filterId must both be null or both be set',
@@ -175,6 +188,15 @@ class BeforeAfterView extends StatefulWidget {
   /// purposes only — it never affects what's rendered (that's entirely
   /// [filter]/[strength]).
   final ColorVisionType? colorVisionType;
+
+  /// 複数層のときの合成ステップ列（適用順、強度 0 の層は除外済み。#119）。
+  ///
+  /// `null`（既定。層が 0〜1 のとき）なら従来どおり [filter] を [strength] で適用する
+  /// （[afterImageRenderer]）。非 null のときは **この列を 1 回の合成で適用**し
+  /// （[afterPipelineRenderer] → [CpuVisionRenderer.pipelineApplier]）、[filter] と
+  /// [strength] は描画に使わない（見出し・書き出しが代表として参照する、フォーカス中の層の
+  /// 値。複数層の見出し・書き出しは #120/#121）。空なら原画をそのまま見せる。
+  final List<VisionStep>? steps;
 
   /// Explicit width/height (in pixels) for the generated square sample
   /// image. When `null` (the default, used by real callers), the resolution
@@ -280,6 +302,17 @@ class BeforeAfterView extends StatefulWidget {
     return CpuVisionRenderer.applier(source, filter, strength);
   }
 
+  /// 複数層の after 画像: [source] に [steps] を並びの順に 1 回の合成で適用する
+  /// （#119）。[steps] が空（全層が強度 0、または原画比較中）なら [source] をそのまま返し、
+  /// レンダラは呼ばない。
+  static Future<ui.Image?> renderAfterPipeline(
+    ui.Image source,
+    List<VisionStep> steps,
+  ) async {
+    if (steps.isEmpty) return source;
+    return CpuVisionRenderer.pipelineApplier(source, steps);
+  }
+
   @override
   State<BeforeAfterView> createState() => _BeforeAfterViewState();
 }
@@ -381,6 +414,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         oldWidget.filterId != widget.filterId ||
         oldWidget.colorVisionType != widget.colorVisionType ||
         oldWidget.strength != widget.strength ||
+        !listEquals(oldWidget.steps, widget.steps) ||
         oldWidget.sampleSize != widget.sampleSize ||
         oldWidget.imageSource != widget.imageSource) {
       _scheduleRebuild(_effectiveSampleSize);
@@ -512,11 +546,14 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
 
     ui.Image? after;
     try {
-      after = await afterImageRenderer(
-        rendererInput,
-        widget.filter,
-        widget.strength,
-      );
+      final steps = widget.steps;
+      after = steps == null
+          ? await afterImageRenderer(
+              rendererInput,
+              widget.filter,
+              widget.strength,
+            )
+          : await afterPipelineRenderer(rendererInput, steps);
     } catch (e, st) {
       // こちらも同様に報告する。
       FlutterError.reportError(FlutterErrorDetails(

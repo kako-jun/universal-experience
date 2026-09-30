@@ -1,3 +1,4 @@
+import '../src/rust/api/sensus_bridge.dart' show VisionStep;
 import 'vision_filter_state.dart';
 
 /// 「今選んでいるフィルタの素の強度」を、bypass に関わらず返す（#79）。
@@ -23,6 +24,18 @@ double selectedStrength(VisionFilterState visionState) => visionState.strength;
 double previewStrength(VisionFilterState visionState) {
   if (visionState.bypassed) return 0.0;
   return selectedStrength(visionState);
+}
+
+/// 複数層のプレビュー合成（sensus の `Pipeline`、#118/#119）に渡すステップ列を決める、
+/// **唯一の判定箇所**。
+///
+/// [VisionFilterState.pipelineSteps]（段順・強度 0 の層を除く）に bypass の判定を重ねたもの。
+/// 原画比較中（[VisionFilterState.bypassed]）は選択・強度の記憶を変えず常に空（= 原画を
+/// そのまま見せる）。層が 1 つ以下のときは従来の単一フィルタの経路（[previewStrength]）を
+/// 使うので、呼び出し側は「層が複数のときだけ」これを渡す。
+List<VisionStep> previewPipelineSteps(VisionFilterState visionState) {
+  if (visionState.bypassed) return const [];
+  return visionState.pipelineSteps();
 }
 
 /// advanced カタログの strength スライダー（`FilterParamPanel`）を表示すべきか
