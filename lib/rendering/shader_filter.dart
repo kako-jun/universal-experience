@@ -5,8 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import 'color_matrices.g.dart';
 
-/// 失敗した Future をキャッシュに残さない汎用の single-flight メモ化キャッシュ
-/// （#58 レビュー S1）。
+/// 失敗した Future をキャッシュに残さない汎用の single-flight メモ化キャッシュ。
 ///
 /// 素朴な `Map<K, Future<V>> ??=` キャッシュは、一度失敗した Future もそのまま
 /// キャッシュし続けてしまうため、一時的な asset ロード失敗（I/O エラー等）が
@@ -15,8 +14,7 @@ import 'color_matrices.g.dart';
 /// できるようにする。`ui.FragmentProgram` のような engine 依存の型を持ち出さず
 /// 汎用にしてあるのは、`flutter test` から実 asset ロードなしに単体テストできる
 /// ようにするため（クラス自体は汎用ユーティリティなので `@visibleForTesting`
-/// は付けない。テスト専用の観測用フィールドである [debugLength] にのみ付ける
-/// — #58 レビュー nit）。
+/// は付けない。テスト専用の観測用フィールドである [debugLength] にのみ付ける）。
 class SingleFlightCache<K, V> {
   final Map<K, Future<V>> _entries = <K, Future<V>>{};
 
@@ -181,7 +179,7 @@ class ShaderFilter {
   }
 
   // ロード済み FragmentProgram を asset パスでキャッシュ（並行ロードの重複を避ける）。
-  // 失敗した Future を残さない SingleFlightCache を使う（#58 レビュー S1）。
+  // 失敗した Future を残さない SingleFlightCache を使う。
   @visibleForTesting
   static final SingleFlightCache<String, ui.FragmentProgram> programCache =
       SingleFlightCache<String, ui.FragmentProgram>();

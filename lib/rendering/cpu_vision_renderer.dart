@@ -25,7 +25,7 @@ typedef VisionCpuApplier = Future<ui.Image> Function(
 /// `applyVisionCpuRgba8` は非同期公開（`#[frb(sync)]` を外した、#85）なので、
 /// Rust 側スレッドプールで実行され、待っている間 UI スレッドを塞がない。
 ///
-/// ## alpha の扱い（#85 レビュー S1）
+/// ## alpha の扱い
 ///
 /// Flutter の `ui.Image` は内部的に **premultiplied alpha** で GPU テクスチャを
 /// 保持する（`ImageByteFormat.rawRgba` で読む生バイト列、`PixelFormat.rgba8888`
@@ -67,7 +67,7 @@ class CpuVisionRenderer {
   /// の clamp/NaN 処理も sensus 側の責務）。
   ///
   /// デコードに失敗した場合（[rgba8ToImage] 参照）は例外がそのまま呼び出し元へ
-  /// 伝わる。無限に待ち続けてハングすることはない（#85 レビュー S2）。
+  /// 伝わる。無限に待ち続けてハングすることはない。
   static Future<ui.Image> apply(
     ui.Image source,
     VisionFilter filter,
@@ -87,7 +87,7 @@ class CpuVisionRenderer {
   /// [image] を **straight**（非 premultiplied）RGBA8 の生バイト列に変換する。
   ///
   /// `ImageByteFormat.rawRgba` ではなく [ui.ImageByteFormat.rawStraightRgba] を
-  /// 使う（#85 レビュー S1）: 前者は premultiplied alpha を返すため、alpha<255
+  /// 使う: 前者は premultiplied alpha を返すため、alpha<255
   /// のピクセルを straight alpha 前提の sensus にそのまま渡すと RGB が実際より
   /// 暗く解釈されてしまう。
   ///
@@ -101,7 +101,7 @@ class CpuVisionRenderer {
       throw StateError('ui.Image から raw RGBA バイト列を取得できなかった');
     }
     // ByteData が指すのは必ずしもバッキング ByteBuffer の全域とは限らないため、
-    // offsetInBytes/lengthInBytes で範囲を明示する（#85 レビュー S2）。
+    // offsetInBytes/lengthInBytes で範囲を明示する。
     return byteData.buffer
         .asUint8List(byteData.offsetInBytes, byteData.lengthInBytes);
   }
@@ -111,12 +111,12 @@ class CpuVisionRenderer {
   ///
   /// Flutter の `PixelFormat.rgba8888`（[rgba8ToImage] が `ImageDescriptor.raw`
   /// に渡す形式）は premultiplied alpha を前提とする。sensus の出力は straight
-  /// alpha なので、`ui.Image` を組み立てる前にここで変換する（#85 レビュー S1）。
+  /// alpha なので、`ui.Image` を組み立てる前にここで変換する。
   ///
   /// `premultiplied = round(straight * alpha / 255)`。alpha==255（このアプリの
   /// 実運用画像はほぼ全て不透明）のピクセルは恒等変換になる。
   ///
-  /// fast path（#85 レビュー N5）: 全ピクセルの alpha が 255 なら変換自体が
+  /// fast path: 全ピクセルの alpha が 255 なら変換自体が
   /// 恒等写像なので、新しいバッファを確保・コピーせず [straight] をそのまま
   /// 返す。1024px 四方（4MB）のバッファをフィルタのたびに複製するコストを、
   /// このアプリの主要ケース（不透明画像）で消す。
@@ -154,7 +154,7 @@ class CpuVisionRenderer {
   ///
   /// [ui.decodeImageFromPixels]（コールバック API）ではなく
   /// `ImmutableBuffer.fromUint8List` → `ImageDescriptor.raw` →
-  /// `instantiateCodec` → `getNextFrame` の await 連鎖を使う（#85 レビュー S2）:
+  /// `instantiateCodec` → `getNextFrame` の await 連鎖を使う:
   /// 前者はデコードに失敗した場合にコールバックが一度も呼ばれず `Future` が
   /// 永久に解決しない（呼び出し元がハングする）経路があり得るのに対し、
   /// 後者は失敗が普通の例外として `Future` の rejection で伝わるため、
@@ -162,7 +162,7 @@ class CpuVisionRenderer {
   /// try/catch・失敗表示（#58）にそのまま乗る。
   ///
   /// [premultiplyStraightRgba8] で premultiplied に変換してから
-  /// `ImageDescriptor.raw` へ渡す（S1 参照）。`buffer`/`descriptor`/`codec` は
+  /// `ImageDescriptor.raw` へ渡す。`buffer`/`descriptor`/`codec` は
   /// 使い終わったら必ず dispose する。
   @visibleForTesting
   static Future<ui.Image> rgba8ToImage(

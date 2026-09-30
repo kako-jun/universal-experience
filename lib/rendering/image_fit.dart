@@ -78,7 +78,7 @@ Future<ui.Image> decodeImageBytes(Uint8List bytes) async {
 }
 
 /// Maximum long-edge dimension [decodeUserImageBytes] decodes a user image
-/// to (#78 レビュー S1). A modern phone photo can easily be 4000px+ on the
+/// to. A modern phone photo can easily be 4000px+ on the
 /// long edge; decoding (and holding in memory) at full intrinsic resolution
 /// when the canonical preview size is only [1024]（`BeforeAfterView.
 /// canonicalSampleSize`) wastes memory for no visual benefit —
@@ -100,7 +100,7 @@ const List<String> kUserImageFileExtensions = [
 
 /// Decodes [bytes] into a [ui.Image] the same way [decodeImageBytes] does,
 /// but downscales **during** decode so neither dimension exceeds
-/// [kUserImageMaxDimension] (#78 レビュー S1), preserving aspect ratio.
+/// [kUserImageMaxDimension], preserving aspect ratio.
 /// Unlike [decodeImageBytes] (used for the already-1024px sample assets,
 /// which never need downscaling), this reads the image's intrinsic size
 /// cheaply via [ui.ImageDescriptor] first (`ui.instantiateImageCodecWithSize`)

@@ -22,8 +22,8 @@ export '../../services/experience_source.dart';
 Key experienceCardKey(String experienceId) =>
     ValueKey('experience_card_$experienceId');
 
-/// [experience] の escalation を [Experience.vision] から取得する（#76 レビュー
-/// S3）。Experience 自体は urgency_escalation を持たないため、視覚フィルタの
+/// [experience] の escalation を [Experience.vision] から取得する。
+/// Experience 自体は urgency_escalation を持たないため、視覚フィルタの
 /// escalation をそのまま使う。vision を持たない体験は現状無いが、無い場合は
 /// 空リスト（喚起なし）にする。
 List<UrgencyEscalation> _escalationFor(Experience experience) =>

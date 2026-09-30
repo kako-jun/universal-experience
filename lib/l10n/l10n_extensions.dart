@@ -373,8 +373,8 @@ String escalationConditionText(AppLocalizations l10n, String condition) {
 
 /// sensus の公開ドキュメントのうち、受診喚起の根拠（Medical notes 節）を指す URL。
 /// [ConsultNotice.citationUrl] の値。UI（`ConsultNoticeBlock`）はこれを
-/// 選択可能なテキストとして表示する（#76 レビュー M2）。アンカーは節そのもの
-/// を指す（#76 再レビュー nit）。
+/// 選択可能なテキストとして表示する。アンカーは節そのもの
+/// を指す。
 const String kSensusMedicalNotesUrl =
     'https://github.com/kako-jun/sensus/blob/main/docs/overview.md'
     '#medical-notes-when-to-see-a-doctor';
@@ -382,7 +382,7 @@ const String kSensusMedicalNotesUrl =
 /// [resolveConsultNotice] が返す、緊急度の段ごとにまとめた escalation
 /// （見出し + 条件文のリスト）。UI（`ConsultNoticeBlock`）と PNG export
 /// （`ExportCaption.escalationGroups`）の両方がこの単位で表示する
-/// （#76 再レビュー S-a: PNG でも段ごとの見出しを出す）。
+/// （PNG でも段ごとの見出しを出す）。
 class ConsultEscalationGroup {
   const ConsultEscalationGroup({required this.header, required this.lines});
 
@@ -393,7 +393,7 @@ class ConsultEscalationGroup {
   final List<String> lines;
 }
 
-/// 受診喚起の解決結果（#76 レビュー M1）。
+/// 受診喚起の解決結果。
 ///
 /// urgency/escalation から「何を表示するか」を **1 箇所**（[resolveConsultNotice]）
 /// で決め、advanced カタログ（`FilterParamPanel`）・体験プリセットのカード
@@ -417,21 +417,21 @@ class ConsultNotice {
   final String? message;
 
   /// 条件付きで緊急度が上がる場合の一覧。emergency → earlyConsultation の順で
-  /// 段ごとにまとめてある（#76 レビュー N4/再レビュー S-a）。どちらの段も
+  /// 段ごとにまとめてある。どちらの段も
   /// 無ければ空リスト。
   final List<ConsultEscalationGroup> escalationGroups;
 
-  /// UI 用の免責文（医療監修を受けていない旨・根拠への言及を含む、#76 レビュー M2）。
+  /// UI 用の免責文（医療監修を受けていない旨・根拠への言及を含む）。
   final String disclaimer;
 
-  /// PNG 焼き込み用の短い免責文（`ExportCaption.disclaimer`、#76 レビュー M1/再レビュー M1'）。
+  /// PNG 焼き込み用の短い免責文（`ExportCaption.disclaimer`）。
   final String disclaimerShort;
 
   /// 免責文が参照する根拠（sensus の Medical notes）への URL。
   final Uri citationUrl;
 }
 
-/// urgency/escalation から [ConsultNotice] を解決する（#76 レビュー M1）。
+/// urgency/escalation から [ConsultNotice] を解決する。
 ///
 /// [urgency] が `none` かつ [escalation] が空なら、表示する喚起が無いので
 /// `null` を返す。呼び出し側（`FilterParamPanel`・`ExperiencePresetTile`・

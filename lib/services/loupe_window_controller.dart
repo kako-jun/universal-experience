@@ -43,7 +43,7 @@ class LoupeWindowPolicy {
   /// 4:3 にしているのは「覗き窓」の直感的な比率で、特定アスペクト強制ではない
   /// (リサイズで自由に変えられる)。
   ///
-  /// 単位の注意 (nit): この値は **論理ピクセル**。HiDPI (DPR 2x) のモニタでは
+  /// 単位の注意: この値は **論理ピクセル**。HiDPI (DPR 2x) のモニタでは
   /// 実効の物理ピクセルは 640x480 相当の見え方になる。物理解像度に応じた見え方の
   /// 調整 (DPR 換算) は #5 DPR スコープで扱う。
   static const Size minimumSize = Size(320, 240);
@@ -349,7 +349,7 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
 
   /// 現在モードの枠ポリシーをウィンドウに反映する。
   ///
-  /// 順序依存の注意 (nit/実機確認): ここでは `_setMode` が `setFullScreen` を
+  /// 順序依存の注意 (実機確認): ここでは `_setMode` が `setFullScreen` を
   /// 呼んだ **後** に `setTitleBarStyle` を当てている。プラットフォームによっては
   /// 全画面遷移とタイトルバースタイル変更の順序で「全画面なのにタイトルバーが
   /// 残る/枠が二重に出る」等の差が出ることがある。この順序 (fullscreen → titleBar)

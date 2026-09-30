@@ -72,8 +72,8 @@ final ImageSourceState imageSourceState = ImageSourceState();
 const String _trayIconPath = 'assets/tray/tray_icon.png';
 
 /// OS からの終了要求（macOS の Cmd+Q / メニューバーの「終了」/ ログアウト等）を
-/// 捕捉し、[FilterService.flush] を挟んでから終了を許可する（#57 レビュー
-/// should-1）。トレイ経由・ウィンドウクローズ経由の flush（[_setUpTray] /
+/// 捕捉し、[FilterService.flush] を挟んでから終了を許可する。
+/// トレイ経由・ウィンドウクローズ経由の flush（[_setUpTray] /
 /// `onQuit`）は window_manager のクローズイベントしか見ておらず、Cmd+Q や
 /// ログアウトはそれらを経由せず直接プロセス終了に向かうため、二重の安全網として
 /// 別途これが要る。`main()` 内のローカル変数にすると `main()` の関数フレームが
@@ -164,7 +164,7 @@ TrayService _buildTrayService(SettingsService settings) {
 ///
 /// 戻り値は `({Widget app, bool bridgeReady})` レコード。呼び出し側は
 /// `bridgeReady` を見て分岐する（Widget のランタイム型 `is NativeBridgeErrorApp`
-/// を見て分岐する必要がない、#55 レビュー nit）。
+/// を見て分岐する必要がない）。
 ///
 /// - [initBridge] は既定で `initNativeBridge()`
 ///   （services/native_bridge_service.dart）。失敗時（native lib が壊れている・
@@ -263,7 +263,7 @@ void main() async {
 
   // macOS の Cmd+Q・メニューバーの「終了」・ログアウト等（window_manager の
   // クローズイベントを経由しない終了経路）でも intensity のデバウンス永続化
-  // （#57）を取りこぼさないための保険（should-1）。トレイ・ウィンドウクローズ
+  // （#57）を取りこぼさないための保険。トレイ・ウィンドウクローズ
   // 経由の flush はそのまま残す。
   appLifecycleListener = AppLifecycleListener(
     onExitRequested: () async {
