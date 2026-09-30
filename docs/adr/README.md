@@ -36,6 +36,7 @@ Universal Experience（ue）の主要な設計判断を記録する正本ディ�
 
 | ファイル | タイトル | 決定日 | ステータス |
 |---|---|---|---|
+| [2026-09-30-color-vision-2x2-compare.md](2026-09-30-color-vision-2x2-compare.md) | 色覚 4 型の一覧比較（2×2）は Before / After の代わりに中央カラムへ出し、既存の描画・書き出しの経路を再利用する | 2026-09-30 | Accepted |
 | [2026-09-30-filter-selection-persistence-and-tray-submenu.md](2026-09-30-filter-selection-persistence-and-tray-submenu.md) | フィルタ選択は版つき JSON で永続化し、トレイは統合一覧をカテゴリ別サブメニューで出す | 2026-09-30 | Accepted |
 | [2026-09-30-clipboard-image-paste.md](2026-09-30-clipboard-image-paste.md) | クリップボードの画像貼り付けに `pasteboard` を使う | 2026-09-30 | Accepted |
 | [2026-09-30-language-picker-endonyms-and-single-resolution.md](2026-09-30-language-picker-endonyms-and-single-resolution.md) | 言語ピッカーは自称名で並べ、言語の解決を 1 つの関数に一本化する | 2026-09-30 | Accepted |

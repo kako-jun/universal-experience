@@ -234,6 +234,91 @@ Future<ui.Image> composeExportImage(
   }
 }
 
+/// 2×2 比較の書き出し（[composeCompareGrid]）で、セルの間と外周に空ける余白（px）。
+const int kCompareGridGap = 16;
+
+/// [composeCompareGrid] の配置結果: 全体のサイズと、各セルを置く位置。
+typedef CompareGridLayout = ({ui.Size size, List<ui.Offset> origins});
+
+/// 大きさの異なりうるセル（[cellSizes]、左上から右へ・下へ並べる順）を [columns]
+/// 列のグリッドに並べる配置を計算する。**pure**（画像には触れない）。
+///
+/// 各スロットは全セルの最大幅 × その行の最大高さ。セルはスロットの左上に置く。
+/// セルの間と外周には [kCompareGridGap] の余白を空ける。[composeCompareGrid] が
+/// 使い、テストが「各セルがどこに置かれるか」を実画素で検証するときにも使う。
+CompareGridLayout compareGridLayout(
+  List<ui.Size> cellSizes, {
+  int columns = 2,
+}) {
+  assert(columns >= 1);
+  final gap = kCompareGridGap.toDouble();
+  final slotWidth = cellSizes.fold<double>(0, (m, s) => math.max(m, s.width));
+  final rows = (cellSizes.length / columns).ceil();
+  final rowHeights = <double>[
+    for (var r = 0; r < rows; r++)
+      cellSizes
+          .skip(r * columns)
+          .take(columns)
+          .fold<double>(0, (m, s) => math.max(m, s.height)),
+  ];
+  final origins = <ui.Offset>[];
+  var y = gap;
+  for (var r = 0; r < rows; r++) {
+    final inRow = math.min(columns, cellSizes.length - r * columns);
+    for (var c = 0; c < inRow; c++) {
+      origins.add(ui.Offset(gap + c * (slotWidth + gap), y));
+    }
+    y += rowHeights[r] + gap;
+  }
+  final usedColumns = math.min(columns, cellSizes.length);
+  return (
+    size: ui.Size(
+      usedColumns == 0 ? 0 : gap + usedColumns * (slotWidth + gap),
+      cellSizes.isEmpty ? 0 : y,
+    ),
+    origins: origins,
+  );
+}
+
+/// キャプション込みのセル画像 [cells]（[composeExportImage] の戻り値）を [columns]
+/// 列のグリッドに並べた 1 枚の [ui.Image] を返す（色覚 4 型の 2×2 比較の書き出し、#84）。
+///
+/// 配置は [compareGridLayout]。各セルは **加工せずそのまま** 描くので、セル内の
+/// 型名・強度・「シミュレーション（近似）」の焼き込みは 1 枚ずつ書き出したときと
+/// 同じ画素になる（ここで文言を足さない・削らない）。余白は不透明の暗色で埋める。
+/// [cells] は破棄しない（呼び出し側の所有）。**pure**（I/O・i18n なし）。
+Future<ui.Image> composeCompareGrid(
+  List<ui.Image> cells, {
+  int columns = 2,
+}) async {
+  if (cells.isEmpty) {
+    throw ArgumentError.value(cells, 'cells', 'must not be empty');
+  }
+  final layout = compareGridLayout([
+    for (final c in cells) ui.Size(c.width.toDouble(), c.height.toDouble()),
+  ], columns: columns);
+  final width = layout.size.width.toInt();
+  final height = layout.size.height.toInt();
+
+  final recorder = ui.PictureRecorder();
+  final canvas = ui.Canvas(recorder);
+  // 色の例外（DESIGN.md §2.3）: 書き出す PNG に焼き込む画素の色（キャプション帯と
+  // 同じ理由で、テーマのロールにしない）。
+  canvas.drawRect(
+    Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+    Paint()..color = const Color(0xFF101418),
+  );
+  for (var i = 0; i < cells.length; i++) {
+    canvas.drawImage(cells[i], layout.origins[i], Paint());
+  }
+  final picture = recorder.endRecording();
+  try {
+    return await picture.toImage(width, height);
+  } finally {
+    picture.dispose();
+  }
+}
+
 /// [numberedFilename] で空きを探す上限。これを超えたら [StateError]。
 const int kMaxExportNumbering = 1000;
 

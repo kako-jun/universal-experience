@@ -26,6 +26,12 @@
 
   "previewSectionTitle": "ビフォー / アフター",
   "previewPaneOriginal": "元の画像",
+  "compareToggleLabel": "2×2 で比較",
+  "compareToggleTooltip": "色覚の 4 型の見え方を並べて表示します",
+  "compareSectionTitle": "色覚 4 型の比較",
+  "compareSharedStrengthNote": "4 型とも同じ強さで表示しています：{percent}%",
+  "compareCellSemanticsLabel": "{name}のシミュレーション、強さ{percent}%",
+  "compareCellFailedSemanticsLabel": "{name}のシミュレーション、描画に失敗しました",
   "previewPreparing": "プレビューを準備中…",
   "previewFailed": "プレビューの描画に失敗しました",
   "previewStaticFrameNote": "時間の経過で変化する見え方です。プレビューは動きのない1コマの静止画で表示しています。",

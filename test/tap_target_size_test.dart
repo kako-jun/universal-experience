@@ -36,7 +36,7 @@ void main() {
   });
 
   testWidgets(
-    'macOS でも主要な操作要素は 48dp 以上（チップ・解除・クリア・AppBar・行・スライダー）',
+    'macOS でも主要な操作要素は 48dp 以上（チップ・解除・クリア・AppBar・行・比較の切替・スライダー）',
     (tester) async {
       expect(defaultTargetPlatform, TargetPlatform.macOS);
       final h = await pumpHomeScreen(
@@ -75,6 +75,10 @@ void main() {
         'AppBar の IconButton',
       );
       expectAtLeast48(find.byType(ListTile), '一覧の行（ListTile）');
+      expectAtLeast48(
+        find.widgetWithText(FilterChip, '2×2 で比較'),
+        '色覚の 2×2 比較の切替（FilterChip）',
+      );
       for (final (type, label) in [
         (ChoiceChip, 'サンプル切替の ChoiceChip'),
         (OutlinedButton, '画像を選ぶ OutlinedButton'),

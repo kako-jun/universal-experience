@@ -32,9 +32,11 @@ lib/
 ├── services/
 │   ├── app_shortcuts.dart           # アプリ内キー操作（/, ↑↓, ←→, Esc, Cmd/Ctrl+V）の Intent 定義（#63/#72/#97）
 │   ├── clipboard_image_reader.dart  # クリップボード画像取得の seam（実体は pasteboard、#97）
+│   ├── color_vision_compare.dart    # 色覚 4 型の 2×2 比較で並べる型（カタログ順・実験的を除く）と
+│   │                                 # 切替を出す条件・セルのフィルタ（#84）
 │   ├── color_vision_selection.dart  # 色覚クイック選択の唯一の入口（FilterService/
 │   │                                 # VisionFilterState を同時更新、#60）
-│   ├── export_service.dart          # PNG エクスポート（メタ焼き込み・「シミュレーション（近似）」と実験的フィルタの注記の焼き込み #80・Downloads へ非上書き保存・フォルダで表示、#43/#64）
+│   ├── export_service.dart          # PNG エクスポート（メタ焼き込み・「シミュレーション（近似）」と実験的フィルタの注記の焼き込み #80・Downloads へ非上書き保存・フォルダで表示、#43/#64）。2×2 比較の書き出し用に composeCompareGrid（#84）
 │   ├── experience_source.dart       # 体験プリセットの供給源 seam・availableExperiences・
 │   │                                 # isValidExperiencePreset（永続化した選択の検証、#65）
 │   ├── filter_list_selection.dart   # 統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行）の
@@ -66,6 +68,7 @@ lib/
     ├── widgets/                     # filter_browser（左カラム「選ぶ」: 検索・カテゴリ・統合一覧、#72）,
     │                                 # filter_list_tile（一覧の 1 行）, adjust_panel（右カラム「調整」、#72）,
     │                                 # intensity_slider, before_after_view,
+    │                                 # color_vision_compare_view（色覚 4 型の 2×2 比較と書き出し、#84）,
     │                                 # experience_presets（体験プリセットの行 ExperiencePresetTile）, filter_param_panel,
     │                                 # consult_notice_block（受診喚起の共有表示ウィジェット、#76）,
     │                                 # strength_caution（強度スライダの上限付近の印・注記、#66）,
@@ -109,6 +112,9 @@ test/
 ├── tap_target_size_test.dart       # macOS 指定で操作領域が 48dp 以上（padded + standard・言語ダイアログの選択肢、#72/#82）
 ├── filter_browser_test.dart        # 統合一覧の検索・カテゴリ切替・行の選択（#72）
 ├── filter_list_selection_test.dart # 統合一覧の純粋ロジック（#72）
+├── color_vision_compare_test.dart  # 2×2 比較で並べる型の順・切替の条件・フィルタの対応表（#84）
+├── color_vision_compare_view_test.dart # 2×2 の描画・Semantics（失敗文言・描画済みの強さ）・直列最新優先・失敗（控えがある間は出さない）・書き出し PNG の実画素（#84）
+├── home_screen_color_vision_compare_test.dart # 「2×2 で比較」の切替が色覚選択時だけ出て Before / After・見出しと入れ替わる／Tab で操作できる／行からの → は高さによらず受け口／bypass（#84）
 ├── clipboard_paste_test.dart       # クリップボード画像の貼り付け経路・失敗 5 種・Cmd/Ctrl+V・ボタン（#97）
 ├── language_dialog_test.dart       # 言語ピッカー: 切替で追従・永続化・自称名の網羅と読み上げ言語・画面とトレイの言語一致（#82）
 ├── tray_locale_sync_test.dart      # 言語の選択/OS ロケール変更でトレイの文言が更新される（#82）
@@ -213,6 +219,13 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 選ぶ / 見る / 調整の 3 カラム、狭幅は縦積み。起動モード等は AppBar のダイアログへ移した。
 カテゴリ切替を `NavigationRail` でなく `ChoiceChip` の `Wrap` にした理由と代替案（`NavigationRail`・
 ボトムシート）、ハイコントラスト対応は `docs/adr/2026-09-30-home-screen-unified-list-and-three-columns.md`。
+
+### 色覚 4 型の 2×2 比較
+
+色覚カテゴリを選んでいる間だけ「2×2 で比較」を出し、ON の間は中央カラムの Before / After の代わりに
+色覚 4 型（カタログの非実験的な色覚）を同じ画像・同じ強さで並べる。描画・書き出しは既存の経路を
+再利用する（専用レンダラを持たない）。Before / After との関係と理由は
+`docs/adr/2026-09-30-color-vision-2x2-compare.md`。
 
 ### iOS非対応
 

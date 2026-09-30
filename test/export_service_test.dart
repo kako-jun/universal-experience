@@ -756,4 +756,240 @@ void main() {
       expect(expNarrow, lessThan((expWide * 1.2).round()));
     });
   });
+
+  group('compareGridLayout（#84）', () {
+    test('同じ大きさの 4 セルは、余白を空けて 2×2 に並ぶ', () {
+      final layout = compareGridLayout(List.filled(4, const ui.Size(100, 80)));
+      const g = kCompareGridGap * 1.0;
+      expect(layout.origins, [
+        const ui.Offset(g + 0, g + 0),
+        const ui.Offset(g + 100 + g, g + 0),
+        const ui.Offset(g + 0, g + 80 + g),
+        const ui.Offset(g + 100 + g, g + 80 + g),
+      ]);
+      // 外周・セル間に余白: 幅 = g + 2*(100+g)、高さ = g + 2*(80+g)。
+      expect(layout.size, const ui.Size(g + 2 * (100 + g), g + 2 * (80 + g)));
+    });
+
+    test('大きさが異なるときは、最大幅のスロット・行ごとの最大高さで並べる', () {
+      final layout = compareGridLayout(const [
+        ui.Size(100, 60),
+        ui.Size(80, 90),
+        ui.Size(70, 50),
+        ui.Size(120, 40),
+      ]);
+      const g = kCompareGridGap * 1.0;
+      // スロット幅は全セルの最大 120、1 行目の高さは 90。
+      expect(layout.origins, [
+        const ui.Offset(g + 0, g + 0),
+        const ui.Offset(g + 120 + g, g + 0),
+        const ui.Offset(g + 0, g + 90 + g),
+        const ui.Offset(g + 120 + g, g + 90 + g),
+      ]);
+      expect(layout.size,
+          const ui.Size(g + 2 * (120 + g), g + (90 + g) + (50 + g)));
+    });
+
+    test('セル数が列数に満たない・奇数のときも成り立つ', () {
+      final one = compareGridLayout(const [ui.Size(10, 10)]);
+      const g = kCompareGridGap * 1.0;
+      expect(one.origins, [const ui.Offset(g, g)]);
+      expect(one.size, const ui.Size(g * 2 + 10, g * 2 + 10));
+
+      final three = compareGridLayout(List.filled(3, const ui.Size(10, 10)));
+      expect(three.origins, hasLength(3));
+    });
+
+    test('セルが無ければ 0×0', () {
+      final layout = compareGridLayout(const []);
+      expect(layout.origins, isEmpty);
+      expect(layout.size, ui.Size.zero);
+    });
+  });
+
+  group('composeCompareGrid（#84）', () {
+    Future<ui.Image> solid(int w, int h, int argb) async {
+      final recorder = ui.PictureRecorder();
+      final canvas = ui.Canvas(recorder);
+      canvas.drawRect(
+        ui.Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()),
+        ui.Paint()..color = ui.Color(argb),
+      );
+      final picture = recorder.endRecording();
+      try {
+        return await picture.toImage(w, h);
+      } finally {
+        picture.dispose();
+      }
+    }
+
+    Future<({int width, int height, Uint8List rgba})> decode(
+        Uint8List png) async {
+      final codec = await ui.instantiateImageCodec(png);
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
+      final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      final result = (
+        width: image.width,
+        height: image.height,
+        rgba: data!.buffer.asUint8List()
+      );
+      image.dispose();
+      codec.dispose();
+      return result;
+    }
+
+    Future<({int width, int height, Uint8List rgba})> pixelsOf(
+        ui.Image image) async {
+      final png = await encodeImagePng(image);
+      return decode(png!);
+    }
+
+    int at(({int width, int height, Uint8List rgba}) img, int x, int y) {
+      final o = (y * img.width + x) * 4;
+      return (img.rgba[o + 3] << 24) |
+          (img.rgba[o] << 16) |
+          (img.rgba[o + 1] << 8) |
+          img.rgba[o + 2];
+    }
+
+    const colors = <int>[0xFFCC3333, 0xFF33CC33, 0xFF3333CC, 0xFFCCCC33];
+
+    test('空のセル一覧は ArgumentError', () async {
+      await expectLater(composeCompareGrid(const []), throwsArgumentError);
+    });
+
+    test('戻り画像の大きさは compareGridLayout と一致し、余白は不透明の背景色', () async {
+      final cells = [for (final c in colors) await solid(40, 30, c)];
+      addTearDown(() {
+        for (final c in cells) {
+          c.dispose();
+        }
+      });
+      final grid = await composeCompareGrid(cells);
+      addTearDown(grid.dispose);
+
+      final layout = compareGridLayout([
+        for (final c in cells) ui.Size(c.width.toDouble(), c.height.toDouble())
+      ]);
+      expect(grid.width, layout.size.width.toInt());
+      expect(grid.height, layout.size.height.toInt());
+
+      final img = await pixelsOf(grid);
+      // 外周の角・セル間（縦・横の溝）はすべて同じ不透明の背景色。
+      const bg = 0xFF101418;
+      expect(at(img, 0, 0), bg);
+      expect(at(img, img.width - 1, img.height - 1), bg);
+      final o = layout.origins;
+      final gutterX = (o[0].dx + 40 + kCompareGridGap / 2).toInt();
+      final gutterY = (o[0].dy + 30 + kCompareGridGap / 2).toInt();
+      expect(at(img, gutterX, o[0].dy.toInt() + 5), bg);
+      expect(at(img, o[0].dx.toInt() + 5, gutterY), bg);
+    });
+
+    test('4 セルは所定の位置に、セル単体と同じ画素のまま置かれる（実画素で比較）', () async {
+      // 各セルに単色ではなく異なる画素を持たせ、位置の取り違え・変形を検出する。
+      final cells = <ui.Image>[];
+      for (var i = 0; i < 4; i++) {
+        final recorder = ui.PictureRecorder();
+        final canvas = ui.Canvas(recorder);
+        canvas.drawRect(const ui.Rect.fromLTWH(0, 0, 40, 30),
+            ui.Paint()..color = ui.Color(colors[i]));
+        canvas.drawRect(ui.Rect.fromLTWH(i * 4.0, 0, 4, 30),
+            ui.Paint()..color = const ui.Color(0xFFFFFFFF));
+        final picture = recorder.endRecording();
+        cells.add(await picture.toImage(40, 30));
+        picture.dispose();
+      }
+      addTearDown(() {
+        for (final c in cells) {
+          c.dispose();
+        }
+      });
+      final grid = await composeCompareGrid(cells);
+      addTearDown(grid.dispose);
+      final gridPx = await pixelsOf(grid);
+      final layout = compareGridLayout([
+        for (final c in cells) ui.Size(c.width.toDouble(), c.height.toDouble())
+      ]);
+
+      for (var i = 0; i < 4; i++) {
+        final cellPx = await pixelsOf(cells[i]);
+        final ox = layout.origins[i].dx.toInt();
+        final oy = layout.origins[i].dy.toInt();
+        for (var y = 0; y < cellPx.height; y++) {
+          for (var x = 0; x < cellPx.width; x++) {
+            if (at(gridPx, ox + x, oy + y) != at(cellPx, x, y)) {
+              fail('セル $i の画素 ($x,$y) がグリッド上で一致しない');
+            }
+          }
+        }
+      }
+    });
+
+    test(
+        'キャプション込みのセルを並べても、各セルの文字（型名・強度・シミュレーション注記）は'
+        '1 枚ずつ書き出したときと同じ画素のまま並ぶ（#84）', () async {
+      const notices = ['Protanopia', 'Deuteranopia', 'Tritanopia', 'Achromatopsia'];
+      final bases = [for (final c in colors) await solid(96, 64, c)];
+      final composed = <ui.Image>[];
+      for (var i = 0; i < 4; i++) {
+        composed.add(await composeExportImage(
+          bases[i],
+          ExportCaption(
+            symptomLabel: notices[i],
+            strengthLabel: 'Strength: 100%',
+            isoDate: '2026-09-30',
+            simulationNotice: 'Simulation (approximation)',
+          ),
+        ));
+      }
+      addTearDown(() {
+        for (final c in [...bases, ...composed]) {
+          c.dispose();
+        }
+      });
+      final grid = await composeCompareGrid(composed);
+      addTearDown(grid.dispose);
+      final gridPx = await pixelsOf(grid);
+      final layout = compareGridLayout([
+        for (final c in composed)
+          ui.Size(c.width.toDouble(), c.height.toDouble())
+      ]);
+
+      // 帯の半透明の背景はグリッドの背景色の上で合成されるので、画素の一致を
+      // 求めるのは不透明な画素（文字）だけ。帯に純白（型名・注記の文字色）の画素が
+      // あり、それがグリッド上の同じ相対位置にもある（= 焼き込みが欠けずに並んで
+      // いる）ことと、グリッド全体が不透明であることを見る。
+      for (var i = 0; i < 4; i++) {
+        final cellPx = await pixelsOf(composed[i]);
+        final ox = layout.origins[i].dx.toInt();
+        final oy = layout.origins[i].dy.toInt();
+        var white = 0;
+        for (var y = 0; y < cellPx.height; y++) {
+          for (var x = 0; x < cellPx.width; x++) {
+            final expected = at(cellPx, x, y);
+            final actual = at(gridPx, ox + x, oy + y);
+            expect(actual >>> 24, 0xFF, reason: 'セル $i ($x,$y) は不透明');
+            if (expected >>> 24 == 0xFF) {
+              expect(actual, expected, reason: 'セル $i の不透明画素 ($x,$y)');
+            }
+            if (y >= bases[i].height && expected == 0xFFFFFFFF) white++;
+          }
+        }
+        expect(white, greaterThan(0), reason: 'セル $i の帯に文字が焼き込まれている');
+      }
+    });
+
+    test('セルは破棄されない（呼び出し側の所有）', () async {
+      final cells = [for (final c in colors) await solid(8, 8, c)];
+      final grid = await composeCompareGrid(cells);
+      grid.dispose();
+      // dispose 済みなら toByteData が例外になる。
+      for (final c in cells) {
+        expect(await c.toByteData(), isNotNull);
+        c.dispose();
+      }
+    });
+  });
 }

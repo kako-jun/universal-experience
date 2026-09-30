@@ -83,6 +83,40 @@
   "@previewPaneOriginal": {
     "description": "Label of the 'before' (unfiltered) preview pane."
   },
+  "compareToggleLabel": "Compare 2×2",
+  "@compareToggleLabel": {
+    "description": "Label of the toggle chip (shown only while a color-vision filter is selected) that replaces the Before/After preview with a 2x2 grid of the four color-vision types the simulator renders (#84)."
+  },
+  "compareToggleTooltip": "Show the four color-vision types side by side",
+  "@compareToggleTooltip": {
+    "description": "Tooltip (also read by screen readers) of the 2x2 compare toggle chip (#84). Generic on purpose: the set of types comes from the catalog."
+  },
+  "compareSectionTitle": "Color-vision comparison",
+  "@compareSectionTitle": {
+    "description": "Heading of the center preview card while the 2x2 color-vision comparison replaces Before/After (#84)."
+  },
+  "compareSharedStrengthNote": "All four types use the same strength: {percent}%",
+  "@compareSharedStrengthNote": {
+    "description": "Note above the 2x2 color-vision comparison grid: every cell is rendered at the strength currently selected, so differences between cells come from the type only (#84).",
+    "placeholders": {
+      "percent": { "type": "int" }
+    }
+  },
+  "compareCellFailedSemanticsLabel": "{name} simulation, rendering failed",
+  "@compareCellFailedSemanticsLabel": {
+    "description": "Screen-reader label of one cell of the 2x2 comparison grid when rendering failed. {name} is the color-vision type name (#84).",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "compareCellSemanticsLabel": "{name} simulation, strength {percent}%",
+  "@compareCellSemanticsLabel": {
+    "description": "Screen-reader label of one cell of the 2x2 color-vision comparison grid. {name} is the color-vision type name, {percent} the shared strength (#84).",
+    "placeholders": {
+      "name": { "type": "String" },
+      "percent": { "type": "int" }
+    }
+  },
   "previewPreparing": "Preparing preview…",
   "@previewPreparing": {
     "description": "Placeholder while the first sample preview image is generated."

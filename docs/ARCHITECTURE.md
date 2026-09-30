@@ -561,10 +561,17 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
   `didUpdateWidget` で反応して、一覧の内側のスクロールだけを最小限動かす（上方向・末尾から先頭への
   折り返しにも対応。外側のページスクロールは動かさない）。`FilterListTile` が動かすのはこの
   「選択が変わった」ときだけで、フォーカスの移動には反応しない。
-  **行にフォーカスがある間の ←→ も標準の方向フォーカス移動になり**、その 1 回では強度の 5% 刻み
-  調整は効かない。フォーカスは行から出て、実測（`home_screen_layout_test.dart`）では画面の
-  ショートカット受け口へ移るので、次の ←→ から強度が動く（移動先は方向によって別カラムの
-  コントロールになりうる）。ポインタで行を選び直しても、フォーカスはショートカット受け口へ戻る。
+  **行にフォーカスがある間の ←→ は、その 1 回では強度の 5% 刻み調整が効かず、フォーカスが必ず
+  画面のショートカット受け口（`homeShortcuts`）へ出る**ので、次の ←→ から強度が動く。これは標準の
+  方向フォーカス移動任せにしていない。標準の走査は幾何（隣のカラムのコントロールとの縦帯の重なり）で
+  着地点が決まり、色覚選択時に中央カラムへ出る「2×2 で比較」の切替が見出し行を高くすると、`→` が中央
+  カラムのサンプル切替チップへ着地して強度に届かなくなった。そこで「選ぶ」カードの `FocusTraversalGroup` に
+  `_ListExitToShortcutsPolicy`（`ReadingOrderTraversalPolicy` を継承し、`FilterListTile` 上からの
+  左右だけ受け口へ固定。体験プリセットの行も同じ `FilterListTile` なので含み、それ以外の方向・部品は
+  標準）を、広幅の左カラム・狭幅の末尾で共通の `_browserCard()` に付け、着地点を幾何から切り離した
+  （`home_screen_layout_test.dart` / `home_screen_color_vision_compare_test.dart` がウィンドウ高さを
+  変えて確認）。他のカラムへは Tab で行く。ポインタで行を選び直しても、フォーカスはショートカット
+  受け口へ戻る。
   キーボード起点かポインタ起点かは、タップ処理の中で `HardwareKeyboard` の Enter/Space の
   押下状態を見て判定する。
 - **`/`・↑↓・←→ はテキスト入力・ボタン・スイッチ等にフォーカスがある間は無効化される**
@@ -899,6 +906,24 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   `_rebuild` の実行を直列化し（同時に走るジョブは常に1本、#85 レビュー S3）、
   スライダーを連続操作しても実ブリッジ呼び出しが積み上がらないようにしている
   （#58 の世代管理・dispose・失敗表示の規約自体は変更していない）
+- `ColorVisionCompareView`（`lib/ui/widgets/color_vision_compare_view.dart`、#84）: 色覚 4 型の
+  2×2 比較。`HomeScreen` の「2×2 で比較」が ON（かつ色覚カテゴリ選択中）の間、`BeforeAfterView` の
+  代わりに `ImageSourcePicker` の中へ出る。並べる型は `kColorVisionCompareEntries`
+  （`lib/services/color_vision_compare.dart`。カタログの色覚カテゴリのうち `isExperimental` でないもの、
+  宣言順）、各セルのフィルタは色覚クイック選択と同じ `visionFilterForColorVisionType` から引く
+  （`colorVisionCompareFilter`）。専用のレンダラは持たず、`BeforeAfterView` と同じ経路
+  （`previewSourceImageLoader` / `afterImageRenderer`。本番コードからは公開ラッパー
+  `loadPreviewImage` / `renderPreviewAfter` 経由）で `CpuVisionRenderer` を 4 回、直列・最新優先で呼ぶ。
+  強さは呼び出し側（`previewStrength`）が決めた値を 4 セル共通で受け取り、選択状態は読まない。
+  セルの Semantics ラベルと「4 型とも同じ強さ」の注記は、表示中の画像を描いた強さ（`_afterStrength`、
+  まだ無ければ `widget.strength`）から作り、再描画中に新しい強さが古い画像に被らない。失敗したセルは
+  「描画に失敗しました」の文言に切り替わる。新しい描画が控えている間（`_rebuildPending`）の失敗は
+  表示せず、最新の入力の描画が失敗したときだけ失敗を出す（スライダー操作中の点滅防止）。
+  書き出しは各セルを `buildExportCaption` + `composeExportImage`（単独の書き出しと同じキャプション）で
+  焼き込み、`composeCompareGrid`（`export_service.dart`。配置は pure な `compareGridLayout`）で
+  1 枚に並べる。キャプションは描画時点の強さから作り、保存・通知・失敗の扱いは
+  `savePngWithClipboard` / `showExportSuccess`（`BeforeAfterView` の書き出しと共通）を使う。
+  `BeforeAfterView` との関係は `docs/adr/2026-09-30-color-vision-2x2-compare.md`
 - `ShaderFilter`（`lib/rendering/shader_filter.dart`）: sensus 由来 GLSL を変換した
   Impeller `FragmentProgram` で `ui.Image` にフィルタを適用する。色覚 7 型
   （protanopia/deuteranopia/tritanopia/achromatopsia + 各 -omaly）に対応

@@ -74,7 +74,8 @@ void main() {
     }
   });
 
-  testWidgets('既定ウィンドウは LoupeWindowPolicy.defaultSize（800x600）', (tester) async {
+  testWidgets('既定ウィンドウは LoupeWindowPolicy.defaultSize（800x600）',
+      (tester) async {
     expect(defaultWindow, const Size(800, 600));
   });
 
@@ -84,8 +85,8 @@ void main() {
         trayAvailable: true,
         hotkeyStatus: HotkeyStatus(),
       );
-      final h = await pumpHomeScreen(tester,
-          size: wideLow, uiContext: uiContext);
+      final h =
+          await pumpHomeScreen(tester, size: wideLow, uiContext: uiContext);
       // クリックスルー復帰バナーを出した状態（縦の余白が最も少ない）。
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
       await tester.runAsync(() => h.loupe.setClickThrough(true));
@@ -106,7 +107,8 @@ void main() {
       expect(list.height, greaterThanOrEqualTo(96),
           reason: '一覧が操作できる高さを持つ（検索欄・カテゴリが固定で食い潰さない）');
       // 検索欄は見えていて、一覧の行をタップして選べる。
-      expect(tester.getRect(find.byType(TextField)).top, greaterThanOrEqualTo(0));
+      expect(
+          tester.getRect(find.byType(TextField)).top, greaterThanOrEqualTo(0));
       final tile = find.byKey(filterListTileKey(entry('cv:protanopia')));
       await tester.ensureVisible(tile);
       await tester.pump();
@@ -157,8 +159,8 @@ void main() {
 
     // 0=左 1=中央 2=右。フォーカス中の要素の矩形の位置で判定する。
     int? columnOfFocus() {
-      final box = tester
-          .binding.focusManager.primaryFocus?.context?.findRenderObject();
+      final box =
+          tester.binding.focusManager.primaryFocus?.context?.findRenderObject();
       if (box is! RenderBox || !box.hasSize) return null;
       final left = box.localToGlobal(Offset.zero).dx;
       if (left >= adjust.left) return 2;
@@ -182,8 +184,8 @@ void main() {
           reason: 'Tab が ${visited.last} 番目のカラムから戻った（$i 回目）');
       visited.add(column);
       if (column == 2) {
-        rightFocusOwner = tester.binding.focusManager.primaryFocus?.context
-            ?.widget;
+        rightFocusOwner =
+            tester.binding.focusManager.primaryFocus?.context?.widget;
       }
     }
     expect(visited, containsAllInOrder([0, 1, 2]),
@@ -427,9 +429,9 @@ void main() {
   });
 
   group('キーボードで行を選んでもフォーカスは行に残る', () {
-    FilterListTile? focusedTile(WidgetTester tester) => tester
-        .binding.focusManager.primaryFocus?.context
-        ?.findAncestorWidgetOfExactType<FilterListTile>();
+    FilterListTile? focusedTile(WidgetTester tester) =>
+        tester.binding.focusManager.primaryFocus?.context
+            ?.findAncestorWidgetOfExactType<FilterListTile>();
 
     Future<void> tabUntilTile(WidgetTester tester, Key tileKey) async {
       for (var i = 0; i < 80; i++) {
@@ -484,8 +486,7 @@ void main() {
       await h.filterService.flush();
     });
 
-    testWidgets('行にフォーカスがある間の ←→ は強度を動かさず、標準のフォーカス移動になる',
-        (tester) async {
+    testWidgets('行にフォーカスがある間の ←→ は強度を動かさず、ショートカット受け口へ固定で出る', (tester) async {
       final h = await pumpHomeScreen(tester, size: wide);
       final protan = entry('cv:protanopia');
       await tester.tap(find.byType(TextField));
@@ -501,11 +502,10 @@ void main() {
 
       expect(h.filterService.intensity, before,
           reason: '行にフォーカスがある間は ←→ を奪わない（強度は動かない）');
-      expect(focusedTile(tester), isNull,
-          reason: '代わりに標準の方向フォーカス移動で行の外へ移る');
+      expect(focusedTile(tester), isNull, reason: '代わりにフォーカスは行の外へ出る');
 
-      // 移った先は画面のショートカット受け口（ARCHITECTURE / DESIGN に観測事実として
-      // 記載）。挙動が変わればここで落とす。次の ←→ からは強度が動く。
+      // 出る先は画面のショートカット受け口に固定（_ListExitToShortcutsPolicy。
+      // 幾何に依らない）。挙動が変わればここで落とす。次の ←→ からは強度が動く。
       expect(tester.binding.focusManager.primaryFocus?.debugLabel,
           'homeShortcuts');
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
@@ -513,6 +513,37 @@ void main() {
       expect(h.filterService.intensity, lessThan(before));
       await h.filterService.flush();
     });
+
+    for (final (layoutLabel, size) in [('広幅', wide), ('狭幅', narrow)]) {
+      for (final (rowLabel, rowKey) in [
+        ('フィルタの行', filterListTileKey(entry('cv:protanopia'))),
+        ('体験プリセットの行', experienceCardKey('bppv')),
+      ]) {
+        for (final (dirLabel, key) in [
+          ('→', LogicalKeyboardKey.arrowRight),
+          ('←', LogicalKeyboardKey.arrowLeft),
+        ]) {
+          testWidgets(
+              '$layoutLabel: $rowLabel からの $dirLabel は強度を動かさず、ショートカット受け口へ出る',
+              (tester) async {
+            final h = await pumpHomeScreen(tester, size: size);
+            await tester.tap(find.byType(TextField));
+            await tester.pump();
+            await tabUntilTile(tester, rowKey);
+            final before = h.filterService.intensity;
+
+            await tester.sendKeyEvent(key);
+            await tester.pump();
+
+            expect(h.filterService.intensity, before);
+            expect(focusedTile(tester), isNull);
+            expect(tester.binding.focusManager.primaryFocus?.debugLabel,
+                'homeShortcuts');
+            await h.filterService.flush();
+          });
+        }
+      }
+    }
 
     testWidgets('ポインタで選ぶとショートカット受け口へフォーカスが戻り ←→ が効く', (tester) async {
       final h = await pumpHomeScreen(tester, size: wide);
@@ -598,8 +629,7 @@ void main() {
   group('クリックスルーとダイアログの Esc（#63）', () {
     const banner = 'クリックスルーが ON です。解除するには:';
 
-    testWidgets('ダイアログのスイッチで ON にするとダイアログが自動で閉じ、Esc 1 回で解除される',
-        (tester) async {
+    testWidgets('ダイアログのスイッチで ON にするとダイアログが自動で閉じ、Esc 1 回で解除される', (tester) async {
       final h = await pumpHomeScreen(tester, size: wide);
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
       await tester.pump();
@@ -646,8 +676,7 @@ void main() {
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
     });
 
-    testWidgets('別のダイアログが上に載っているときは、そちらを閉じずに起動モードのダイアログだけ閉じる',
-        (tester) async {
+    testWidgets('別のダイアログが上に載っているときは、そちらを閉じずに起動モードのダイアログだけ閉じる', (tester) async {
       final h = await pumpHomeScreen(tester, size: wide);
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
       await tester.tap(find.byTooltip('起動モード'));
@@ -673,8 +702,7 @@ void main() {
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
     });
 
-    testWidgets('言語ダイアログを開いたままクリックスルーが ON になると、自動で閉じる（#82）',
-        (tester) async {
+    testWidgets('言語ダイアログを開いたままクリックスルーが ON になると、自動で閉じる（#82）', (tester) async {
       final h = await pumpHomeScreen(tester, size: wide);
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
       await tester.tap(find.byTooltip('言語'));
@@ -718,8 +746,7 @@ void main() {
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
     });
 
-    testWidgets('ON のままダイアログを開いた場合、ダイアログの中でも Esc は解除になる（閉じない）',
-        (tester) async {
+    testWidgets('ON のままダイアログを開いた場合、ダイアログの中でも Esc は解除になる（閉じない）', (tester) async {
       final h = await pumpHomeScreen(tester, size: wide);
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
       await tester.runAsync(() => h.loupe.setClickThrough(true));
