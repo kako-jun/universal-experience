@@ -796,7 +796,12 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   あるが、その機能自体が未実装のため**現状 production コードから呼ばれることは
   ない**。GPU と CPU の等価性は `test/vision_filter_golden_test.dart` 等の
   GPU golden テストが（production の呼び出しとは独立に）担保する
-- `ExportService`: フィルタ適用後（after）画像のメタ焼き込み PNG エクスポート
+- `ExportService`: フィルタ適用後（after）画像のメタ焼き込み PNG エクスポート。
+  書き出し先は Downloads（macOS は `files.downloads.read-write` entitlement が
+  必要。無いとサンドボックスのコンテナ内に出てユーザーに見えない、#64）。ファイル名
+  は日付＋時刻（`exportFilename`）で、同名があっても `writeBytesWithoutOverwrite`
+  が `File.create(exclusive: true)` で連番にし上書きしない。成功 SnackBar の
+  「フォルダで表示」は `revealInFolder`（コマンド決定は pure な `revealCommandFor`）
 - `ExperiencePresetTile`（`lib/ui/widgets/experience_presets.dart`）: sensus の
   `experiences()` をワンタップ適用の行として消費する（複合体験、#19）。統合一覧
   `FilterBrowser` の最上段に並ぶ（#72）
