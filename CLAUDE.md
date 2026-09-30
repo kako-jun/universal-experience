@@ -37,14 +37,15 @@ lib/
 │   │                                 # 切替を出す条件・セルのフィルタ（#84）
 │   ├── color_vision_selection.dart  # 色覚クイック選択の唯一の入口（FilterService/
 │   │                                 # VisionFilterState を同時更新、#60）
-│   ├── export_service.dart          # PNG エクスポート（メタ焼き込み・「シミュレーション（近似）」と実験的フィルタの注記の焼き込み #80・Downloads へ非上書き保存・フォルダで表示、#43/#64）。2×2 比較の書き出し用に composeCompareGrid（#84）
+│   ├── export_service.dart          # PNG エクスポート（メタ焼き込み・「シミュレーション（近似）」と実験的フィルタの注記の焼き込み #80・Downloads へ非上書き保存・フォルダで表示、#43/#64）。2×2 比較の書き出し用に composeCompareGrid（#84）。複数層はキャプションを層ごとの行にし（ExportCaption.layered）、ファイル名の症状 id は exportSymptomId（適用順・48 文字上限・`-plusN`、#121）
 │   ├── experience_source.dart       # 体験プリセットの供給源 seam・availableExperiences・
 │   │                                 # isValidExperiencePreset（永続化した選択の検証、#65）
 │   ├── filter_list_selection.dart   # 統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行）の
 │   │                                 # 検索・選択入口・↑↓ の順送りの純粋ロジック（#72）
 │   ├── filter_service.dart          # 色覚クイック選択の型と、sensus VisionFilter へのマッピング。
 │   │                                 # 強度は VisionFilterState の記憶へ委譲（#117）
-│   ├── hotkey_actions.dart          # グローバルホットキー4アクションの実処理（#63）
+│   ├── export_layers.dart           # 書き出しが数える層 effectiveExportLayers（強度 > 0 のみ）・描画時点の控え ExportLayer / exportLayersOf（#121）
+│   ├── hotkey_actions.dart          # グローバルホットキー4アクションの実処理（#63。フィルタ解除は全層を外す、#121 でテスト固定）
 │   ├── hotkey_service.dart          # hotkey_manager 登録の副作用層（#63）
 │   ├── image_source_state.dart      # プレビュー原画（サンプル/ユーザー画像）の選択の唯一の正本（#78）
 │   ├── loupe_rect_source.dart       # ルーペ矩形決定元のインターフェース（#44 向け seam、#63）
@@ -55,7 +56,7 @@ lib/
 │   ├── settings_service.dart        # isFirstRun/welcomeBannerDismissed も持つ（#78）
 │   ├── tray_menu_labels.dart        # トレイの i18n 解決済み文言 TrayMenuLabels・クイック色覚一覧（#65）
 │   ├── tray_service.dart            # タスクトレイ（updateLocalization で文言を差し替える #82・
-│   │                                 # カテゴリ別「高度なフィルタ」サブメニューで UI と双方向同期 #65）
+│   │                                 # カテゴリ別「高度なフィルタ」サブメニューで UI と双方向同期 #65。チェック式の多選択 #121）
 │   ├── tray_locale_sync.dart        # 言語の選択/OS ロケール変更をトレイの文言へ橋渡し（#82）
 │   ├── vision_filter_snapshot.dart  # 層・強度の記憶・payload の永続 JSON（v2。v1 も読む）と、
 │   │                                 # カタログ定義に照らした補正 sanitizeVisionParams（#65/#117）
@@ -68,7 +69,7 @@ lib/
 │   ├── vision_filter_metadata.dart  # urgency/urgency_escalation/recommended_strength の
 │   │                                 # provider seam（sensus ブリッジが唯一の正本、#76/#77）。
 │   │                                 # citation/limitations も同じ seam（#80）。複数層の相談喚起の
-│   │                                 # 入力の統合 mergeConsultInputs / consultInputForFilters（#119。UI 適用は #121）
+│   │                                 # 入力の統合 mergeConsultInputs / consultInputForFilters（#119。PNG 書き出しが使う、#121）
 │   └── vision_filter_state.dart     # 層の列・フォーカス・強度の記憶（キー variantId ?? id）・
 │                                     # パラメータの記憶（#77/#117）・多選択 API
 │                                     # toggle/remove/setLayerStrength/setLayerParams/replaceWith（#119）
@@ -79,7 +80,7 @@ lib/
     │                                 # filter_list_tile（一覧の 1 行: チェック・適用順の番号バッジ、#120）,
     │                                 # layer_chip_strip（プレビュー上の適用順チップ帯・✕・すべて解除、#120）,
     │                                 # adjust_panel（右カラム「調整」: 2 層以上は層ごとの節、#72/#120）,
-    │                                 # before_after_view（複数層は名前の要約見出し・書き出し無効、#120）, loupe_hud,
+    │                                 # before_after_view（複数層は名前の要約見出し・書き出しは層ごとの行と併合した受診喚起、#120/#121）, loupe_hud,
     │                                 # color_vision_compare_view（色覚 4 型の 2×2 比較と書き出し、#84）,
     │                                 # experience_presets（体験プリセットの行 ExperiencePresetTile）, filter_param_panel,
     │                                 # consult_notice_block（受診喚起の共有表示ウィジェット、#76）,
@@ -133,7 +134,8 @@ test/
 ├── filter_browser_multi_select_test.dart # 統合一覧のチェック式・番号バッジが段順・色覚の排他置き換え・上限で未選択の行が無効（色覚置き換え行とプリセットは有効）・プリセット置換と一致時だけ強調・行フォーカス移動（#120）
 ├── layer_chip_strip_test.dart      # チップ帯: 2 層以上で出る・チップで調整中が移る・✕ で 1 層除去・すべて解除・状態が形で分かる（#120）
 ├── adjust_panel_layers_test.dart   # 調整パネルの層ごとの節・調整中の層だけ展開・強度スライダー 1 本・1 層は従来の見た目（#120）
-├── home_screen_multi_layer_heading_test.dart # 複数層の見出し（名前の要約）・書き出し無効と理由・2×2 スイッチが色覚 1 層のときだけ（#120）
+├── home_screen_multi_layer_heading_test.dart # 複数層の見出し（名前の要約）・書き出しボタンが複数層でも有効・2×2 スイッチが色覚 1 層のときだけ（#120/#121）
+├── export_multi_layer_test.dart    # 複数層の書き出し: 層ごとの行・最大の緊急度と併合した escalation・実験的の注記・強度 0 の層を数えない・ファイル名・描画時点の控え・単一層の従来どおり（#121）
 ├── home_screen_multi_select_keys_test.dart # ↑↓ は選択を変えず Space/Enter で足し引き・←→ は調整中の層の強度（#120）
 ├── filter_list_selection_test.dart # 統合一覧の純粋ロジック（#72）
 ├── color_vision_compare_test.dart  # 2×2 比較で並べる型の順・切替の条件・フィルタの対応表（#84）
@@ -142,7 +144,7 @@ test/
 ├── clipboard_paste_test.dart       # クリップボード画像の貼り付け経路・失敗 5 種・Cmd/Ctrl+V・ボタン（#97）
 ├── language_dialog_test.dart       # 言語ピッカー: 切替で追従・永続化・自称名の網羅と読み上げ言語・画面とトレイの言語一致（#82）
 ├── tray_locale_sync_test.dart      # 言語の選択/OS ロケール変更でトレイの文言が更新される（#82）
-├── tray_advanced_filters_test.dart # トレイの「高度なフィルタ」サブメニュー: 構造・チェック・クリック→状態・UI との双方向同期・言語追従・click-through 不干渉（#65）
+├── tray_advanced_filters_test.dart # トレイの「高度なフィルタ」サブメニュー: 構造・チェック式（層の集合から導く）・クリック→状態・上限での灰色・UI との双方向同期・言語追従・click-through 不干渉（#65/#121）
 ├── vision_filter_snapshot_test.dart # 永続 JSON v2 の往復・層の不変条件・v1 → v2 変換・壊れた値/未知 id/範囲外のフォールバック（#65/#117）
 ├── vision_filter_store_test.dart   # 永続化ストア・VisionFilterState.snapshot/restore・旧 intensityByType の取り込み (a)(b)(c) と失敗系（#65/#117）
 ├── vision_filter_persistence_app_test.dart # 実アプリ（buildRootApp）を作り直して選択が復元される・旧強度の取り込み（#65/#117）
@@ -277,7 +279,7 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
   （`afterImageRenderer`）のままで、2 層以上のときだけ `pipelineApplier`（#118）を使う。
 - 推奨サンプル（#78）は `focusedId` の層に追従する。フォーカスが外れたら適用順で最後の層へ移る。
 - 複数層の相談喚起の入力は `mergeConsultInputs`（urgency は最大・escalation は段ごとに重複除去）で作る
-  （UI・書き出しへの適用は #121）。
+  （PNG 書き出しが使う、#121。調整パネル・HUD の注意書きは ADR どおり層ごと）。
 
 第 4 段（#120）で UI が多選択になった:
 
@@ -286,8 +288,13 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 - プレビュー上のチップ帯（2 層以上のみ）で層の切替（調整中）・✕・「すべて解除」。調整パネルは 2 層以上で層ごとの
   節（調整中の層だけ展開）、強度スライダーは 1 本。1 層のときの見た目・挙動は従来どおり。
 - キー: ↑↓ は行フォーカスの移動だけ、Space / Enter が足し引き、←→ は調整中の層（`focusedId`）の強度。
-- 複数層の見出し・HUD は「名前 + 名前 …（+N）」（強度は出さない）。暫定として、複数層の間は PNG 書き出しを無効にして
-  理由を出し（#121 で解除）、「2×2 で比較」は層の集合がちょうど色覚 1 層のときだけ出す（#122 で解除）。トレイは #121 まで単一の意味のまま。
+- 複数層の見出し・HUD は「名前 + 名前 …（+N）」（強度は出さない）。PNG 書き出しは複数層でも使え（#121）、画像に効いている層
+  （強度 > 0）ごとの行・最大の緊急度と併合した escalation・実験的の注記を焼き込む。強度 0 の層は症状行・受診喚起・注記・
+  ファイル名に数えない（画像だけが共有されたとき実際の見え方と食い違わないため）。「2×2 で比較」は層の集合がちょうど
+  色覚 1 層のときだけ出す（#122 で解除）。
+- トレイ（#121）: 「高度なフィルタ」はチェック式。クリックはメイン画面の一覧と同じ入口（`toggleColorVision` /
+  `toggleFilterListEntry`）を通り、チェックは層の集合から導く（origin を見ない。トレイに `isColorQuickSelection` の消費者は残らない）。
+  色覚 4 項目は排他（別の型で置き換え）、上限 5 で未選択の項目は灰色（色覚の置き換えは有効）。フィルタ解除（トレイ・ホットキー）は全層を外す。
 - `FilterService` の色覚型は、UI の足し引き・プリセット選択・起動時の復元のたびに `syncFilterServiceWithLayers` が層の集合へ合わせる
   （色覚クイック選択の層があればその型、無ければ none）。
 
