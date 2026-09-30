@@ -270,10 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
               width: leftWidth,
               child: FocusTraversalOrder(
                 order: const NumericFocusOrder(1),
-                child: FocusTraversalGroup(
-                  policy: _ListExitToShortcutsPolicy(_shortcutFocus),
-                  child: _browserCard(),
-                ),
+                child: _browserCard(),
               ),
             ),
             const SizedBox(width: 16),
@@ -351,13 +348,18 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _browserCard() => Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: FilterBrowser(
-            controller: _browser,
-            onActivated: _shortcutFocus.requestFocus,
+  /// 広幅の左カラム・狭幅の末尾で共通。一覧の行（体験プリセットの行も同じ
+  /// `FilterListTile`）からの ←→ を受け口へ固定する走査方針を付ける（#84）。
+  Widget _browserCard() => FocusTraversalGroup(
+        policy: _ListExitToShortcutsPolicy(_shortcutFocus),
+        child: Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: FilterBrowser(
+              controller: _browser,
+              onActivated: _shortcutFocus.requestFocus,
+            ),
           ),
         ),
       );
@@ -495,7 +497,7 @@ class _ThemeModeButton extends StatelessWidget {
       };
 }
 
-/// 左カラム（選ぶ）用のフォーカス走査。標準（読み順）と同じだが、**一覧の行にフォーカスが
+/// 「選ぶ」カード（広幅は左カラム、狭幅は末尾）用のフォーカス走査。標準（読み順）と同じだが、**一覧の行にフォーカスが
 /// ある間の ←→ は、常に画面のショートカット受け口へ出る**（#84）。
 ///
 /// 標準の方向フォーカス移動のままだと、行から → で出た先が「隣のカラムの、たまたま縦位置が
