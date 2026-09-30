@@ -13,6 +13,13 @@ typedef VisionCpuApplier = Future<ui.Image> Function(
   double strength,
 );
 
+/// [CpuVisionRenderer.applyPipeline] の型（[VisionCpuApplier] の複数ステップ版。
+/// テストでフェイクに差し替えるための seam）。[steps] は適用順（先頭から順に適用）。
+typedef VisionCpuPipelineApplier = Future<ui.Image> Function(
+  ui.Image source,
+  List<VisionStep> steps,
+);
+
 /// sensus の CPU `apply()`（`applyVisionCpuRgba8`）で静止画プレビューを描画する
 /// レンダラ（#85）。
 ///
@@ -58,6 +65,11 @@ class CpuVisionRenderer {
   /// そのまま既定値（[apply] 自身）を使う。
   static VisionCpuApplier applier = apply;
 
+  /// [applyPipeline] の供給源（[applier] の複数ステップ版、#118）。テストは
+  /// これをフェイクへ差し替えて、実ブリッジなしに「どのステップ列を渡したか」を
+  /// 検証できる。production はそのまま既定値（[applyPipeline] 自身）を使う。
+  static VisionCpuPipelineApplier pipelineApplier = applyPipeline;
+
   /// [source] に [filter] を [strength]（0.0..=1.0）で適用した新しい [ui.Image]
   /// を返す。
   ///
@@ -80,6 +92,28 @@ class CpuVisionRenderer {
       width: source.width,
       height: source.height,
       strength: strength,
+    );
+    return rgba8ToImage(outBytes, source.width, source.height);
+  }
+
+  /// [source] に [steps] を **並びの順に**適用した新しい [ui.Image] を返す
+  /// （`applyVisionPipelineCpuRgba8`、sensus の `Pipeline`、#118）。
+  ///
+  /// [apply] の複数ステップ版で、alpha の扱い（straight ⇄ premultiplied の境界変換）
+  /// も同じ。並べ替え・重複除去はしない（適用順は呼び出し側が決める）。各ステップの
+  /// 結果は単体で [apply] した結果と一致するが、8bit ↔ f32 の往復が段ごとに入るため
+  /// 量子化誤差は段数に応じて累積する。[steps] が空なら入力と同じ内容の画像を
+  /// 新しく作って返す（ブリッジ側が入力をそのまま返す）。
+  static Future<ui.Image> applyPipeline(
+    ui.Image source,
+    List<VisionStep> steps,
+  ) async {
+    final rgba8 = await imageToRgba8(source);
+    final outBytes = await applyVisionPipelineCpuRgba8(
+      steps: steps,
+      rgba8: rgba8,
+      width: source.width,
+      height: source.height,
     );
     return rgba8ToImage(outBytes, source.width, source.height);
   }

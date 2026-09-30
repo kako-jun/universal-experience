@@ -58,6 +58,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<UrgencyEscalation> dco_decode_list_urgency_escalation(dynamic raw);
 
   @protected
+  List<VisionStep> dco_decode_list_vision_step(dynamic raw);
+
+  @protected
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
@@ -92,6 +95,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   VisionGlaucomaMode dco_decode_vision_glaucoma_mode(dynamic raw);
+
+  @protected
+  VisionStep dco_decode_vision_step(dynamic raw);
 
   @protected
   String sse_decode_String(SseDeserializer deserializer);
@@ -136,6 +142,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       SseDeserializer deserializer);
 
   @protected
+  List<VisionStep> sse_decode_list_vision_step(SseDeserializer deserializer);
+
+  @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
@@ -174,6 +183,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   VisionGlaucomaMode sse_decode_vision_glaucoma_mode(
       SseDeserializer deserializer);
+
+  @protected
+  VisionStep sse_decode_vision_step(SseDeserializer deserializer);
 
   @protected
   bool sse_decode_bool(SseDeserializer deserializer);
@@ -257,6 +269,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     final ans = wire.cst_new_list_urgency_escalation(raw.length);
     for (var i = 0; i < raw.length; ++i) {
       cst_api_fill_to_wire_urgency_escalation(raw[i], ans.ref.ptr[i]);
+    }
+    return ans;
+  }
+
+  @protected
+  ffi.Pointer<wire_cst_list_vision_step> cst_encode_list_vision_step(
+      List<VisionStep> raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    final ans = wire.cst_new_list_vision_step(raw.length);
+    for (var i = 0; i < raw.length; ++i) {
+      cst_api_fill_to_wire_vision_step(raw[i], ans.ref.ptr[i]);
     }
     return ans;
   }
@@ -571,6 +594,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   }
 
   @protected
+  void cst_api_fill_to_wire_vision_step(
+      VisionStep apiObj, wire_cst_vision_step wireObj) {
+    cst_api_fill_to_wire_vision_filter(apiObj.filter, wireObj.filter);
+    wireObj.strength = cst_encode_f_32(apiObj.strength);
+  }
+
+  @protected
   double cst_encode_f_32(double raw);
 
   @protected
@@ -640,6 +670,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       List<UrgencyEscalation> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_vision_step(
+      List<VisionStep> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
@@ -679,6 +713,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_vision_glaucoma_mode(
       VisionGlaucomaMode self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_vision_step(VisionStep self, SseSerializer serializer);
 
   @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
@@ -762,6 +799,45 @@ class RustLibWire implements BaseWire {
             int,
             double,
           )>();
+
+  void wire__crate__api__sensus_bridge__apply_vision_pipeline_cpu_rgba8(
+    int port_,
+    ffi.Pointer<wire_cst_list_vision_step> steps,
+    ffi.Pointer<wire_cst_list_prim_u_8_loose> rgba8,
+    int width,
+    int height,
+  ) {
+    return _wire__crate__api__sensus_bridge__apply_vision_pipeline_cpu_rgba8(
+      port_,
+      steps,
+      rgba8,
+      width,
+      height,
+    );
+  }
+
+  late final _wire__crate__api__sensus_bridge__apply_vision_pipeline_cpu_rgba8Ptr =
+      _lookup<
+          ffi.NativeFunction<
+              ffi.Void Function(
+                ffi.Int64,
+                ffi.Pointer<wire_cst_list_vision_step>,
+                ffi.Pointer<wire_cst_list_prim_u_8_loose>,
+                ffi.Uint32,
+                ffi.Uint32,
+              )>>(
+    'frbgen_universal_experience_wire__crate__api__sensus_bridge__apply_vision_pipeline_cpu_rgba8',
+  );
+  late final _wire__crate__api__sensus_bridge__apply_vision_pipeline_cpu_rgba8 =
+      _wire__crate__api__sensus_bridge__apply_vision_pipeline_cpu_rgba8Ptr
+          .asFunction<
+              void Function(
+                int,
+                ffi.Pointer<wire_cst_list_vision_step>,
+                ffi.Pointer<wire_cst_list_prim_u_8_loose>,
+                int,
+                int,
+              )>();
 
   WireSyncRust2DartDco wire__crate__api__sensus_bridge__experiences() {
     return _wire__crate__api__sensus_bridge__experiences();
@@ -1078,6 +1154,17 @@ class RustLibWire implements BaseWire {
       _cst_new_list_urgency_escalationPtr.asFunction<
           ffi.Pointer<wire_cst_list_urgency_escalation> Function(int)>();
 
+  ffi.Pointer<wire_cst_list_vision_step> cst_new_list_vision_step(int len) {
+    return _cst_new_list_vision_step(len);
+  }
+
+  late final _cst_new_list_vision_stepPtr = _lookup<
+          ffi.NativeFunction<
+              ffi.Pointer<wire_cst_list_vision_step> Function(ffi.Int32)>>(
+      'frbgen_universal_experience_cst_new_list_vision_step');
+  late final _cst_new_list_vision_step = _cst_new_list_vision_stepPtr
+      .asFunction<ffi.Pointer<wire_cst_list_vision_step> Function(int)>();
+
   int dummy_method_to_enforce_bundling() {
     return _dummy_method_to_enforce_bundling();
   }
@@ -1240,6 +1327,20 @@ final class wire_cst_vision_filter extends ffi.Struct {
 
 final class wire_cst_list_prim_u_8_loose extends ffi.Struct {
   external ffi.Pointer<ffi.Uint8> ptr;
+
+  @ffi.Int32()
+  external int len;
+}
+
+final class wire_cst_vision_step extends ffi.Struct {
+  external wire_cst_vision_filter filter;
+
+  @ffi.Float()
+  external double strength;
+}
+
+final class wire_cst_list_vision_step extends ffi.Struct {
+  external ffi.Pointer<wire_cst_vision_step> ptr;
 
   @ffi.Int32()
   external int len;

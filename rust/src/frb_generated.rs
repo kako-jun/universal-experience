@@ -37,7 +37,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueNom,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.11.1";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -978312356;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1415993197;
 
 // Section: executor
 
@@ -73,6 +73,35 @@ fn wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8_impl(
                         api_width,
                         api_height,
                         api_strength,
+                    )?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__sensus_bridge__apply_vision_pipeline_cpu_rgba8_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    steps: impl CstDecode<Vec<crate::api::sensus_bridge::VisionStep>>,
+    rgba8: impl CstDecode<Vec<u8>>,
+    width: impl CstDecode<u32>,
+    height: impl CstDecode<u32>,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::DcoCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "apply_vision_pipeline_cpu_rgba8",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let api_steps = steps.cst_decode();
+            let api_rgba8 = rgba8.cst_decode();
+            let api_width = width.cst_decode();
+            let api_height = height.cst_decode();
+            move |context| {
+                transform_result_dco::<_, _, String>((move || {
+                    let output_ok = crate::api::sensus_bridge::apply_vision_pipeline_cpu_rgba8(
+                        api_steps, api_rgba8, api_width, api_height,
                     )?;
                     Ok(output_ok)
                 })())
@@ -543,6 +572,20 @@ impl SseDecode for Vec<crate::api::sensus_bridge::UrgencyEscalation> {
     }
 }
 
+impl SseDecode for Vec<crate::api::sensus_bridge::VisionStep> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = vec![];
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::sensus_bridge::VisionStep>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Option<String> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -821,6 +864,18 @@ impl SseDecode for crate::api::sensus_bridge::VisionGlaucomaMode {
             2 => crate::api::sensus_bridge::VisionGlaucomaMode::ArcuateInferior,
             3 => crate::api::sensus_bridge::VisionGlaucomaMode::Biarcuate,
             _ => unreachable!("Invalid variant for VisionGlaucomaMode: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::sensus_bridge::VisionStep {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_filter = <crate::api::sensus_bridge::VisionFilter>::sse_decode(deserializer);
+        let mut var_strength = <f32>::sse_decode(deserializer);
+        return crate::api::sensus_bridge::VisionStep {
+            filter: var_filter,
+            strength: var_strength,
         };
     }
 }
@@ -1148,6 +1203,27 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::sensus_bridge::VisionGlaucoma
         self
     }
 }
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::sensus_bridge::VisionStep {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.filter.into_into_dart().into_dart(),
+            self.strength.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::sensus_bridge::VisionStep
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::sensus_bridge::VisionStep>
+    for crate::api::sensus_bridge::VisionStep
+{
+    fn into_into_dart(self) -> crate::api::sensus_bridge::VisionStep {
+        self
+    }
+}
 
 impl SseEncode for String {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -1283,6 +1359,16 @@ impl SseEncode for Vec<crate::api::sensus_bridge::UrgencyEscalation> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <crate::api::sensus_bridge::UrgencyEscalation>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::sensus_bridge::VisionStep> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::sensus_bridge::VisionStep>::sse_encode(item, serializer);
         }
     }
 }
@@ -1565,6 +1651,14 @@ impl SseEncode for crate::api::sensus_bridge::VisionGlaucomaMode {
     }
 }
 
+impl SseEncode for crate::api::sensus_bridge::VisionStep {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::api::sensus_bridge::VisionFilter>::sse_encode(self.filter, serializer);
+        <f32>::sse_encode(self.strength, serializer);
+    }
+}
+
 impl SseEncode for bool {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1725,6 +1819,16 @@ mod io {
             vec.into_iter().map(CstDecode::cst_decode).collect()
         }
     }
+    impl CstDecode<Vec<crate::api::sensus_bridge::VisionStep>> for *mut wire_cst_list_vision_step {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> Vec<crate::api::sensus_bridge::VisionStep> {
+            let vec = unsafe {
+                let wrap = flutter_rust_bridge::for_generated::box_from_leak_ptr(self);
+                flutter_rust_bridge::for_generated::vec_from_leak_ptr(wrap.ptr, wrap.len)
+            };
+            vec.into_iter().map(CstDecode::cst_decode).collect()
+        }
+    }
     impl CstDecode<crate::api::sensus_bridge::UrgencyEscalation> for wire_cst_urgency_escalation {
         // Codec=Cst (C-struct based), see doc to use other codecs
         fn cst_decode(self) -> crate::api::sensus_bridge::UrgencyEscalation {
@@ -1850,6 +1954,15 @@ mod io {
             }
         }
     }
+    impl CstDecode<crate::api::sensus_bridge::VisionStep> for wire_cst_vision_step {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> crate::api::sensus_bridge::VisionStep {
+            crate::api::sensus_bridge::VisionStep {
+                filter: self.filter.cst_decode(),
+                strength: self.strength.cst_decode(),
+            }
+        }
+    }
     impl NewWithNullPtr for wire_cst_experience {
         fn new_with_null_ptr() -> Self {
             Self {
@@ -1904,6 +2017,19 @@ mod io {
             Self::new_with_null_ptr()
         }
     }
+    impl NewWithNullPtr for wire_cst_vision_step {
+        fn new_with_null_ptr() -> Self {
+            Self {
+                filter: Default::default(),
+                strength: Default::default(),
+            }
+        }
+    }
+    impl Default for wire_cst_vision_step {
+        fn default() -> Self {
+            Self::new_with_null_ptr()
+        }
+    }
 
     #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_universal_experience_wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
@@ -1916,6 +2042,19 @@ mod io {
     ) {
         wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8_impl(
             port_, filter, rgba8, width, height, strength,
+        )
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_universal_experience_wire__crate__api__sensus_bridge__apply_vision_pipeline_cpu_rgba8(
+        port_: i64,
+        steps: *mut wire_cst_list_vision_step,
+        rgba8: *mut wire_cst_list_prim_u_8_loose,
+        width: u32,
+        height: u32,
+    ) {
+        wire__crate__api__sensus_bridge__apply_vision_pipeline_cpu_rgba8_impl(
+            port_, steps, rgba8, width, height,
         )
     }
 
@@ -2090,6 +2229,20 @@ mod io {
         flutter_rust_bridge::for_generated::new_leak_box_ptr(wrap)
     }
 
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_universal_experience_cst_new_list_vision_step(
+        len: i32,
+    ) -> *mut wire_cst_list_vision_step {
+        let wrap = wire_cst_list_vision_step {
+            ptr: flutter_rust_bridge::for_generated::new_leak_vec_ptr(
+                <wire_cst_vision_step>::new_with_null_ptr(),
+                len,
+            ),
+            len,
+        };
+        flutter_rust_bridge::for_generated::new_leak_box_ptr(wrap)
+    }
+
     #[repr(C)]
     #[derive(Clone, Copy)]
     pub struct wire_cst_experience {
@@ -2167,6 +2320,12 @@ mod io {
     #[derive(Clone, Copy)]
     pub struct wire_cst_list_urgency_escalation {
         ptr: *mut wire_cst_urgency_escalation,
+        len: i32,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_list_vision_step {
+        ptr: *mut wire_cst_vision_step,
         len: i32,
     }
     #[repr(C)]
@@ -2276,6 +2435,12 @@ mod io {
     #[derive(Clone, Copy)]
     pub struct wire_cst_VisionFilter_FlickeringStars {
         seed: u64,
+    }
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    pub struct wire_cst_vision_step {
+        filter: wire_cst_vision_filter,
+        strength: f32,
     }
 }
 #[cfg(not(target_family = "wasm"))]
@@ -2411,6 +2576,18 @@ mod web {
                 .collect()
         }
     }
+    impl CstDecode<Vec<crate::api::sensus_bridge::VisionStep>>
+        for flutter_rust_bridge::for_generated::wasm_bindgen::JsValue
+    {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> Vec<crate::api::sensus_bridge::VisionStep> {
+            self.dyn_into::<flutter_rust_bridge::for_generated::js_sys::Array>()
+                .unwrap()
+                .iter()
+                .map(CstDecode::cst_decode)
+                .collect()
+        }
+    }
     impl CstDecode<Option<String>> for Option<String> {
         // Codec=Cst (C-struct based), see doc to use other codecs
         fn cst_decode(self) -> Option<String> {
@@ -2517,6 +2694,26 @@ mod web {
             }
         }
     }
+    impl CstDecode<crate::api::sensus_bridge::VisionStep>
+        for flutter_rust_bridge::for_generated::wasm_bindgen::JsValue
+    {
+        // Codec=Cst (C-struct based), see doc to use other codecs
+        fn cst_decode(self) -> crate::api::sensus_bridge::VisionStep {
+            let self_ = self
+                .dyn_into::<flutter_rust_bridge::for_generated::js_sys::Array>()
+                .unwrap();
+            assert_eq!(
+                self_.length(),
+                2,
+                "Expected 2 elements, got {}",
+                self_.length()
+            );
+            crate::api::sensus_bridge::VisionStep {
+                filter: self_.get(0).cst_decode(),
+                strength: self_.get(1).cst_decode(),
+            }
+        }
+    }
     impl CstDecode<String> for flutter_rust_bridge::for_generated::wasm_bindgen::JsValue {
         // Codec=Cst (C-struct based), see doc to use other codecs
         fn cst_decode(self) -> String {
@@ -2605,6 +2802,19 @@ mod web {
     ) {
         wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8_impl(
             port_, filter, rgba8, width, height, strength,
+        )
+    }
+
+    #[wasm_bindgen]
+    pub fn wire__crate__api__sensus_bridge__apply_vision_pipeline_cpu_rgba8(
+        port_: flutter_rust_bridge::for_generated::MessagePort,
+        steps: flutter_rust_bridge::for_generated::wasm_bindgen::JsValue,
+        rgba8: Box<[u8]>,
+        width: u32,
+        height: u32,
+    ) {
+        wire__crate__api__sensus_bridge__apply_vision_pipeline_cpu_rgba8_impl(
+            port_, steps, rgba8, width, height,
         )
     }
 

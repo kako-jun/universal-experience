@@ -24,7 +24,8 @@ lib/
 │   ├── sample_catalog.dart          # サンプル画像集（8種）+ フィルタ id ごとの推奨サンプル（#78）
 │   └── preview_image_source.dart    # プレビュー原画の値型（サンプル/ユーザー画像、#78）
 ├── rendering/
-│   ├── cpu_vision_renderer.dart     # sensus CPU apply() 経由、プレビュー描画の正本（#85）
+│   ├── cpu_vision_renderer.dart     # sensus CPU apply() 経由、プレビュー描画の正本（#85）。
+│   │                                 # 複数ステップ版 applyPipeline（sensus Pipeline、#118）も持つ
 │   ├── color_matrices.g.dart        # sensus 由来 Machado 11段テーブルの生成物（GPU 経路専用）
 │   ├── shader_filter.dart           # sensus 由来 GLSL → Impeller FragmentProgram 適用
 │   │                                 # （ライブ画面キャプチャ向けに残置、現状 production 未使用）
@@ -243,14 +244,16 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 再利用する（専用レンダラを持たない）。Before / After との関係と理由は
 `docs/adr/2026-09-30-color-vision-2x2-compare.md`。
 
-### 状態モデルの統一と多症状の同時適用（第 1 段 #117 まで実装）
+### 状態モデルの統一と多症状の同時適用（第 2 段 #118 まで実装）
 
 状態が 2 系統（`FilterService` の `ColorVisionType` 8 値（none + 7 型）/ `VisionFilterState` の 30 フィルタ。強度の記憶は #117 で後者に一本化済み）並行し、
 選択も 1 つだけという現状を、「カタログ id ごとに 1 つのレイヤー」の順序つき列（最大 5、色覚は排他、
 適用順は段で固定）に統一し、sensus の `Pipeline` で合成する方針。実装は Issue #117〜#125 の段階移行で、
 `ColorVisionType` / `FilterService` の削除は最後。判断・代替案は
 `docs/adr/2026-09-30-multi-select-filter-state-model.md`。第 1 段（#117）で層の列・強度の記憶の一本化・
-永続化 v2 が入った（選択はまだ常に 1 層。複数層の API・合成は #119）。
+永続化 v2 が入った（選択はまだ常に 1 層。複数層の API・合成は #119）。第 2 段（#118）で bridge に
+`apply_vision_pipeline_cpu_rgba8`（`VisionStep` 列を並びの順に適用。空列は入力を返す）と
+`CpuVisionRenderer.applyPipeline` が入った（呼び出し側の配線は #119）。
 
 ### iOS非対応
 

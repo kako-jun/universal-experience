@@ -60,6 +60,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<UrgencyEscalation> dco_decode_list_urgency_escalation(dynamic raw);
 
   @protected
+  List<VisionStep> dco_decode_list_vision_step(dynamic raw);
+
+  @protected
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
@@ -94,6 +97,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   VisionGlaucomaMode dco_decode_vision_glaucoma_mode(dynamic raw);
+
+  @protected
+  VisionStep dco_decode_vision_step(dynamic raw);
 
   @protected
   String sse_decode_String(SseDeserializer deserializer);
@@ -138,6 +144,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       SseDeserializer deserializer);
 
   @protected
+  List<VisionStep> sse_decode_list_vision_step(SseDeserializer deserializer);
+
+  @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
@@ -176,6 +185,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   VisionGlaucomaMode sse_decode_vision_glaucoma_mode(
       SseDeserializer deserializer);
+
+  @protected
+  VisionStep sse_decode_vision_step(SseDeserializer deserializer);
 
   @protected
   bool sse_decode_bool(SseDeserializer deserializer);
@@ -292,6 +304,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   JSAny cst_encode_list_urgency_escalation(List<UrgencyEscalation> raw) {
     // Codec=Cst (C-struct based), see doc to use other codecs
     return raw.map(cst_encode_urgency_escalation).toList().jsify()!;
+  }
+
+  @protected
+  JSAny cst_encode_list_vision_step(List<VisionStep> raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return raw.map(cst_encode_vision_step).toList().jsify()!;
   }
 
   @protected
@@ -456,6 +474,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   }
 
   @protected
+  JSAny cst_encode_vision_step(VisionStep raw) {
+    // Codec=Cst (C-struct based), see doc to use other codecs
+    return [cst_encode_vision_filter(raw.filter), cst_encode_f_32(raw.strength)]
+        .jsify()!;
+  }
+
+  @protected
   double cst_encode_f_32(double raw);
 
   @protected
@@ -525,6 +550,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       List<UrgencyEscalation> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_vision_step(
+      List<VisionStep> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
@@ -566,6 +595,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       VisionGlaucomaMode self, SseSerializer serializer);
 
   @protected
+  void sse_encode_vision_step(VisionStep self, SseSerializer serializer);
+
+  @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
 }
 
@@ -583,6 +615,16 @@ class RustLibWire implements BaseWire {
           double strength) =>
       wasmModule.wire__crate__api__sensus_bridge__apply_vision_cpu_rgba8(
           port_, filter, rgba8, width, height, strength);
+
+  void wire__crate__api__sensus_bridge__apply_vision_pipeline_cpu_rgba8(
+          NativePortType port_,
+          JSAny steps,
+          JSAny rgba8,
+          int width,
+          int height) =>
+      wasmModule
+          .wire__crate__api__sensus_bridge__apply_vision_pipeline_cpu_rgba8(
+              port_, steps, rgba8, width, height);
 
   JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
       wire__crate__api__sensus_bridge__experiences() =>
@@ -660,6 +702,14 @@ extension type RustLibWasmModule._(JSObject _) implements JSObject {
       int width,
       int height,
       double strength);
+
+  external void
+      wire__crate__api__sensus_bridge__apply_vision_pipeline_cpu_rgba8(
+          NativePortType port_,
+          JSAny steps,
+          JSAny rgba8,
+          int width,
+          int height);
 
   external JSAny? /* flutter_rust_bridge::for_generated::WireSyncRust2DartDco */
       wire__crate__api__sensus_bridge__experiences();

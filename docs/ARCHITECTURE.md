@@ -436,12 +436,14 @@ Linux debug ビルド成功で代替している:
   2 回起動して復元・取り込みを確かめる実アプリ経路のテスト
   （`test/vision_filter_persistence_app_test.dart`）。
 
-## 状態モデルの統一と多症状の同時適用 (#32 / #41、第 1 段 #117 まで実装)
+## 状態モデルの統一と多症状の同時適用 (#32 / #41、第 2 段 #118 まで実装)
 
 > **実装状況**: 第 1 段（#117）で、`VisionFilterState` がレイヤー列（`lib/services/vision_layer.dart`）と
 > 段の表（`lib/models/vision_filter_stage.dart`）を持ち、強度の記憶が `variantId ?? id` キーの 1 つに
 > 統一され、永続化が v2 になった。**選択はまだ常に 1 層**（`select` / `selectColorVisionType` /
 > `selectPreset` は「全部外して 1 つ足す」）で、複数層を作る API・合成描画は第 3 段（#119）。
+> 第 2 段（#118）で bridge に複数ステップ適用 `apply_vision_pipeline_cpu_rgba8` と
+> `CpuVisionRenderer.applyPipeline` が入った（配線は #119）。
 > `FilterService` は色覚クイック選択の型を持ち、強度は `VisionFilterState` の記憶へ委譲する薄い窓に
 > なった（`ColorVisionType` / `FilterService` の削除は最終段 #124）。下の「現状は状態が 2 系統」
 > 以降は設計時点の記述。
@@ -945,7 +947,14 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   の `renderAfter` はこれを直接呼ぶ production コードなので、テストで差し替える
   ための `CpuVisionRenderer.applier`（`sampleImageGenerator`/
   `afterImageRenderer` と同じ seam パターン、#58）に `@visibleForTesting` は
-  付けていない（同一ライブラリ外の production コードから正当に参照するため）
+  付けていない（同一ライブラリ外の production コードから正当に参照するため）。
+  複数ステップ版の入口 `CpuVisionRenderer.applyPipeline(source, steps)`
+  （`applyVisionPipelineCpuRgba8`、sensus の `Pipeline`、#118）も同じ往復・同じ
+  alpha 変換で、`List<VisionStep>`（`filter` + `strength`）を並びの順に適用する。
+  単一版と同様に seam（`CpuVisionRenderer.pipelineApplier`）を持つ。並べ替えは
+  しない（適用順は呼び出し側が段順で決める）。空のステップ列は入力と同じ内容を返す。
+  プレビュー配線（`BeforeAfterView` がこの入口を使う）は #119 で、#118 時点では
+  production から呼ぶ箇所はない
 - `BeforeAfterView`（`lib/ui/widgets/before_after_view.dart`）: before/after
   プレビューペイン。#85 で、ペインの論理サイズ・
   `devicePixelRatio` に連動して都度サイズを変えていた旧 GPU 時代の auto-sizing

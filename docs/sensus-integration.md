@@ -149,6 +149,11 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
   プールで実行されるため Dart 側の `await` は UI スレッドを塞がない。
   `lib/rendering/cpu_vision_renderer.dart` の `CpuVisionRenderer` が薄くラップし、
   `ui.Image` ⇄ raw RGBA8 の往復を行う）
+- `applyVisionPipelineCpuRgba8(steps, rgba8, width, height)` → `Future<Uint8List>`
+  （#118。`VisionStep{filter, strength}` の列を `sensus_core::pipeline::Pipeline` で
+  **並びの順に**適用する。各ステップは単体の `applyVisionCpuRgba8` と同じ結果だが、
+  8bit ↔ f32 の往復が段ごとに入る。空の列は入力をそのまま返し、バッファ長の検証は
+  空でも行う。`CpuVisionRenderer.applyPipeline` が薄くラップする）
 
 #### 複合体験（Experience）API（#10）
 

@@ -79,9 +79,7 @@ void main() {
       expect(rgba8.length, image.width * image.height * 4);
     });
 
-    test(
-        '透過ピクセル（alpha=128 の既知の色）を含む往復で straight alpha が保たれる',
-        () async {
+    test('透過ピクセル（alpha=128 の既知の色）を含む往復で straight alpha が保たれる', () async {
       // 1x1 の半透明ピクセル。straight alpha 前提で描画する: Canvas に
       // Paint(color) で塗ると Skia は不透明色×アルファのブレンドで
       // 内部的に premultiply して合成するため、ここでは
@@ -191,6 +189,90 @@ void main() {
         1.0,
       );
       expect(called, isTrue);
+    });
+  });
+
+  group('pipelineApplier seam（複数ステップ、#118）', () {
+    tearDown(() {
+      CpuVisionRenderer.pipelineApplier = CpuVisionRenderer.applyPipeline;
+    });
+
+    test('既定値は CpuVisionRenderer.applyPipeline 自身で、単一版の seam とは独立', () {
+      expect(CpuVisionRenderer.pipelineApplier,
+          same(CpuVisionRenderer.applyPipeline));
+      expect(CpuVisionRenderer.applier, same(CpuVisionRenderer.apply));
+    });
+
+    test('seam の型の契約: フェイクへ差し替えて呼べる', () async {
+      // 注: フェイクを直接呼ぶだけなので、実際の呼び出し側の配線（layers 順・強度・
+      // payload を渡す）は検証しない。それは production の呼び出し元ができる #119 で
+      // テストする。ここでは seam の型（ui.Image, List<VisionStep>）→ ui.Image の契約だけを固定する。
+      var called = false;
+      CpuVisionRenderer.pipelineApplier = (source, steps) async {
+        called = true;
+        return source;
+      };
+      expect(CpuVisionRenderer.pipelineApplier,
+          isNot(same(CpuVisionRenderer.applyPipeline)));
+
+      final dummy = await decodeFile('test/golden/protanopia_input.png');
+      addTearDown(dummy.dispose);
+      final out = await CpuVisionRenderer.pipelineApplier(
+        dummy,
+        const [VisionStep(filter: VisionFilter.myopia(), strength: 0.8)],
+      );
+      expect(called, isTrue);
+      expect(identical(out, dummy), isTrue);
+    });
+  });
+
+  group('VisionStep の等値性', () {
+    test('payload（astigmatism の axisDeg）と強度の違いを区別し、同値は等しい', () {
+      const base = VisionStep(
+        filter: VisionFilter.astigmatism(axisDeg: 30),
+        strength: 0.4,
+      );
+      expect(
+        base,
+        const VisionStep(
+          filter: VisionFilter.astigmatism(axisDeg: 30),
+          strength: 0.4,
+        ),
+      );
+      expect(
+        base.hashCode,
+        const VisionStep(
+          filter: VisionFilter.astigmatism(axisDeg: 30),
+          strength: 0.4,
+        ).hashCode,
+      );
+      expect(
+        base,
+        isNot(const VisionStep(
+          filter: VisionFilter.astigmatism(axisDeg: 45),
+          strength: 0.4,
+        )),
+        reason: 'payload が違えば別ステップ',
+      );
+      expect(
+        base,
+        isNot(const VisionStep(
+          filter: VisionFilter.astigmatism(axisDeg: 30),
+          strength: 0.5,
+        )),
+        reason: '強度が違えば別ステップ',
+      );
+      expect(
+        const [
+          VisionStep(filter: VisionFilter.myopia(), strength: 0.8),
+          VisionStep(filter: VisionFilter.protanopia(), strength: 1.0),
+        ],
+        isNot(equals(const [
+          VisionStep(filter: VisionFilter.protanopia(), strength: 1.0),
+          VisionStep(filter: VisionFilter.myopia(), strength: 0.8),
+        ])),
+        reason: '並びの順が違う列は等しくない',
+      );
     });
   });
 }
