@@ -533,6 +533,22 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       return;
     }
 
+    // 描画器の型は null を許す（[AfterImageRenderer]）が、null は「after 画像が
+    // 無い」状態で、空の枠を成功として出してしまう。例外と同じ失敗として扱う（#45）。
+    if (after == null) {
+      FlutterError.reportError(FlutterErrorDetails(
+        exception: StateError('afterImageRenderer returned null'),
+        library: 'before_after_view',
+      ));
+      if (clonedInput) {
+        rendererInput.dispose();
+      } else if (!identical(before, _before)) {
+        before.dispose();
+      }
+      _onRebuildFailed(generation);
+      return;
+    }
+
     final bool isLatest = generation == _generation && mounted;
     if (!isLatest) {
       // Superseded while we awaited the renderer, or disposed meanwhile —
@@ -545,8 +561,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       // どちらかに任せる」という以前の条件分岐は、両方の条件が同時に false に
       // なる組み合わせで dispose 漏れ（リーク）を起こしていた。
       if (clonedInput) rendererInput.dispose();
-      if (after != null &&
-          !identical(after, rendererInput) &&
+      if (!identical(after, rendererInput) &&
           !identical(after, before) &&
           !identical(after, _after)) {
         after.dispose();
@@ -726,8 +741,9 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                 image: _after,
                 // 何も選んでいないとき after は原画と同じで、見出し（afterName）が
                 // 説明を担うので付けない（二重読み上げの回避）。
-                // （`_before` と `_after` は同時に代入され、描画失敗なら上の
-                // `_failed` 分岐に入るので、ここで画像が無いことはない。）
+                // （`_after` は成功時にだけ非 null で代入され、描画器が null を返した
+                // 場合も `_rebuild` が失敗として扱い `_failed` 分岐に入るので、
+                // ここで画像が無いことはない。）
                 semanticLabel:
                     widget.filterId == null && widget.colorVisionType == null
                         ? null
