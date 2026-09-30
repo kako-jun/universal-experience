@@ -65,18 +65,25 @@ void deactivateColorVision(
 /// 別の色覚へ置き換える。呼んだあと [FilterService] を層の集合へ合わせる
 /// （[syncFilterServiceWithLayers]）ので、`settings.filterType` ・トレイ・色覚の強度の記憶の
 /// 読み口とずれない。[type] が [ColorVisionType.none] のときは色覚層を外す
-/// （[VisionLayerResult.removed] か、色覚層が無ければ何もしない）。
+/// （外したなら [VisionLayerResult.removed]、色覚層が無ければ何もせず
+/// [VisionLayerResult.unchanged]）。
 VisionLayerResult toggleColorVision(
   FilterService filterService,
   VisionFilterState visionState,
   ColorVisionType type,
 ) {
   if (type == ColorVisionType.none) {
-    for (final layer in visionState.layers) {
-      if (isVisionColorGroupId(layer.id)) visionState.remove(layer.id);
+    final colorLayerIds = [
+      for (final layer in visionState.layers)
+        if (isVisionColorGroupId(layer.id)) layer.id,
+    ];
+    for (final id in colorLayerIds) {
+      visionState.remove(id);
     }
     syncFilterServiceWithLayers(filterService, visionState);
-    return VisionLayerResult.removed;
+    return colorLayerIds.isEmpty
+        ? VisionLayerResult.unchanged
+        : VisionLayerResult.removed;
   }
   final catalogId =
       visionFilterCatalogId(visionFilterForColorVisionType(type)!);

@@ -159,6 +159,24 @@ void main() {
       expect(filterService.currentFilter, ColorVisionType.none);
     });
 
+    test('none は色覚の層が無ければ何も変えず、unchanged を返す', () {
+      visionState.toggle('myopia');
+      final result =
+          toggleColorVision(filterService, visionState, ColorVisionType.none);
+      expect(result, VisionLayerResult.unchanged);
+      expect(result.changed, isFalse);
+      expect([for (final l in visionState.layers) l.id], ['myopia']);
+      expect(filterService.currentFilter, ColorVisionType.none);
+    });
+
+    test('none は色覚の層があれば removed を返す', () {
+      toggleColorVision(filterService, visionState, ColorVisionType.tritanopia);
+      final result =
+          toggleColorVision(filterService, visionState, ColorVisionType.none);
+      expect(result, VisionLayerResult.removed);
+      expect(result.changed, isTrue);
+    });
+
     test('quick 以外（advanced 由来）の色覚層は FilterService の対象にしない', () {
       visionState.toggle('protanopia'); // origin 既定 = advanced
       syncFilterServiceWithLayers(filterService, visionState);
