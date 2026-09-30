@@ -85,6 +85,19 @@ Experience? selectedExperience(VisionFilterState state) {
   return null;
 }
 
+/// 永続化された体験プリセット選択（[presetId] とカタログ id [catalogId] の組、
+/// #65）が今も有効か。プリセットが存在し、その体験の視覚フィルタが [catalogId] に
+/// 写るときだけ true（sensus の体験一覧が変わっても、古い保存値をプリセット
+/// 選択として復元しない）。
+bool isValidExperiencePreset(String presetId, String catalogId) {
+  for (final exp in availableExperiences()) {
+    if (exp.id != presetId) continue;
+    final vision = exp.vision;
+    return vision != null && visionFilterCatalogId(vision) == catalogId;
+  }
+  return false;
+}
+
 /// 体験プリセット (#19) の一覧の 1 行。
 ///
 /// sensus の [experiences]（meniere / bppv / vestibular_neuritis /
