@@ -4,6 +4,12 @@
 // 調整 → 選択）。プレビューが最初のビューポートに収まること、一覧の選択が右カラムに
 // 反映されること、クリックスルー ON の復帰方法が主画面に常時見えること、`/` で検索欄へ
 // 移ること、何も選んでいないときの空状態を確認する。
+//
+// 注意: ハーネスはプレビュー画像を「準備中」のプレースホルダのまま止めるので、
+// ここでの「最初のビューポートに収まる」は準備中状態での測定。読み込み済みだと
+// ImageSourcePicker が 800x600 で約 612dp になり収まらない既知の差は #130。
+// 「フィルタを選んだまま runAsync で実時間を進めても例外が出ない」テストは、
+// ハーネスの契約（Rust 非依存の供給源）を守る回帰テスト（#127）。
 
 import 'dart:async' show unawaited;
 
@@ -50,6 +56,8 @@ void main() {
       kFilterListEntries.firstWhere((e) => e.key == key);
 
   group('プレビューは最初のビューポートに収まる', () {
+    // 画像は準備中のプレースホルダ状態で測っている。読み込み済みでは ImageSourcePicker が
+    // 800x600 で約 612dp になり収まらない既知の差は #130。
     for (final (label, size) in [
       ('広幅 1280x800', wide),
       ('狭幅 800x700', narrow),
@@ -135,6 +143,34 @@ void main() {
       await tester.runAsync(() => h.loupe.setClickThrough(false));
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
     });
+  });
+
+  testWidgets('フィルタを選んだまま実時間が進んでも、プレビューは Rust に触れず例外を出さない', (tester) async {
+    // 実ブリッジ（native lib / RustLib.init()）が無い環境で、読み込み済みのプレビューに
+    // 実フィルタを適用しに行くと FRB 未初期化の非同期例外が漏れる（過去に別テストへ
+    // 漏れて不安定になった）。ハーネスの供給源が Rust 非依存であることを、実時間が
+    // 進む `runAsync` をまたいで確かめる。
+    // 画像が載った状態にする（既定のハーネスは「準備中」で止める）。フィルタ適用は
+    // ハーネスの既定（Rust 非依存）のまま。
+    previewSourceImageLoader = (source, size) async => fixturePreviewImage();
+    await pumpHomeScreen(
+      tester,
+      size: wide,
+      select: (f, s) => selectColorVision(f, s, ColorVisionType.protanopia),
+    );
+    for (var i = 0; i < 3; i++) {
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 100)));
+      await tester.pump();
+    }
+    expect(tester.takeException(), isNull);
+    // 失敗扱い（再読み込みを促す UI）に落ちていない = 描画が成功した。
+    expect(find.byType(PreviewErrorPlaceholder), findsNothing);
+    final panes = tester.widgetList<PreviewImageView>(
+      find.byType(PreviewImageView),
+    );
+    expect(panes.length, 2);
+    expect(panes.every((p) => p.image != null), isTrue);
   });
 
   testWidgets('広幅は 3 カラム（左=選ぶ・中=見る・右=調整）で横に並ぶ', (tester) async {

@@ -50,7 +50,7 @@ const Map<String, String> _excludedFilters = <String, String>{
   'detail_loss': 'GLSL derives tile_size from strength (vision::detail_loss) '
       'and has no cell_size uniform; the exposed DetailLoss{cell_size} '
       'corresponds to detail_loss_with_cell_size instead, so the GPU path '
-      "can't reproduce cell_size/strength semantics (tracked in #61)",
+      "can't reproduce cell_size/strength semantics (tracked in kako-jun/sensus#190)",
 };
 
 void main(List<String> args) {
