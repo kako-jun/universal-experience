@@ -399,6 +399,54 @@ void main() {
       expect(p.strengthPercent, 0);
     });
 
+    test('全層が強度 0: 喚起・実験的の注記・ファイル名はフォーカス中の層の値（従来どおり）', () {
+      visionFilterUrgencyProvider = (f) => switch (f) {
+            VisionFilter_Myopia() => Urgency.emergency,
+            VisionFilter_Vertigo() => Urgency.earlyConsultation,
+            _ => Urgency.none,
+          };
+      visionFilterUrgencyEscalationProvider = (f) => switch (f) {
+            VisionFilter_Myopia() => [_esc(Urgency.emergency, _suddenHearing)],
+            _ => const [],
+          };
+      final layers = layersOf(
+        ['tetrachromacy', 'myopia', 'vertigo'],
+        strengths: {'tetrachromacy': 0.0, 'myopia': 0.0, 'vertigo': 0.0},
+      );
+
+      // フォーカスが myopia（強度 0）: 喚起は myopia のもの。実験的（tetrachromacy）の注記は出ない。
+      final onMyopia = plan(
+        en,
+        layers,
+        filterId: 'myopia',
+        colorVisionType: null,
+        filter: const VisionFilter.myopia(),
+        strength: 0.0,
+      );
+      expect(onMyopia.caption.layers, isEmpty);
+      expect(onMyopia.caption.symptomLabel, en.filterMyopia);
+      expect(onMyopia.caption.strengthLabel, en.strengthLabel(0));
+      expect(onMyopia.caption.urgencyMessage, en.consultEmergency);
+      expect(onMyopia.caption.escalationGroups.single.lines,
+          [en.escalationConditionHearingSuddenOneEar]);
+      expect(onMyopia.caption.experimentalNotice, isNull);
+      expect(onMyopia.symptomId, 'myopia');
+      expect(onMyopia.strengthPercent, 0);
+
+      // フォーカスが tetrachromacy（実験的・強度 0）: 注記はフォーカス層のもの。喚起は無い。
+      final onTetra = plan(
+        en,
+        layers,
+        filterId: 'tetrachromacy',
+        colorVisionType: null,
+        filter: const VisionFilter.tetrachromacy(),
+        strength: 0.0,
+      );
+      expect(onTetra.caption.experimentalNotice, en.exportExperimentalNotice);
+      expect(onTetra.caption.urgencyMessage, isNull);
+      expect(onTetra.symptomId, 'tetrachromacy');
+    });
+
     test('原画比較中（bypass）は層が無い扱い', () {
       final state = VisionFilterState()
         ..toggle('protanopia')
