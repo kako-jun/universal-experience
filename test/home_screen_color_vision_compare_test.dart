@@ -268,6 +268,7 @@ void main() {
 
     final holder = Object();
     renderedStrengths.clear();
+    final composedBeforeBypass = pipelineCalls.length;
     h.visionState.acquireBypass(holder);
     await tester.pump();
     for (var i = 0; i < 20; i++) {
@@ -279,12 +280,19 @@ void main() {
     expect(view.baseSteps, isEmpty);
     expect(find.text(l10n.compareSharedStrengthNote(0)), findsOneWidget);
     expect(h.visionState.layers.length, 2, reason: '選択は残る');
+    expect(renderedStrengths.length, 4, reason: 'バイパス中は 4 セルとも描き直す');
+    expect(renderedStrengths, everyElement(0.0),
+        reason: 'バイパス中は 4 セルとも強度 0（原画）');
+    expect(pipelineCalls.length, composedBeforeBypass,
+        reason: 'バイパス中は土台を合成しない');
 
     h.visionState.releaseBypass(holder);
     await tester.pump();
     for (var i = 0; i < 20; i++) {
       await tester.pump();
     }
+    expect(pipelineCalls.length, composedBeforeBypass,
+        reason: '解除しても層が同じなら土台を再合成しない');
     expect(
       tester
           .widget<ColorVisionCompareView>(find.byType(ColorVisionCompareView))
@@ -355,6 +363,7 @@ void main() {
 
     final holder = Object();
     renderedStrengths.clear();
+    final composedBeforeBypass = pipelineCalls.length;
     h.visionState.acquireBypass(holder);
     await tester.pump();
     for (var i = 0; i < 20; i++) {

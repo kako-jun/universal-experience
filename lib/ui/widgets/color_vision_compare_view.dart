@@ -87,7 +87,8 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
   PreviewImageSource? _currentImageSource;
 
   /// 土台（[_before] に [ColorVisionCompareView.baseSteps] を 1 回適用した画像、#122）。
-  /// steps が空のときは null（土台 = [_before]）。表示には使わない。
+  /// まだ作っていない間は null。steps が空の間は使わず（土台 = [_before]）、ソース・サイズが
+  /// 変わるか dispose されるまで保持する。表示には使わない。
   ui.Image? _baseImage;
 
   /// [_baseImage] を作ったときの入力（再利用の判定用）。
@@ -238,12 +239,18 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
     }
 
     // 土台: steps が空なら原画、あれば 1 回だけ合成（同じ入力の間は使い回す）。
-    final ui.Image base;
-    if (baseSteps.isEmpty) {
-      final old = _baseImage;
+    // 保持した土台を捨てるのはソース・サイズが変わったときと dispose のときだけ。
+    // steps が空の間（原画比較のホールド中など）も捨てずに持ち、解除後に層が
+    // 変わっていなければ CPU 再合成しない（空 steps の間は土台を使わず原画を使う）。
+    if (_baseImage != null &&
+        (_baseImageSize != size || _baseImageSource != source)) {
+      final stale = _baseImage;
       _baseImage = null;
       _baseImageSteps = null;
-      old?.dispose();
+      stale?.dispose();
+    }
+    final ui.Image base;
+    if (baseSteps.isEmpty) {
       base = before;
     } else if (_baseImage != null &&
         _baseImageSize == size &&

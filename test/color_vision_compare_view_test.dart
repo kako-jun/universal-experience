@@ -867,19 +867,90 @@ void main() {
       );
     });
 
-    testWidgets('土台ありから土台なしへ戻ると、保持していた土台を破棄して原画から描く', (tester) async {
+    testWidgets('土台が空の間（原画比較のホールド中など）は、保持した土台を使わず原画から描く。解除して層が同じなら再合成しない',
+        (tester) async {
       final fakes = await installBaseFakes(tester);
       await tester
           .pumpWidget(localized(viewOf(inputOf(['myopia', 'protanopia']))));
       await settleCells(tester, fakes.cellCalls, 4);
       expect(fakes.baseReturned.single.debugDisposed, isFalse);
 
-      await tester.pumpWidget(localized(viewOf(inputOf(['protanopia']))));
+      // 空 steps（強度 0・土台なし = バイパス中の入力）。
+      await tester.pumpWidget(
+          localized(viewOf(const ColorVisionCompareInput(strength: 0))));
       await settleCells(tester, fakes.cellCalls, 8);
-      expect(fakes.baseCalls.length, 1);
-      expect(fakes.baseReturned.single.debugDisposed, isTrue);
-      expect(await centerArgb(tester, fakes.cellReturned[4]),
-          tint('protanopia', 0xFFFFFFFF));
+      expect(fakes.baseCalls.length, 1, reason: '空の間は合成を呼ばない');
+      expect(fakes.baseReturned.single.debugDisposed, isFalse,
+          reason: 'ホールド中も土台は捨てずに保持する');
+      for (var i = 4; i < 8; i++) {
+        final id = kColorVisionCompareEntries[i - 4].id;
+        expect(await centerArgb(tester, fakes.cellReturned[i]),
+            tint(id, 0xFFFFFFFF),
+            reason: '$id は保持した土台ではなく原画から始まる');
+      }
+
+      // 解除（同じ層）→ 再合成しない。保持した土台から描く。
+      await tester
+          .pumpWidget(localized(viewOf(inputOf(['myopia', 'protanopia']))));
+      await settleCells(tester, fakes.cellCalls, 12);
+      expect(fakes.baseCalls.length, 1, reason: '層が変わっていなければ CPU 再合成しない');
+      expect(fakes.baseReturned.single.debugDisposed, isFalse);
+      for (var i = 8; i < 12; i++) {
+        final id = kColorVisionCompareEntries[i - 8].id;
+        expect(await centerArgb(tester, fakes.cellReturned[i]),
+            tint(id, baseArgb));
+      }
+    });
+
+    testWidgets('土台が空の間に層が変わってから戻ると、再合成は 1 回だけ', (tester) async {
+      final fakes = await installBaseFakes(tester);
+      await tester
+          .pumpWidget(localized(viewOf(inputOf(['myopia', 'protanopia']))));
+      await settleCells(tester, fakes.cellCalls, 4);
+
+      await tester.pumpWidget(
+          localized(viewOf(const ColorVisionCompareInput(strength: 0))));
+      await settleCells(tester, fakes.cellCalls, 8);
+
+      final changed =
+          inputOf(['myopia', 'protanopia'], strengths: {'myopia': 0.5});
+      await tester.pumpWidget(localized(viewOf(changed)));
+      await settleCells(tester, fakes.cellCalls, 12);
+      expect(fakes.baseCalls.length, 2, reason: '層が変わっていたので 1 回だけ再合成');
+      expect(fakes.baseCalls.last.single.strength, 0.5);
+      expect(fakes.baseReturned.first.debugDisposed, isTrue,
+          reason: '置き換えられた古い土台は破棄される');
+    });
+
+    testWidgets('ソースが変わると保持していた土台を破棄し、dispose でも破棄する', (tester) async {
+      final fakes = await installBaseFakes(tester);
+      final input = inputOf(['myopia', 'protanopia']);
+      await tester.pumpWidget(localized(viewOf(input)));
+      await settleCells(tester, fakes.cellCalls, 4);
+
+      // 空の間にソースを替える → 古い土台は捨てる。
+      await tester.pumpWidget(localized(ColorVisionCompareView(
+        strength: 0,
+        imageSource: const SamplePreviewImageSource('other'),
+        sampleSize: _kSize,
+      )));
+      await settleCells(tester, fakes.cellCalls, 8);
+      expect(fakes.baseReturned.single.debugDisposed, isTrue,
+          reason: 'ソースが変わった土台は使い回せないので捨てる');
+
+      // 土台ありで作り直し → dispose で破棄。
+      await tester.pumpWidget(localized(ColorVisionCompareView(
+        strength: input.strength,
+        baseSteps: input.baseSteps,
+        baseLayers: input.baseLayers,
+        imageSource: const SamplePreviewImageSource('other'),
+        sampleSize: _kSize,
+      )));
+      await settleCells(tester, fakes.cellCalls, 12);
+      expect(fakes.baseCalls.length, 2);
+      expect(fakes.baseReturned.last.debugDisposed, isFalse);
+      await tester.pumpWidget(const SizedBox());
+      expect(fakes.baseReturned.last.debugDisposed, isTrue);
     });
 
     testWidgets('土台の注記が出る（en / ja）。土台の層の名前が適用順', (tester) async {
