@@ -28,7 +28,8 @@ lib/
 │   │                                 # （ライブ画面キャプチャ向けに残置、現状 production 未使用）
 │   └── image_fit.dart               # 任意画像を正準サイズの正方形へレターボックス（#78）
 ├── services/
-│   ├── app_shortcuts.dart           # アプリ内キー操作（/, ↑↓, ←→, Esc）の Intent 定義（#63/#72）
+│   ├── app_shortcuts.dart           # アプリ内キー操作（/, ↑↓, ←→, Esc, Cmd/Ctrl+V）の Intent 定義（#63/#72/#97）
+│   ├── clipboard_image_reader.dart  # クリップボード画像取得の seam（実体は pasteboard、#97）
 │   ├── color_vision_selection.dart  # 色覚クイック選択の唯一の入口（FilterService/
 │   │                                 # VisionFilterState を同時更新、#60）
 │   ├── export_service.dart          # PNG エクスポート（メタ焼き込み）
@@ -60,7 +61,7 @@ lib/
     │                                 # loupe_hud（ルーペ窓モード限定の HUD。症状名・強度・
     │                                 # 受診喚起・原画比較・設定を開く、#79）,
     │                                 # image_source_picker（サンプルチップ・ファイル選択・
-    │                                 # drag&drop、#78）, welcome_banner（初回案内、#78）
+    │                                 # drag&drop・クリップボード貼り付け、#78/#97）, welcome_banner（初回案内、#78）
     └── theme/app_theme.dart         # light/dark に加え highContrastTheme / highContrastDarkTheme
                                       # （contrastLevel 1.0。OS のハイコントラスト設定で MaterialApp が自動選択、#72）
 
@@ -91,6 +92,7 @@ test/
 ├── tap_target_size_test.dart       # macOS 指定で操作領域が 48dp 以上（padded + standard、#72）
 ├── filter_browser_test.dart        # 統合一覧の検索・カテゴリ切替・行の選択（#72）
 ├── filter_list_selection_test.dart # 統合一覧の純粋ロジック（#72）
+├── clipboard_paste_test.dart       # クリップボード画像の貼り付け経路・失敗 4 種・Cmd/Ctrl+V・ボタン（#97）
 ├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品
 ├── support/screenshot_harness.dart # スクリーンショット用フォント読込・PNG 書出し（フォントはコミットしない）
 └── ui_screenshots/                 # HomeScreen の PNG 書出し。`UE_SCREENSHOTS=1` のときだけ実行（DESIGN.md §8）

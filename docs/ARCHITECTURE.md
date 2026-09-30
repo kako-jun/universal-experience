@@ -420,7 +420,7 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
 
 ## アプリ内キー操作 (#63)
 
-ウィンドウにフォーカスがある間だけ効くショートカット 4 種。実装は
+ウィンドウにフォーカスがある間だけ効くショートカット 5 種（貼り付けは #97 で追加）。実装は
 `lib/services/app_shortcuts.dart`（`Intent` 定義 + `isFocusOnInteractiveControl()` /
 `InteractiveFocusAwareCallbackAction`）+ `lib/services/preview_selection.dart`
 （実処理: `adjustPreviewStrength()`）+ `lib/services/filter_list_selection.dart`
@@ -435,7 +435,18 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
 | `↑` / `↓` | 統合フィルタ一覧（色覚 7 型 + advanced 30 件）の、今見えている行を逆送り/順送り（wraparound） |
 | `←` / `→` | 選択中フィルタの強度を `kKeyboardStrengthStep`（5%）刻みで増減 |
 | `Esc` | クリックスルーが ON のとき解除する（クリックスルーの復帰経路。上記「クリックスルーの復帰経路」参照） |
+| `Cmd+V`（macOS）/ `Ctrl+V` | クリップボードの画像をプレビューの原画として貼り付ける（#97。下記） |
 
+- **`Cmd/Ctrl+V` のガードだけは狭い**（#97）: `/`・↑↓・←→ は `isFocusOnInteractiveControl()`
+  （テキスト入力・ボタン・スライダー等）で奪わないが、貼り付けは
+  `isFocusOnTextInput()`（`EditableText` のみ）でしか奪わない
+  （`TextInputAwareCallbackAction`）。ボタンやスライダーは貼り付けに固有の意味を
+  持たず、「貼り付け」ボタンを押した直後（フォーカスがボタンに残る）でもキーボードの
+  貼り付けが効くべきため。テキスト入力中は `isEnabled` が false になってキーイベントを
+  消費しないので、`MaterialApp` 直下の `DefaultTextEditingShortcuts` が入力欄自身の
+  貼り付けとして処理する。割り当てはプラットフォームで変わる（macOS は Cmd、それ以外は
+  Ctrl）ので `home_screen.dart` の `Shortcuts` マップには実行時に足す
+  （`pasteShortcutActivator()`）。
 - **`/` は検索欄へフォーカスする**（#72 で左カラムに検索欄が入った。それ以前は
   advanced カタログへフォーカスしていた）。検索欄は `TextField` なので、フォーカス
   中は `/` 自体を含むキー入力が本来の文字入力として通る（上記ガード）。
@@ -804,7 +815,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   **原画**（before ペインの元画像）の選択状態を持つ、唯一の正本（#78）。
   `VisionFilterState`（フィルタの選択）とは独立した軸で、内蔵サンプル 7 種
   （`lib/models/sample_catalog.dart`）か、ユーザーが読み込んだ画像
-  （`ui.Image`、ファイル選択/ドラッグ＆ドロップ）のどちらかを指す
+  （`ui.Image`、ファイル選択/ドラッグ＆ドロップ/クリップボード貼り付け）のどちらかを指す
   `PreviewImageSource`（`lib/models/preview_image_source.dart`。サンプルは
   `sampleId` の値型、ユーザー画像は単調増加する `generation` で世代を区別する
   値型 — `ui.Image` 自体に意味のある値等価性が無いため）を返す。フィルタが
@@ -853,7 +864,19 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   （`lib/rendering/image_fit.dart`。`ui.instantiateImageCodecWithSize` で
   `kUserImageMaxDimension`（2048px）を超える長辺をデコード時にダウンスケール
   する）でデコードする。画像はメモリ上の `ui.Image` に変換するだけで、
-  ディスクへの保存や外部送信は一切しない（#78）
+  ディスクへの保存や外部送信は一切しない（#78）。
+  **クリップボード貼り付け（#97）**は同じ正本に流し込む別の入口:
+  「貼り付け」ボタンと `Cmd/Ctrl+V`（後述）はどちらも
+  `pasteUserImageFromClipboard`（`ClipboardImageReader.readImageBytes()` →
+  50MB 超は専用文言で拒否 → `decodeUserImageBytes` → `setUserImage`）を通る。
+  クリップボード取得は `lib/services/clipboard_image_reader.dart` の
+  `ClipboardImageReader`（interface）に切り出してあり、本番実装は `pasteboard`
+  パッケージ（macOS: NSPasteboard、Linux: GtkClipboard。どちらも PNG バイト列を
+  返す）、テストは `clipboardImageReader` をフェイクへ差し替える。失敗は 4 種
+  （画像なし `imageSourcePasteNoImage` / 巨大 `imageSourcePasteTooLarge` /
+  デコード不能 `imageSourcePasteUnsupported` / 読み取り失敗
+  `imageSourcePasteFailed`）を SnackBar で示し、`ImageSourceState` には触れない。
+  依存に `pasteboard` を選んだ理由は `docs/adr/2026-09-30-clipboard-image-paste.md`
 - `WelcomeBanner`（`lib/ui/widgets/welcome_banner.dart`）: 初回起動時だけ出す
   案内バナー（#78）。表示条件・恒久的な非表示は `SettingsService.
   welcomeBannerDismissed`/`dismissWelcomeBanner()` に永続化する。初期選択
@@ -985,10 +1008,6 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   advanced フィルタとして選択・パラメータ調整はできる。live GPU 描画・専用 UI の
   拡張は個別 Issue（#59 等）で順次対応する。運動障害・認知障害は非目標
   （`README.md`「やらないこと（非目標）」参照）
-- **クリップボードからの画像貼り付け**（#78）: ファイル選択・ドラッグ＆
-  ドロップは実装済みだが、クリップボード貼り付け（`pasteboard`/
-  `super_clipboard` 等）は依存の重さ・スコープの見合いから後続 Issue に
-  分離した
 - **depth_aware_blur の配線**（#78 着手コメント参照）: `depth_landscape` の
   深度マップ（`assets/samples/depth_landscape_depth.png`）は素材として同梱
   済みだが、sensus の `depth_aware_blur`（近視/遠視/老視を距離依存のぼけで
