@@ -79,9 +79,7 @@ void main() {
       expect(rgba8.length, image.width * image.height * 4);
     });
 
-    test(
-        '透過ピクセル（alpha=128 の既知の色）を含む往復で straight alpha が保たれる',
-        () async {
+    test('透過ピクセル（alpha=128 の既知の色）を含む往復で straight alpha が保たれる', () async {
       // 1x1 の半透明ピクセル。straight alpha 前提で描画する: Canvas に
       // Paint(color) で塗ると Skia は不透明色×アルファのブレンドで
       // 内部的に premultiply して合成するため、ここでは
@@ -191,6 +189,46 @@ void main() {
         1.0,
       );
       expect(called, isTrue);
+    });
+  });
+
+  group('pipelineApplier seam（複数ステップ、#118）', () {
+    tearDown(() {
+      CpuVisionRenderer.pipelineApplier = CpuVisionRenderer.applyPipeline;
+    });
+
+    test('既定値は CpuVisionRenderer.applyPipeline 自身で、単一版の seam とは独立', () {
+      expect(CpuVisionRenderer.pipelineApplier,
+          same(CpuVisionRenderer.applyPipeline));
+      expect(CpuVisionRenderer.applier, same(CpuVisionRenderer.apply));
+    });
+
+    test('フェイクへ差し替えると、渡したステップ列が順序・強度・payload ごとそのまま届く', () async {
+      ui.Image? gotSource;
+      List<VisionStep>? gotSteps;
+      CpuVisionRenderer.pipelineApplier = (source, steps) async {
+        gotSource = source;
+        gotSteps = steps;
+        return source;
+      };
+
+      final dummy = await decodeFile('test/golden/protanopia_input.png');
+      addTearDown(dummy.dispose);
+      const steps = [
+        VisionStep(filter: VisionFilter.myopia(), strength: 0.8),
+        VisionStep(
+          filter: VisionFilter.astigmatism(axisDeg: 30),
+          strength: 0.4,
+        ),
+        VisionStep(filter: VisionFilter.protanopia(), strength: 1.0),
+      ];
+      final out = await CpuVisionRenderer.pipelineApplier(dummy, steps);
+
+      expect(identical(out, dummy), isTrue);
+      expect(identical(gotSource, dummy), isTrue);
+      expect(gotSteps, equals(steps),
+          reason: '並び順（myopia → astigmatism → protanopia）と強度・payload を保つ');
+      expect(gotSteps![1].filter, const VisionFilter.astigmatism(axisDeg: 30));
     });
   });
 }
