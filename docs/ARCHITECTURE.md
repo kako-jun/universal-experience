@@ -867,15 +867,22 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   ディスクへの保存や外部送信は一切しない（#78）。
   **クリップボード貼り付け（#97）**は同じ正本に流し込む別の入口:
   「貼り付け」ボタンと `Cmd/Ctrl+V`（後述）はどちらも
-  `pasteUserImageFromClipboard`（`ClipboardImageReader.readImageBytes()` →
-  50MB 超は専用文言で拒否 → `decodeUserImageBytes` → `setUserImage`）を通る。
+  `pasteUserImageFromClipboard`（`ClipboardImageReader.read()` →
+  画像データなら 50MB 超は専用文言で拒否 → `decodeUserImageBytes` → `setUserImage`）を通る。
+  実行中の再入は無視する（in-flight ガード。キーのリピートは `includeRepeats: false` でも弾く）。
   クリップボード取得は `lib/services/clipboard_image_reader.dart` の
-  `ClipboardImageReader`（interface）に切り出してあり、本番実装は `pasteboard`
-  パッケージ（macOS: NSPasteboard、Linux: GtkClipboard。どちらも PNG バイト列を
-  返す）、テストは `clipboardImageReader` をフェイクへ差し替える。失敗は 4 種
+  `ClipboardImageReader`（interface。`read()` が `ClipboardContent` =
+  画像なし / 画像データ / 画像ファイルのパス を返す）に切り出してあり、本番実装は
+  `pasteboard` パッケージ（macOS: NSPasteboard、Linux: GtkClipboard。画像は PNG
+  バイト列）、テストは `clipboardImageReader` をフェイクへ差し替える。
+  **ファイルを先に見る**（`resolveClipboardContent`）: ファイラでファイルをコピーすると
+  OS がアイコン画像も載せるため、画像拡張子のファイルがあれば先頭 1 枚を
+  `loadUserImageFile`（選択・ドロップと同じ経路）に回し、画像でないファイルだけなら
+  画像データへ進まず「画像なし」にする。失敗は 4 種
   （画像なし `imageSourcePasteNoImage` / 巨大 `imageSourcePasteTooLarge` /
   デコード不能 `imageSourcePasteUnsupported` / 読み取り失敗
-  `imageSourcePasteFailed`）を SnackBar で示し、`ImageSourceState` には触れない。
+  `imageSourcePasteFailed`）を SnackBar で示し、`ImageSourceState` には触れない
+  （ファイル経路の失敗は `loadUserImageFile` の文言）。
   依存に `pasteboard` を選んだ理由は `docs/adr/2026-09-30-clipboard-image-paste.md`
 - `WelcomeBanner`（`lib/ui/widgets/welcome_banner.dart`）: 初回起動時だけ出す
   案内バナー（#78）。表示条件・恒久的な非表示は `SettingsService.

@@ -22,12 +22,22 @@ Flutter 標準の `Clipboard` はテキストしか扱えないため、画像�
 2. 取得は `ClipboardImageReader`（interface、`lib/services/clipboard_image_reader.dart`）の
    背後に置く。既存の `pickImageFile`（#78）と同じ seam パターンで、テストは
    `clipboardImageReader` をフェイクに差し替える。プラグインは素の `flutter test` では動かない。
-3. 読み込んだバイト列は、ファイル選択と同じ `decodeUserImageBytes`（長辺 2048px に縮小しながら
+3. **ファイルを先に見る**。`ClipboardImageReader.read()` は `Pasteboard.files` を先に読み、
+   画像拡張子（png/jpg/jpeg/gif/bmp/webp）のファイルがあれば先頭の 1 枚を `ClipboardImageFile`
+   として返し、選択・ドロップと同じ `loadUserImageFile`（50MB の事前判定付き）に回す。
+   画像でないファイルだけがコピーされているときは、画像データ取得へ進まず「画像なし」にする。
+   ファイラでファイルをコピーすると、OS がファイルのアイコン画像も一緒に載せることがある
+   （macOS の Finder はファイル URL とアイコンの TIFF）。先に画像データを見ると、画像ファイルの
+   中身ではなくアイコンを貼り付けてしまうため。判定は純粋関数 `resolveClipboardContent` に切り出して
+   テストする。
+4. 画像データのバイト列は、ファイル選択と同じ `decodeUserImageBytes`（長辺 2048px に縮小しながら
    デコード）を経て `ImageSourceState.setUserImage` に渡す。原画の正本は増やさない。
    サイズ上限は 50MB（ファイルと同じ）で、デコード前に判定する。
-4. 入口は「貼り付け」ボタンと `Cmd+V`（macOS）/ `Ctrl+V`。キー操作はテキスト入力にフォーカスが
-   あるときだけ奪わない（DESIGN.md §6.3）。
-5. 失敗は SnackBar で 4 種に分けて示す（画像なし / 大きすぎる / 読めない形式 / 読み取り失敗）。
+5. 入口は「貼り付け」ボタンと `Cmd+V`（macOS）/ `Ctrl+V`。キー操作はテキスト入力にフォーカスが
+   あるときだけ奪わない（DESIGN.md §6.3）。キーの押しっぱなし（リピート）は無視し
+   （`includeRepeats: false`）、貼り付けの実行中に再度呼ばれても無視する（in-flight ガード、
+   例外でも解除）。
+6. 失敗は SnackBar で 4 種に分けて示す（画像なし / 大きすぎる / 読めない形式 / 読み取り失敗）。
    失敗しても現在の原画は変えない。
 
 ## 代替案
@@ -54,6 +64,21 @@ Flutter 標準の `Clipboard` はテキストしか扱えないため、画像�
 
 ## 結果・トレードオフ
 
+- **ライセンス**: `pasteboard` は Apache-2.0。MIT の本アプリで使用でき、配布物のライセンス表示は
+  Flutter の `LicenseRegistry`（`showLicensePage`）が pub パッケージの LICENSE を集めるので含まれる。
+- **既知の上流問題（Linux のメモリリーク）**: `pasteboard` 0.5.0 の Linux 実装
+  （`linux/pasteboard_plugin.cc`、`clipboard_request_image_callback`）は、
+  `gdk_pixbuf_save_to_buffer` が確保した `buffer` を Flutter へ渡した後に `g_free` せず、
+  エラー時の `GError` も `g_error_free` しない。画像を貼り付けるたびに PNG 1 枚分のメモリが
+  解放されない（プロセス終了まで残る）。当アプリ側では回避できない（プラグイン内部の確保のため）。
+  上流への起票は第三者への公開行為なので行っていない（起票用の文案は Issue #97 のコメントにある。起票するかは
+  kako-jun の判断）。macOS の実装は Swift で、同種の手動解放の漏れはコード上にない。
+- **ファイルのコピー経路は実機未確認**: `Pasteboard.files` が Finder（macOS）・Nautilus 等（Linux）で
+  実際にどう返るか（macOS は Finder が載せるアイコンの TIFF を避けられるか、Linux は URI のみの
+  クリップボードからパスを取れるか）は、コード上の想定であり実機で確認していない。実機確認が要る。
+- **macOS のプライバシー警告は実機未確認**: 新しい macOS には、他アプリのクリップボードを
+  プログラムが読むときに確認を出す仕組み（「他のアプリからのペーストを許可」）がある。本アプリの
+  貼り付けボタン・Cmd+V で警告が出るか、出た場合の文言と挙動は実機でしか確認できない。
 - `pasteboard` は PNG を返すため、元のクリップボードの形式（JPEG 等）は保たれず、
   一度 PNG に変換された分だけバイト数が増えうる。上限 50MB は変換後のバイト列に対して判定する。
 - Linux では GTK のクリップボード経由のため、Wayland のみの環境での挙動はヘッドレス開発環境では
