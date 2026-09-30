@@ -92,6 +92,20 @@ VisionLayerResult toggleColorVision(
   return result;
 }
 
+/// 体験プリセットを選ぶ入口（#120）。[VisionFilterState.selectPreset] は層の集合をそのプリセット
+/// 単体へ置き換えるので、色覚クイック選択の層は無くなる。呼んだあと [FilterService] を層の集合へ
+/// 合わせる（[syncFilterServiceWithLayers]）ので、`settings.filterType`・トレイに「いま無い色覚」が
+/// 残らない。
+void selectExperiencePreset(
+  FilterService filterService,
+  VisionFilterState visionState,
+  String presetId,
+  String catalogId,
+) {
+  visionState.selectPreset(presetId, catalogId);
+  syncFilterServiceWithLayers(filterService, visionState);
+}
+
 /// [FilterService] の色覚型（`currentFilter`）を、[visionState] の層の集合に合わせる（#120）。
 ///
 /// 色覚クイック選択（origin が quick）の層があればその型、無ければ none。色覚グループは

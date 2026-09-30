@@ -111,12 +111,14 @@ class HomeScreenHarness {
     required this.visionState,
     required this.loupe,
     required this.imageSource,
+    required this.settings,
   });
 
   final FilterService filterService;
   final VisionFilterState visionState;
   final LoupeWindowController loupe;
   final ImageSourceState imageSource;
+  final SettingsService settings;
 }
 
 /// [size]（論理ピクセル）のウィンドウで [HomeScreen] を組む。何も選択していない
@@ -176,5 +178,6 @@ Future<HomeScreenHarness> pumpHomeScreen(
     visionState: visionState,
     loupe: loupe,
     imageSource: imageSource,
+    settings: settings,
   );
 }

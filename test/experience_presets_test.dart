@@ -5,7 +5,8 @@
 // 1. 4 プリセットが i18n 名で一覧に描画される。
 // 2. タップで VisionFilterState.selectedId が対応 catalog id・selectedPresetId が
 //    experience id になる（meniere→vertigo / bppv→bppv_rotation）。色覚
-//    FilterService は変更しない（#60: deactivate() は呼ばない）。
+//    FilterService は、置き換えで無くなる色覚クイック選択の層に合わせて none へ
+//    導き直す（#120。settings.filterType に「いま無い色覚」を残さない）。
 // 3. 選んだあと右カラムに、urgency=emergency（vestibular_neuritis）で緊急受診、
 //    earlyConsultation（meniere）で早期受診メッセージ、none（bppv）では受診喚起が
 //    出ない。選ぶまでは何も出ない。
@@ -26,6 +27,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
@@ -145,13 +147,14 @@ void main() {
   });
 
   testWidgets(
-      'meniere タップで vision=vertigo・selectedPresetId=meniere を選択する'
-      '（色覚 FilterService は変更しない、#60）', (tester) async {
+      'meniere タップで vision=vertigo・selectedPresetId=meniere を選択し、'
+      '層が無くなる色覚クイック選択は FilterService からも外れる（#120）', (tester) async {
     await pumpPresets(tester, const Locale('en'));
 
-    // 事前に色覚フィルタを有効化しておく。プリセット適用で解除されないことを
-    // 確認する（#60: FilterService.deactivate() は呼ばない）。
-    filterService.applyFilter(ColorVisionType.protanopia);
+    // 事前に色覚クイック選択を有効化しておく。プリセットは層の集合を置き換える
+    // ので、色覚の層ごと外れる。FilterService（settings.filterType・トレイの読み口）に
+    // 「いま無い色覚」が残らないよう、層の集合から導いた none になる。
+    selectColorVision(filterService, visionState, ColorVisionType.protanopia);
     expect(filterService.currentFilter, ColorVisionType.protanopia);
 
     await tester.tap(find.byKey(experienceCardKey('meniere')));
@@ -160,8 +163,8 @@ void main() {
     expect(visionState.selectedId, 'vertigo');
     expect(visionState.selectedPresetId, 'meniere');
     expect(visionState.isColorQuickSelection, isFalse);
-    expect(filterService.currentFilter, ColorVisionType.protanopia,
-        reason: 'プリセット適用は色覚クイック選択の状態に干渉しない');
+    expect(filterService.currentFilter, ColorVisionType.none,
+        reason: 'プリセットが層の集合を置き換えたので、色覚の層はもう無い');
   });
 
   testWidgets('bppv タップで vision=bppv_rotation・selectedPresetId=bppv を選択する',

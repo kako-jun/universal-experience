@@ -431,8 +431,11 @@ optics に置く。）
   - **暫定の 2 点を入れた**: 複数層のとき PNG 書き出しを無効にして理由を表示する（#121 で解除）。
     「2×2 で比較」は層集合がちょうど色覚 1 層のときだけ出す（#122 で解除）。
   - **`FilterService` との同期**（第 3 段の「既知の制約」）は `syncFilterServiceWithLayers` に決めた。
-    UI の足し引きの後に、色覚クイック選択（origin が quick）の層があればその型、無ければ none へ
-    `FilterService.currentFilter` を合わせる。トレイ・`settings.filterType` はこれを読む。
+    UI の足し引き・プリセット選択（`selectExperiencePreset`）の後に、色覚クイック選択（origin が quick）の
+    層があればその型、無ければ none へ `FilterService.currentFilter` を合わせる。トレイ・
+    `settings.filterType` はこれを読む。プリセットは層の集合を置き換えるので、直前の色覚クイック選択は
+    同期で none になり、`settings.filterType` に「いま無い色覚」は残らない。起動時の復元も、復元した層の
+    集合全体から同じ関数で導く（フォーカス層だけは見ない）。
   - トレイのチェック式への拡張は #121 のまま。
 
 **#120〜#122 の間の暫定挙動**（この間の退行を防ぐための取り決め）:
