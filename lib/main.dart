@@ -14,6 +14,7 @@ import 'l10n/locale_resolution.dart';
 import 'models/disability_type.dart';
 import 'models/sample_catalog.dart';
 import 'services/color_vision_selection.dart';
+import 'services/experience_source.dart' show isValidExperiencePreset;
 import 'services/filter_service.dart';
 import 'services/image_source_state.dart';
 import 'services/vision_filter_state.dart';
@@ -24,6 +25,7 @@ import 'services/tray_locale_sync.dart';
 import 'services/tray_service.dart';
 import 'services/native_bridge_service.dart';
 import 'services/settings_service.dart';
+import 'services/vision_filter_store.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/theme/app_theme.dart';
 import 'ui/widgets/loupe_hud.dart';
@@ -44,6 +46,11 @@ final FilterService filterService = FilterService();
 /// `lib/services/color_vision_selection.dart` の `selectColorVision` を経由して
 /// 同じインスタンスを更新する必要があるため（#60）。
 final VisionFilterState visionFilterState = VisionFilterState();
+
+/// [visionFilterState]（選んだフィルタ・payload・強度）の永続化（#65）。
+/// [buildRootApp] が復元して購読を張り、終了シーケンス（トレイの終了・ウィンドウ
+/// クローズ・`onExitRequested`）で [VisionFilterStore.flush] する。
+final VisionFilterStore visionFilterStore = VisionFilterStore();
 
 /// ホットキー「押している間だけ原画」（#63）用の bypass holder トークン
 /// （#79）。`VisionFilterState.acquireBypass`/`releaseBypass` は入力元ごとに
@@ -137,6 +144,7 @@ TrayService _buildTrayService(SettingsService settings) {
       // デバウンス中の intensity 永続化（#57）を、実タイマーの発火を待たず
       // 確定させてから終了する（待たないと直近のスライダー操作が失われうる）。
       await filterService.flush();
+      await visionFilterStore.flush();
       // トレイアイコンを破棄し、prevent-close を解除してから実際に終了する。
       await trayService.dispose();
       await hotkeyService.dispose();
@@ -175,11 +183,15 @@ TrayService _buildTrayService(SettingsService settings) {
 ///   `FilterService` 自身の永続化ストアから復元する（`settings.intensity` は
 ///   #57 で撤去済み。旧キーからの移行はしない）。
 ///
+/// - 続けて [VisionFilterStore]（#65）が前回の選択・payload・強度を復元する
+///   （[store] 未指定ならトップレベルの [visionFilterStore]）。
+///
 /// windowManager / trayService の初期化はここでは行わない。それらは
 /// `main()` 内に閉じたままにする（test/widget_test.dart のコメント参照）。
 Future<({Widget app, bool bridgeReady})> buildRootApp({
   Future<bool> Function() initBridge = initNativeBridge,
   SettingsService? settings,
+  VisionFilterStore? store,
 }) async {
   if (!await initBridge()) {
     return (app: const NativeBridgeErrorApp(), bridgeReady: false);
@@ -193,7 +205,7 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
 
   // Restore the shared FilterService's (#15) own per-type intensity store
   // (#57) before seeding it with the restored filter type. The old
-  // single-value key (if any leftover on disk) is not migrated (M1 review):
+  // single-value key (if any leftover on disk) is not migrated:
   // the app is pre-release, so there are no existing users to preserve it
   // for; load() just deletes it.
   await filterService.load();
@@ -219,6 +231,21 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
     await s.setFilterType(seedType);
   }
 
+  // #65: 前回の選択・payload・強度を復元し、以後の変更の保存を始める。上の
+  // 色覚シードの**後**に行い、保存があればそちらを優先する（advanced /
+  // 体験プリセット / 色覚クイック選択のいずれで終了しても、その選択のまま起動
+  // する）。保存が無い・壊れている・カタログと合わない部分は既定値に落ち、
+  // 起動は止まらない。色覚クイック選択に戻した場合は、トレイとウィンドウ内 UI の
+  // 両方が見る filterService も同じ型に合わせる。
+  final restored = await (store ?? visionFilterStore).restoreAndBind(
+    visionFilterState,
+    isValidPreset: isValidExperiencePreset,
+  );
+  final restoredColorType = visionFilterState.colorVisionType;
+  if (restored && restoredColorType != null) {
+    filterService.applyFilter(restoredColorType);
+  }
+
   // #78: seed the initial sample from the just-restored/seeded filter
   // selection's recommendation, so the preview never starts on a sample that
   // doesn't match the selected filter. followRecommendedSample (not
@@ -241,6 +268,7 @@ void main() async {
   appLifecycleListener = AppLifecycleListener(
     onExitRequested: () async {
       await filterService.flush();
+      await visionFilterStore.flush();
       return AppExitResponse.exit;
     },
   );
@@ -408,6 +436,7 @@ Future<void> _setUpTray() async {
         // ウィンドウを閉じずに固まらないよう、実際の終了は finally で行う。
         try {
           await filterService.flush();
+          await visionFilterStore.flush();
         } finally {
           await windowManager.setPreventClose(false);
           await windowManager.destroy();

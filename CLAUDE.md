@@ -35,6 +35,8 @@ lib/
 │   ├── color_vision_selection.dart  # 色覚クイック選択の唯一の入口（FilterService/
 │   │                                 # VisionFilterState を同時更新、#60）
 │   ├── export_service.dart          # PNG エクスポート（メタ焼き込み・Downloads へ非上書き保存・フォルダで表示、#43/#64）
+│   ├── experience_source.dart       # 体験プリセットの供給源 seam・availableExperiences・
+│   │                                 # isValidExperiencePreset（永続化した選択の検証、#65）
 │   ├── filter_list_selection.dart   # 統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行）の
 │   │                                 # 検索・選択入口・↑↓ の順送りの純粋ロジック（#72）
 │   ├── filter_service.dart          # 選択状態モデル（sensus VisionFilter へのマッピング）
@@ -46,8 +48,14 @@ lib/
 │   ├── native_bridge_service.dart   # flutter_rust_bridge（sensus-core）の bootstrap 初期化
 │   ├── preview_selection.dart       # プレビュー強度の出どころを一本化する判定（#60/#63）
 │   ├── settings_service.dart        # isFirstRun/welcomeBannerDismissed も持つ（#78）
-│   ├── tray_service.dart            # タスクトレイ（updateLocalization で文言を差し替える、#82）
+│   ├── tray_menu_labels.dart        # トレイの i18n 解決済み文言 TrayMenuLabels・クイック色覚一覧（#65）
+│   ├── tray_service.dart            # タスクトレイ（updateLocalization で文言を差し替える #82・
+│   │                                 # カテゴリ別「高度なフィルタ」サブメニューで UI と双方向同期 #65）
 │   ├── tray_locale_sync.dart        # 言語の選択/OS ロケール変更をトレイの文言へ橋渡し（#82）
+│   ├── vision_filter_snapshot.dart  # 選択・payload・強度の永続 JSON（版つき）と、カタログ定義に
+│   │                                 # 照らした補正 sanitizeVisionParams（#65）
+│   ├── vision_filter_store.dart     # VisionFilterState の SharedPreferences 永続化・起動時復元・
+│   │                                 # 300ms デバウンス・flush（#65）
 │   ├── vision_filter_metadata.dart  # urgency/urgency_escalation/recommended_strength の
 │   │                                 # provider seam（sensus ブリッジが唯一の正本、#76/#77）
 │   └── vision_filter_state.dart     # フィルタ id ごとの強度・パラメータの記憶（#77）
@@ -101,6 +109,10 @@ test/
 ├── clipboard_paste_test.dart       # クリップボード画像の貼り付け経路・失敗 5 種・Cmd/Ctrl+V・ボタン（#97）
 ├── language_dialog_test.dart       # 言語ピッカー: 切替で追従・永続化・自称名の網羅と読み上げ言語・画面とトレイの言語一致（#82）
 ├── tray_locale_sync_test.dart      # 言語の選択/OS ロケール変更でトレイの文言が更新される（#82）
+├── tray_advanced_filters_test.dart # トレイの「高度なフィルタ」サブメニュー: 構造・チェック・クリック→状態・UI との双方向同期・言語追従・click-through 不干渉（#65）
+├── vision_filter_snapshot_test.dart # 永続 JSON の往復・壊れた値/未知 id/範囲外/旧形式のフォールバック（#65）
+├── vision_filter_store_test.dart   # 永続化ストアと VisionFilterState.snapshot/restore（#65）
+├── vision_filter_persistence_app_test.dart # 実アプリ（buildRootApp）を作り直して選択が復元される（#65）
 ├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品
 ├── support/screenshot_harness.dart # スクリーンショット用フォント読込・PNG 書出し（フォントはコミットしない）
 └── ui_screenshots/                 # HomeScreen の PNG 書出し。`UE_SCREENSHOTS=1` のときだけ実行（DESIGN.md §8）

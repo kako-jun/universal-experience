@@ -5,10 +5,15 @@ import 'package:flutter/foundation.dart';
 import 'package:tray_manager/tray_manager.dart';
 
 import '../models/disability_type.dart';
+import '../models/vision_filter_catalog.dart';
 import 'color_vision_selection.dart';
+import 'filter_list_selection.dart';
 import 'filter_service.dart';
 import 'loupe_window_controller.dart';
+import 'tray_menu_labels.dart';
 import 'vision_filter_state.dart';
+
+export 'tray_menu_labels.dart';
 
 /// タスクトレイ常駐 (#15)。
 ///
@@ -84,6 +89,14 @@ enum TrayMenuKind {
   /// フィルタ解除。
   clearFilter,
 
+  /// 「高度なフィルタ」サブメニュー（カテゴリ別、#65）。[TrayMenuEntry.children]
+  /// にカテゴリのサブメニュー（同じく [submenu]）、その中に [applyListEntry]
+  /// 項目を持つ。自身はクリックできない。
+  submenu,
+
+  /// 統合フィルタ一覧（#72）の 1 行を選ぶ（#65）。
+  applyListEntry,
+
   /// メインウィンドウを表示して設定を開く。
   openSettings,
 
@@ -105,6 +118,8 @@ class TrayMenuEntry {
     this.key,
     this.label,
     this.colorVisionType,
+    this.listEntryKey,
+    this.children = const [],
     this.checked = false,
   });
 
@@ -114,6 +129,8 @@ class TrayMenuEntry {
         key = null,
         label = null,
         colorVisionType = null,
+        listEntryKey = null,
+        children = const [],
         checked = false;
 
   final TrayMenuKind kind;
@@ -128,6 +145,13 @@ class TrayMenuEntry {
   /// それ以外は null。
   final ColorVisionType? colorVisionType;
 
+  /// [kind] が [TrayMenuKind.applyListEntry] のとき選ぶ統合一覧の行
+  /// （[FilterListEntry.key]）。それ以外は null。
+  final String? listEntryKey;
+
+  /// [kind] が [TrayMenuKind.submenu] のときの子項目。それ以外は空。
+  final List<TrayMenuEntry> children;
+
   /// チェック表示するか (アクティブなフィルタ / ルーペ表示状態の目印)。
   final bool checked;
 
@@ -138,86 +162,64 @@ class TrayMenuEntry {
       other.key == key &&
       other.label == label &&
       other.colorVisionType == colorVisionType &&
+      other.listEntryKey == listEntryKey &&
+      listEquals(other.children, children) &&
       other.checked == checked;
 
   @override
-  int get hashCode => Object.hash(kind, key, label, colorVisionType, checked);
+  int get hashCode => Object.hash(kind, key, label, colorVisionType,
+      listEntryKey, Object.hashAll(children), checked);
 
   @override
   String toString() => 'TrayMenuEntry(kind: $kind, key: $key, label: $label, '
-      'colorVisionType: $colorVisionType, checked: $checked)';
-}
-
-/// トレイから直接ワンクリック切替できる色覚フィルタの一覧。
-///
-/// 全フィルタ catalogue は設定 UI (#16) にある。トレイはメニューを短く保つため
-/// よく使う色覚シミュレーションのみを出す。
-/// [ColorVisionType.none] は「フィルタ解除」項目が担うため意図的に除外する。
-List<ColorVisionType> quickColorVisionFilters() => const <ColorVisionType>[
-      ColorVisionType.protanopia,
-      ColorVisionType.deuteranopia,
-      ColorVisionType.tritanopia,
-      ColorVisionType.achromatopsia,
-    ];
-
-/// トレイメニューの表示文言を 1 つにまとめた値オブジェクト (#18)。
-///
-/// 純粋データ層 ([buildTrayMenuSpec]) は **文言を自前で持たない**。i18n の解決は
-/// UI/副作用層 ([TrayService]) の責務で、起動時ロケールの `AppLocalizations` から
-/// 文字列を取り出してここに詰めて渡す（context を持てないトレイ層の作法）。
-/// color-vision フィルタのラベルは id ごとに [filterLabels] で引く。
-@immutable
-class TrayMenuLabels {
-  const TrayMenuLabels({
-    required this.showLoupe,
-    required this.hideLoupe,
-    required this.clearFilter,
-    required this.openSettings,
-    required this.quit,
-    required this.filterLabels,
-    required this.appModeLoupeLabel,
-    required this.alwaysOnTopLabel,
-    required this.clickThroughLabel,
-  });
-
-  /// ルーペ窓を表示する項目のラベル（非表示状態のトグルに使う）。
-  final String showLoupe;
-
-  /// ルーペ窓を隠す項目のラベル（表示状態のトグルに使う）。
-  final String hideLoupe;
-
-  /// フィルタ解除項目のラベル。
-  final String clearFilter;
-
-  /// 起動モード切替項目のラベル（`WindowModePanel` の「ルーペモード」表記を
-  /// 再利用、#63）。
-  final String appModeLoupeLabel;
-
-  /// 最前面固定切替項目のラベル（`WindowModePanel` と同じ ARB キーを再利用、#63）。
-  final String alwaysOnTopLabel;
-
-  /// クリックスルー切替項目のラベル（`WindowModePanel` と同じ ARB キーを再利用、#63）。
-  final String clickThroughLabel;
-
-  /// 設定を開く項目のラベル。
-  final String openSettings;
-
-  /// 終了項目のラベル。
-  final String quit;
-
-  /// color-vision id → 表示ラベル。[quickColorVisionFilters] の各型をカバーする。
-  final Map<ColorVisionType, String> filterLabels;
-
-  /// ルーペ窓トグルのラベルを表示状態に応じて返す。
-  String toggleLabel({required bool loupeVisible}) =>
-      loupeVisible ? hideLoupe : showLoupe;
-
-  /// 指定 color-vision 型のラベル（未登録なら id をフォールバック表示）。
-  String filterLabel(ColorVisionType type) => filterLabels[type] ?? type.id;
+      'colorVisionType: $colorVisionType, listEntryKey: $listEntryKey, '
+      'children: $children, checked: $checked)';
 }
 
 /// 色覚フィルタ項目の安定キー (フィルタ id から導出)。
 String colorVisionEntryKey(ColorVisionType type) => 'filter_${type.id}';
+
+/// 「高度なフィルタ」サブメニュー（#65）のカテゴリ項目・一覧項目の安定キー。
+String categorySubmenuKey(VisionFilterCategory category) =>
+    'category_${category.name}';
+String listEntryMenuKey(FilterListEntry entry) => 'list_${entry.key}';
+
+/// 「高度なフィルタ」サブメニュー（#65）を純粋データとして組み立てる。
+///
+/// カテゴリごとのサブメニューに、統合フィルタ一覧（[kFilterListEntries]）の行を
+/// 並べる。[selected]（`selectedFilterListEntry` の結果）の行にチェックを付ける。
+TrayMenuEntry buildAdvancedFiltersSubmenu({
+  required TrayMenuLabels labels,
+  FilterListEntry? selected,
+}) {
+  return TrayMenuEntry(
+    kind: TrayMenuKind.submenu,
+    key: kAdvancedFiltersKey,
+    label: labels.advancedFilters,
+    children: [
+      for (final category in VisionFilterCategory.values)
+        TrayMenuEntry(
+          kind: TrayMenuKind.submenu,
+          key: categorySubmenuKey(category),
+          label: labels.categoryLabel(category),
+          children: [
+            for (final e in kFilterListEntries)
+              if (e.category == category)
+                TrayMenuEntry(
+                  kind: TrayMenuKind.applyListEntry,
+                  key: listEntryMenuKey(e),
+                  label: labels.listEntryLabel(
+                    catalogId: e.catalogId,
+                    colorVisionType: e.colorVisionType,
+                  ),
+                  listEntryKey: e.key,
+                  checked: e == selected,
+                ),
+          ],
+        ),
+    ],
+  );
+}
 
 // フィルタ以外の項目の安定キー。
 const String kToggleLoupeKey = 'toggle_loupe';
@@ -225,6 +227,7 @@ const String kToggleAppModeKey = 'toggle_app_mode';
 const String kToggleAlwaysOnTopKey = 'toggle_always_on_top';
 const String kToggleClickThroughKey = 'toggle_click_through';
 const String kClearFilterKey = 'clear_filter';
+const String kAdvancedFiltersKey = 'advanced_filters';
 const String kOpenSettingsKey = 'open_settings';
 const String kQuitKey = 'quit';
 
@@ -233,7 +236,10 @@ const String kQuitKey = 'quit';
 /// [loupeVisible] がトグルのラベルを、[activeFilter] がアクティブな
 /// クイックフィルタへのチェック表示を制御する。[appMode]/[alwaysOnTop]/
 /// [clickThrough] は起動モード・最前面・クリックスルーのチェック表示を制御する
-/// （#63、UI とトレイの両方から切り替えられる受け入れ条件）。表示文言は
+/// （#63、UI とトレイの両方から切り替えられる受け入れ条件）。[selectedListEntry]
+/// は「高度なフィルタ」サブメニュー（#65）でチェックする一覧の行、
+/// [advancedSelected] は色覚クイック選択以外（advanced・プリセット）が選ばれて
+/// いるか（そのとき「フィルタを解除」はチェックしない）。表示文言は
 /// 呼び出し側が i18n 解決して [labels] で渡す（純粋層は文言を持たない: #18）。
 List<TrayMenuEntry> buildTrayMenuSpec({
   required bool loupeVisible,
@@ -242,6 +248,8 @@ List<TrayMenuEntry> buildTrayMenuSpec({
   required bool alwaysOnTop,
   required bool clickThrough,
   ColorVisionType activeFilter = ColorVisionType.none,
+  FilterListEntry? selectedListEntry,
+  bool advancedSelected = false,
 }) {
   return <TrayMenuEntry>[
     TrayMenuEntry(
@@ -278,11 +286,12 @@ List<TrayMenuEntry> buildTrayMenuSpec({
         colorVisionType: f,
         checked: f == activeFilter,
       ),
+    buildAdvancedFiltersSubmenu(labels: labels, selected: selectedListEntry),
     TrayMenuEntry(
       kind: TrayMenuKind.clearFilter,
       key: kClearFilterKey,
       label: labels.clearFilter,
-      checked: activeFilter == ColorVisionType.none,
+      checked: activeFilter == ColorVisionType.none && !advancedSelected,
     ),
     const TrayMenuEntry.separator(),
     TrayMenuEntry(
@@ -468,29 +477,55 @@ class TrayService with TrayListener {
   }
 
   Future<void> _rebuildMenu() async {
+    // チェックはすべて VisionFilterState から決める（ウィンドウ内 UI の選択が
+    // そのままトレイに出る、#65）。一覧の選択行は統合一覧（FilterBrowser）と同じ
+    // 判定なので、色覚 base 型（protanopia 等）を高度なフィルタ側から選んだ場合も、
+    // 一覧と同じくトップレベルの同名項目に点灯する。プリセット選択中は一覧の行が
+    // 無い（null）ので、何もチェックしない（トレイにプリセットは出さない）。
+    final selectedEntry = selectedFilterListEntry(visionFilterState);
     final spec = buildTrayMenuSpec(
       loupeVisible: _loupeVisible,
       labels: _labels,
       appMode: loupeWindow.appMode,
       alwaysOnTop: loupeWindow.alwaysOnTop,
       clickThrough: loupeWindow.clickThrough,
-      // advanced/プリセットを選んでいる間は、色覚クイック選択のチェックマークを
-      // 出さない（#60。FilterBrowser 一覧の選択行の強調と同じ判定）。
-      activeFilter: visionFilterState.isColorQuickSelection
-          ? filterService.currentFilter
-          : ColorVisionType.none,
+      activeFilter: selectedEntry?.colorVisionType ?? ColorVisionType.none,
+      selectedListEntry: selectedEntry,
+      advancedSelected: visionFilterState.selectedId != null &&
+          !visionFilterState.isColorQuickSelection,
     );
+    // 変化が無いなら OS へ再送しない。スライダーのドラッグ中などに
+    // visionFilterState が連続通知されても、ネイティブメニューを作り直し続けない。
+    final last = _lastSpec;
+    if (last != null && listEquals(last, spec)) return;
+    // 送信の完了を待たずに「最後に送った構造」を更新する。完了後に更新すると、
+    // 送信中に A→B→A と変わったとき、最後の A が（まだ記録が古い A と等しいため）
+    // 送られず、ネイティブが B のまま残る。チャネルは送信順に処理される。
+    _lastSpec = spec;
     final menu = Menu(items: spec.map(_toMenuItem).toList());
     try {
       await trayManager.setContextMenu(menu);
     } catch (error) {
+      // 失敗した送信が最新なら、次の再構築で必ず再送させる（より新しい送信が
+      // すでに走っているなら、その記録を消さない）。
+      if (identical(_lastSpec, spec)) _lastSpec = null;
       debugPrint('TrayService.setContextMenu failed: $error');
     }
   }
 
+  /// 最後にネイティブへ送ったメニュー構造（[_rebuildMenu] の重複送信の抑止用）。
+  List<TrayMenuEntry>? _lastSpec;
+
   MenuItem _toMenuItem(TrayMenuEntry entry) {
     if (entry.kind == TrayMenuKind.separator) {
       return MenuItem.separator();
+    }
+    if (entry.kind == TrayMenuKind.submenu) {
+      return MenuItem.submenu(
+        key: entry.key,
+        label: entry.label ?? '',
+        submenu: Menu(items: entry.children.map(_toMenuItem).toList()),
+      );
     }
     if (entry.checked) {
       return MenuItem.checkbox(
@@ -508,6 +543,10 @@ class TrayService with TrayListener {
   }
 
   Future<void> _handleClick(TrayMenuEntry entry) async {
+    // ネイティブ側がクリックでチェック表示を先に反転させる環境でも、選択が
+    // 変わらないクリック（選択済みの行の再クリック等）で見た目が食い違わない
+    // よう、クリックの後は必ず構造を送り直す（[_rebuildMenu] の重複送信の抑止を外す）。
+    _lastSpec = null;
     switch (entry.kind) {
       case TrayMenuKind.toggleLoupe:
         await _toggleLoupe();
@@ -542,6 +581,17 @@ class TrayService with TrayListener {
         deactivateColorVision(filterService, visionFilterState);
         await refresh();
         break;
+      case TrayMenuKind.applyListEntry:
+        // ウィンドウ内の統合一覧と同じ入口（#72/#65）。フィルタの切替は
+        // loupeWindow（クリックスルー等、#63）に一切触れない。
+        final listEntry = _listEntryByKey(entry.listEntryKey);
+        if (listEntry != null) {
+          applyFilterListEntry(filterService, visionFilterState, listEntry);
+          await refresh();
+        }
+        break;
+      case TrayMenuKind.submenu:
+        break;
       case TrayMenuKind.openSettings:
         await onOpenSettings();
         _loupeVisible = true;
@@ -553,6 +603,14 @@ class TrayService with TrayListener {
       case TrayMenuKind.separator:
         break;
     }
+  }
+
+  static FilterListEntry? _listEntryByKey(String? key) {
+    if (key == null) return null;
+    for (final e in kFilterListEntries) {
+      if (e.key == key) return e;
+    }
+    return null;
   }
 
   /// トレイの「ルーペ窓を表示/隠す」と同じロジックをホットキーからも呼べるようにする (#63)。
@@ -596,6 +654,8 @@ class TrayService with TrayListener {
     filterService.removeListener(_onSelectionChanged);
     visionFilterState.removeListener(_onSelectionChanged);
     loupeWindow.removeListener(_onSelectionChanged);
+    // 破棄後の再 init で、同じ構造でも必ず送り直させる。
+    _lastSpec = null;
     if (!isTraySupportedPlatform) return;
     try {
       trayManager.removeListener(this);

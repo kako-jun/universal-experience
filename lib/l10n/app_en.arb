@@ -264,6 +264,10 @@
   "@trayQuit": {
     "description": "Tray menu item that quits the application."
   },
+  "trayAdvancedFilters": "Advanced filters",
+  "@trayAdvancedFilters": {
+    "description": "Tray submenu title that groups every filter by category (advanced filters and all color-vision types)."
+  },
 
   "filterNormalVision": "Normal vision",
   "@filterNormalVision": {
