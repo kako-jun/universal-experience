@@ -57,7 +57,7 @@ class FilterParamPanel extends StatelessWidget {
         final escalation = filter == null
             ? const <UrgencyEscalation>[]
             : visionFilterUrgencyEscalationProvider(filter);
-        // #76 レビュー M1: 喚起の解決は resolveConsultNotice 1 箇所に集約し、
+        // 喚起の解決は resolveConsultNotice 1 箇所に集約し、
         // 表示は ConsultNoticeBlock（プリセットカード・export と共有）に委ねる。
         final notice =
             noticeOverride ?? resolveConsultNotice(l10n, urgency, escalation);
@@ -256,10 +256,19 @@ class FilterParamPanel extends StatelessWidget {
       runSpacing: 4,
       children: [
         Text(label),
-        OutlinedButton.icon(
-          onPressed: () => state.randomizeSeed(param.name),
-          icon: const Icon(Icons.shuffle, size: 18),
-          label: Text(l10n.changePattern),
+        // 画面上の文言は短く「パターンを変える」だが、ボタンが複数並ぶ
+        // フィルタでどのパターンかを読み上げで区別できるよう、パラメータ名を
+        // 含むラベルを読ませる。
+        Semantics(
+          button: true,
+          label: l10n.changePatternFor(label),
+          excludeSemantics: true,
+          onTap: () => state.randomizeSeed(param.name),
+          child: OutlinedButton.icon(
+            onPressed: () => state.randomizeSeed(param.name),
+            icon: const Icon(Icons.shuffle, size: 16),
+            label: Text(l10n.changePattern),
+          ),
         ),
       ],
     );

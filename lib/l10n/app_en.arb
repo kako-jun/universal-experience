@@ -124,6 +124,28 @@
   "@provenanceEnglishOriginalNote": {
     "description": "Shown only when the UI language is not English: sensus supplies the citation and limitations text in English only, and ue does not translate medical wording (#80)."
   },
+  "provenanceAboutFilter": "The information below is about the \"{filter}\" filter.",
+  "@provenanceAboutFilter": {
+    "description": "Shown above the model/source and limitations rows when the heading is an experience preset, so it is clear which underlying filter the information is for (#80).",
+    "placeholders": {
+      "filter": {
+        "type": "String"
+      }
+    }
+  },
+  "changePatternFor": "Change pattern ({param})",
+  "@changePatternFor": {
+    "description": "Screen-reader label / tooltip of the seed button; names the parameter so that several buttons can be told apart (#80).",
+    "placeholders": {
+      "param": {
+        "type": "String"
+      }
+    }
+  },
+  "exportExperimentalNotice": "Experimental visualization",
+  "@exportExperimentalNotice": {
+    "description": "Second notice line burned into the exported PNG of an experimental filter (currently tetrachromacy), next to the simulation notice (#80). The set is VisionFilterEntry.isExperimental."
+  },
   "exportSimulationNotice": "Simulation (approximation)",
   "@exportSimulationNotice": {
     "description": "One line burned into every exported PNG caption so that the image is never mistaken for a real photo or a measurement (#80)."
@@ -381,7 +403,7 @@
   "categoryEyeStrain": "Eye strain",
   "categoryOther": "Other",
 
-  "paramAstigmatismAxisDeg": "Blur direction (deg)",
+  "paramAstigmatismAxisDeg": "Sharp direction (deg)",
   "paramGlaucomaMode": "Field-loss pattern",
   "paramGlaucomaModeVignette": "Vignette (peripheral)",
   "paramGlaucomaModeArcuateSuperior": "Arcuate (superior)",

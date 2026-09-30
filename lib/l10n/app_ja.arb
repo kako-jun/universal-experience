@@ -37,6 +37,9 @@
   "provenanceNoCitation": "このフィルタについて、sensus は出典を示していません。",
   "provenanceSourceNote": "シミュレーションライブラリ sensus のメタデータです。医療監修を受けたものではありません。",
   "provenanceEnglishOriginalNote": "sensus が英語で提供している原文を、そのまま表示しています。",
+  "provenanceAboutFilter": "以下は「{filter}」フィルタについての情報です。",
+  "changePatternFor": "パターンを変える（{param}）",
+  "exportExperimentalNotice": "実験的な可視化",
   "exportSimulationNotice": "シミュレーション（近似）",
 
   "prevalenceLabel": "有病率：{value}",
@@ -142,7 +145,7 @@
   "categoryEyeStrain": "眼精疲労",
   "categoryOther": "その他",
 
-  "paramAstigmatismAxisDeg": "ぼやけの向き（度）",
+  "paramAstigmatismAxisDeg": "くっきり見える向き（度）",
   "paramGlaucomaMode": "欠け方のタイプ",
   "paramGlaucomaModeVignette": "周辺（ビネット）",
   "paramGlaucomaModeArcuateSuperior": "弓状（上方）",

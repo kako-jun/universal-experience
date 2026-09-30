@@ -219,7 +219,14 @@ class _SelectedContent extends StatelessWidget {
         // 置き、それらの位置を動かさない。
         if (provenanceFilter != null) ...[
           const SizedBox(height: 16),
-          FilterProvenanceSection(filter: provenanceFilter),
+          FilterProvenanceSection(
+            filter: provenanceFilter,
+            // 体験プリセットの見出しは体験名なので、情報がどの視覚フィルタの
+            // ものかを添える。
+            filterName: experience == null
+                ? null
+                : visionFilterName(l10n, state.selectedId!),
+          ),
         ],
       ],
     );

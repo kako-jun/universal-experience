@@ -13,47 +13,80 @@ import '../../src/rust/api/sensus_bridge.dart';
 /// 既定では閉じ、強度・パラメータ・受診喚起の位置を動かさない。閉じた行も
 /// 48dp 以上の操作領域を持つ。
 ///
+/// 「医療監修を受けたものではありません」の一文は、どちらを開いていても
+/// 閉じていても読めるよう、折りたたみの外（最下段の区切り線の下）に 1 行だけ
+/// 常時出す。
+///
 /// **文言の正本は sensus のメタデータ**（`Filter::citation()` /
 /// `Filter::limitations()`、供給源は `vision_filter_metadata.dart`）。sensus は
 /// 英文しか返さず、医学的な文言を ue が訳すと誤情報になりうるので、原文のまま
-/// 出す（英語以外の UI では「原文をそのまま表示」と明記し、読み上げの言語も
-/// 英語にする）。有病率・症状の説明は sensus に無いので、ここでは扱わない。
+/// 出す（英語以外の UI では、出典・表現できないことのどちらにも「原文をそのまま
+/// 表示」と明記し、読み上げの言語も英語にする）。有病率・症状の説明は sensus に
+/// 無いので、ここでは扱わない。
 ///
-/// 出典が無い（`citation()` が null）フィルタは、無いことをそのまま書く
-/// （sensus は出典をでっち上げない方針。「出典なし」は情報である）。
+/// 出典が無い（`citation()` が null か空）フィルタは、無いことをそのまま書く
+/// （sensus は出典をでっち上げない方針。「出典なし」は情報である）。表現できない
+/// ことが空のときは、書かれていないことを「限界が無い」と読ませないよう、
+/// その折りたたみ自体を出さない。
 class FilterProvenanceSection extends StatelessWidget {
-  const FilterProvenanceSection({super.key, required this.filter});
+  const FilterProvenanceSection({
+    super.key,
+    required this.filter,
+    this.filterName,
+  });
 
   /// メタデータを引く対象（payload に依存しないので選択中の実インスタンスでよい）。
   final VisionFilter filter;
 
+  /// 出典・限界がどのフィルタについての情報かを見出しに明示するときの名前。
+  /// 体験プリセットは見出しが体験名で、情報は裏の視覚フィルタのものなので、
+  /// そのときだけ渡す（フィルタを直接選んだときは見出しと同じなので null）。
+  final String? filterName;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
     final citation = visionFilterCitationProvider(filter);
     final limitations = visionFilterLimitationsProvider(filter);
+    final hasLimitations = limitations.trim().isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (filterName != null) ...[
+          Text(
+            l10n.provenanceAboutFilter(filterName!),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         const Divider(height: 1),
         _ProvenanceTile(
           tileKey: const Key('provenance-model'),
           title: l10n.provenanceModelHeading,
           sensusText: citation,
           emptyText: l10n.provenanceNoCitation,
-          showEnglishNote: false,
-          showSourceNote: true,
         ),
+        if (hasLimitations) ...[
+          const Divider(height: 1),
+          _ProvenanceTile(
+            tileKey: const Key('provenance-limitations'),
+            title: l10n.provenanceLimitationsHeading,
+            sensusText: limitations,
+            emptyText: null,
+          ),
+        ],
         const Divider(height: 1),
-        _ProvenanceTile(
-          tileKey: const Key('provenance-limitations'),
-          title: l10n.provenanceLimitationsHeading,
-          sensusText: limitations,
-          emptyText: null,
-          showEnglishNote: true,
-          showSourceNote: false,
+        const SizedBox(height: 8),
+        Text(
+          l10n.provenanceSourceNote,
+          key: const Key('provenance-source-note'),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
-        const Divider(height: 1),
       ],
     );
   }
@@ -65,23 +98,14 @@ class _ProvenanceTile extends StatelessWidget {
     required this.title,
     required this.sensusText,
     required this.emptyText,
-    required this.showEnglishNote,
-    required this.showSourceNote,
   });
 
   final Key tileKey;
   final String title;
 
-  /// sensus の原文。null なら [emptyText] を出す。
+  /// sensus の原文。null か空なら [emptyText] を出す。
   final String? sensusText;
   final String? emptyText;
-
-  /// 英語以外の UI で「原文（英語）をそのまま表示」の注記を添えるか。
-  final bool showEnglishNote;
-
-  /// 「sensus のメタデータ・医療監修を受けていない」の注記を添えるか。同じ文が
-  /// 2 つ続かないよう、出典（モデルと出典）の側にだけ付ける。
-  final bool showSourceNote;
 
   @override
   Widget build(BuildContext context) {
@@ -90,6 +114,7 @@ class _ProvenanceTile extends StatelessWidget {
     final secondary = theme.colorScheme.onSurfaceVariant;
     final isEnglishUi = Localizations.localeOf(context).languageCode == 'en';
     final text = sensusText;
+    final hasText = text != null && text.trim().isNotEmpty;
     return ExpansionTile(
       key: tileKey,
       tilePadding: EdgeInsets.zero,
@@ -101,11 +126,12 @@ class _ProvenanceTile extends StatelessWidget {
       collapsedShape: const Border(),
       title: Text(title, style: theme.textTheme.titleSmall),
       children: [
-        if (text != null && text.isNotEmpty)
+        if (hasText)
           _SensusText(text: text, isEnglishUi: isEnglishUi)
         else if (emptyText != null)
           Text(emptyText!, style: theme.textTheme.bodyMedium),
-        if (text != null && text.isNotEmpty && showEnglishNote && !isEnglishUi)
+        // 原文は英語。英語以外の UI では出典側にも同じ注記を添える。
+        if (hasText && !isEnglishUi)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
@@ -113,13 +139,6 @@ class _ProvenanceTile extends StatelessWidget {
               style: theme.textTheme.bodySmall?.copyWith(color: secondary),
             ),
           ),
-        if (showSourceNote) ...[
-          const SizedBox(height: 8),
-          Text(
-            l10n.provenanceSourceNote,
-            style: theme.textTheme.bodySmall?.copyWith(color: secondary),
-          ),
-        ],
       ],
     );
   }

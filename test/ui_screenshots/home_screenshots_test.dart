@@ -167,6 +167,8 @@ void main() {
     double? strength,
     // true なら「モデルと出典」「表現できないこと」を両方開いて撮る（#80）。
     bool expandProvenance = false,
+    // 指定すると体験プリセット（[id, 対応するカタログ id]）を選ぶ（#80）。
+    (String, String)? preset,
   }) async {
     tester.view.physicalSize = Size(width, height);
     tester.view.devicePixelRatio = 1.0;
@@ -188,6 +190,7 @@ void main() {
       visionState.select(advancedFilterId);
       if (strength != null) visionState.setStrength(strength);
     }
+    if (preset != null) visionState.selectPreset(preset.$1, preset.$2);
     imageSourceState.followRecommendedSample(
       recommendedSampleIdForFilter(visionState.selectedId),
     );
@@ -381,6 +384,30 @@ void main() {
           locale: locale,
           suffix: '-explain-$tag',
           advancedFilterId: filterId,
+          expandProvenance: true,
+        );
+      },
+      skip: !screenshotsEnabled,
+    );
+  }
+
+  // 体験プリセット（見出しは体験名）。どの視覚フィルタの情報かを添える行の確認（#80）。
+  for (final (locale, dark) in const [('ja', false), ('en', true)]) {
+    testWidgets(
+      'screenshot wide/${dark ? 'dark' : 'light'}/$locale explanation meniere',
+      (tester) {
+        visionFilterCitationProvider = (_) => null;
+        visionFilterLimitationsProvider = (_) =>
+            'Layout-only sample text about what the simulation cannot show.';
+        return shoot(
+          tester,
+          widthLabel: 'wide',
+          width: 1280,
+          height: 1100,
+          dark: dark,
+          locale: locale,
+          suffix: '-explain-meniere',
+          preset: ('meniere', 'vertigo'),
           expandProvenance: true,
         );
       },
