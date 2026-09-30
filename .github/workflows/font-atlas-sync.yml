@@ -1,0 +1,73 @@
+name: Font atlas sync
+
+# tools/fonts/ のビットマップフォント（*.fnt / *.png）は tools/generate_font_atlases.py が
+# 固定した版の OFL フォントを取得（SHA-256 検証）して再生成する生成物（#99）。
+# スクリプトを変えたのにアトラスを再生成し忘れた、といった食い違いを検出する（#115）。
+#
+# Python + ネットワーク（raw.githubusercontent.com からのフォント取得）を使うので、
+# 通常の CI とは別ワークフローにし、対象ファイルが変わった push/PR と手動実行
+# （workflow_dispatch）のときだけ走らせる。サンプル画像との同期は samples-sync.yml。
+#
+# アトラスのバイト列は Pillow に同梱される FreeType / PNG エンコードに依存し、OS をまたぐと
+# 変わる（ubuntu-latest では *.fnt は一致するが *.png が 6 本とも食い違うことを #115 の
+# CI で確認した）。コミット済みのアトラスは macOS（Apple Silicon）で生成しているため、
+# このジョブも macos-latest で走らせる。対象ファイルを変えたときだけ起動するので、macOS
+# ランナーの分は通常の PR には乗らない。
+# 環境差で落ちるようになったら、デコード後の画素一致での比較への切り替えを検討する。
+#
+# このワークフローの check は必須チェックにしない前提（`paths` で起動しない PR では
+# 報告されないため）。ブランチ保護で必須にする場合は、この paths フィルタを外して
+# ジョブ内で差分判定する形に作り直すこと。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - tools/generate_font_atlases.py
+      - tools/fonts/**
+      - .github/workflows/font-atlas-sync.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - tools/generate_font_atlases.py
+      - tools/fonts/**
+      - .github/workflows/font-atlas-sync.yml
+  workflow_dispatch:
+
+concurrency:
+  group: font-atlas-sync-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  font-atlas-sync:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      # フォント取得（raw.githubusercontent.com）はリトライなし。ネットワークの一時失敗で
+      # 赤になったら再実行する。
+      # 生成前に既存のアトラスを消す（README.md と OFL-*.txt は残す）。スクリプトがもう
+      # 書き出さない古いアトラスが残っていても、削除として差分に出て落ちる。
+      - name: Regenerate font atlases
+        run: |
+          rm -f tools/fonts/*.fnt tools/fonts/*.png
+          uv run --with pillow==12.3.0 python3 tools/generate_font_atlases.py
+
+      - name: Verify tools/fonts match the generator output
+        run: |
+          changed=$(git status --porcelain --untracked-files=all -- tools/fonts)
+          if [ -n "$changed" ]; then
+            echo "::error::tools/fonts が tools/generate_font_atlases.py の生成結果と一致しません。"
+            echo "手元で次を実行し、差分をコミットしてください（アトラスを変えたら PNG も再生成）:"
+            echo "  uv run --with pillow==12.3.0 python3 tools/generate_font_atlases.py"
+            echo "  dart run tools/generate_samples.dart"
+            echo "差分に D（削除）が出ている古いアトラスは、スクリプトが作らなくなったものです。手元でも git rm してください。"
+            echo
+            echo "$changed"
+            exit 1
+          fi
+          echo "tools/fonts は生成結果と一致しています。"
