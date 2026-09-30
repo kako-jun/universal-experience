@@ -18,6 +18,7 @@ import '../widgets/adjust_panel.dart';
 import '../widgets/before_after_view.dart';
 import '../widgets/color_vision_compare_view.dart';
 import '../widgets/filter_browser.dart';
+import '../widgets/filter_list_tile.dart';
 import '../widgets/image_source_picker.dart';
 import '../widgets/language_dialog.dart';
 import '../widgets/welcome_banner.dart';
@@ -269,7 +270,10 @@ class _HomeScreenState extends State<HomeScreen> {
               width: leftWidth,
               child: FocusTraversalOrder(
                 order: const NumericFocusOrder(1),
-                child: FocusTraversalGroup(child: _browserCard()),
+                child: FocusTraversalGroup(
+                  policy: _ListExitToShortcutsPolicy(_shortcutFocus),
+                  child: _browserCard(),
+                ),
               ),
             ),
             const SizedBox(width: 16),
@@ -391,7 +395,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     Semantics(
                       header: true,
                       child: Text(
-                        l10n.previewSectionTitle,
+                        // 2×2 の間は Before / After ではないので、見出しも実態に合わせる。
+                        comparing
+                            ? l10n.compareSectionTitle
+                            : l10n.previewSectionTitle,
                         style: theme.textTheme.titleMedium,
                       ),
                     ),
@@ -408,7 +415,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     if (canCompare)
                       FilterChip(
                         label: Text(l10n.compareToggleLabel),
-                        tooltip: l10n.compareToggleSemanticsHint,
+                        tooltip: l10n.compareToggleTooltip,
                         selected: _compareColorVision,
                         onSelected: (value) =>
                             setState(() => _compareColorVision = value),
@@ -486,4 +493,33 @@ class _ThemeModeButton extends StatelessWidget {
         ThemeMode.light => ThemeMode.dark,
         ThemeMode.dark => ThemeMode.system,
       };
+}
+
+/// 左カラム（選ぶ）用のフォーカス走査。標準（読み順）と同じだが、**一覧の行にフォーカスが
+/// ある間の ←→ は、常に画面のショートカット受け口へ出る**（#84）。
+///
+/// 標準の方向フォーカス移動のままだと、行から → で出た先が「隣のカラムの、たまたま縦位置が
+/// 重なるコントロール」になり、ウィンドウの高さや中央カラムの内容（色覚を選ぶと出る
+/// 「2×2 で比較」の切替で見出しが少し高くなる、など）で変わる。そうなると、行を Enter で
+/// 選んだあとの → → ←→ で強度に届くかどうかが偶然で決まる。ここで出先を固定すれば、
+/// 1 回目の ←→ は強度を動かさず（行から出るだけ）、次の ←→ から必ず強度が動く。
+/// 他カラムのコントロールへは Tab で入る。検索欄・カテゴリのチップなど行以外は標準のまま。
+class _ListExitToShortcutsPolicy extends ReadingOrderTraversalPolicy {
+  _ListExitToShortcutsPolicy(this._shortcutFocus);
+
+  final FocusNode _shortcutFocus;
+
+  @override
+  bool inDirection(FocusNode currentNode, TraversalDirection direction) {
+    final horizontal = direction == TraversalDirection.left ||
+        direction == TraversalDirection.right;
+    final onRow =
+        currentNode.context?.findAncestorWidgetOfExactType<FilterListTile>() !=
+            null;
+    if (horizontal && onRow) {
+      _shortcutFocus.requestFocus();
+      return true;
+    }
+    return super.inDirection(currentNode, direction);
+  }
 }

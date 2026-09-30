@@ -504,19 +504,13 @@ void main() {
       expect(focusedTile(tester), isNull,
           reason: '代わりに標準の方向フォーカス移動で行の外へ移る');
 
-      // 色覚を選んでいる間は中央カラムに「2×2 で比較」の切替が出る（#84）ので、
-      // 行から → で出た先はショートカット受け口ではなく中央カラムの操作部品になる。
-      // どれに移るかは方向フォーカスの探索次第なので、中央カラムへ移ったことだけを見る。
-      final centerLeft = tester.getRect(find.byType(ImageSourcePicker)).left;
-      final focusRect = tester.binding.focusManager.primaryFocus!.rect;
-      expect(focusRect.left, greaterThanOrEqualTo(centerLeft),
-          reason: '→ で移った先は中央カラムの操作部品');
+      // 移った先は画面のショートカット受け口（ARCHITECTURE / DESIGN に観測事実として
+      // 記載）。挙動が変わればここで落とす。次の ←→ からは強度が動く。
+      expect(tester.binding.focusManager.primaryFocus?.debugLabel,
+          'homeShortcuts');
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
       await tester.pump();
-      expect(h.filterService.intensity, before,
-          reason: '中央カラムの部品にフォーカスがある間も ←→ は強度を動かさない');
-      expect(focusedTile(tester)?.key, filterListTileKey(protan),
-          reason: '← で行へ戻る');
+      expect(h.filterService.intensity, lessThan(before));
       await h.filterService.flush();
     });
 

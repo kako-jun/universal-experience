@@ -387,20 +387,26 @@ void main() {
         final codec = await ui.instantiateImageCodec(saved!);
         final frame = await codec.getNextFrame();
         final image = frame.image;
-        final data =
-            await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+        final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
         final rgba = data!.buffer.asUint8List();
-        // グリッドは gap + 2 * (セル + gap)（compareGridLayout）。セルの上部は
-        // 正方形の画像。
+        // セルの位置は本番と同じ compareGridLayout で求める。4 セルは同じ大きさ
+        // （幅 = 画像の幅から割り出し、高さ = 行の高さ）なので、組んだレイアウトの
+        // 全体サイズが保存された PNG と一致することで、この割り出しの正しさを確かめる。
         const g = kCompareGridGap;
         final cellW = (image.width - 3 * g) ~/ 2;
+        final rowH = (image.height - 3 * g) ~/ 2;
+        final layout = compareGridLayout([
+          for (var i = 0; i < 4; i++)
+            ui.Size(cellW.toDouble(), rowH.toDouble()),
+        ]);
+        expect(layout.size,
+            ui.Size(image.width.toDouble(), image.height.toDouble()),
+            reason: 'compareGridLayout の全体サイズが書き出した PNG と一致する');
         final result = <List<double>>[];
         for (var i = 0; i < 4; i++) {
-          final col = i % 2, row = i ~/ 2;
-          final ox = g + col * (cellW + g);
-          // 行の高さは（画像 + 帯）のセルの最大。行の先頭は g + row * (rowH + g)。
-          final rowH = (image.height - 3 * g) ~/ 2;
-          final oy = g + row * (rowH + g);
+          // セルの上部は正方形の画像。
+          final ox = layout.origins[i].dx.toInt();
+          final oy = layout.origins[i].dy.toInt();
           var r = 0.0, gr = 0.0, b = 0.0;
           for (var y = oy; y < oy + cellW; y++) {
             for (var x = ox; x < ox + cellW; x++) {
