@@ -244,7 +244,7 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
    `sensus_core::Filter` の全 30 種を選択・パラメータ調整できる状態まで広がった
    （#16）が、プレビューの GPU 描画が配線されているのは上記のとおり一部のみ。
    payload 付きフィルタ（cataract/floaters の seed、glaucoma の mode、astigmatism
-   の axis_deg、時間依存の vertigo/bppv 等）の描画配線は個別 Issue（#59 等）で継続中
+   の axis_deg、時間依存の vertigo/bppv 等）の GPU 描画配線は個別 Issue（#61 等）で継続中
    （**追記**: §9（#85）以降はプレビュー自体が CPU `apply()` 経路になり、全 30 種が
    配線済み。本項目が指す「GPU 描画の配線」自体は #60 で advanced カタログ・体験
    プリセットの UI 結線が完了した後もライブ画面キャプチャ向けの将来課題として残る）。
@@ -266,7 +266,9 @@ ue が二重に持っていた色覚ロジックを撤去し、アルゴリズ�
   permission 概念、`colorMatrix` getter（simulator 依存）を撤去。現在は純粋な
   選択状態モデル（`currentFilter` / `intensity` / `isActive`）で、選択・強度変更で
   `notifyListeners` するだけ。`ColorVisionType` → sensus `VisionFilter` の
-  マッピング（`VisionFilter? get sensusFilter`）を追加した。none→null、
+  マッピング（`VisionFilter? get sensusFilter`）を追加した（追記: `isActive` と
+  `sensusFilter` は本番から呼ばれなくなり #67 で撤去。マッピングの正本は
+  トップレベル関数 `visionFilterForColorVisionType`）。none→null、
   protanopia/deuteranopia/tritanopia/achromatopsia→対応する `VisionFilter`、
   -anomaly 系は sensus が severity を `strength` で表すため base の -opia へマップ
   （anomaly は強度 < 1 相当）。
@@ -274,7 +276,7 @@ ue が二重に持っていた色覚ロジックを撤去し、アルゴリズ�
   （FilterService の公開 API を維持）。home_screen は system-wide 適用前提の文言を
   外し、「ライブ画面への適用は画面キャプチャ経路（#1/#3/#4）実装後」と明記した。
 - **テスト**: `test/filter_service_test.dart` を追加（選択状態の遷移・clamp・
-  sensusFilter マッピング）。protanopia golden は維持。
+  マッピング。現在は `visionFilterForColorVisionType` を直接検証）。protanopia golden は維持。
 - **残課題（このフェーズ外）**: ライブ画面キャプチャ経路（#1/#3/#4）、
   `ColorVisionType` の全面 sensus `VisionFilter` 化や category/param パネル（#16）。
 
@@ -471,11 +473,11 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   （`home_screen.dart`）が `VisionFilterState.build()` で行い、`renderAfter` は
   組み立て済みの `VisionFilter?` をそのまま `CpuVisionRenderer.applier` へ渡す
   だけになっている。`visionFilterForColorVisionType`
-  （トップレベル関数。`FilterService.sensusFilter` はこれに委譲するだけの
-  インスタンス getter）自体は変わらず健在だが、`lib/services/
-  color_vision_selection.dart` の `selectColorVision` が色覚のクイック選択を
-  `VisionFilterState` へ書き込む際、`FilterService` のインスタンス
-  （`filterService.sensusFilter`）は経由せずこの関数を直接呼ぶ — `selectColorVision`
+  （トップレベル関数。当時はこれに委譲するだけのインスタンス getter
+  `FilterService.sensusFilter` があったが、本番から呼ばれず #67 で撤去した）は
+  変わらず健在で、`lib/services/color_vision_selection.dart` の
+  `selectColorVision` が色覚のクイック選択を `VisionFilterState` へ書き込む際、
+  `FilterService` のインスタンスは経由せずこの関数を直接呼ぶ — `selectColorVision`
   は `filterService.applyFilter(type)` と `VisionFilterState` への書き込みを
   同じ `type` から並行して行う関数なので、インスタンスの現在値
   （`filterService.currentFilter`）に依存させる必要がないため。

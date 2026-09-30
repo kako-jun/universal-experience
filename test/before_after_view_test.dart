@@ -254,7 +254,7 @@ void main() {
           'colorVisionType=deuteranomaly なら filterId=deuteranopia でも '
           '見出しは Deuteranomaly になる（#60）', (tester) async {
         // カタログは色覚を 5 種しか持たず、-omaly は base の -opia と同じ
-        // catalog id（deuteranopia）に写る（FilterService.sensusFilter の
+        // catalog id（deuteranopia）に写る（visionFilterForColorVisionType の
         // 対応表）。filterId だけで見出しを解決すると常に "Deuteranopia" に
         // なってしまうため、colorVisionType を優先する契約を確認する。
         await tester.pumpWidget(

@@ -51,11 +51,12 @@ double recommendedStrength(ColorVisionType type) {
 /// strength < 1（推奨値 [kAnomalyDefaultSeverity] = 0.6）を渡す責務が
 /// **呼び出し側** にある。
 ///
-/// [FilterService.sensusFilter] と、`lib/services/color_vision_selection.dart`
-/// の `selectColorVision`（色覚クイック選択を [VisionFilterState] へ写す、
-/// #60）の双方がこの対応表を参照する。片方だけが対応表を持つと、色覚クイック
-/// 選択とプレビュー描画で別々のフィルタが適用されるバグ（#52 と同種）を
-/// 起こしうるため、ここ 1 箇所に集約する。
+/// `lib/services/color_vision_selection.dart` の `selectColorVision`（色覚
+/// クイック選択を [VisionFilterState] へ写す、#60）、2×2 比較の
+/// `color_vision_compare.dart`（#84）、プレビューの CPU レンダラ（#85）が
+/// この対応表を参照する。複数箇所が別々に対応表を持つと、色覚クイック選択と
+/// プレビュー描画で別々のフィルタが適用されるバグ（#52 と同種）を起こしうる
+/// ため、ここ 1 箇所に集約する。
 VisionFilter? visionFilterForColorVisionType(ColorVisionType type) {
   switch (type) {
     case ColorVisionType.none:
@@ -141,7 +142,6 @@ class FilterService extends ChangeNotifier {
 
   ColorVisionType _currentFilter = ColorVisionType.none;
   final Map<ColorVisionType, double> _intensityByType = {};
-  bool _isActive = false;
 
   /// 現在選択中の色覚タイプ。
   ColorVisionType get currentFilter => _currentFilter;
@@ -150,31 +150,6 @@ class FilterService extends ChangeNotifier {
   /// [recommendedStrength] を返す（#57）。
   double get intensity =>
       _intensityByType[_currentFilter] ?? recommendedStrength(_currentFilter);
-
-  /// フィルタが選択されている（none 以外）か。
-  bool get isActive => _isActive;
-
-  /// anomaly 型（protanomaly / deuteranomaly / tritanomaly）の既定 severity 係数。
-  ///
-  /// トップレベル定数 [kAnomalyDefaultSeverity] への委譲。anomaly 型は対応する
-  /// -opia 型と同一の [VisionFilter] にマップされるため、レンダリング時に
-  /// `strength`（[intensity]）を下げることで「軽度（anomaly）」を表現する。
-  /// 旧 simulator（`color_vision_simulator.dart`、#13 で撤去）は anomaly を
-  /// severity 0.6 相当で表現していた。その知見を失わないための定数。
-  double get anomalyDefaultSeverity => kAnomalyDefaultSeverity;
-
-  /// 現在選択中のタイプに推奨される strength（[recommendedStrength] への委譲）。
-  double get recommendedStrengthForCurrent =>
-      recommendedStrength(_currentFilter);
-
-  /// 現在選択中のタイプに対応する sensus の [VisionFilter]。
-  ///
-  /// [visionFilterForColorVisionType] への委譲（#85: before/after プレビュー
-  /// の CPU レンダラ（`lib/rendering/cpu_vision_renderer.dart`）も同じ対応表を
-  /// 使うため、`FilterService` インスタンスを介さず引ける形にトップレベル関数へ
-  /// 切り出してある。対応の中身・契約はそちらの doc を参照）。
-  VisionFilter? get sensusFilter =>
-      visionFilterForColorVisionType(_currentFilter);
 
   /// 永続化されている per-type intensity（[keyIntensityByType]）を読み込む。
   ///
@@ -219,7 +194,6 @@ class FilterService extends ChangeNotifier {
     if (intensity != null) {
       _intensityByType[type] = intensity.clamp(0.0, 1.0);
     }
-    _isActive = type != ColorVisionType.none;
     notifyListeners();
     if (intensity != null) _schedulePersist();
   }
@@ -239,7 +213,6 @@ class FilterService extends ChangeNotifier {
   /// 選択を解除する（none に戻す）。
   void deactivate() {
     _currentFilter = ColorVisionType.none;
-    _isActive = false;
     notifyListeners();
   }
 

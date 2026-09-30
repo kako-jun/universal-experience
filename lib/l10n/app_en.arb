@@ -61,10 +61,6 @@
   "@intensityActive": {
     "description": "Status label when a filter is currently active."
   },
-  "intensityInactive": "Inactive",
-  "@intensityInactive": {
-    "description": "Status label when a filter is selected but not active."
-  },
 
   "clearFilter": "Clear filter",
   "@clearFilter": {

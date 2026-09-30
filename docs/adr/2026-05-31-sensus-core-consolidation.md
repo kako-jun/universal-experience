@@ -35,7 +35,9 @@ ue は色覚シミュレーションのアルゴリズムを**二重に**持っ�
   permission 概念・`colorMatrix` getter（simulator 依存）を撤去。現在は純粋な選択状態
   モデル（`currentFilter` / `intensity` / `isActive`）で、選択・強度変更時に
   `notifyListeners` するだけ。`ColorVisionType` → sensus `VisionFilter` のマッピング
-  （`VisionFilter? get sensusFilter`）を追加。
+  （`VisionFilter? get sensusFilter`）を追加。（追記: `isActive` と `sensusFilter` は
+  本番から呼ばれなくなったため #67 で撤去済み。マッピングの正本はトップレベル関数
+  `visionFilterForColorVisionType`。）
 - フィルタ適用は sensus 由来の GPU シェーダ（`lib/rendering/shader_filter.dart`）が担う。
   ue は GLSL や行列・半径式を**再実装しない**。
 
@@ -67,8 +69,8 @@ ue は色覚シミュレーションのアルゴリズムを**二重に**持っ�
 ## 結果・トレードオフ
 
 - ue から LMS 行列・plugin・permission の関心事が消え、`FilterService` は選択状態の
-  保持に純化した。`test/filter_service_test.dart`（選択状態遷移・clamp・sensusFilter
-  マッピング）を追加。
+  保持に純化した。`test/filter_service_test.dart`（選択状態遷移・clamp・
+  `visionFilterForColorVisionType` のマッピング）を追加。
 - **トレードオフ**: 「他アプリ含む全画面への system-wide 適用」は plugin 撤去で
   いったん失われた。現状の ue は sensus シェーダで**画像（ルーペ窓内）**にフィルタを
   適用する。ライブ全画面適用は画面キャプチャ経路（#1/#3/#4）の実装後に取り直す。

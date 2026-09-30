@@ -168,7 +168,7 @@ class BeforeAfterView extends StatefulWidget {
   /// The catalog (and therefore [filterId]) only has 5 color-vision entries
   /// (protanopia/deuteranopia/tritanopia/achromatopsia/tetrachromacy) —
   /// -omaly (anomaly) types map to the same catalog id as their base -opia
-  /// (`FilterService.sensusFilter`'s contract). Without this field, the
+  /// (`visionFilterForColorVisionType`'s contract). Without this field, the
   /// after-pane label / export caption / filename would always say
   /// "Protanopia" even when the user picked "Protanomaly" (#60). When
   /// non-null, this overrides [filterId]-based name resolution for display
