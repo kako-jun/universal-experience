@@ -84,7 +84,7 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('en では名前が Intensity になる', (tester) async {
+    testWidgets('en では名前が Strength になる', (tester) async {
       final handle = tester.ensureSemantics();
       await installFakes(tester);
       final h =
@@ -93,8 +93,7 @@ void main() {
           h.filterService, h.visionState, ColorVisionType.protanopia);
       await settle(tester);
 
-      expect(
-          dataOf(tester, find.byType(Slider)).label, startsWith('Intensity'));
+      expect(dataOf(tester, find.byType(Slider)).label, startsWith('Strength'));
       handle.dispose();
     });
 

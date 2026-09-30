@@ -50,21 +50,6 @@
   },
 
 
-  "intensityValue": "Intensity: {percent}%",
-  "@intensityValue": {
-    "description": "Current filter intensity as a percentage.",
-    "placeholders": {
-      "percent": { "type": "int" }
-    }
-  },
-  "intensityActive": "Active",
-  "@intensityActive": {
-    "description": "Status label when a filter is currently active."
-  },
-  "intensitySliderName": "Intensity",
-  "@intensitySliderName": {
-    "description": "Screen-reader name of the intensity slider of the color-vision rows. Same word as the on-screen 'Intensity: N%' text; the value is read separately by the slider (#45)."
-  },
   "strengthSliderName": "Strength",
   "@strengthSliderName": {
     "description": "Screen-reader name of the strength slider of an advanced filter / experience. Same word as the on-screen 'Strength: N%' text; the value is read separately by the slider (#45)."
@@ -790,6 +775,21 @@
     "placeholders": {
       "name": {
         "type": "String"
+      }
+    }
+  },
+  "layerSectionSummary": "Number {order}, {name}, strength {percent}%",
+  "@layerSectionSummary": {
+    "description": "Screen-reader label of a collapsed layer section in the adjust panel (application order, name, strength). Pressing it makes that filter the one being adjusted (#120).",
+    "placeholders": {
+      "order": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "int"
       }
     }
   },

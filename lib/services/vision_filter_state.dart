@@ -431,7 +431,7 @@ class VisionFilterState extends ChangeNotifier {
   /// [type] は選択された色覚型そのもの。[ColorVisionType.none] は「何も
   /// シミュレーションしない」ことを表し、解除（[deactivateColorVision]）と
   /// 同じ効果になる — この場合 [isColorQuickSelection] は **false** のまま
-  /// になる（[FilterBrowser] 一覧の「正常色覚」行・`IntensitySlider`・
+  /// になる（[FilterBrowser] 一覧の「正常色覚」行・強度スライダー・
   /// 解除ボタンのいずれも、[isColorQuickSelection] だけを見て点灯/有効化を
   /// 決めるため、none を「選択中」扱いにすると強度スライダーだけが宙に浮いて
   /// 有効化されてしまう。none はカタログにも強度概念にも対応しない）。

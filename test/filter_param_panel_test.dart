@@ -76,16 +76,32 @@ void main() {
     expect(find.byType(Slider), findsOneWidget);
   });
 
-  testWidgets('色覚クイック選択由来の選択では strength スライダーを表示しない', (tester) async {
+  testWidgets('色覚クイック選択由来の選択でも strength スライダーは 1 本だけ表示する（#120）',
+      (tester) async {
     visionState.selectColorVisionType(ColorVisionType.protanopia, 'protanopia');
     expect(visionState.isColorQuickSelection, isTrue);
 
     await pumpPanel(tester);
 
-    expect(find.byType(Slider), findsNothing);
-    // 受診喚起ブロックなど、パネル自体は描画され続けている（strength だけが
-    // 隠れている）ことも確認する。
+    expect(find.byType(Slider), findsOneWidget);
     expect(find.byType(FilterParamPanel), findsOneWidget);
+  });
+
+  testWidgets('strength スライダーは調整中の層の強度の記憶を動かし、原画比較を解除する', (tester) async {
+    visionState.selectColorVisionType(ColorVisionType.protanopia, 'protanopia');
+    visionState.toggle('myopia');
+    visionState.focusLayer('protanopia');
+    visionState.acquireBypass(Object());
+    expect(visionState.bypassed, isTrue);
+    await pumpPanel(tester);
+
+    await tester.tap(find.byType(Slider)); // 中央 = 50%
+    await tester.pump();
+
+    final protan = visionState.layers.firstWhere((l) => l.id == 'protanopia');
+    expect(visionState.strengthOf(protan), closeTo(0.5, 0.06));
+    expect(visionState.bypassed, isFalse);
+    expect(visionState.focusedId, 'protanopia');
   });
 
   group('受診喚起ブロック（#76）', () {
@@ -102,8 +118,7 @@ void main() {
       expect(find.text(en.consultDisclaimer), findsNothing);
     });
 
-    testWidgets('urgency=emergency では喚起文と免責文を表示し、段階名は出さない',
-        (tester) async {
+    testWidgets('urgency=emergency では喚起文と免責文を表示し、段階名は出さない', (tester) async {
       visionFilterUrgencyProvider = (_) => Urgency.emergency;
       visionFilterUrgencyEscalationProvider = (_) => const [];
       visionState.select('hemianopia');
@@ -118,8 +133,7 @@ void main() {
       expect(find.text('High'), findsNothing);
     });
 
-    testWidgets('escalation は「次の場合は受診を」の形で併記し、訳があれば日本語になる',
-        (tester) async {
+    testWidgets('escalation は「次の場合は受診を」の形で併記し、訳があれば日本語になる', (tester) async {
       visionFilterUrgencyProvider = (_) => Urgency.none;
       visionFilterUrgencyEscalationProvider = (_) => const [
             UrgencyEscalation(
@@ -141,8 +155,7 @@ void main() {
       );
     });
 
-    testWidgets('訳の対応表に無い condition は英語のままフォールバック表示する',
-        (tester) async {
+    testWidgets('訳の対応表に無い condition は英語のままフォールバック表示する', (tester) async {
       const unknownCondition = 'a brand-new sensus condition string';
       visionFilterUrgencyProvider = (_) => Urgency.earlyConsultation;
       visionFilterUrgencyEscalationProvider = (_) => const [
@@ -158,8 +171,7 @@ void main() {
       expect(find.textContaining(unknownCondition), findsOneWidget);
     });
 
-    testWidgets(
-        'escalation は emergency と earlyConsultation で見出しを分けて表示する',
+    testWidgets('escalation は emergency と earlyConsultation で見出しを分けて表示する',
         (tester) async {
       // 現状 vision フィルタの escalation は全て earlyConsultation だが、
       // ConsultNoticeBlock 自体は聴覚側（#80、emergency 段を持つ）にも備えて
@@ -193,8 +205,7 @@ void main() {
       );
     });
 
-    testWidgets('emergency の喚起文は本文（bodyMedium）より大きいスタイルで表示する',
-        (tester) async {
+    testWidgets('emergency の喚起文は本文（bodyMedium）より大きいスタイルで表示する', (tester) async {
       visionFilterUrgencyProvider = (_) => Urgency.emergency;
       visionFilterUrgencyEscalationProvider = (_) => const [];
       visionState.select('hemianopia');
@@ -202,8 +213,7 @@ void main() {
       await pumpPanel(tester);
       final en = lookupAppLocalizations(const Locale('en'));
 
-      final messageWidget =
-          tester.widget<Text>(find.text(en.consultEmergency));
+      final messageWidget = tester.widget<Text>(find.text(en.consultEmergency));
       final theme = Theme.of(tester.element(find.text(en.consultEmergency)));
       final bodySize = theme.textTheme.bodyMedium?.fontSize ?? 0;
       final messageSize = messageWidget.style?.fontSize ??
@@ -212,8 +222,7 @@ void main() {
       expect(messageSize, greaterThan(bodySize));
     });
 
-    testWidgets('免責文の根拠 URL を選択可能なテキストで表示する',
-        (tester) async {
+    testWidgets('免責文の根拠 URL を選択可能なテキストで表示する', (tester) async {
       visionFilterUrgencyProvider = (_) => Urgency.earlyConsultation;
       visionFilterUrgencyEscalationProvider = (_) => const [];
       visionState.select('glaucoma');
@@ -234,7 +243,8 @@ void main() {
       visionState.setStrength(0.9);
       visionState.setParam('axisDeg', 30.0);
       expect(visionState.strength, 0.9);
-      expect(visionState.paramValue(visionState.selectedEntry!.parameters.first),
+      expect(
+          visionState.paramValue(visionState.selectedEntry!.parameters.first),
           30.0);
 
       await pumpPanel(tester);
@@ -243,7 +253,8 @@ void main() {
       await tester.pump();
 
       expect(visionState.strength, 0.5);
-      expect(visionState.paramValue(visionState.selectedEntry!.parameters.first),
+      expect(
+          visionState.paramValue(visionState.selectedEntry!.parameters.first),
           90.0); // カタログ既定値（axisDeg の defaultValue）
     });
   });

@@ -49,25 +49,24 @@ void main() {
     final settings = SettingsService();
     await settings.load();
 
-    // スライダーを操作可能にするため、フィルタを選択しておく（IntensitySlider は
-    // VisionFilterState.isColorQuickSelection が false の間 onChanged が null で
-    // 操作不能、#60）。main() では buildRootApp() が selectColorVision
+    // スライダーを操作可能にするため、フィルタを選択しておく（何も選んでいないと
+    // 調整パネルにスライダーが出ない）。main() では buildRootApp() が selectColorVision
     // （FilterService と VisionFilterState の両方を更新する唯一の
     // 入口、#60）で filterService/visionFilterState と settings.filterType を
     // 揃えて起動するので、ここでもテスト対象外の初期同期として揃えておく
     // （揃えないと、最初の 1 回だけ HomeScreen._persistFilterState の
     // setFilterType が「none → protanopia」の実変更として notify してしまい、
     // これから見たい「intensity だけを動かしたとき」の挙動と混ざってしまう）。
-    selectColorVision(filterService, visionFilterState, ColorVisionType.protanopia);
+    selectColorVision(
+        filterService, visionFilterState, ColorVisionType.protanopia);
     await settings.setFilterType(ColorVisionType.protanopia);
 
     await tester.pumpWidget(UniversalExperienceApp(settings: settings));
     await tester.pump();
 
     // 幅 1200 の 3 カラム（#72）では、強度スライダーは右カラム「調整」の先頭付近に
-    // あり、スクロールせずに hit test できる。色覚クイック選択由来のときは
-    // FilterParamPanel が strength スライダーを出さない（showsAdvancedStrengthSlider、
-    // #60）ため、Slider は IntensitySlider の 1 本だけ。
+    // あり、スクロールせずに hit test できる。強度スライダーは層の由来によらず
+    // FilterParamPanel の 1 本だけ（#120）。
     final sliderFinder = find.byType(Slider);
     expect(sliderFinder, findsOneWidget);
 

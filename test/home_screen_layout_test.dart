@@ -32,7 +32,6 @@ import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
 import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 import 'package:universal_experience/ui/widgets/image_source_picker.dart';
-import 'package:universal_experience/ui/widgets/intensity_slider.dart';
 import 'package:universal_experience/ui/widgets/welcome_banner.dart';
 import 'package:universal_experience/ui/widgets/language_dialog.dart';
 import 'package:universal_experience/ui/widgets/window_mode_panel.dart';
@@ -248,7 +247,6 @@ void main() {
 
         expect(find.text('何も選択されていません'), findsOneWidget);
         // 強度・受診喚起・パラメータの空カードは出さない。
-        expect(find.byType(IntensitySlider, skipOffstage: false), findsNothing);
         expect(
             find.byType(ConsultNoticeBlock, skipOffstage: false), findsNothing);
         expect(find.byType(Slider, skipOffstage: false), findsNothing);

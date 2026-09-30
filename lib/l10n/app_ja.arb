@@ -17,9 +17,6 @@
   "themeTooltipHint": "{themeLabel}（タップで切り替え）",
 
 
-  "intensityValue": "強さ：{percent}%",
-  "intensityActive": "適用中",
-  "intensitySliderName": "強さ",
   "strengthSliderName": "強さ",
   "previewImageFilteredSemantics": "{name}を適用した画像",
 
@@ -255,6 +252,7 @@
   "layerChipLabel": "適用順 {order} 番目、{name}",
   "layerChipFocusHint": "押すと、このフィルタを調整します",
   "layerChipRemove": "{name}を外す",
+  "layerSectionSummary": "適用順 {order} 番目、{name}、強さ {percent}%",
   "adjustHeading": "調整",
   "selectionEmptyTitle": "何も選択されていません",
   "selectionEmptyBody": "一覧から見え方を選ぶと、ここに強さやパラメータが表示されます。",
