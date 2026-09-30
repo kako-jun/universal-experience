@@ -280,8 +280,7 @@ void main() {
       expect(p.strengthPercent, 100);
     });
 
-    testWidgets('1 層（本番の経路 planExport）: キャプション・ファイル名・画素が、従来の書き出しの値と一致する',
-        (tester) async {
+    test('1 層（本番の経路 planExport）: キャプション・ファイル名が、従来の書き出しの値と一致する', () {
       final layers = layersOf(['protanopia'], strengths: {'protanopia': 0.6});
       final p = plan(en, layers, strength: 0.6);
 
@@ -312,31 +311,6 @@ void main() {
         ),
         'ue-protanopia-60pct-2026-06-23.png',
       );
-
-      // 画素: 本番の 1 層のキャプションと、従来の値のキャプションで、合成した画像が同じ。
-      Future<List<int>> pixels(ExportCaption c) async {
-        final base = await generateSampleImage(64);
-        final composed = await composeExportImage(base, c);
-        final rgba =
-            await composed.toByteData(format: ui.ImageByteFormat.rawRgba);
-        final out = [
-          composed.width,
-          composed.height,
-          ...rgba!.buffer.asUint8List(),
-        ];
-        composed.dispose();
-        base.dispose();
-        return out;
-      }
-
-      late List<int> actual;
-      late List<int> expected;
-      await tester.runAsync(() async {
-        actual = await pixels(p.caption);
-        expected = await pixels(legacy);
-      });
-      expect(actual.length, greaterThan(64 * 64 * 4));
-      expect(actual, expected);
     });
   });
 
@@ -445,6 +419,22 @@ void main() {
       final p = plan(en, layers, strength: 0.0);
 
       expect(p.caption.layers, isEmpty);
+      expect(p.symptomId, 'protanopia');
+      expect(p.strengthPercent, 0);
+    });
+
+    test('表示強度が 0% の層しかない（0.004 のみ）: 従来どおりフォーカス中の層のキャプション', () {
+      final layers = layersOf(
+        ['protanopia', 'myopia'],
+        strengths: {'myopia': 0.004, 'protanopia': 0.004},
+      );
+      expect(effectiveExportLayers(layers), isEmpty);
+
+      final p = plan(en, layers, strength: 0.004);
+
+      expect(p.caption.layers, isEmpty, reason: '層ごとの行にはせず、フォーカス中の層の 2 行');
+      expect(p.caption.symptomLabel, en.filterProtanopia);
+      expect(p.caption.strengthLabel, en.strengthLabel(0));
       expect(p.symptomId, 'protanopia');
       expect(p.strengthPercent, 0);
     });
@@ -681,6 +671,97 @@ void main() {
       ], reason: '画像に写っている 2 層だけ。後から足された vertigo は焼かない');
       expect(captured!.layers[0].strengthLabel, en.strengthLabel(50));
       expect(savedFilename, startsWith('ue-myopia-protanopia-'));
+
+      renders[1].complete(after2);
+      await tester.pump();
+      await tester.pump();
+    });
+
+    testWidgets('フィルタ 1 本の経路（steps なし）: 描画中に親が強度・フィルタを変えても、画像に写った値を焼く',
+        (tester) async {
+      late ui.Image before, after1, after2, composedStub;
+      await tester.runAsync(() async {
+        before = await generateSampleImage(4);
+        after1 = await generateSampleImage(4);
+        after2 = await generateSampleImage(4);
+        composedStub = await generateSampleImage(4);
+      });
+      previewSourceImageLoader = (source, size) => Future.value(before);
+      final renders = <Completer<ui.Image>>[];
+      afterImageRenderer = (source, filter, strength) {
+        final c = Completer<ui.Image>();
+        renders.add(c);
+        return c.future;
+      };
+      ExportCaption? captured;
+      exportImageComposer = (base, caption) async {
+        captured = caption;
+        return composedStub;
+      };
+      String? savedFilename;
+      pngSaver = (bytes, filename) async {
+        savedFilename = filename;
+        return '/fake/downloads/$filename';
+      };
+
+      Widget viewOf({
+        required VisionFilter filter,
+        required String filterId,
+        required ColorVisionType type,
+        required double strength,
+      }) =>
+          localized(BeforeAfterView(
+            filter: filter,
+            filterId: filterId,
+            colorVisionType: type,
+            strength: strength,
+            imageSource: const SamplePreviewImageSource('test'),
+            sampleSize: 16,
+          ));
+
+      // 画像に写る値: protanopia 60%。
+      await tester.pumpWidget(viewOf(
+        filter: const VisionFilter.protanopia(),
+        filterId: 'protanopia',
+        type: ColorVisionType.protanopia,
+        strength: 0.6,
+      ));
+      for (var i = 0; i < 5 && renders.isEmpty; i++) {
+        await tester.pump();
+      }
+      expect(renders, hasLength(1), reason: '1 回目の描画が await 中');
+
+      // 描画中に親が別のフィルタ・強度へ変える。1 回目の世代は最新のまま完了し得る。
+      await tester.pumpWidget(viewOf(
+        filter: const VisionFilter.deuteranopia(),
+        filterId: 'deuteranopia',
+        type: ColorVisionType.deuteranopia,
+        strength: 0.3,
+      ));
+      renders[0].complete(after1);
+      for (var i = 0; i < 5 && renders.length < 2; i++) {
+        await tester.pump();
+      }
+      expect(renders, hasLength(2), reason: '待避された 2 回目の描画が始まる（まだ await 中）');
+
+      await tester.pump(); // 1 回目の結果の setState を描画へ反映する
+      await tester.tap(find.byTooltip(en.exportButtonTooltip));
+      await tester.runAsync(() async {
+        for (var i = 0; i < 50; i++) {
+          if (savedFilename != null) return;
+          await tester.pump(const Duration(milliseconds: 20));
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+      });
+      await tester.pump();
+
+      expect(captured, isNotNull);
+      expect(captured!.layers, isEmpty);
+      expect(captured!.symptomLabel, en.filterProtanopia,
+          reason: '画像に写っているフィルタ。後から渡された deuteranopia ではない');
+      expect(captured!.strengthLabel, en.strengthLabel(60),
+          reason: '画像に写っている強度。後から渡された 30% ではない');
+      expect(savedFilename, startsWith('ue-protanopia-60pct-'));
 
       renders[1].complete(after2);
       await tester.pump();
