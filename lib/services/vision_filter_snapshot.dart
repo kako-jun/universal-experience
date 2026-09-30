@@ -69,7 +69,9 @@ Object? _sanitizeParamValue(VisionParam p, Object? value) {
     case VisionParamKind.seed:
       final BigInt? seed;
       if (value is String) {
-        seed = BigInt.tryParse(value);
+        // 保存形式は 10 進の整数文字列だけ。BigInt.tryParse は "0x10" や前後の
+        // 空白も受け付けるので、形式を先に絞る。
+        seed = _decimalInteger.hasMatch(value) ? BigInt.tryParse(value) : null;
       } else if (value is int) {
         seed = BigInt.from(value);
       } else {
@@ -79,6 +81,8 @@ Object? _sanitizeParamValue(VisionParam p, Object? value) {
       return seed;
   }
 }
+
+final RegExp _decimalInteger = RegExp(r'^-?\d+$');
 
 double _clampToDefinition(VisionParam p, double v) {
   var out = v;
