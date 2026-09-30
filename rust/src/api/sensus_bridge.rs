@@ -817,7 +817,7 @@ pub fn apply_vision_cpu_rgba8(
 
     let out =
         sensus_core::apply(filter.to_sensus(), dynimg, strength).map_err(|e| e.to_string())?;
-    Ok(out.to_rgba8().into_raw())
+    Ok(out.into_rgba8().into_raw())
 }
 
 /// [`apply_vision_pipeline_cpu_rgba8`] の 1 ステップ。
@@ -859,7 +859,7 @@ pub fn apply_vision_pipeline_cpu_rgba8(
     let dynimg = rgba8_to_dynamic_image(rgba8, width, height)?;
 
     if steps.is_empty() {
-        return Ok(dynimg.to_rgba8().into_raw());
+        return Ok(dynimg.into_rgba8().into_raw());
     }
 
     let mut pipeline = sensus_core::pipeline::Pipeline::new();
@@ -870,7 +870,7 @@ pub fn apply_vision_pipeline_cpu_rgba8(
         ));
     }
     let out = pipeline.apply(dynimg).map_err(|e| e.to_string())?;
-    Ok(out.to_rgba8().into_raw())
+    Ok(out.into_rgba8().into_raw())
 }
 
 /// 生 RGBA8 を検証して `DynamicImage`（Rgba8）にする。`apply_vision_cpu_rgba8` と
@@ -881,7 +881,12 @@ fn rgba8_to_dynamic_image(
     width: u32,
     height: u32,
 ) -> Result<image::DynamicImage, String> {
-    let expected = (width as usize) * (height as usize) * 4;
+    // 桁あふれ（32bit ターゲットで巨大な width/height）は期待長を表せないので、
+    // バッファ長不一致と同じ系統のエラーにする。
+    let expected = (width as usize)
+        .checked_mul(height as usize)
+        .and_then(|n| n.checked_mul(4))
+        .ok_or_else(|| format!("rgba8 length {} != width*height*4 (overflow)", rgba8.len()))?;
     if rgba8.len() != expected {
         return Err(format!(
             "rgba8 length {} != width*height*4 ({})",
@@ -1401,7 +1406,9 @@ pub(crate) mod tests {
 
     #[test]
     fn pipeline_single_step_matches_single_apply_for_all_filters() {
-        let (w, h) = (16u32, 12u32);
+        // 64x64: ぼかし系（半径 = strength * 比率 * min(W,H)）が MIN_BLUR_RADIUS_PX 以上になり、
+        // 単体適用側でも実際に効く大きさ。
+        let (w, h) = (64u32, 64u32);
         let input = pipeline_test_rgba(w, h);
         for f in ALL_FILTERS {
             let single = apply_vision_cpu_rgba8(f, input.clone(), w, h, 0.7).unwrap();
@@ -1413,8 +1420,16 @@ pub(crate) mod tests {
 
     #[test]
     fn pipeline_two_to_five_steps_match_one_by_one_application() {
-        let (w, h) = (32u32, 24u32);
+        // Myopia の半径は strength(0.8) * 0.023 * min(W,H) で、64 なら約 1.18px。
+        // sensus の isotropic_disk_blur_image（common.rs）は 0.5px 未満だと identity なので、
+        // 32x24（約 0.44px）ではぼかしが効かない。64x64 で実際にぼかしを含む多段にする。
+        let (w, h) = (64u32, 64u32);
         let input = pipeline_test_rgba(w, h);
+        assert_ne!(
+            apply_vision_cpu_rgba8(VisionFilter::Myopia, input.clone(), w, h, 0.8).unwrap(),
+            input,
+            "前提: この条件で Myopia が実際に画素を変える"
+        );
         let all = [
             step(VisionFilter::Protanopia, 1.0),
             step(VisionFilter::Myopia, 0.8),
