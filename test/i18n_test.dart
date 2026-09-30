@@ -1,8 +1,11 @@
 // i18n 基盤（#18）の配線を自動検証する。
 //
-// 1. ARB の en/ja でキー集合が一致する（訳漏れの早期検出）。
-// 2. AppLocalizations が en/ja の両方で lookup でき、代表キーが空でない。
-// 3. SettingsService.setLocale が往復・永続化し、null でシステム追従に戻る。
+// 1. `lib/l10n/app_*.arb` を glob し、全 ARB のキー集合・プレースホルダが基準言語（en）と
+//    一致し、ARB の言語が AppLocalizations.supportedLocales と一致する（訳漏れの早期検出。
+//    言語を足してもこのテストの改修は要らない）。
+// 2. AppLocalizations が対応言語すべてで lookup でき、代表キーが空でない。
+// 3. SettingsService.setLocale が往復・永続化し、null でシステム追従に戻る。未対応の
+//    言語コードが保存されていたら読み込み時に捨てる（#82）。
 // 4. HomeScreen を ja / en で pump し、ロケールごとに正しい文言が出る
 //    （受診喚起メッセージ含む）。
 
@@ -42,32 +45,96 @@ Map<String, dynamic> _readArb(String name) {
 Set<String> _messageKeys(Map<String, dynamic> arb) =>
     arb.keys.where((k) => !k.startsWith('@')).toSet();
 
+/// `lib/l10n/app_<言語コード>.arb` を全部読む（言語コード → 中身）。言語を足したとき
+/// このテストの改修なしに検査対象へ入るよう、ファイルを glob する。
+Map<String, Map<String, dynamic>> _readAllArbs() {
+  final result = <String, Map<String, dynamic>>{};
+  final pattern = RegExp(r'^app_(.+)\.arb$');
+  final files = Directory('lib/l10n')
+      .listSync()
+      .whereType<File>()
+      .map((f) => f.uri.pathSegments.last)
+      .where(pattern.hasMatch)
+      .toList()
+    ..sort();
+  for (final name in files) {
+    result[pattern.firstMatch(name)!.group(1)!] = _readArb(name);
+  }
+  return result;
+}
+
+/// メッセージ中のプレースホルダ名（`{name}`）。
+Set<String> _placeholders(String message) =>
+    RegExp(r'\{(\w+)\}').allMatches(message).map((m) => m.group(1)!).toSet();
+
+/// 対応言語すべての AppLocalizations（`AppLocalizations.supportedLocales`）。
+List<AppLocalizations> _allLocalizations() => [
+      for (final locale in AppLocalizations.supportedLocales)
+        lookupAppLocalizations(locale),
+    ];
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('ARB 整合性', () {
-    test('en と ja のキー集合が一致する', () {
-      final en = _messageKeys(_readArb('app_en.arb'));
-      final ja = _messageKeys(_readArb('app_ja.arb'));
-      expect(ja.difference(en), isEmpty, reason: 'ja にしかないキー');
-      expect(en.difference(ja), isEmpty, reason: 'en にしかないキー（ja 訳漏れ）');
+    // 基準言語は l10n.yaml の template-arb-file（app_en.arb）。
+    const templateCode = 'en';
+
+    test('ARB ファイルの言語と AppLocalizations.supportedLocales が一致する', () {
+      final arbs = _readAllArbs();
+      expect(arbs, contains(templateCode));
+      final supported =
+          AppLocalizations.supportedLocales.map((l) => l.languageCode).toSet();
+      expect(arbs.keys.toSet(), supported,
+          reason: 'ARB の言語 = 対応言語（supportedLocales は ARB から生成される）');
+      for (final entry in arbs.entries) {
+        expect(entry.value['@@locale'], entry.key,
+            reason: 'app_${entry.key}.arb の @@locale がファイル名と違う');
+      }
     });
 
-    test('ja の全メッセージが非空文字列', () {
-      final ja = _readArb('app_ja.arb');
-      for (final key in _messageKeys(ja)) {
-        expect(ja[key], isA<String>(), reason: key);
-        expect((ja[key] as String).trim(), isNotEmpty, reason: key);
+    test('全 ARB のキー集合が基準言語（en）と一致する', () {
+      final arbs = _readAllArbs();
+      final template = _messageKeys(arbs[templateCode]!);
+      for (final entry in arbs.entries) {
+        if (entry.key == templateCode) continue;
+        final keys = _messageKeys(entry.value);
+        expect(keys.difference(template), isEmpty,
+            reason: '${entry.key} にしかないキー');
+        expect(template.difference(keys), isEmpty,
+            reason: '${entry.key} の訳漏れ（キーの欠落）');
+      }
+    });
+
+    test('全 ARB の全メッセージが非空文字列', () {
+      for (final entry in _readAllArbs().entries) {
+        for (final key in _messageKeys(entry.value)) {
+          expect(entry.value[key], isA<String>(), reason: '${entry.key}.$key');
+          expect((entry.value[key] as String).trim(), isNotEmpty,
+              reason: '${entry.key}.$key');
+        }
+      }
+    });
+
+    test('全 ARB で、基準言語と同じプレースホルダを持つ', () {
+      final arbs = _readAllArbs();
+      final template = arbs[templateCode]!;
+      for (final entry in arbs.entries) {
+        if (entry.key == templateCode) continue;
+        for (final key in _messageKeys(template)) {
+          final translated = entry.value[key];
+          if (translated is! String) continue; // 欠落は上のテストが報告する
+          expect(
+              _placeholders(translated), _placeholders(template[key] as String),
+              reason: '${entry.key}.$key のプレースホルダが en と違う');
+        }
       }
     });
   });
 
   group('AppLocalizations lookup', () {
-    test('en/ja とも代表キーが解決でき空でない', () {
-      for (final l10n in [
-        lookupAppLocalizations(const Locale('en')),
-        lookupAppLocalizations(const Locale('ja')),
-      ]) {
+    test('対応言語すべてで代表キーが解決でき空でない', () {
+      for (final l10n in _allLocalizations()) {
         expect(l10n.appTitle, isNotEmpty);
         expect(l10n.filterListHeading, isNotEmpty);
         expect(l10n.consultEarly, isNotEmpty);
@@ -76,57 +143,50 @@ void main() {
       }
     });
 
-    test('全 catalog id がフォールバックなしで名前解決できる', () {
-      final en = lookupAppLocalizations(const Locale('en'));
-      for (final entry in kVisionFilterCatalog) {
-        // フォールバックは id をそのまま返すので、id と異なれば解決済み。
-        expect(visionFilterName(en, entry.id), isNot(entry.id),
-            reason: entry.id);
+    test('全 catalog id が対応言語すべてでフォールバックなしで名前解決できる', () {
+      // フォールバックは id をそのまま返すので、id と異なれば解決済み。これが検出するのは
+      // 「id に対応する ARB キーの引き当て漏れ」で、訳が英語のままコピーされている
+      // ケースは検出できない（それは翻訳の確認で見る。docs/ADDING_A_LANGUAGE.md）。
+      for (final l10n in _allLocalizations()) {
+        for (final entry in kVisionFilterCatalog) {
+          expect(visionFilterName(l10n, entry.id), isNot(entry.id),
+              reason: '${l10n.localeName}.${entry.id}');
+        }
       }
     });
 
-    test('全サンプル id が ja/en ともフォールバックなしで名前解決できる（#78 レビュー S7）',
-        () {
-      final en = lookupAppLocalizations(const Locale('en'));
-      final ja = lookupAppLocalizations(const Locale('ja'));
-      for (final entry in kSampleCatalog) {
-        // フォールバックは id をそのまま返すので、id と異なれば解決済み。
-        expect(sampleImageName(en, entry.id), isNot(entry.id), reason: entry.id);
-        expect(sampleImageName(ja, entry.id), isNot(entry.id), reason: entry.id);
+    test('全サンプル id が対応言語すべてでフォールバックなしで名前解決できる（#78）', () {
+      for (final l10n in _allLocalizations()) {
+        for (final entry in kSampleCatalog) {
+          // フォールバックは id をそのまま返すので、id と異なれば解決済み。
+          expect(sampleImageName(l10n, entry.id), isNot(entry.id),
+              reason: '${l10n.localeName}.${entry.id}');
+        }
       }
     });
 
     test(
-        '全 catalog param.labelKey / option.labelKey が en/ja ともフォールバックなしで'
+        '全 catalog param.labelKey / option.labelKey が対応言語すべてでフォールバックなしで'
         '名前解決できる', () {
       // visionParamLabel() のフォールバックは labelKey をそのまま返すので、
       // labelKey と異なれば実翻訳が解決できている（未訳のまま raw key が UI に
       // 出てしまう回帰を検出する）。
-      final en = lookupAppLocalizations(const Locale('en'));
-      final ja = lookupAppLocalizations(const Locale('ja'));
-      for (final entry in kVisionFilterCatalog) {
-        for (final param in entry.parameters) {
-          expect(
-            visionParamLabel(en, param.labelKey),
-            isNot(param.labelKey),
-            reason: '${entry.id}.${param.name} (en)',
-          );
-          expect(
-            visionParamLabel(ja, param.labelKey),
-            isNot(param.labelKey),
-            reason: '${entry.id}.${param.name} (ja)',
-          );
-          for (final option in param.options) {
+      for (final l10n in _allLocalizations()) {
+        final lang = l10n.localeName;
+        for (final entry in kVisionFilterCatalog) {
+          for (final param in entry.parameters) {
             expect(
-              visionParamLabel(en, option.labelKey),
-              isNot(option.labelKey),
-              reason: '${entry.id}.${param.name}.${option.value} (en)',
+              visionParamLabel(l10n, param.labelKey),
+              isNot(param.labelKey),
+              reason: '${entry.id}.${param.name} ($lang)',
             );
-            expect(
-              visionParamLabel(ja, option.labelKey),
-              isNot(option.labelKey),
-              reason: '${entry.id}.${param.name}.${option.value} (ja)',
-            );
+            for (final option in param.options) {
+              expect(
+                visionParamLabel(l10n, option.labelKey),
+                isNot(option.labelKey),
+                reason: '${entry.id}.${param.name}.${option.value} ($lang)',
+              );
+            }
           }
         }
       }
@@ -206,6 +266,23 @@ void main() {
       final c = SettingsService();
       await c.load();
       expect(c.locale, isNull);
+    });
+
+    test('未対応の言語コードが保存されていたら、読み込み時に捨てて自動（null）にする（#82）', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        SettingsService.keyLocale: 'xx',
+      });
+      final settings = SettingsService();
+      await settings.load();
+      expect(settings.locale, isNull);
+
+      // 対応言語の保存値はそのまま復元される。
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        SettingsService.keyLocale: 'ja',
+      });
+      final restored = SettingsService();
+      await restored.load();
+      expect(restored.locale, const Locale('ja'));
     });
   });
 

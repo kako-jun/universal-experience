@@ -612,5 +612,25 @@
   "windowModeCloseButton": "Close",
   "@windowModeCloseButton": {
     "description": "Button that closes the launch-mode dialog (#72)."
+  },
+  "languageSectionTitle": "Language",
+  "@languageSectionTitle": {
+    "description": "Tooltip of the AppBar language button and title of the language dialog (#82)."
+  },
+  "languageOptionSystem": "Auto",
+  "@languageOptionSystem": {
+    "description": "Language dialog option that follows the device language instead of forcing one (#82). The other options are language names shown in their own language (日本語 / English) and are not translated."
+  },
+  "languageOptionSystemSemantics": "Auto (device language)",
+  "@languageOptionSystemSemantics": {
+    "description": "Screen-reader label of the Auto option in the language dialog, so it is read together with what it does (follows the device language) instead of just 'Auto' (#82)."
+  },
+  "languageDialogNote": "\"Auto\" follows your device language (English if it is not supported). The tray menu changes language too.",
+  "@languageDialogNote": {
+    "description": "Caption under the language selector in the language dialog (#82)."
+  },
+  "languageCloseButton": "Close",
+  "@languageCloseButton": {
+    "description": "Button that closes the language dialog (#82)."
   }
 }

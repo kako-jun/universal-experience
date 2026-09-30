@@ -211,10 +211,31 @@
   `quickColorVisionFilters()` / `buildTrayMenuSpec()` / `trayToggleLabel()` /
   `resolveCloseAction()`) — 「トレイメニューに何を出すか」をデータとして表現する。
   tray_manager に一切依存しないため、ウィンドウシステム無しで単体テストできる
-  (`test/tray_service_test.dart`、15 件)。
+  (`test/tray_service_test.dart`)。
 - **`TrayService`** — tray_manager を叩く副作用層。上記スペックを実際の
   `Menu` / `MenuItem` に変換し、クリックを `FilterService` (#14) と、main.dart
   から注入されるウィンドウ表示/非表示コールバックに橋渡しする。
+
+### 言語の切替とトレイの文言 (#82)
+
+AppBar の言語ダイアログ (`lib/ui/widgets/language_dialog.dart`) が
+`SettingsService.setLocale` を呼ぶ。使う言語は `lib/l10n/locale_resolution.dart` の
+`resolveSupportedLocale`（選んだ言語 → OS の言語の一覧 → 英語）が唯一の入口。
+OS の言語は Flutter 標準の `basicLocaleListResolution` に一覧ごと渡して選ぶ
+（`[fr, ja]` で fr 未対応なら ja になる）。`main.dart` の `MaterialApp` は、
+言語を選んでいれば `locale` にこの関数の結果を、「自動」なら
+`localeListResolutionCallback` からこの関数を呼ぶ。起動時のエラー画面とトレイも
+同じ関数なので、画面とトレイの言語がずれない。保存された言語コードが
+`supportedLocales` に無いときは `SettingsService.load` が捨てて「自動」に戻す。
+
+トレイは `BuildContext` を持たないため、`TrayService` はコンストラクタで文言
+(`TrayMenuLabels` とツールチップ) を受け取り、`updateLocalization()` で差し替える
+(初期化済みならツールチップとメニューを作り直す)。`lib/services/tray_locale_sync.dart` の
+`TrayLocaleSync` が `SettingsService` の変更と `WidgetsBindingObserver.didChangeLocales`
+（「自動」のときの OS 言語変更）を見て、**解決後の言語が変わったときだけ**
+`main()` から渡された `apply` を呼ぶ。`test/tray_locale_sync_test.dart` と
+`test/tray_service_test.dart` の `updateLocalization` がこれを検証する。言語の追加手順は
+`docs/ADDING_A_LANGUAGE.md`。
 
 メインウィンドウ自体がルーペ窓 (#14)。`LoupeWindowController` は枠/モード/透過の
 責務を持つが show/hide は持たないため、トレイの「ルーペ窓を表示/隠す」は

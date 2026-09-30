@@ -131,7 +131,7 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 | 情報のまとまり | `Card`（`CardTheme` のとおり、影なし・`surfaceContainerHighest`）を**画面の主要な区画にだけ** | カードの中にカード、カードの中に枠付きカード |
 | 主要な 1 アクション | `FilledButton` | 1 つの区画に `FilledButton` を複数 |
 | 副次アクション | `OutlinedButton` / `TextButton` | |
-| 排他的な少数の選択（2〜4 個）: 起動モードなど | `SegmentedButton` | チップの並べ置き |
+| 排他的な少数の選択（2〜4 個）: 起動モード・言語など | `SegmentedButton` | チップの並べ置き |
 | 多数の選択肢から 1 つ選ぶ（フィルタ選択・サンプル画像） | `ChoiceChip`（選択中がひと目で分かる） | 選択状態を色だけで示すボタン |
 | ON/OFF の切り替えが状態として残るもの | `FilterChip` / `Switch` | |
 | 大分類の切り替え（フィルタのカテゴリ） | `ChoiceChip` の `Wrap`（広幅・狭幅とも。「すべて」+ 7 カテゴリ、選択中はチェックと色） | ボタンで独自に作る |
@@ -165,6 +165,13 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
   復帰方法（フォーカス復帰・Esc・トレイ・ホットキー）を主画面最上部の `ClickThroughRecoveryBanner` に常時出す（#63）。
   ダイアログ内でスイッチを ON にするとダイアログは自動で閉じ（案内が見えるようにする）、開いたままの間も
   ダイアログ内で `Esc` が解除として効く。
+- **言語**（`LanguageDialog`）も AppBar のボタン（地球儀）から開くダイアログ。排他的な 3 択（自動 /
+  日本語 / English）なので `SegmentedButton`（§5）。言語名は**その言語自身の表記**で出し、翻訳しない
+  （読めない言語の画面から抜け出せるように）。読み上げでは各言語名に言語を付ける
+  （`LocaleStringAttribute`）。「自動」は端末の言語に合わせ、対応外なら英語で、補足文に書く。見た目は短い「自動」のまま、
+  読み上げだけ「自動（端末の言語）」にする。
+  選ぶとフィルタ名・説明・トレイの文言まで即時に切り替わる（#82）。起動モードと同じ
+  クリックスルー安全策（ON になったら自動で閉じる・`Esc` で解除）を共有部品で持つ。
 - キー操作: `/` は検索欄へ、`↑↓` は今見えている一覧の行を順送り（体験プリセットは含まない）、
   `←→` は強度 5% 刻み、`Esc` はクリックスルー解除。フォーカスがテキスト入力・ボタン・スライダー・
   一覧の行などにあるときは奪わない。行を**ポインタで**選んだあとだけ画面がショートカットの受け口へフォーカスを戻し、Enter/Space で選んだときはフォーカスを行に残す。
@@ -283,7 +290,8 @@ UE_SCREENSHOTS=1 UE_SCREENSHOT_DIR=/path/to/out \
   （狭幅 800×700。どちらもウィンドウ 1 枚ぶん）、狭幅だけ同名に `-full` を付けた縦長の全体像（縦積みの
   スクロール量の確認用）、`wide-{light|dark}-ja-hc.png`（ハイコントラスト）、
   `{wide|wide-low|default-window}-light-ja-clickthrough.png`（クリックスルー ON の案内。`wide-low` は 1280×480、
-  `default-window` は 800×600）と `wide-light-ja-dialog.png`（起動モードのダイアログ）、
+  `default-window` は 800×600）、`wide-light-ja-dialog.png`（起動モードのダイアログ）と
+  `wide-{light|dark}-{ja|en}-languagedialog.png`（言語ダイアログ。light/ja と dark/en の 2 枚）、
   `wide-light-ja-tunnel-mid.png` / `wide-light-ja-tunnel-max.png` / `wide-dark-ja-tunnel-max.png` / `wide-light-en-tunnel-max.png` / `wide-light-ja-tunnel-max-hc.png`（tunnel_vision の強度スライダの印と警告の 5 通り。#66）。
 - フォールバック: macOS のシステムフォント（ヒラギノ角ゴシック / Apple Symbols）と Flutter SDK 同梱の
   Roboto・Material Icons を `FontLoader` で読む。**フォントファイルはリポに入れない。** 見つからない環境では
