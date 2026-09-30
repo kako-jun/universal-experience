@@ -804,6 +804,31 @@ void main() {
       expect(result.strengthByKey, {'myopia': 0.5, 'protanopia': 0.9});
     });
 
+    test('(a) 版 1 が -opia の強度だけなら、空とみなさず seedType の層は足さない', () async {
+      SharedPreferences.setMockInitialValues({
+        VisionFilterStore.keySnapshot: jsonEncode({
+          'version': 1,
+          'selectedId': null,
+          'filters': {
+            'protanopia': {'strength': 1.0},
+          },
+        }),
+        legacyKey: jsonEncode({'protanopia': 0.4}),
+      });
+
+      final result = await migrate(seedType: ColorVisionType.protanopia);
+
+      expect(result!.layers, isEmpty, reason: '旧実装は非空として復元し、未選択で始まった');
+      expect(result.focusedId, isNull);
+      expect(result.strengthByKey, {'protanopia': 0.4},
+          reason: '版 1 の -opia 強度は持ち越さず、旧 per-type 強度だけが残る');
+      final saved = (await _storedJson())!;
+      expect(saved['version'], 2);
+      expect(saved['layers'], isEmpty);
+      expect(saved['strengthByKey'], {'protanopia': 0.4});
+      expect(await hasLegacyKey(), isFalse);
+    });
+
     test('(a) 版 1 が空（選択も記憶も無い）なら seedType の層を入れる', () async {
       SharedPreferences.setMockInitialValues({
         VisionFilterStore.keySnapshot: jsonEncode({
