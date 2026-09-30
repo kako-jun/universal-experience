@@ -144,7 +144,8 @@ class ExportCaption {
 
   /// 複数の層を重ねた書き出し用。[layers]（適用順、2 つ以上）の各行を、[symptomLabel] と
   /// [strengthLabel] の 2 行の代わりに描く。[symptomLabel] は層の名前を `+` でつないだもの
-  /// （画像には描かない。テストや代替テキストが全層の名前を読める用）、[strengthLabel] は空。
+  /// （画像には描かない。全層の名前を 1 つの文字列で読めるようにしておく用）、
+  /// [strengthLabel] は空。
   ExportCaption.layered({
     required this.layers,
     required this.isoDate,
