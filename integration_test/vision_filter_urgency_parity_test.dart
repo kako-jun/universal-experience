@@ -96,17 +96,35 @@ void main() {
   });
 
   group('出典・限界のメタデータ（#80）: 実ブリッジの値を UI がそのまま出す', () {
-    testWidgets('limitations は全 30 種で非空、citation は空文字にならない（null は「出典なし」）',
+    testWidgets('limitations は全 30 種で非空、citation は空文字にならず、持つ id は既知の 10 種だけ',
         (tester) async {
+      // sensus 0.6.1 の `Filter::citation()` が Some を返すのは、一次資料が
+      // 文書化されているこの 10 種だけ（lib.rs の
+      // `citation_is_only_present_when_documented`）。増減したら sensus 側の
+      // 変更なので、このテストで気づく（null は「出典なし」として UI に出す）。
+      const expectedCited = {
+        'protanopia',
+        'deuteranopia',
+        'tritanopia',
+        'achromatopsia',
+        'myopia',
+        'hyperopia',
+        'presbyopia',
+        'astigmatism',
+        'cataract',
+        'night_blindness',
+      };
+      final cited = <String>{};
       for (final entry in kVisionFilterCatalog) {
         final filter = (VisionFilterState()..select(entry.id)).build()!;
         expect(visionFilterLimitations(filter: filter).trim(), isNotEmpty,
             reason: entry.id);
         final citation = visionFilterCitation(filter: filter);
-        if (citation != null) {
-          expect(citation.trim(), isNotEmpty, reason: entry.id);
-        }
+        if (citation == null) continue;
+        expect(citation.trim(), isNotEmpty, reason: entry.id);
+        cited.add(entry.id);
       }
+      expect(cited, expectedCited);
     });
 
     testWidgets('代表: 色覚 3 型は Machado 2009 を出典に持ち、四色覚は出典なし', (tester) async {

@@ -677,10 +677,28 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   integration test が検知する、#76 レビュー S1）。
 - **citation() / limitations()**: #80 で UI に配線した（右カラム最下段の
   `FilterProvenanceSection`。provider seam は `visionFilterCitationProvider` /
-  `visionFilterLimitationsProvider`、実ブリッジとの一致は integration test）。sensus の英文を
-  そのまま出し、ue 側で医学的な文言を訳さない。**sensus に無いもの（ue は捏造しない）**:
-  有病率（出典付きの数値）、フィルタごとの短い説明（i18n キー）、limitations の
-  日本語版。`citation()` は 10 フィルタにしか無く、無いフィルタは「出典を示していない」と表示する。
+  `visionFilterLimitationsProvider`、実ブリッジとの一致と「出典を持つ 10 種」の
+  完全一致は integration test）。sensus の英文をそのまま出し、ue 側で医学的な文言を
+  訳さない。英語以外の UI では出典・限界の両方に「原文をそのまま表示」と添える。
+  「医療監修を受けたものではありません」は折りたたみの外に常時 1 行出す。
+  `citation()` は 10 フィルタにしか無く、無い（null / 空）フィルタは「出典を示して
+  いない」と表示する。空の `limitations()` は折りたたみごと出さない。
+  - **sensus に無いもの（ue は捏造しない。sensus 側で Issue 化済み）**:
+    有病率（出典付きの数値、sensus#186）、フィルタごとの短い説明（i18n キー、
+    sensus#187）、limitations の日本語版（sensus#188）。
+  - **利用者向け文から API 名・内部参照を外す（sensus#189、未対応）**: sensus の
+    英文には `FieldLossMode::Darken` / `Blur` / `strength` などの API 名、
+    `see ADR-0003` / `see ADR-0004` / `see light.rs` の内部参照、ue が Darken に
+    固定していて利用者が選べない前提の文（「Blur is closer」など）が含まれる。ue は
+    書き換えない方針（訳・改変で誤情報にしない）なので、そのまま表示される。
+    sensus 側の修正を待つ。
+  - **出典の照合が未了（sensus#184）**: Vos (1978) の暗所視係数、屈折系の
+    「Smith–Helmholtz」の呼称は一次資料の照合が済んでいない。照合前の文言が UI に
+    表示されうる（夜盲・近視系のフィルタ）。
+  - **ue が持つ言い換え（パラメータ名）は sensus の定義と対応させる**: 乱視の
+    `axis_deg` は「ぼやける向き」ではなく**シャープ方向**（ぼかし方向は +90°）。
+    ARB の言い換えを変えるときは `test/filter_explanations_test.dart` の対応表
+    （sensus の定義の所在を注記）に合わせる。
 - **#65（永続化）向けの注意点（#76 レビュー N9）**: `VisionFilterState` の
   `_strengthById`/`_paramsById` はそのまま永続化できる構造にしてあるが、
   `_paramsById` の値は seed パラメータを [BigInt] で持つ（`kSeedMax` 参照）。

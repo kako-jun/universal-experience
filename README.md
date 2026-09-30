@@ -144,7 +144,9 @@ sensus-core の `experiences()` です。
 
 > すべての PNG に「シミュレーション（近似）」/ "Simulation (approximation)" の 1 文を
 > 焼き込みます（受診喚起の有無にかかわらず常に。単体で共有されても実際の見え方と
-> 誤解されないため、#80）。
+> 誤解されないため、#80）。狭い画像でも省略せず、折り返して全文を描きます。
+> 実験的なフィルタ（現状は四色覚）には、加えて「実験的な可視化」/
+> "Experimental visualization" も焼き込みます。
 >
 > 受診喚起がある場合は、PNG にもプレビューと同じ喚起文・escalation の行
 > （emergency/earlyConsultation の見出し付き）・免責文を焼き込みます（#76）。
