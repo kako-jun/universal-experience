@@ -10,22 +10,44 @@ class AppTheme {
 
   /// Brand seed color. A calm teal/cyan that reads well for an
   /// accessibility-focused colour-vision tool.
+  ///
+  /// 色の例外（DESIGN.md）: カラートークン（colorScheme）の生成元そのもの。
   static const Color seedColor = Color(0xFF00897B);
+
+  /// ハイコントラスト時に使う `ColorScheme.fromSeed` の contrastLevel
+  /// （-1.0..1.0。1.0 が最大）。プラットフォームのアクセシビリティ設定
+  /// （MediaQuery.highContrast）が有効なときだけ使う。
+  static const double highContrastLevel = 1.0;
 
   static ThemeData get lightTheme => _build(Brightness.light);
 
   static ThemeData get darkTheme => _build(Brightness.dark);
 
-  static ThemeData _build(Brightness brightness) {
+  /// `MaterialApp.highContrastTheme` 用。既定テーマと同じ生成ロジックで
+  /// contrastLevel だけを最大にする（二重実装しない）。
+  static ThemeData get highContrastTheme =>
+      _build(Brightness.light, contrastLevel: highContrastLevel);
+
+  /// `MaterialApp.highContrastDarkTheme` 用。
+  static ThemeData get highContrastDarkTheme =>
+      _build(Brightness.dark, contrastLevel: highContrastLevel);
+
+  static ThemeData _build(Brightness brightness, {double contrastLevel = 0.0}) {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: seedColor,
       brightness: brightness,
+      contrastLevel: contrastLevel,
     );
 
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
       brightness: brightness,
+      // デスクトップ（macOS/Windows/Linux）の既定は shrinkWrap + 密な密度で、
+      // チップ・テキストボタン・アイコンボタンが 48dp を割る。全プラットフォームで
+      // 最小タップ領域 48×48dp を保つ（DESIGN §5、#45）。
+      materialTapTargetSize: MaterialTapTargetSize.padded,
+      visualDensity: VisualDensity.standard,
       appBarTheme: AppBarTheme(
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,

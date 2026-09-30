@@ -28,10 +28,12 @@ lib/
 │   │                                 # （ライブ画面キャプチャ向けに残置、現状 production 未使用）
 │   └── image_fit.dart               # 任意画像を正準サイズの正方形へレターボックス（#78）
 ├── services/
-│   ├── app_shortcuts.dart           # アプリ内キー操作（/, ↑↓, ←→）の Intent 定義（#63）
+│   ├── app_shortcuts.dart           # アプリ内キー操作（/, ↑↓, ←→, Esc）の Intent 定義（#63/#72）
 │   ├── color_vision_selection.dart  # 色覚クイック選択の唯一の入口（FilterService/
 │   │                                 # VisionFilterState を同時更新、#60）
 │   ├── export_service.dart          # PNG エクスポート（メタ焼き込み）
+│   ├── filter_list_selection.dart   # 統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行）の
+│   │                                 # 検索・選択入口・↑↓ の順送りの純粋ロジック（#72）
 │   ├── filter_service.dart          # 選択状態モデル（sensus VisionFilter へのマッピング）
 │   ├── hotkey_actions.dart          # グローバルホットキー4アクションの実処理（#63）
 │   ├── hotkey_service.dart          # hotkey_manager 登録の副作用層（#63）
@@ -48,16 +50,19 @@ lib/
 ├── src/rust/                        # flutter_rust_bridge 生成コード（sensus-core 連携）
 └── ui/
     ├── screens/home_screen.dart
-    ├── widgets/                     # filter_selector, intensity_slider, before_after_view,
-    │                                 # experience_presets, filter_catalog_selector, filter_param_panel,
+    ├── widgets/                     # filter_browser（左カラム「選ぶ」: 検索・カテゴリ・統合一覧、#72）,
+    │                                 # filter_list_tile（一覧の 1 行）, adjust_panel（右カラム「調整」、#72）,
+    │                                 # intensity_slider, before_after_view,
+    │                                 # experience_presets（体験プリセットの行 ExperiencePresetTile）, filter_param_panel,
     │                                 # consult_notice_block（受診喚起の共有表示ウィジェット、#76）,
     │                                 # window_mode_panel（起動モード・最前面・クリックスルー・
-    │                                 # ホットキー一覧、#63）,
+    │                                 # ホットキー一覧を持つ。AppBar のダイアログで開く、#63/#72）,
     │                                 # loupe_hud（ルーペ窓モード限定の HUD。症状名・強度・
     │                                 # 受診喚起・原画比較・設定を開く、#79）,
     │                                 # image_source_picker（サンプルチップ・ファイル選択・
     │                                 # drag&drop、#78）, welcome_banner（初回案内、#78）
-    └── theme/app_theme.dart
+    └── theme/app_theme.dart         # light/dark に加え highContrastTheme / highContrastDarkTheme
+                                      # （contrastLevel 1.0。OS のハイコントラスト設定で MaterialApp が自動選択、#72）
 
 rust/                        # sensus-core を FRB で公開する Rust crate
 ├── Cargo.toml
@@ -76,6 +81,19 @@ assets/samples/              # サンプル画像集（自作・手続き生成�
 macos/                       # macOS ランナー（現行対応）
 linux/                       # Linux ランナー（現行対応）
 # Android / Windows ランナーは計画中（未作成）
+
+DESIGN.md                    # UI 設計原則（カラートークン・タイポ・余白・コンポーネント・画面構成・検証方法、#72）
+
+test/
+├── no_hardcoded_colors_test.dart   # lib/ の色ハードコードを検出（例外は DESIGN.md の例外表と一致させる、#72）
+├── app_theme_test.dart             # ハイコントラストテーマの生成と MaterialApp での切替（#72）
+├── home_screen_layout_test.dart    # 3 カラム/縦積み・プレビューの初回ビューポート・空状態・キー操作（#72）
+├── tap_target_size_test.dart       # macOS 指定で操作領域が 48dp 以上（padded + standard、#72）
+├── filter_browser_test.dart        # 統合一覧の検索・カテゴリ切替・行の選択（#72）
+├── filter_list_selection_test.dart # 統合一覧の純粋ロジック（#72）
+├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品
+├── support/screenshot_harness.dart # スクリーンショット用フォント読込・PNG 書出し（フォントはコミットしない）
+└── ui_screenshots/                 # HomeScreen の PNG 書出し。`UE_SCREENSHOTS=1` のときだけ実行（DESIGN.md §8）
 
 docs/
 ├── adr/                     # 設計判断の正本（Architecture Decision Records）
@@ -163,6 +181,13 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 - シンプルで学習コスト低
 - 将来的にRiverpod移行可能
 
+### 主画面の構成（統合一覧 + 3 カラム）
+
+色覚 7 型・advanced 30 フィルタ・体験プリセットを 1 つの検索できる一覧に統合し、広幅は
+選ぶ / 見る / 調整の 3 カラム、狭幅は縦積み。起動モード等は AppBar のダイアログへ移した。
+カテゴリ切替を `NavigationRail` でなく `ChoiceChip` の `Wrap` にした理由と代替案（`NavigationRail`・
+ボトムシート）、ハイコントラスト対応は `docs/adr/2026-09-30-home-screen-unified-list-and-three-columns.md`。
+
 ### iOS非対応
 
 目標とする方式（ルーペ窓のライブキャプチャ。`docs/adr/2026-09-26-loupe-as-single-render-unit.md`、
@@ -181,6 +206,9 @@ flutter analyze
 flutter test
 flutter run
 ```
+
+UI を変える場合は先に `DESIGN.md` を読む（色は `colorScheme` のロールのみ、余白は 4 の倍数、
+画面構成の目標状態など）。スクリーンショットで確認する手順は DESIGN.md §8。
 
 ## CI
 

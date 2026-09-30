@@ -121,9 +121,9 @@ void main() {
 
   testWidgets(
       '「ほかの見え方を選ぶ」は onChooseOtherView を呼んでから dismiss する'
-      '（#78 レビュー S8）。実際にチップへフォーカスを移し画面内へスクロール'
-      'する側の契約は test/filter_selector_test.dart の '
-      'FilterSelectorState.focusSelectedChip が担う（#78 レビュー nit）',
+      '（#78 レビュー S8）。実際に検索欄へフォーカスを移す側の契約は '
+      'test/filter_browser_test.dart（FilterBrowserController.focusSearch）と '
+      'test/home_screen_layout_test.dart のバナー経由の確認が担う（#78 レビュー nit、#72）',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     final settings = SettingsService();

@@ -2,7 +2,6 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/models/disability_type.dart';
-import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/preview_selection.dart';
@@ -144,46 +143,6 @@ void main() {
       visionState.setStrength(1.0);
       adjustPreviewStrength(visionState, filterService, kKeyboardStrengthStep);
       expect(visionState.strength, 1.0);
-    });
-  });
-
-  group('cycleAdvancedFilter', () {
-    test('未選択から forward で先頭を選ぶ', () {
-      final visionState = VisionFilterState();
-      cycleAdvancedFilter(visionState, forward: true);
-      expect(visionState.selectedId, kVisionFilterCatalog.first.id);
-    });
-
-    test('未選択から backward で末尾を選ぶ', () {
-      final visionState = VisionFilterState();
-      cycleAdvancedFilter(visionState, forward: false);
-      expect(visionState.selectedId, kVisionFilterCatalog.last.id);
-    });
-
-    test('forward はカタログ順で次に進み、末尾から先頭へ wraparound する', () {
-      final visionState = VisionFilterState()
-        ..select(kVisionFilterCatalog.last.id);
-      cycleAdvancedFilter(visionState, forward: true);
-      expect(visionState.selectedId, kVisionFilterCatalog.first.id);
-    });
-
-    test('backward はカタログ順で前に戻り、先頭から末尾へ wraparound する', () {
-      final visionState = VisionFilterState()
-        ..select(kVisionFilterCatalog.first.id);
-      cycleAdvancedFilter(visionState, forward: false);
-      expect(visionState.selectedId, kVisionFilterCatalog.last.id);
-    });
-
-    test('色覚クイック選択中は advanced の選択中とみなさず先頭/末尾から始める', () {
-      final filterService = FilterService();
-      final visionState = VisionFilterState();
-      selectColorVision(filterService, visionState, ColorVisionType.protanopia);
-      expect(visionState.isColorQuickSelection, isTrue);
-
-      cycleAdvancedFilter(visionState, forward: true);
-      expect(visionState.selectedId, kVisionFilterCatalog.first.id);
-      expect(visionState.isColorQuickSelection, isFalse,
-          reason: 'advanced への select は色覚クイック選択の記録を解除する');
     });
   });
 }

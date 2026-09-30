@@ -1,19 +1,257 @@
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:hotkey_manager/hotkey_manager.dart' show HotKey;
 import 'package:provider/provider.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../main.dart' show WindowModeUiContext;
+import '../../services/app_shortcuts.dart';
 import '../../services/hotkey_service.dart';
 import '../../services/loupe_window_controller.dart';
 
+/// クリックスルーを解除する方法の文言一覧（#63）。
+///
+/// フォーカス復帰＋最初のキー入力・アプリ内 Esc は常に使える復帰経路なので
+/// 必ず含める。トレイ・ホットキーは、実際に使えるときだけ足す。Wayland
+/// ネイティブセッションでは登録「成功」が実発火を保証しないため、その判定に
+/// 該当する Linux ではホットキーのヒントを常に除外する。toggleClickThrough の
+/// 方がクリックスルーを直接解除できて分かりやすいので優先する。
+///
+/// [WindowModePanel]（起動モードのダイアログ内、常時表示）と
+/// [ClickThroughRecoveryBanner]（クリックスルー ON の間、主画面に常時表示、
+/// #72）が共有する。
+List<String> clickThroughRecoveryLines(
+  AppLocalizations l10n,
+  WindowModeUiContext uiContext,
+) {
+  final isLikelyUnreliableHotkeyEnvironment = Platform.isLinux &&
+      LoupeWindowPolicy.isLikelyWaylandNativeSession(Platform.environment);
+  AppHotkeyAction? hotkeyRecoveryAction;
+  if (!isLikelyUnreliableHotkeyEnvironment) {
+    if (uiContext.hotkeyStatus.isRegistered(AppHotkeyAction.toggleClickThrough)) {
+      hotkeyRecoveryAction = AppHotkeyAction.toggleClickThrough;
+    } else if (uiContext.hotkeyStatus
+        .isRegistered(AppHotkeyAction.emergencyExit)) {
+      hotkeyRecoveryAction = AppHotkeyAction.emergencyExit;
+    }
+  }
+  final hotkeyRecoveryText = hotkeyRecoveryAction == null
+      ? null
+      : describeHotkey(
+          uiContext.hotkeyStatus.bindings[hotkeyRecoveryAction] ??
+              defaultHotkeyBindings()[hotkeyRecoveryAction]!,
+          useMacSymbols: Platform.isMacOS,
+        );
+  return [
+    l10n.clickThroughRecoveryFocusHint,
+    l10n.clickThroughRecoveryEscapeHint,
+    if (uiContext.trayAvailable) l10n.clickThroughRecoveryTrayHint,
+    if (hotkeyRecoveryText != null)
+      l10n.clickThroughRecoveryHotkeyHint(hotkeyRecoveryText),
+  ];
+}
+
+/// 起動モードのダイアログを開く（#72: 主役より後ろ、AppBar のボタンから）。
+///
+/// クリックスルーが ON になった時点（このダイアログのスイッチでも、グローバル
+/// ホットキー・トレイ経由でも）でダイアログを自動で閉じ、主画面の復帰方法の案内
+/// （[ClickThroughRecoveryBanner]）を見せる。ON のあとはクリックが窓を素通りして
+/// 「閉じる」ボタンを押せず、最初の Esc もダイアログを閉じるだけで解除まで 2 回
+/// かかってしまうため（#63）。すでに ON のままダイアログを開いた場合は閉じず、
+/// ダイアログの中でも Esc がクリックスルーの解除になる。
+///
+/// [MaterialApp] より上に置かれた Provider（`main.dart`）を読むので、
+/// ダイアログの中でもそのまま [WindowModePanel] が使える。
+Future<void> showWindowModeDialog(BuildContext context) {
+  final l10n = AppLocalizations.of(context)!;
+  return showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Row(
+        children: [
+          Icon(
+            Icons.window_outlined,
+            color: Theme.of(dialogContext).colorScheme.primary,
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Text(l10n.windowModeSectionTitle)),
+        ],
+      ),
+      content: const _ClickThroughDialogScope(
+        child: SizedBox(
+          width: 480,
+          child: SingleChildScrollView(child: WindowModePanel()),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: Text(l10n.windowModeCloseButton),
+        ),
+      ],
+    ),
+  );
+}
+
+/// [showWindowModeDialog] の中身を包む。クリックスルーの OFF→ON でダイアログを
+/// 閉じ、ON の間は Esc を [ReleaseClickThroughIntent]（解除）にする。
+class _ClickThroughDialogScope extends StatefulWidget {
+  const _ClickThroughDialogScope({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_ClickThroughDialogScope> createState() =>
+      _ClickThroughDialogScopeState();
+}
+
+class _ClickThroughDialogScopeState extends State<_ClickThroughDialogScope> {
+  LoupeWindowController? _loupe;
+  bool _wasClickThrough = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final loupe = context.read<LoupeWindowController>();
+    if (identical(loupe, _loupe)) return;
+    _loupe?.removeListener(_onChanged);
+    _loupe = loupe;
+    _wasClickThrough = loupe.clickThrough;
+    loupe.addListener(_onChanged);
+  }
+
+  void _onChanged() {
+    final on = _loupe?.clickThrough ?? false;
+    if (on && !_wasClickThrough && mounted) _closeThisDialog();
+    _wasClickThrough = on;
+  }
+
+  /// このダイアログのルートだけを閉じる。最上位のルートを無条件に pop すると、
+  /// 別のルート（別のダイアログなど）が上に載っているときにそちらを閉じてしまう。
+  void _closeThisDialog() {
+    final route = ModalRoute.of(context);
+    if (route == null || !route.isActive) return;
+    final navigator = Navigator.of(context);
+    if (route.isCurrent) {
+      navigator.pop();
+    } else {
+      navigator.removeRoute(route);
+    }
+  }
+
+  @override
+  void dispose() {
+    _loupe?.removeListener(_onChanged);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Shortcuts(
+      shortcuts: const <ShortcutActivator, Intent>{
+        SingleActivator(LogicalKeyboardKey.escape): ReleaseClickThroughIntent(),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          ReleaseClickThroughIntent: _ReleaseClickThroughAction(_loupe!),
+        },
+        // ダイアログの中にフォーカスを置く（キーイベントはフォーカスのある
+        // ノードから祖先へ流れるので、上の Shortcuts に届かせるため）。
+        child: Focus(autofocus: true, child: widget.child),
+      ),
+    );
+  }
+}
+
+/// ON の間だけ有効な Esc の解除アクション。OFF のときは無効になり、Esc は
+/// ダイアログの標準の閉じる動作へ流れる。
+class _ReleaseClickThroughAction extends Action<ReleaseClickThroughIntent> {
+  _ReleaseClickThroughAction(this._loupe);
+
+  final LoupeWindowController _loupe;
+
+  @override
+  bool isEnabled(ReleaseClickThroughIntent intent) => _loupe.clickThrough;
+
+  @override
+  Object? invoke(ReleaseClickThroughIntent intent) {
+    _loupe.setClickThrough(false);
+    return null;
+  }
+}
+
+/// クリックスルーが ON の間だけ主画面に常時表示する、復帰方法の案内（#63, #72）。
+///
+/// 復帰手段が見えないと操作不能になるため、起動モードのダイアログを開かなくても
+/// 見える場所（主画面の最上部）に出す。色は [ColorScheme] のロールのみ。
+class ClickThroughRecoveryBanner extends StatelessWidget {
+  const ClickThroughRecoveryBanner({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final uiContext = context.watch<WindowModeUiContext>();
+    return Consumer<LoupeWindowController>(
+      builder: (context, loupeWindow, _) {
+        if (!loupeWindow.clickThrough) return const SizedBox.shrink();
+        final lines = clickThroughRecoveryLines(l10n, uiContext);
+        return Semantics(
+          container: true,
+          liveRegion: true,
+          child: Container(
+            width: double.infinity,
+            margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: scheme.tertiaryContainer,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.ads_click, size: 18, color: scheme.onTertiaryContainer),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        l10n.clickThroughOnBannerTitle,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: scheme.onTertiaryContainer,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                for (final line in lines)
+                  Text(
+                    line,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: scheme.onTertiaryContainer),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// 起動モード・最前面固定・クリックスルー・グローバルホットキー一覧 (#63)。
 ///
-/// **色は `Theme.of(context).colorScheme` のロールだけを使う**（`home_screen.dart`
-/// の既存セクションはまだ `Colors.xxx` をハードコードしているが、この新しい
-/// ウィジェットだけは colorScheme ロールに従う、#63 の指示）。
+/// #72 で主画面から外し、AppBar のボタンから開くダイアログ
+/// （[showWindowModeDialog]）の中身にした。ここは面（`Card`）を持たない。
+/// クリックスルーの復帰方法の文言（[clickThroughRecoveryLines]）は、
+/// スイッチのすぐ下に常時表示する。
+///
+/// **色は `Theme.of(context).colorScheme` のロールだけを使う**（DESIGN.md）。
 class WindowModePanel extends StatelessWidget {
   const WindowModePanel({super.key});
 
@@ -26,132 +264,85 @@ class WindowModePanel extends StatelessWidget {
 
     return Consumer<LoupeWindowController>(
       builder: (context, loupeWindow, _) {
-        // 実際に登録されている toggleClickThrough/emergencyExit ホットキーを、
-        // 「戻るにはこのホットキー」ヒントに使う (#63)。toggleClickThrough の
-        // 方がクリックスルーを直接解除できて分かりやすいため優先する。Wayland
-        // ネイティブセッションでは登録「成功」が実発火を保証しないため、その
-        // 判定に該当する Linux では常にヒントから除外する。
-        final isLikelyUnreliableHotkeyEnvironment = Platform.isLinux &&
-            LoupeWindowPolicy.isLikelyWaylandNativeSession(Platform.environment);
-        AppHotkeyAction? hotkeyRecoveryAction;
-        if (!isLikelyUnreliableHotkeyEnvironment) {
-          if (uiContext.hotkeyStatus
-              .isRegistered(AppHotkeyAction.toggleClickThrough)) {
-            hotkeyRecoveryAction = AppHotkeyAction.toggleClickThrough;
-          } else if (uiContext.hotkeyStatus
-              .isRegistered(AppHotkeyAction.emergencyExit)) {
-            hotkeyRecoveryAction = AppHotkeyAction.emergencyExit;
-          }
-        }
-        final hotkeyRecoveryText = hotkeyRecoveryAction == null
-            ? null
-            : describeHotkey(
-                uiContext.hotkeyStatus.bindings[hotkeyRecoveryAction] ??
-                    defaultHotkeyBindings()[hotkeyRecoveryAction]!,
-                useMacSymbols: Platform.isMacOS,
-              );
+        final recoveryLines = clickThroughRecoveryLines(l10n, uiContext);
 
-        final recoveryLines = <String>[
-          l10n.clickThroughRecoveryFocusHint,
-          l10n.clickThroughRecoveryEscapeHint,
-          if (uiContext.trayAvailable) l10n.clickThroughRecoveryTrayHint,
-          if (hotkeyRecoveryText != null)
-            l10n.clickThroughRecoveryHotkeyHint(hotkeyRecoveryText),
-        ];
-
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.window_outlined, color: colorScheme.primary),
-                    const SizedBox(width: 12),
-                    Text(
-                      l10n.windowModeSectionTitle,
-                      style: theme.textTheme.titleLarge
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ],
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SegmentedButton<AppMode>(
+              segments: [
+                ButtonSegment(
+                  value: AppMode.settings,
+                  label: Text(l10n.windowModeSettings),
+                  icon: const Icon(Icons.tune),
                 ),
-                const SizedBox(height: 20),
-                SegmentedButton<AppMode>(
-                  segments: [
-                    ButtonSegment(
-                      value: AppMode.settings,
-                      label: Text(l10n.windowModeSettings),
-                      icon: const Icon(Icons.tune),
-                    ),
-                    ButtonSegment(
-                      value: AppMode.loupe,
-                      label: Text(l10n.windowModeLoupe),
-                      icon: const Icon(Icons.search),
-                    ),
-                  ],
-                  selected: {loupeWindow.appMode},
-                  onSelectionChanged: (selected) {
-                    if (selected.isEmpty) return;
-                    loupeWindow.setAppMode(selected.first);
-                  },
-                ),
-                const SizedBox(height: 8),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(l10n.alwaysOnTopLabel),
-                  value: loupeWindow.alwaysOnTop,
-                  onChanged: (value) => loupeWindow.setAlwaysOnTop(value),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(l10n.clickThroughLabel),
-                  value: loupeWindow.clickThrough,
-                  // 設定窓モードは UI 操作が前提の通常ウィンドウなので、
-                  // クリックスルーを ON にはできない。setClickThrough 自身が
-                  // 拒否するため機能的には安全だが、拒否されて何も起きないより
-                  // 先にスイッチ自体を無効化したほうが分かりやすい (#63)。
-                  onChanged: loupeWindow.appMode == AppMode.settings
-                      ? null
-                      : (value) => loupeWindow.setClickThrough(value),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 4, bottom: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (final line in recoveryLines)
-                        Text(
-                          line,
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: colorScheme.onSurfaceVariant),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  l10n.hotkeySectionTitle,
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                for (final action in AppHotkeyAction.values)
-                  _HotkeyRow(
-                    hotKey: uiContext.hotkeyStatus.bindings[action] ??
-                        defaultHotkeyBindings()[action]!,
-                    label: _hotkeyLabel(l10n, action),
-                    failed: uiContext.hotkeyStatus.failed.contains(action),
-                  ),
-                const SizedBox(height: 4),
-                Text(
-                  l10n.hotkeyRegistrationCaveat,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: colorScheme.onSurfaceVariant),
+                ButtonSegment(
+                  value: AppMode.loupe,
+                  label: Text(l10n.windowModeLoupe),
+                  icon: const Icon(Icons.search),
                 ),
               ],
+              selected: {loupeWindow.appMode},
+              onSelectionChanged: (selected) {
+                if (selected.isEmpty) return;
+                loupeWindow.setAppMode(selected.first);
+              },
             ),
-          ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(l10n.alwaysOnTopLabel),
+              value: loupeWindow.alwaysOnTop,
+              onChanged: (value) => loupeWindow.setAlwaysOnTop(value),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(l10n.clickThroughLabel),
+              value: loupeWindow.clickThrough,
+              // 設定窓モードは UI 操作が前提の通常ウィンドウなので、
+              // クリックスルーを ON にはできない。setClickThrough 自身が
+              // 拒否するため機能的には安全だが、拒否されて何も起きないより
+              // 先にスイッチ自体を無効化したほうが分かりやすい (#63)。
+              onChanged: loupeWindow.appMode == AppMode.settings
+                  ? null
+                  : (value) => loupeWindow.setClickThrough(value),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final line in recoveryLines)
+                    Text(
+                      line,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: colorScheme.onSurfaceVariant),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l10n.hotkeySectionTitle,
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            for (final action in AppHotkeyAction.values)
+              _HotkeyRow(
+                hotKey: uiContext.hotkeyStatus.bindings[action] ??
+                    defaultHotkeyBindings()[action]!,
+                label: _hotkeyLabel(l10n, action),
+                failed: uiContext.hotkeyStatus.failed.contains(action),
+              ),
+            const SizedBox(height: 4),
+            Text(
+              l10n.hotkeyRegistrationCaveat,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: colorScheme.onSurfaceVariant),
+            ),
+          ],
         );
       },
     );
@@ -194,7 +385,7 @@ class _HotkeyRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: TextStyle(
+              style: theme.textTheme.bodyMedium?.copyWith(
                 color: failed ? colorScheme.error : colorScheme.onSurface,
               ),
             ),

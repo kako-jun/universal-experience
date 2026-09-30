@@ -16,19 +16,25 @@ import 'consult_notice_block.dart';
 /// - enum → [DropdownButton]
 /// - seed → 表示 + 乱数再生成ボタン
 ///
-/// 加えて受診喚起の注記ブロック・strength スライダ・「推奨値に戻す」ボタンを
-/// 表示する。受診喚起（緊急度・条件付き上振れ）は sensus ブリッジ
+/// 加えて strength スライダ・「推奨値に戻す」ボタン・受診喚起の注記ブロックを
+/// 表示する。並びは **強度 → 受診喚起 → パラメータ**（#72: 受診喚起は強度の
+/// すぐ下に常時展開で出す）。受診喚起（緊急度・条件付き上振れ）は sensus ブリッジ
 /// （`visionFilterUrgencyProvider` / `visionFilterUrgencyEscalationProvider`、
 /// `lib/services/vision_filter_metadata.dart`）を**唯一の正本**にする（#76）。
 /// ue 独自の段階名（旧 `VisionFilterUrgency`）は UI に一切出さない。
 ///
-/// strength スライダは、選択が色覚クイック選択（`FilterSelector`/トレイ）
+/// strength スライダは、選択が色覚クイック選択（統合一覧の色覚の行/トレイ）
 /// 由来のときは出さない（`lib/services/preview_selection.dart` の
 /// `showsAdvancedStrengthSlider` を参照。その場合の強度は #57 のタイプ別
 /// 記憶が決め、このスライダーを動かしても反映されないため、#60）。
 /// 文言はすべて i18n で解決する（カタログは識別子/enum のみ持つ: #18）。
 class FilterParamPanel extends StatelessWidget {
-  const FilterParamPanel({super.key});
+  const FilterParamPanel({super.key, this.noticeOverride});
+
+  /// 受診喚起を、選択中フィルタ単体の緊急度ではなくこの値で表示する。体験
+  /// プリセットを選んでいるときの「体験としての緊急度」（`Experience.urgency`、
+  /// `experienceConsultNotice`）を渡すために使う。null ならフィルタから解決する。
+  final ConsultNotice? noticeOverride;
 
   @override
   Widget build(BuildContext context) {
@@ -36,16 +42,9 @@ class FilterParamPanel extends StatelessWidget {
     return Consumer<VisionFilterState>(
       builder: (context, state, _) {
         final entry = state.selectedEntry;
-        if (entry == null) {
-          return Text(
-            l10n.advancedParamPanelHint,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
-              fontStyle: FontStyle.italic,
-            ),
-          );
-        }
+        // 未選択のときの表示（「何も選択されていません」）は呼び出し側
+        // （`AdjustPanel`）が持つ。ここは何も出さない。
+        if (entry == null) return const SizedBox.shrink();
 
         // urgency/urgency_escalation は payload に依存しない（sensus 側 doc
         // 参照）ため、現在の選択（payload 込み）から組み立てた実インスタンスを
@@ -59,7 +58,8 @@ class FilterParamPanel extends StatelessWidget {
             : visionFilterUrgencyEscalationProvider(filter);
         // #76 レビュー M1: 喚起の解決は resolveConsultNotice 1 箇所に集約し、
         // 表示は ConsultNoticeBlock（プリセットカード・export と共有）に委ねる。
-        final notice = resolveConsultNotice(l10n, urgency, escalation);
+        final notice =
+            noticeOverride ?? resolveConsultNotice(l10n, urgency, escalation);
         // 色覚クイック選択由来の選択では、強度は previewStrength が
         // FilterService のタイプ別記憶（#57）から決める — この strength
         // スライダーを動かしても実際のプレビューには反映されないので出さない
@@ -68,10 +68,10 @@ class FilterParamPanel extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (notice != null) ConsultNoticeBlock(notice: notice, l10n: l10n),
-            if (showStrength) ...[
-              const SizedBox(height: 16),
-              _buildStrength(l10n, state),
+            if (showStrength) _buildStrength(context, l10n, state),
+            if (notice != null) ...[
+              if (showStrength) const SizedBox(height: 16),
+              ConsultNoticeBlock(notice: notice, l10n: l10n),
             ],
             for (final param in entry.parameters) ...[
               const SizedBox(height: 16),
@@ -83,14 +83,25 @@ class FilterParamPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildStrength(AppLocalizations l10n, VisionFilterState state) {
+  Widget _buildStrength(
+    BuildContext context,
+    AppLocalizations l10n,
+    VisionFilterState state,
+  ) {
     final percent = (state.strength * 100).toInt();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
+        // 狭い右カラムでも折り返して収まるよう Wrap にする（ラベルと「推奨に戻す」
+        // を横並びにできない幅では、ボタンが次の行へ落ちる）。
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Expanded(child: Text(l10n.strengthLabel(percent))),
+            Text(
+              l10n.strengthLabel(percent),
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
             TextButton.icon(
               onPressed: () => state.resetToRecommended(),
               icon: const Icon(Icons.restart_alt, size: 18),

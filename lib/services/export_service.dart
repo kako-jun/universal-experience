@@ -158,6 +158,9 @@ Future<ui.Image> composeExportImage(
   canvas.drawImage(base, Offset.zero, Paint());
 
   // キャプション帯（半透明の濃い背景）。
+  // 色の例外（DESIGN.md）: 以下のキャプション色はすべて、書き出す PNG に
+  // 焼き込む画素の色。BuildContext を持たず、アプリのテーマ（ライト/ダーク）に
+  // かかわらず同じ見た目で共有されるべきものなのでロールにしない。
   final bandTop = base.height.toDouble();
   canvas.drawRect(
     Rect.fromLTWH(0, bandTop, width.toDouble(), bandHeight),
@@ -237,7 +240,7 @@ enum _Style {
         return const TextStyle(
           color: Color(0xFFFFD27F),
           fontSize: 13,
-          fontStyle: FontStyle.italic,
+          fontWeight: FontWeight.w500,
           height: 1.25,
         );
       // escalation の段見出し（emergency/earlyConsultation、#76 再レビュー

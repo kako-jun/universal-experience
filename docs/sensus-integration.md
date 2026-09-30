@@ -270,7 +270,7 @@ ue が二重に持っていた色覚ロジックを撤去し、アルゴリズ�
   protanopia/deuteranopia/tritanopia/achromatopsia→対応する `VisionFilter`、
   -anomaly 系は sensus が severity を `strength` で表すため base の -opia へマップ
   （anomaly は強度 < 1 相当）。
-- **UI**: `filter_selector` / `intensity_slider` は `ColorVisionType` のまま動く
+- **UI**: `filter_selector`（現 `filter_browser`、#72） / `intensity_slider` は `ColorVisionType` のまま動く
   （FilterService の公開 API を維持）。home_screen は system-wide 適用前提の文言を
   外し、「ライブ画面への適用は画面キャプチャ経路（#1/#3/#4）実装後」と明記した。
 - **テスト**: `test/filter_service_test.dart` を追加（選択状態の遷移・clamp・
@@ -483,7 +483,7 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   変化を `VisionFilterState` へミラーしていたが、「`currentFilter` が変わった
   ときだけ」反映する差分検知のせいで、advanced/プリセットを経由したあとに
   同じ色覚型を再選択しても反映されない穴があった。ミラーはやめ、
-  `FilterSelector`・トレイ・`main.dart` の起動時復元のいずれも
+  `FilterBrowser`（旧 `FilterSelector`）・トレイ・`main.dart` の起動時復元のいずれも
   `selectColorVision`/`deactivateColorVision`
   （`lib/services/color_vision_selection.dart`）を直接呼んで、その場で
   `FilterService` と `VisionFilterState` の両方を更新する形にした。
@@ -605,8 +605,8 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   （urgency + escalation → 喚起文・段ごとにまとめた escalation
   （`ConsultEscalationGroup`）・免責文をまとめて解決する唯一の関数）と、
   `lib/ui/widgets/consult_notice_block.dart` の `ConsultNoticeBlock`
-  （表示ウィジェット）を切り出した。`FilterParamPanel`・`ExperiencePresets`
-  のカード・`before_after_view.dart` の export の 3 か所がこれを共有する。
+  （表示ウィジェット）を切り出した。`FilterParamPanel`・体験プリセット
+  （旧 `ExperiencePresets` のカード。#72 で `AdjustPanel` に移動）・`before_after_view.dart` の export の 3 か所がこれを共有する。
   export（`ExportCaption` / `export_service.dart`）にも免責文（短い形）と
   escalation の行を必ず焼き込む。escalation は PNG でも emergency/
   earlyConsultation の見出しで段を分ける（`ExportCaption.escalationGroups`、
@@ -631,7 +631,7 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   UI（`ConsultNoticeBlock`）だけでなく PNG（`ExportCaption.escalationGroups`）
   でも両方の見出しを最初から用意した。
 - **#76 再レビュー nit: 体験プリセットの免責文はセクション単位で 1 回**。
-  `ExperiencePresets` の各カードは喚起文・escalation は出すが、免責文・根拠
+  体験プリセットの各カード（旧 `ExperiencePresets`。#72 で一覧は行のみになり喚起は右カラムが出す）は喚起文・escalation は出すが、免責文・根拠
   URL は出さない（`ConsultNoticeBlock(showDisclaimer: false)`）。代わりに
   「体験プリセット」セクションの末尾に `ConsultDisclaimerFooter` を 1 回だけ
   表示する（いずれかのカードに喚起があるときのみ）。「免責文を必ず添える」
@@ -640,7 +640,7 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   `ConsultNoticeBlock` の既定（`showDisclaimer: true`）のまま。
 - **#76 再レビュー S-b: emergency の文字サイズ**。`ConsultNoticeBlock` の
   emergency 喚起文は当初 `titleMedium`（16px、太字）にしていたが、
-  `ExperiencePresets` のカードタイトル（同じ `titleMedium` + bold）と見た目が
+  体験プリセットのカードタイトル（旧 `ExperiencePresets`）（同じ `titleMedium` + bold）と見た目が
   衝突するという指摘を受け、`bodyLarge`（16px、太字）に変更した。
 - **#77: 推奨強度の唯一の正本**。`VisionFilterState` はフィルタ id ごとに
   strength/payload を記憶する（`_strengthById` / `_paramsById`）。初めて

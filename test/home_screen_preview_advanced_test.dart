@@ -1,10 +1,10 @@
-// HomeScreen のプレビュー（_buildPreviewSection の Consumer2<VisionFilterState,
+// HomeScreen のプレビュー（_previewCard の Consumer2<VisionFilterState,
 // FilterService> → BeforeAfterView）が、advanced カタログ（VisionFilterState）の
 // 選択・パラメータ変更に追従することの回帰テスト（#60）。
 //
 // #60 修正の要点は「プレビューの描画対象を VisionFilterState の現在の選択
 // （VisionFilter + payload + strength）に一本化する」こと。advanced カタログの
-// 選択（FilterCatalogSelector が呼ぶ `VisionFilterState.select`）が
+// 選択（統合フィルタ一覧が呼ぶ `VisionFilterState.select`）が
 // BeforeAfterView.filter/filterId に反映されること、payload の変更
 // （FilterParamPanel が呼ぶ `VisionFilterState.setParam`）が新しい filter
 // インスタンス（payload 込みの値等価）として反映されることを確認する。
@@ -15,8 +15,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
-import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/services/filter_list_selection.dart';
 import 'package:universal_experience/main.dart' show WindowModeUiContext;
 import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/filter_service.dart';
@@ -29,14 +29,14 @@ import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
-import 'package:universal_experience/ui/widgets/filter_selector.dart';
+import 'package:universal_experience/ui/widgets/filter_browser.dart';
 
 import 'support/vision_filter_metadata_fixture.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  // ExperiencePresets は実 FRB ブリッジ（experiences()）を要求し、プレーンな
+  // 体験プリセットの行は実 FRB ブリッジ（experiences()）を要求し、プレーンな
   // `flutter test` では呼べない。widget test 用の fixture に差し替える
   // （i18n_test.dart / home_screen_preview_intensity_test.dart と同じ手法）。
   // VisionFilterState の選択も同様に urgency/recommended_strength（#76/#77）で
@@ -103,8 +103,8 @@ void main() {
     expect(currentPreview().filter, isNull);
     expect(currentPreview().filterId, isNull);
 
-    // advanced カタログから starbursts を選択する（FilterCatalogSelector の
-    // onSelected と同じ呼び出し）。
+    // advanced カタログから starbursts を選択する（統合フィルタ一覧の行と同じ
+    // 呼び出し）。
     visionState.select('starbursts');
     await tester.pump();
 
@@ -233,7 +233,7 @@ void main() {
         tester.widget<BeforeAfterView>(find.byType(BeforeAfterView));
 
     // 1. protanomaly を色覚クイック選択で選び、強度を独自の値に変える
-    //    （#57 のタイプ別記憶）。selectColorVision は FilterSelector・トレイ
+    //    （#57 のタイプ別記憶）。selectColorVision は統合フィルタ一覧・トレイ
     //    共通の入口（#60）。
     selectColorVision(filterService, visionState, ColorVisionType.protanomaly);
     await tester.pump();
@@ -271,7 +271,7 @@ void main() {
   });
 
   testWidgets(
-      'protanopia → プリセット → protanopia に戻すと、プレビューに反映されチップも正しく点灯する '
+      'protanopia → プリセット → protanopia に戻すと、プレビューに反映され行も正しく点灯する '
       '（#60 回帰テスト）', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 4000);
     tester.view.devicePixelRatio = 1.0;
@@ -326,27 +326,24 @@ void main() {
     );
     await tester.pump();
 
+    final protanopiaEntry =
+        kFilterListEntries.firstWhere((e) => e.key == 'cv:protanopia');
     final en = lookupAppLocalizations(const Locale('en'));
     BeforeAfterView currentPreview() =>
         tester.widget<BeforeAfterView>(find.byType(BeforeAfterView));
-    // advanced カタログ（FilterCatalogSelector）にも "Protanopia" チップが
-    // あるため、FilterSelector（色覚クイック選択）の中だけに絞って探す。
-    Finder protanopiaChip() => find.descendant(
-          of: find.byType(FilterSelector),
-          matching: find.text(colorVisionTypeName(en, ColorVisionType.protanopia)),
-        );
-    bool protanopiaChipSelected() =>
-        tester.widget<FilterChip>(find.ancestor(
-          of: protanopiaChip(),
-          matching: find.byType(FilterChip),
-        )).selected;
+    // 統合フィルタ一覧（#72）の protanopia の行。選択中は行にチェックが付く。
+    Finder protanopiaRow() => find.byKey(filterListTileKey(protanopiaEntry));
+    bool protanopiaRowSelected() => find
+        .descendant(of: protanopiaRow(), matching: find.byIcon(Icons.check))
+        .evaluate()
+        .isNotEmpty;
 
-    // 1. protanopia チップをタップする。
-    await tester.tap(protanopiaChip());
+    // 1. protanopia の行をタップする。
+    await tester.tap(protanopiaRow());
     await tester.pump();
 
     expect(currentPreview().filterId, 'protanopia');
-    expect(protanopiaChipSelected(), isTrue);
+    expect(protanopiaRowSelected(), isTrue);
 
     // 2. プリセット（meniere）をタップする。色覚クイック選択の記憶は
     //    FilterService 側に残るが、プレビュー・チップの点灯は advanced/
@@ -356,21 +353,21 @@ void main() {
 
     expect(currentPreview().filterId, 'vertigo');
     expect(visionState.isColorQuickSelection, isFalse);
-    expect(protanopiaChipSelected(), isFalse,
-        reason: 'advanced/プリセットを見ている間は色覚チップを点灯させない（#60）');
+    expect(protanopiaRowSelected(), isFalse,
+        reason: 'advanced/プリセットを見ている間は色覚の行を点灯させない（#60）');
 
-    // 3. protanopia チップに戻す。以前の実装（listener ミラー + 直前の型との
+    // 3. protanopia の行に戻す。以前の実装（listener ミラー + 直前の型との
     //    差分検知）は、FilterService.currentFilter がプリセット遷移中も
     //    ずっと protanopia のままだったため、この再タップに反応せず
     //    VisionFilterState が更新されなかった（#60）。
     //    selectColorVision はタップの都度、無条件に両方のサービスを更新する
     //    ため、この再タップでも正しく反映される。
-    await tester.tap(protanopiaChip());
+    await tester.tap(protanopiaRow());
     await tester.pump();
 
     expect(currentPreview().filterId, 'protanopia');
     expect(visionState.isColorQuickSelection, isTrue);
-    expect(protanopiaChipSelected(), isTrue);
+    expect(protanopiaRowSelected(), isTrue);
   });
 
   testWidgets(

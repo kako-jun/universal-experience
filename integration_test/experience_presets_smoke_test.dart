@@ -31,6 +31,32 @@ import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/src/rust/frb_generated.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
+import 'package:universal_experience/ui/widgets/filter_browser.dart';
+
+/// 統合フィルタ一覧（#72）を固定高さで置くヘルパ。体験プリセットは一覧の最上段に
+/// 並ぶので、4 行とも初期表示で見える高さにしてある。
+class _BrowserBox extends StatefulWidget {
+  const _BrowserBox();
+
+  @override
+  State<_BrowserBox> createState() => _BrowserBoxState();
+}
+
+class _BrowserBoxState extends State<_BrowserBox> {
+  final FilterBrowserController _controller = FilterBrowserController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: 560,
+        child: FilterBrowser(controller: _controller),
+      );
+}
 
 Widget _presetsApp() {
   return MultiProvider(
@@ -50,14 +76,14 @@ Widget _presetsApp() {
       ],
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
-        body: SingleChildScrollView(child: ExperiencePresets()),
+        body: _BrowserBox(),
       ),
     ),
   );
 }
 
 /// home_screen.dart のプレビュー結線（#60）を最小構成で再現したアプリ。
-/// [ExperiencePresets] のタップが実際に [BeforeAfterView] の描画へつながる
+/// 体験プリセットの行（[ExperiencePresetTile]）のタップが実際に [BeforeAfterView] の描画へつながる
 /// ことを、実ブリッジ（CPU `apply()`）込みで確かめる。
 Widget _previewWithPresetsApp() {
   return MultiProvider(
@@ -89,7 +115,7 @@ Widget _previewWithPresetsApp() {
               child: const Column(
                 children: [
                   _PreviewFromState(),
-                  ExperiencePresets(),
+                  _BrowserBox(),
                 ],
               ),
             ),
@@ -101,7 +127,7 @@ Widget _previewWithPresetsApp() {
 }
 
 /// [_previewWithPresetsApp] 専用の配線ウィジェット。home_screen.dart の
-/// `_buildPreviewSection` と同じ判定（`previewStrength`）で
+/// `_previewCard` と同じ判定（`previewStrength`）で
 /// [VisionFilterState] の選択を [BeforeAfterView] に渡す。
 class _PreviewFromState extends StatelessWidget {
   const _PreviewFromState();
@@ -171,21 +197,21 @@ void main() {
     });
   });
 
-  group('プリセット欄（ExperiencePresets）', () {
-    testWidgets('実ブリッジで例外なく描画される（Card 4枚）', (tester) async {
+  group('プリセット行（統合フィルタ一覧の最上段、#72）', () {
+    testWidgets('実ブリッジで例外なく描画される（プリセットの行 4 つ）', (tester) async {
       await tester.pumpWidget(_presetsApp());
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
-      expect(find.byType(Card), findsNWidgets(4));
+      expect(find.byType(ExperiencePresetTile), findsNWidgets(4));
     });
 
-    testWidgets('カードをタップすると選択状態が変わる（色覚 FilterService は変更しない、#60）',
+    testWidgets('行をタップすると選択状態が変わる（色覚 FilterService は変更しない、#60）',
         (tester) async {
       await tester.pumpWidget(_presetsApp());
       await tester.pumpAndSettle();
 
-      final context = tester.element(find.byType(ExperiencePresets));
+      final context = tester.element(find.byType(FilterBrowser));
       final visionState = context.read<VisionFilterState>();
       final filterService = context.read<FilterService>();
 
@@ -253,7 +279,7 @@ void main() {
       await tester.pumpWidget(_previewWithPresetsApp());
       await tester.pumpAndSettle();
 
-      final context = tester.element(find.byType(ExperiencePresets));
+      final context = tester.element(find.byType(FilterBrowser));
       final visionState = context.read<VisionFilterState>();
 
       // afterImageRenderer（BeforeAfterView が公開する production 供給源、

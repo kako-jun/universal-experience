@@ -12,9 +12,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/main.dart';
 import 'package:universal_experience/models/disability_type.dart';
-import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/app_shortcuts.dart';
 import 'package:universal_experience/services/color_vision_selection.dart';
+import 'package:universal_experience/services/filter_list_selection.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
@@ -61,14 +61,14 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('/ で advanced カタログの FocusNode にフォーカスが移る',
+  testWidgets('/ で統合一覧の検索欄にフォーカスが移る（#72）',
       (WidgetTester tester) async {
     await pumpApp(tester);
 
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel,
-      isNot('filterCatalog'),
-      reason: '起動直後は Scaffold 側 (autofocus) にフォーカスがあるはず',
+      isNot('filterSearch'),
+      reason: '起動直後は画面のショートカット受け口（autofocus）にフォーカスがあるはず',
     );
 
     await tester.sendKeyEvent(LogicalKeyboardKey.slash);
@@ -76,33 +76,36 @@ void main() {
 
     expect(
       tester.binding.focusManager.primaryFocus?.debugLabel,
-      'filterCatalog',
+      'filterSearch',
     );
   });
 
-  testWidgets('↓ で VisionFilterState.selectedId がカタログ順に進む（先頭から）',
-      (WidgetTester tester) async {
+  testWidgets('↓ で統合一覧の選択が一覧順に進む（先頭から）', (WidgetTester tester) async {
     await pumpApp(tester);
     expect(visionFilterState.selectedId, isNull);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pump();
-    expect(visionFilterState.selectedId, kVisionFilterCatalog[0].id);
+    expect(selectedFilterListEntry(visionFilterState), kFilterListEntries[0]);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pump();
-    expect(visionFilterState.selectedId, kVisionFilterCatalog[1].id);
+    expect(selectedFilterListEntry(visionFilterState), kFilterListEntries[1]);
+
+    // 色覚の行を選んだときは FilterService 側も動く（selectColorVision 経由）。
+    await filterService.flush();
   });
 
-  testWidgets('↑ で VisionFilterState.selectedId がカタログ順に戻る',
-      (WidgetTester tester) async {
+  testWidgets('↑ で統合一覧の選択が一覧順に戻る', (WidgetTester tester) async {
     await pumpApp(tester);
-    visionFilterState.select(kVisionFilterCatalog[2].id);
+    applyFilterListEntry(filterService, visionFilterState, kFilterListEntries[2]);
     await tester.pump();
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
     await tester.pump();
-    expect(visionFilterState.selectedId, kVisionFilterCatalog[1].id);
+    expect(selectedFilterListEntry(visionFilterState), kFilterListEntries[1]);
+
+    await filterService.flush();
   });
 
   testWidgets('← → で advanced 選択中は VisionFilterState.strength が ±5% 動く',

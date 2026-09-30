@@ -4,16 +4,23 @@ import '../../l10n/app_localizations.dart';
 import '../../services/filter_service.dart';
 import '../../services/vision_filter_state.dart';
 
-/// 色覚クイック選択の強度スライダー（#60）。
+/// 色覚クイック選択の強度スライダー（#60）。右カラム「調整」（`AdjustPanel`、
+/// #72）の、色覚の行を選んでいるときの強度の入口。
 ///
-/// 有効/無効は `VisionFilterState.isColorQuickSelection` から導く（`none`
-/// チップの選択中・advanced カタログ/体験プリセットを見ている間は無効）。
+/// 有効/無効は `VisionFilterState.isColorQuickSelection` から導く（何も
+/// 選択していない・advanced カタログ/体験プリセットを見ている間は無効）。
+/// 選んでいないときの案内は `AdjustPanel` の「何も選択されていません」が担う
+/// ので、このウィジェット自身は説明文を持たない。
+///
+/// 文字の大きさ・太さは `textTheme` のロールで指定する（DESIGN §3）。
 class IntensitySlider extends StatelessWidget {
   const IntensitySlider({super.key});
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Consumer2<FilterService, VisionFilterState>(
       builder: (context, filterService, visionState, _) {
         final isEnabled = visionState.isColorQuickSelection;
@@ -21,14 +28,19 @@ class IntensitySlider extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // 狭い右カラムでも収まるよう Wrap にする（幅が足りなければ状態表示が
+            // 次の行へ落ちる）。
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
               children: [
                 Text(
                   l10n.intensityValue((filterService.intensity * 100).toInt()),
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: isEnabled ? Colors.black87 : Colors.grey,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: isEnabled
+                        ? colorScheme.onSurface
+                        : colorScheme.onSurface.withValues(alpha: 0.38),
                   ),
                 ),
                 if (isEnabled)
@@ -36,11 +48,10 @@ class IntensitySlider extends StatelessWidget {
                     filterService.isActive
                         ? l10n.intensityActive
                         : l10n.intensityInactive,
-                    style: TextStyle(
-                      fontSize: 14,
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       color: filterService.isActive
-                          ? Colors.green.shade700
-                          : Colors.orange.shade700,
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -60,18 +71,6 @@ class IntensitySlider extends StatelessWidget {
               divisions: 20,
               label: '${(filterService.intensity * 100).toInt()}%',
             ),
-            if (!isEnabled)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  l10n.intensityHint,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ),
           ],
         );
       },

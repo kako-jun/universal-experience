@@ -2,25 +2,34 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
-import '../../l10n/l10n_extensions.dart';
-import '../../models/disability_type.dart';
 import '../../models/sample_catalog.dart';
 import '../../services/app_shortcuts.dart';
+import '../../services/filter_list_selection.dart';
 import '../../services/filter_service.dart';
 import '../../services/image_source_state.dart';
 import '../../services/loupe_window_controller.dart';
 import '../../services/preview_selection.dart';
 import '../../services/settings_service.dart';
 import '../../services/vision_filter_state.dart';
+import '../widgets/adjust_panel.dart';
 import '../widgets/before_after_view.dart';
-import '../widgets/experience_presets.dart';
-import '../widgets/filter_selector.dart';
+import '../widgets/filter_browser.dart';
 import '../widgets/image_source_picker.dart';
-import '../widgets/intensity_slider.dart';
-import '../widgets/filter_catalog_selector.dart';
-import '../widgets/filter_param_panel.dart';
 import '../widgets/welcome_banner.dart';
 import '../widgets/window_mode_panel.dart';
+
+/// これ以上の幅（dp）で 3 カラム（選ぶ / 見る / 調整）、未満で縦に並べる（#72）。
+const double kWideLayoutBreakpoint = 1000;
+
+/// 狭幅レイアウトの内容の最大幅。
+const double _kNarrowContentMaxWidth = 800;
+
+/// 狭幅でのプレビューカードの最大幅。プレビュー（正方形の 2 枚が横並び）の
+/// 高さを抑え、800x700 でも最初の画面に収める。
+const double _kNarrowPreviewMaxWidth = 560;
+
+/// 狭幅で一覧が使う高さ（一覧は内側でスクロールする）。
+const double _kNarrowBrowserHeight = 560;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -33,18 +42,15 @@ class _HomeScreenState extends State<HomeScreen> {
   FilterService? _filterService;
   VisionFilterState? _visionFilterStateForImageSource;
 
-  /// `/`（アプリ内ショートカット、#63）で advanced カタログへフォーカスを移す
-  /// ための FocusNode。検索欄が無い現状は、このカタログが `/` の唯一の対象。
-  final FocusNode _catalogFocusNode = FocusNode(debugLabel: 'filterCatalog');
+  /// 統合フィルタ一覧の検索語・カテゴリ・検索欄フォーカス（#72）。`/` で検索欄へ
+  /// 移し、↑↓ で今見えている行を送るために、画面が保持する。ウェルカム
+  /// バナーの「ほかの見え方を選ぶ」もここへフォーカスを移す。
+  final FilterBrowserController _browser = FilterBrowserController();
 
-  /// ウェルカムバナーの「ほかの見え方を選ぶ」（#78 レビュー S8/nit）で
-  /// `FilterSelectorState.focusSelectedChip` を呼ぶための GlobalKey。単一の
-  /// 外部 FocusNode で `FilterSelector` 全体を包むだけでは見た目に何も
-  /// 起きないため、実際に選択中のチップ（無ければ先頭）へフォーカスを移し
-  /// `Scrollable.ensureVisible` でスクロールする責務は `FilterSelectorState`
-  /// 自身に持たせ、ここからは GlobalKey 経由で呼び出すだけにする。
-  final GlobalKey<FilterSelectorState> _filterSelectorKey =
-      GlobalKey<FilterSelectorState>();
+  /// アプリ内ショートカット（`/` ↑↓ ←→ Esc、#63）の受け口となる FocusNode。
+  /// 一覧の行をタップしたあとにフォーカスをここへ戻し、行（`InkResponse`）に
+  /// フォーカスが残って ↑↓ ←→ が効かなくなるのを防ぐ。
+  final FocusNode _shortcutFocus = FocusNode(debugLabel: 'homeShortcuts');
 
   @override
   void didChangeDependencies() {
@@ -57,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // listener here. That mirroring is gone — color-vision selection now
     // updates both services directly, at the point of the user action
     // (`lib/services/color_vision_selection.dart`'s `selectColorVision`/
-    // `deactivateColorVision`, called from `FilterSelector`, the tray, and
+    // `deactivateColorVision`, called from the unified filter list, the tray, and
     // `main.dart`'s startup restore). A listener-based mirror needs a
     // postFrameCallback to avoid "setState() called during build" on first
     // subscribe, and a "did the type actually change" guard to avoid
@@ -113,7 +119,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _filterService?.removeListener(_persistFilterState);
     _visionFilterStateForImageSource?.removeListener(_followRecommendedSample);
-    _catalogFocusNode.dispose();
+    _browser.dispose();
+    _shortcutFocus.dispose();
     super.dispose();
   }
 
@@ -139,17 +146,23 @@ class _HomeScreenState extends State<HomeScreen> {
           FocusFilterSearchIntent:
               InteractiveFocusAwareCallbackAction<FocusFilterSearchIntent>(
             onInvoke: (_) {
-              _catalogFocusNode.requestFocus();
+              _browser.focusSearch();
               return null;
             },
           ),
           CycleFilterIntent:
               InteractiveFocusAwareCallbackAction<CycleFilterIntent>(
             onInvoke: (intent) {
-              cycleAdvancedFilter(
-                context.read<VisionFilterState>(),
+              final filterService = context.read<FilterService>();
+              final visionState = context.read<VisionFilterState>();
+              final next = nextFilterListEntry(
+                _browser.visibleEntries,
+                selectedFilterListEntry(visionState),
                 forward: intent.forward,
               );
+              if (next != null) {
+                applyFilterListEntry(filterService, visionState, next);
+              }
               return null;
             },
           ),
@@ -177,10 +190,16 @@ class _HomeScreenState extends State<HomeScreen> {
         },
         child: Focus(
           autofocus: true,
+          focusNode: _shortcutFocus,
           child: Scaffold(
             appBar: AppBar(
               title: Text(l10n.appTitle),
               actions: [
+                IconButton(
+                  icon: const Icon(Icons.window_outlined),
+                  onPressed: () => showWindowModeDialog(context),
+                  tooltip: l10n.windowModeSectionTitle,
+                ),
                 const _ThemeModeButton(),
                 IconButton(
                   icon: const Icon(Icons.info_outline),
@@ -189,95 +208,75 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-            body: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 800),
-                child: ListView(
-                  padding: const EdgeInsets.all(24),
-                  children: [
-                    _buildHeaderSection(l10n),
-                    const SizedBox(height: 24),
-                    WelcomeBanner(
-                      onChooseOtherView: () =>
-                          _filterSelectorKey.currentState?.focusSelectedChip(),
+            body: Column(
+              children: [
+                // クリックスルー ON の間だけ出る復帰方法の案内（#63, #72）。
+                const ClickThroughRecoveryBanner(),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) =>
+                        constraints.maxWidth >= kWideLayoutBreakpoint
+                            ? _buildWide(constraints.maxWidth)
+                            : _buildNarrow(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 3 カラム（選ぶ / 見る / 調整）。Tab 順は左 → 中央 → 右（#45）。
+  Widget _buildWide(double width) {
+    final leftWidth = (width * 0.24).clamp(280.0, 340.0);
+    final rightWidth = (width * 0.27).clamp(300.0, 380.0);
+    return FocusTraversalGroup(
+      policy: OrderedTraversalPolicy(),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: leftWidth,
+              child: FocusTraversalOrder(
+                order: const NumericFocusOrder(1),
+                child: FocusTraversalGroup(child: _browserCard()),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: FocusTraversalOrder(
+                order: const NumericFocusOrder(2),
+                child: FocusTraversalGroup(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _previewCard(),
+                        WelcomeBanner(onChooseOtherView: _browser.focusSearch),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    const WindowModePanel(),
-                    const SizedBox(height: 24),
-                    _buildFilterSection(l10n),
-                    const SizedBox(height: 24),
-                    _buildControlsSection(l10n),
-                    const SizedBox(height: 24),
-                    _buildPreviewSection(),
-                    const SizedBox(height: 32),
-                    _buildAdvancedSection(l10n),
-                    const SizedBox(height: 32),
-                    _buildExperiencePresetsSection(l10n),
-                    const SizedBox(height: 32),
-                    _buildInfoSection(),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeaderSection(AppLocalizations l10n) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          l10n.headerTagline,
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Colors.indigo.shade700,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          l10n.headerSubtitle,
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.grey.shade600,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFilterSection(AppLocalizations l10n) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.visibility, color: Colors.indigo.shade600),
-                const SizedBox(width: 12),
-                Text(
-                  l10n.colorVisionSectionTitle,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+            const SizedBox(width: 16),
+            SizedBox(
+              width: rightWidth,
+              child: FocusTraversalOrder(
+                order: const NumericFocusOrder(3),
+                child: FocusTraversalGroup(
+                  child: const Card(
+                    margin: EdgeInsets.zero,
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.all(16),
+                      child: AdjustPanel(),
+                    ),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            FilterSelector(key: _filterSelectorKey),
-            const SizedBox(height: 16),
-            Text(
-              l10n.colorVisionSectionNote,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
-                fontStyle: FontStyle.italic,
               ),
             ),
           ],
@@ -286,73 +285,87 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildControlsSection(AppLocalizations l10n) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.tune, color: Colors.indigo.shade600),
-                const SizedBox(width: 12),
-                Text(
-                  l10n.intensitySectionTitle,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+  /// 縦積み: 上からプレビュー → 調整 → 選択（#72）。プレビューは最初の
+  /// 画面に収める。
+  Widget _buildNarrow() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: _kNarrowContentMaxWidth),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: ConstrainedBox(
+                  constraints:
+                      const BoxConstraints(maxWidth: _kNarrowPreviewMaxWidth),
+                  child: _previewCard(),
                 ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            const IntensitySlider(),
-          ],
+              ),
+              WelcomeBanner(onChooseOtherView: _browser.focusSearch),
+              const SizedBox(height: 16),
+              const Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: AdjustPanel(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(height: _kNarrowBrowserHeight, child: _browserCard()),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  /// プレビューのカード（#60）。
-  ///
-  /// 描画対象は常に [VisionFilterState] の現在の選択（色覚クイック選択・
-  /// advanced カタログ・体験プリセットのいずれで選んでも、最終的にここへ
-  /// 書き込まれる — 色覚クイック選択は `lib/services/color_vision_selection.dart`
-  /// の `selectColorVision`/`deactivateColorVision` 経由、それ以外は
-  /// `ExperiencePresets` / `FilterCatalogSelector` 参照）。strength は
-  /// `previewStrength`（`lib/services/preview_selection.dart`）で 1 か所に
+  Widget _browserCard() => Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: FilterBrowser(
+            controller: _browser,
+            onActivated: _shortcutFocus.requestFocus,
+          ),
+        ),
+      );
+
+  /// 中央「見る」: Before / After とサンプル切替（#72）。描画対象は常に
+  /// [VisionFilterState] の現在の選択（#60）。strength は [previewStrength] に
   /// 集約した判定に従う。[VisionFilterState.colorVisionType] も渡し、色覚
   /// クイック選択のときは見出し・export の caption・ファイル名に -omaly の
-  /// 名前を正しく出す（#60。カタログは色覚を 5 種しか持たず、-omaly は
-  /// base の -opia と同じカタログ id に写るため id だけでは区別できない）。
-  Widget _buildPreviewSection() {
+  /// 名前を正しく出す。
+  Widget _previewCard() {
     return Consumer3<VisionFilterState, FilterService, ImageSourceState>(
       builder: (context, visionState, filterService, imageSourceState, _) {
         final theme = Theme.of(context);
         final l10n = AppLocalizations.of(context)!;
         return Card(
+          margin: EdgeInsets.zero,
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Icon(Icons.compare, color: theme.colorScheme.primary),
-                    const SizedBox(width: 12),
-                    Text(
-                      l10n.previewSectionTitle,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    Semantics(
+                      header: true,
+                      child: Text(
+                        l10n.previewSectionTitle,
+                        style: theme.textTheme.titleMedium,
                       ),
                     ),
                     if (visionState.bypassed) ...[
-                      const SizedBox(width: 12),
                       Chip(
                         label: Text(l10n.bypassedBadgeLabel),
                         backgroundColor: theme.colorScheme.secondaryContainer,
-                        labelStyle: TextStyle(
+                        labelStyle: theme.textTheme.labelLarge?.copyWith(
                           color: theme.colorScheme.onSecondaryContainer,
                         ),
                         visualDensity: VisualDensity.compact,
@@ -360,7 +373,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 ImageSourcePicker(
                   child: BeforeAfterView(
                     filter: visionState.build(),
@@ -368,148 +381,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     strength: previewStrength(visionState, filterService),
                     colorVisionType: visionState.colorVisionType,
                     imageSource: imageSourceState.current,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  /// Advanced（sensus 全 30 フィルタ）セクション。既存の色覚 7 種 UI とは別系統。
-  Widget _buildAdvancedSection(AppLocalizations l10n) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.science_outlined, color: Colors.indigo.shade600),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    l10n.advancedSectionTitle,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              l10n.advancedSectionNote,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-            const SizedBox(height: 20),
-            FilterCatalogSelector(focusNode: _catalogFocusNode),
-            const Divider(height: 32),
-            const FilterParamPanel(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 体験プリセット集 (#19) セクション。sensus の experiences() を消費し、
-  /// 複合体験（前庭性めまい系 4 種）をタップで視覚フィルタに適用する。聴覚再生は
-  /// 本 Issue 非スコープで、聴覚を含む体験は注記に留める。
-  Widget _buildExperiencePresetsSection(AppLocalizations l10n) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.auto_awesome, color: Colors.indigo.shade600),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    l10n.experienceSectionTitle,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              l10n.experienceSectionNote,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-            const SizedBox(height: 20),
-            const ExperiencePresets(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoSection() {
-    return Consumer<FilterService>(
-      builder: (context, filterService, _) {
-        final filter = filterService.currentFilter;
-
-        if (filter == ColorVisionType.none) {
-          return const SizedBox.shrink();
-        }
-
-        final l10n = AppLocalizations.of(context)!;
-        return Card(
-          color: Colors.blue.shade50,
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.info, color: Colors.blue.shade700),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        colorVisionTypeName(l10n, filter),
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  colorVisionTypeDescription(l10n, filter),
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.blue.shade800,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  l10n.prevalenceLabel(colorVisionTypePrevalence(l10n, filter)),
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.blue.shade700,
-                    fontStyle: FontStyle.italic,
                   ),
                 ),
               ],
@@ -531,6 +402,8 @@ class _HomeScreenState extends State<HomeScreen> {
         Text(l10n.aboutBody),
         const SizedBox(height: 16),
         Text(l10n.aboutPhases),
+        const SizedBox(height: 16),
+        Text(l10n.aboutLiveCaptureNote),
       ],
     );
   }

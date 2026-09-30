@@ -129,7 +129,7 @@ class BeforeAfterView extends StatefulWidget {
   final double strength;
 
   /// The actual [ColorVisionType] behind the current selection, when it came
-  /// from the color-vision quick pick (`FilterSelector`/tray via
+  /// from the color-vision quick pick (`FilterBrowser`/tray via
   /// `lib/services/color_vision_selection.dart`). `null` for advanced-catalog
   /// or preset selections (and for the quick pick's own "none"/original).
   ///
@@ -599,7 +599,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       final strengthPercent = (strength.clamp(0.0, 1.0) * 100).round();
       final date = isoDate(DateTime.now());
       // #76 レビュー M1: プレビューの注記（FilterParamPanel・
-      // ExperiencePresets）と同じ正本・同じ解決経路（resolveConsultNotice）を
+      // ExperiencePresetTile）と同じ正本・同じ解決経路（resolveConsultNotice）を
       // export の焼き込みにも使う。色覚 7 型は urgency=none かつ escalation も
       // 無いので notice は自然に null になる。
       final notice = afterFilter == null
@@ -719,7 +719,6 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
               ? IconButton(
                   icon: const Icon(Icons.download_outlined),
                   iconSize: 20,
-                  visualDensity: VisualDensity.compact,
                   tooltip: l10n.exportButtonTooltip,
                   onPressed: _exporting ? null : () => _export(l10n),
                 )
@@ -754,7 +753,6 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                 l10n.previewStaticFrameNote,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
-                  fontStyle: FontStyle.italic,
                 ),
               ),
             ],
@@ -797,7 +795,7 @@ class _Pane extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         AspectRatio(
           aspectRatio: 1,
           child: ClipRRect(
@@ -819,7 +817,9 @@ class _ImageView extends StatelessWidget {
   Widget build(BuildContext context) {
     final img = image;
     if (img == null) {
-      return const ColoredBox(color: Color(0x11000000));
+      return ColoredBox(
+        color: Theme.of(context).colorScheme.onSurface.withAlpha(0x11),
+      );
     }
     return CustomPaint(painter: _UiImagePainter(img), size: Size.infinite);
   }

@@ -6,8 +6,10 @@ import '../../src/rust/api/sensus_bridge.dart';
 
 /// [ConsultNotice] の表示ウィジェット（#76 レビュー M1）。
 ///
-/// advanced カタログ（`FilterParamPanel`）・体験プリセットのカード
-/// （`ExperiencePresets`）が共有する、受診喚起の唯一の表示ウィジェット。
+/// 右カラム「調整」（`FilterParamPanel`、#72）が、advanced カタログ・体験
+/// プリセットのどちらを選んでいても使う、受診喚起の唯一の表示ウィジェット。
+/// PNG export（`export_service.dart`）と同じ解決経路（[resolveConsultNotice]）を
+/// 共有する。常時展開で、折りたたまない・隠さない。
 ///
 /// - 段階名（旧「緊急度：高」のような表示）は一切出さない。喚起文
 ///   （[ConsultNotice.message]）だけを、本文サイズ以上で表示する。emergency は
@@ -24,9 +26,8 @@ import '../../src/rust/api/sensus_bridge.dart';
 ///   段ごとの構成は [ConsultNotice.escalationGroups]（[resolveConsultNotice]）
 ///   が組み立て済みで、PNG export もこれをそのまま使う、再レビュー S-a）。
 /// - 免責文（医療監修を受けていない旨・sensus の Medical notes への参照）は
-///   既定で表示するが、[showDisclaimer] を false にすると省略できる
-///   （体験プリセットのカードは各カードでは出さず、セクション末尾に
-///   [ConsultDisclaimerFooter] で 1 回だけ出す、#76 再レビュー nit）。
+///   既定で表示する。[showDisclaimer] を false にすると省略できる
+///   （免責文だけを別の場所に出したいとき用。[ConsultDisclaimerFooter]）。
 class ConsultNoticeBlock extends StatelessWidget {
   const ConsultNoticeBlock({
     super.key,
@@ -120,8 +121,7 @@ class ConsultNoticeBlock extends StatelessWidget {
 
 /// 免責文 + 根拠 URL だけの独立したフッタ（#76 再レビュー nit）。
 ///
-/// 体験プリセット（`ExperiencePresets`）は各カードに免責文を繰り返さず、
-/// 「体験プリセット」セクションの末尾にこれを 1 回だけ表示する。
+/// 免責文だけを、urgency に紐づく着色コンテナの外に出したいときに使う。
 /// [ConsultNoticeBlock]（`showDisclaimer: true` のとき）も同じ見た目を使う。
 class ConsultDisclaimerFooter extends StatelessWidget {
   const ConsultDisclaimerFooter({
@@ -150,8 +150,12 @@ class ConsultDisclaimerFooter extends StatelessWidget {
       children: [
         Text(
           disclaimer,
-          style: theme.textTheme.bodyMedium
-              ?.copyWith(color: effectiveColor, fontStyle: FontStyle.italic),
+          // イタリックは使わない（DESIGN §3: 日本語の長文では崩れて読みにくい）。
+          // 本文（w400）と区別しつつ目立たせすぎない w500 にする。
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: effectiveColor,
+            fontWeight: FontWeight.w500,
+          ),
         ),
         const SizedBox(height: 2),
         SelectableText(

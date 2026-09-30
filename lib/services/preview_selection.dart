@@ -1,10 +1,9 @@
-import '../models/vision_filter_catalog.dart';
 import 'filter_service.dart';
 import 'vision_filter_state.dart';
 
 /// 「今選んでいるフィルタの素の強度」を、bypass に関わらず返す（#79）。
 /// 強度の出どころは 2 系統ある:
-/// - 色覚のクイック選択（`FilterSelector`/トレイ、[FilterService] 経由）は
+/// - 色覚のクイック選択（`FilterBrowser`/トレイ、[FilterService] 経由）は
 ///   色覚タイプごとの強度の記憶（#57、[FilterService.intensity]）を使う。
 /// - advanced カタログ・体験プリセット経由の選択は [VisionFilterState.strength]
 ///   を使う。
@@ -73,24 +72,4 @@ void adjustPreviewStrength(
   } else {
     visionState.setStrength((visionState.strength + delta).clamp(0.0, 1.0));
   }
-}
-
-/// ↑↓ (#63) で advanced カタログ（[kVisionFilterCatalog]、30 件）を順送り/逆送りする。
-/// 未選択なら down で先頭、up で末尾に入る（wraparound）。
-void cycleAdvancedFilter(VisionFilterState visionState,
-    {required bool forward}) {
-  final ids = kVisionFilterCatalog.map((e) => e.id).toList();
-  if (ids.isEmpty) return;
-  final currentIndex = visionState.isColorQuickSelection
-      ? -1 // 色覚クイック選択中は advanced の「選択中」とはみなさず先頭/末尾から始める
-      : ids.indexOf(visionState.selectedId ?? '');
-  int nextIndex;
-  if (currentIndex == -1) {
-    nextIndex = forward ? 0 : ids.length - 1;
-  } else {
-    nextIndex = forward ? currentIndex + 1 : currentIndex - 1;
-    if (nextIndex >= ids.length) nextIndex = 0;
-    if (nextIndex < 0) nextIndex = ids.length - 1;
-  }
-  visionState.select(ids[nextIndex]);
 }

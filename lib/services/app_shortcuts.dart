@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-/// `/`（アプリ内ショートカット、#63）: advanced カタログ（[kVisionFilterCatalog]）
-/// にフォーカスを移す。検索欄は現状存在しないため、常にこの動作になる
-/// （Issue の「検索欄が無ければ advanced のカタログに」を字義どおり実装）。
+/// `/`（アプリ内ショートカット、#63）: 統合フィルタ一覧の検索欄
+/// （`FilterBrowser`、#72）にフォーカスを移す。
 class FocusFilterSearchIntent extends Intent {
   const FocusFilterSearchIntent();
 }
 
-/// ↑↓（#63）: advanced カタログを順送り/逆送りする。
+/// ↑↓（#63）: 統合フィルタ一覧（`FilterBrowser`、#72）の今見えている行を
+/// 順送り/逆送りして選択する。
 class CycleFilterIntent extends Intent {
   const CycleFilterIntent({required this.forward});
   final bool forward;

@@ -10,7 +10,7 @@ import 'vision_filter_metadata.dart';
 /// フィルタ選択状態を保持する ChangeNotifier。**プレビュー（before/after）の
 /// 描画対象の唯一の正本**（#60）。
 ///
-/// 色覚 7 種のクイック選択（`FilterSelector`/トレイ、どちらも
+/// 色覚 7 種のクイック選択（`FilterBrowser`/トレイ、どちらも
 /// `lib/services/color_vision_selection.dart` の `selectColorVision` を経由
 /// して [selectColorVisionType] を呼ぶ）・advanced カタログ全 30 種・体験
 /// プリセットのいずれで選んでも、最終的にここへ書き込まれる
@@ -46,11 +46,11 @@ class VisionFilterState extends ChangeNotifier {
   /// meniere と labyrinthitis はどちらもカタログ id `vertigo` に写るため、
   /// `selectedId` だけでは「どちらのプリセットが選ばれているか」を区別できない
   /// （#60 の「2 枚同時に点灯」バグの原因）。この id を正本にして、
-  /// `ExperiencePresets` の選択表示（`isSelected`）はカタログ id ではなく
+  /// `ExperiencePresetTile` の選択表示（`isSelected`）はカタログ id ではなく
   /// これを比較する。
   String? _selectedPresetId;
 
-  /// 現在の選択が色覚のクイック選択（`FilterSelector`/トレイ、`FilterService`
+  /// 現在の選択が色覚のクイック選択（`FilterBrowser`/トレイ、`FilterService`
   /// 経由）由来かどうか（#60）。
   ///
   /// **プレビューにどちらの強度を使うか（`FilterService` のタイプ別記憶 vs
@@ -128,7 +128,7 @@ class VisionFilterState extends ChangeNotifier {
   /// 選択中の体験プリセット id。プリセット経由でなければ null（#60）。
   String? get selectedPresetId => _selectedPresetId;
 
-  /// 現在の選択が色覚クイック選択（`FilterSelector`/トレイ）由来か（#60）。
+  /// 現在の選択が色覚クイック選択（`FilterBrowser`/トレイ）由来か（#60）。
   bool get isColorQuickSelection => _isColorQuickSelection;
 
   /// 色覚クイック選択で選ばれた実際の [ColorVisionType]。色覚クイック選択で
@@ -163,14 +163,14 @@ class VisionFilterState extends ChangeNotifier {
     _selectInternal(id);
   }
 
-  /// 色覚のクイック選択（`FilterSelector`/トレイ、
+  /// 色覚のクイック選択（`FilterBrowser`/トレイ、
   /// `lib/services/color_vision_selection.dart` の `selectColorVision`/
   /// `deactivateColorVision` 経由）からフィルタを選択・解除する（#60）。
   ///
   /// [type] は選択された色覚型そのもの。[ColorVisionType.none] は「何も
   /// シミュレーションしない」ことを表し、解除（[deactivateColorVision]）と
   /// 同じ効果になる — この場合 [isColorQuickSelection] は **false** のまま
-  /// になる（[FilterSelector] の「Normal vision」チップ・`IntensitySlider`・
+  /// になる（[FilterBrowser] 一覧の「正常色覚」行・`IntensitySlider`・
   /// 解除ボタンのいずれも、[isColorQuickSelection] だけを見て点灯/有効化を
   /// 決めるため、none を「選択中」扱いにすると強度スライダーだけが宙に浮いて
   /// 有効化されてしまう。none はカタログにも強度概念にも対応しない）。
@@ -205,7 +205,7 @@ class VisionFilterState extends ChangeNotifier {
     _selectInternal(catalogId);
   }
 
-  /// 体験プリセット（`ExperiencePresets`）からフィルタを選択する（#60）。
+  /// 体験プリセット（`ExperiencePresetTile`）からフィルタを選択する（#60）。
   /// [presetId] は `Experience.id`、[catalogId] はその体験の視覚フィルタに
   /// 対応するカタログ id。色覚クイック選択の記録は解除する。強度・パラメータは
   /// 常に推奨値・既定値にする（#76 レビュー N1: advanced 側で当該 id を

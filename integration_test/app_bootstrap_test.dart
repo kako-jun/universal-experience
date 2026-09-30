@@ -1,7 +1,7 @@
 // main() の実起動経路を踏む integration test (#55 レビュー M1)。
 //
 // integration_test/experience_presets_smoke_test.dart は自身の setUpAll で
-// initNativeBridge() を呼んでから ExperiencePresets を自前の MaterialApp に
+// initNativeBridge() を呼んでから統合フィルタ一覧を自前の MaterialApp に
 // 包んで pump しているだけで、main() の実際のブートストラップ（buildRootApp()）
 // は一度も通らない。main() 内から initNativeBridge() の呼び出しが削除/誤配置
 // されても、既存のテストは全部グリーンのままになりうる（#52 と同種の退行が
@@ -51,33 +51,11 @@ void main() {
     expect(RustLib.instance.initialized, isTrue);
     expect(find.byType(HomeScreen), findsOneWidget);
 
-    // HomeScreen の body は素の ListView（暗黙 SliverList）なので、初期ビュー
-    // ポート + デフォルトの cache extent より下にあるセクションは、実際に
-    // スクロールされるまでツリーに build されない。ExperiencePresets は 6
-    // セクション中 5 番目で、実起動時のウィンドウでは初期表示では画面外
-    // （experience_presets_smoke_test.dart は ExperiencePresets 単体を自前の
-    // 小さな Scaffold+SingleChildScrollView に包んで pump するだけなので
-    // この問題を踏まない）。まず ExperiencePresets をスクロールで可視化する。
-    await tester.scrollUntilVisible(
-      find.byType(ExperiencePresets),
-      300.0,
-      // このテスト時点で画面上の Scrollable はこの HomeScreen 本体の ListView
-      // 1 つだけ（DropdownButton 等はメニューを開かない限り Scrollable を
-      // 生成しない）なので .first で一意に解決できる。
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-
-    // HomeScreen の他 5 セクション（filter/controls/preview/advanced/info）も
-    // それぞれ自前で Card を使っているため、素の find.byType(Card) はツリー
-    // 全体では 4 に確定しない。ExperiencePresets の子孫だけに絞って検証する。
-    expect(
-      find.descendant(
-        of: find.byType(ExperiencePresets),
-        matching: find.byType(Card),
-      ),
-      findsNWidgets(4),
-    );
+    // #72: 統合フィルタ一覧の最上段に、実ブリッジの experiences() 由来の体験
+    // プリセット 4 行が出ていること（#52: 本番でプリセットが例外表示になった
+    // 退行の検知）。一覧は遅延構築されない（SingleChildScrollView）ので、画面外でも
+    // ツリー上に存在する。
+    expect(find.byType(ExperiencePresetTile), findsNWidgets(4));
     expect(tester.takeException(), isNull);
   });
 

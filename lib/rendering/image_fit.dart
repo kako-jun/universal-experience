@@ -56,6 +56,9 @@ Future<ui.Image> fitImageToSquare(ui.Image source, int size) async {
 
 /// Letterbox bar colour for [fitImageToSquare] (#78). Neutral mid-gray —
 /// see that function's doc for why not pure white/black.
+///
+/// 色の例外（DESIGN.md）: 画像内容の一部（フィルタに通る画素）であり、
+/// アプリのテーマ（ライト/ダーク）で変わってはならないためロールにしない。
 const ui.Color kImageFitLetterboxColor = ui.Color(0xFF808080);
 
 /// Decodes arbitrary encoded image bytes (PNG/JPEG/etc., whatever

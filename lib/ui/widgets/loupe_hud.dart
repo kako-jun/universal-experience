@@ -190,7 +190,7 @@ class _LoupeHudBar extends StatelessWidget {
             (selectedStrength(visionState, filterService).clamp(0.0, 1.0) * 100)
                 .round();
         // #76 と同じく、喚起の解決は resolveConsultNotice 1 箇所に集約する
-        // （FilterParamPanel・ExperiencePresets・export と同じ経路）。
+        // （FilterParamPanel・ExperiencePresetTile・export と同じ経路）。
         final notice = filter == null
             ? null
             : resolveConsultNotice(
@@ -206,7 +206,7 @@ class _LoupeHudBar extends StatelessWidget {
             bottom: Radius.circular(12),
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -501,8 +501,9 @@ class _CompareOriginalButtonState extends State<_CompareOriginalButton> {
                 height: 48,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color:
-                      comparing ? scheme.primaryContainer : Colors.transparent,
+                  // 非比較時は同じロールの alpha=0（Colors.transparent を使わない）。
+                  color: scheme.primaryContainer
+                      .withAlpha(comparing ? 255 : 0),
                   borderRadius: BorderRadius.circular(24),
                   border: _hasFocus
                       ? Border.all(color: scheme.primary, width: 2)

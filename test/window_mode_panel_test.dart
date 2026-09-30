@@ -37,10 +37,16 @@ void main() {
     return settings;
   }
 
+  // 起動モードは主役より後ろ（AppBar のボタンから開くダイアログ、#72）。
+  Future<Finder> openWindowModeDialog(WidgetTester tester) async {
+    await tester.tap(find.byTooltip('Startup Mode'));
+    await tester.pumpAndSettle();
+    return find.byType(AlertDialog);
+  }
+
   testWidgets(
       'トレイもホットキーも無い既定状態でもクリックスルーを ON にでき、'
-      'フォーカス復帰・Esc の復帰手段ヒントが常に表示される (#63)',
-      (WidgetTester tester) async {
+      'フォーカス復帰・Esc の復帰手段ヒントが常に表示される (#63)', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 4000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -53,30 +59,41 @@ void main() {
     // 引数省略 = 既定コンストラクタ（trayAvailable: false, hotkeyStatus: 空）。
     await tester.pumpWidget(UniversalExperienceApp(settings: settings));
     await tester.pump();
+    final dialog = await openWindowModeDialog(tester);
 
     final clickThroughTile = tester.widget<SwitchListTile>(
-      find.widgetWithText(SwitchListTile, 'Click-through'),
+      find.descendant(
+        of: dialog,
+        matching: find.widgetWithText(SwitchListTile, 'Click-through'),
+      ),
     );
     expect(clickThroughTile.onChanged, isNotNull,
         reason: 'フォーカス復帰・Esc が常に使えるので、トレイ/ホットキーが無くても '
             'ON にする操作自体を塞ぐ必要は無い');
 
     expect(
-      find.text(
-        'Select this window (e.g. with Alt+Tab) and press any key to turn '
-        'it off',
-      ),
+      find.descendant(
+          of: dialog,
+          matching: find.text(
+            'Select this window (e.g. with Alt+Tab) and press any key to turn '
+            'it off',
+          )),
       findsOneWidget,
       reason: 'フォーカス復帰＋最初のキー入力は常に使える復帰経路なので常時表示する',
     );
     expect(
-      find.text('You can also press Esc inside the app to turn it off'),
+      find.descendant(
+          of: dialog,
+          matching: find
+              .text('You can also press Esc inside the app to turn it off')),
       findsOneWidget,
       reason: 'アプリ内 Esc は常に使える復帰経路なので常時表示する',
     );
     // トレイもホットキーも無いので、その 2 つのヒントは出ない。
     expect(
-      find.text('You can also turn it off from the tray menu'),
+      find.descendant(
+          of: dialog,
+          matching: find.text('You can also turn it off from the tray menu')),
       findsNothing,
     );
   });
@@ -91,9 +108,13 @@ void main() {
 
     await tester.pumpWidget(UniversalExperienceApp(settings: settings));
     await tester.pump();
+    final dialog = await openWindowModeDialog(tester);
 
     final clickThroughTile = tester.widget<SwitchListTile>(
-      find.widgetWithText(SwitchListTile, 'Click-through'),
+      find.descendant(
+        of: dialog,
+        matching: find.widgetWithText(SwitchListTile, 'Click-through'),
+      ),
     );
     expect(clickThroughTile.value, isFalse);
     expect(clickThroughTile.onChanged, isNull,
@@ -115,9 +136,12 @@ void main() {
       hotkeyStatus: const HotkeyStatus(),
     ));
     await tester.pump();
+    final dialog = await openWindowModeDialog(tester);
 
     expect(
-      find.text('You can also turn it off from the tray menu'),
+      find.descendant(
+          of: dialog,
+          matching: find.text('You can also turn it off from the tray menu')),
       findsOneWidget,
     );
   });
@@ -141,13 +165,17 @@ void main() {
       ),
     ));
     await tester.pump();
+    final dialog = await openWindowModeDialog(tester);
 
     final hotkeyText = describeHotkey(
       defaultHotkeyBindings()[AppHotkeyAction.emergencyExit]!,
       useMacSymbols: Platform.isMacOS,
     );
     expect(
-      find.text('You can also turn it off with the $hotkeyText hotkey'),
+      find.descendant(
+          of: dialog,
+          matching: find
+              .text('You can also turn it off with the $hotkeyText hotkey')),
       findsOneWidget,
       reason: '実際に登録されている emergencyExit のキーを案内すべき',
     );
@@ -157,9 +185,11 @@ void main() {
       useMacSymbols: Platform.isMacOS,
     );
     expect(
-      find.text(
-        'You can also turn it off with the $failedHotkeyText hotkey',
-      ),
+      find.descendant(
+          of: dialog,
+          matching: find.text(
+            'You can also turn it off with the $failedHotkeyText hotkey',
+          )),
       findsNothing,
       reason: '登録に失敗した toggleClickThrough のキーをヒントに案内してはいけない',
     );

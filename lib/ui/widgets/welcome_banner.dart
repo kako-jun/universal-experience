@@ -11,15 +11,14 @@ import 'image_source_picker.dart' show pickAndLoadUserImage;
 /// successful action) persists via `SettingsService.dismissWelcomeBanner`
 /// and it never reappears (`SettingsService.welcomeBannerDismissed`).
 ///
-/// - "Choose another way of seeing" moves focus to the colour-vision chips
-///   ([onChooseOtherView], #78 レビュー S8) and dismisses — the chips are
-///   already visible on the same screen, so no navigation is needed, just a
-///   focus handoff. `home_screen.dart` wires this to
-///   `FilterSelectorState.focusSelectedChip` (via a `GlobalKey`), which moves
-///   focus to a specific chip (visibly, with Material's focus ring) and
-///   scrolls it into view with `Scrollable.ensureVisible` — not just to an
-///   inert container `FocusNode` (#78 レビュー nit: the handoff must be
-///   visible, not just logically correct).
+/// - "Choose another way of seeing" moves focus to the search field of the
+///   unified filter list ([onChooseOtherView], #78 レビュー S8, #72) and
+///   dismisses — the list is already visible on the same screen, so no
+///   navigation is needed, just a focus handoff. `home_screen.dart` wires this
+///   to `FilterBrowserController.focusSearch`, which moves focus to a real
+///   text field (visibly, with Material's focus ring) — not just to an inert
+///   container `FocusNode` (#78 レビュー nit: the handoff must be visible, not
+///   just logically correct).
 /// - "Try it with your photo" opens the file picker ([pickAndLoadUserImage],
 ///   the exact same path `ImageSourcePicker`'s own button uses) and
 ///   dismisses **only if a photo was actually loaded** (#78 レビュー Q3):
@@ -31,7 +30,7 @@ import 'image_source_picker.dart' show pickAndLoadUserImage;
 class WelcomeBanner extends StatelessWidget {
   const WelcomeBanner({super.key, this.onChooseOtherView});
 
-  /// Called for "choose another way of seeing" (#78 レビュー S8/nit), before
+  /// Called for "choose another way of seeing" (#78 レビュー S8/nit, #72), before
   /// dismissing. `null` (e.g. in isolated widget tests) just skips the
   /// handoff — the banner still dismisses.
   final VoidCallback? onChooseOtherView;
@@ -46,6 +45,7 @@ class WelcomeBanner extends StatelessWidget {
 
         final onContainer = theme.colorScheme.onSecondaryContainer;
         return Card(
+          margin: const EdgeInsets.only(top: 16),
           color: theme.colorScheme.secondaryContainer,
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -81,6 +81,11 @@ class WelcomeBanner extends StatelessWidget {
                   runSpacing: 8,
                   children: [
                     OutlinedButton(
+                      // 前景はコンテナの上の文字色に揃える（ハイコントラストでは
+                      // primary がコンテナと近い明度になり読めなくなるため）。
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: onContainer,
+                      ),
                       onPressed: () {
                         onChooseOtherView?.call();
                         settings.dismissWelcomeBanner();

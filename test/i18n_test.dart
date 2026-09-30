@@ -69,7 +69,7 @@ void main() {
         lookupAppLocalizations(const Locale('ja')),
       ]) {
         expect(l10n.appTitle, isNotEmpty);
-        expect(l10n.colorVisionSectionTitle, isNotEmpty);
+        expect(l10n.filterListHeading, isNotEmpty);
         expect(l10n.consultEarly, isNotEmpty);
         expect(l10n.consultEmergency, isNotEmpty);
         expect(l10n.trayQuit, isNotEmpty);
@@ -294,21 +294,27 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('ja では日本語のセクション見出しが出る', (tester) async {
+    testWidgets('ja では日本語の見出し・空状態・検索欄が出る', (tester) async {
       await pumpHome(tester, const Locale('ja'));
       final ja = lookupAppLocalizations(const Locale('ja'));
-      expect(find.text(ja.colorVisionSectionTitle), findsOneWidget);
-      expect(find.text(ja.intensitySectionTitle), findsOneWidget);
-      // 既存の英語ハードコードが残っていないこと（退行検出）。
+      expect(find.text(ja.filterListHeading), findsOneWidget);
+      expect(find.text(ja.adjustHeading), findsOneWidget);
+      expect(find.text(ja.previewSectionTitle), findsOneWidget);
+      expect(find.text(ja.selectionEmptyTitle), findsOneWidget);
+      expect(find.text(ja.filterSearchLabel), findsOneWidget);
+      // 旧セクション見出し・英語ハードコードが残っていないこと（退行検出）。
       expect(find.text('Color Vision Simulation'), findsNothing);
       expect(find.text('Filter Intensity'), findsNothing);
     });
 
-    testWidgets('en では英語のセクション見出しが出る', (tester) async {
+    testWidgets('en では英語の見出し・空状態・検索欄が出る', (tester) async {
       await pumpHome(tester, const Locale('en'));
       final en = lookupAppLocalizations(const Locale('en'));
-      expect(find.text(en.colorVisionSectionTitle), findsOneWidget);
-      expect(find.text(en.intensitySectionTitle), findsOneWidget);
+      expect(find.text(en.filterListHeading), findsOneWidget);
+      expect(find.text(en.adjustHeading), findsOneWidget);
+      expect(find.text(en.previewSectionTitle), findsOneWidget);
+      expect(find.text(en.selectionEmptyTitle), findsOneWidget);
+      expect(find.text(en.filterSearchLabel), findsOneWidget);
       // 旧ハードコードの日本語ヒーローが残っていないこと。
       expect(find.text('すべての感覚を、すべての人に。'), findsNothing);
     });
@@ -331,11 +337,10 @@ void main() {
       state.select('vestibular_neuritis');
       await tester.pump();
 
-      // advanced カタログ選択（FilterParamPanel）で緊急受診メッセージが 1 件。
-      // 加えて体験プリセット集 (#19) の vestibular_neuritis（emergency）が常時
-      // 同じメッセージを表示するため厳密に計 2 件。プリセットが落ちたら 1 件に
-      // なり検出できる（exact count）。
-      expect(find.text(en.consultEmergency), findsNWidgets(2));
+      // 右カラム（AdjustPanel → FilterParamPanel）に緊急受診メッセージが 1 件。
+      // #72 で体験プリセットは一覧の行になり、選ぶまで喚起文を出さないので、
+      // 選んでいないプリセット（vestibular_neuritis の体験）の分は数えない。
+      expect(find.text(en.consultEmergency), findsOneWidget);
     });
   });
 }

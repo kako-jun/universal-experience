@@ -124,12 +124,13 @@ Future<bool> pickAndLoadUserImage(BuildContext context) async {
   return loadUserImageFile(context, file);
 }
 
-/// Sample-picker chips + "choose a photo" button + drag-and-drop target for
-/// [child] (#78).
+/// Drag-and-drop target for [child] + sample-picker chips + "choose a photo"
+/// button (#78).
 ///
 /// Wraps [child] (the `BeforeAfterView` preview) in a `desktop_drop`
 /// [DropTarget] so dropping an image file anywhere over the preview loads
-/// it — the sample chips and the "choose a photo…" button sit above it.
+/// it — the sample chips and the "choose a photo…" button sit right below it
+/// (#72: the preview comes first so it stays in the first viewport).
 /// Reads and writes only `ImageSourceState` (the single source of truth for
 /// which image is shown, #78) and `VisionFilterState` (to resolve the
 /// current filter's recommended sample for the chips/"back to recommended"
@@ -168,8 +169,6 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildControls(l10n, theme, imageSourceState, recommendedId),
-            const SizedBox(height: 12),
             DropTarget(
               onDragEntered: (_) => setState(() => _dragging = true),
               onDragExited: (_) => setState(() => _dragging = false),
@@ -193,6 +192,9 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
                 child: widget.child,
               ),
             ),
+            const SizedBox(height: 12),
+            // サンプル画像の切替はプレビューに隣接させ、その下に置く（#72）。
+            _buildControls(l10n, theme, imageSourceState, recommendedId),
           ],
         );
       },
@@ -228,7 +230,6 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
           IconButton(
             icon: const Icon(Icons.close, size: 18),
             tooltip: l10n.imageSourceClosePhotoTooltip,
-            visualDensity: VisualDensity.compact,
             onPressed: () =>
                 imageSourceState.clearUserImage(recommendedId),
           ),

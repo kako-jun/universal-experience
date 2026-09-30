@@ -217,7 +217,7 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
   // Seed the shared FilterService and VisionFilterState (#15/#60) from the
   // restored settings (#17) so the previously selected filter is reflected on
   // startup — through selectColorVision (#60), the single entry point that
-  // keeps both services in sync, same as FilterSelector/tray. No explicit
+  // keeps both services in sync, same as FilterBrowser/tray. No explicit
   // intensity override here (#57): the type's own remembered/recommended
   // strength (just loaded above) is used instead of resetting it.
   //
@@ -296,6 +296,8 @@ void main() async {
       size: LoupeWindowPolicy.defaultSize,
       minimumSize: LoupeWindowPolicy.minimumSize,
       center: true,
+      // 色の例外（DESIGN.md）: OS ウィンドウの下地色。Flutter のテーマが
+      // 立ち上がる前に window_manager へ渡す値で、ロールを引けない。
       backgroundColor: LoupeWindowPolicy.transparentForMode(loupeWindow.appMode)
           ? Colors.transparent
           : Colors.black,
@@ -495,6 +497,10 @@ class UniversalExperienceApp extends StatelessWidget {
                 AppLocalizations.of(context)!.appTitle,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
+            // OS のハイコントラスト設定（MediaQuery.highContrast）が有効なとき
+            // だけ自動で切り替わる（DESIGN.md）。
+            highContrastTheme: AppTheme.highContrastTheme,
+            highContrastDarkTheme: AppTheme.highContrastDarkTheme,
             themeMode: settings.themeMode,
             // i18n (#18). locale = null はシステム追従。言語ピッカー UI は本 Issue
             // 外（#16/#19）。SettingsService.setLocale が将来の足場。

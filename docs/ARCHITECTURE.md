@@ -28,7 +28,7 @@
 > — `deactivate()` は呼ばない。選択中のプリセットは体験 id で保持するため、
 > 同じ `vertigo` フィルタに写る 2 つのプリセット（メニエール病・迷路炎）が
 > 同時に選択中と表示されることはない（#60）。色覚のクイック選択
-> （`FilterSelector`/トレイ）は `lib/services/color_vision_selection.dart` の
+> （`FilterBrowser` の色覚の行・トレイ）は `lib/services/color_vision_selection.dart` の
 > `selectColorVision`/`deactivateColorVision` を唯一の入口とし、呼ばれた
 > その場で `FilterService` と `VisionFilterState` の両方を更新する（listener
 > によるミラーはしない）。これに伴い `VisionFilterState` も `filterService`
@@ -61,7 +61,7 @@
 > 喚起文・escalation の訳・免責文）は `lib/l10n/l10n_extensions.dart` の
 > `resolveConsultNotice` に一本化し、表示は `lib/ui/widgets/
 > consult_notice_block.dart` の `ConsultNoticeBlock` が担う。`FilterParamPanel`・
-> `ExperiencePresets` のカード・PNG export（`ExportCaption`）の 3 か所が
+> `AdjustPanel` の体験プリセット選択時・PNG export（`ExportCaption`）の 3 か所が
 > これを共有する（Opus レビュー 1 巡目 M1: 3 か所がそれぞれ解決していて
 > 食い違いうる、という指摘への対応）。段階名は出さず、喚起文だけを
 > `ColorScheme` ロール（`tertiaryContainer`/`errorContainer`/
@@ -423,26 +423,42 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
 ウィンドウにフォーカスがある間だけ効くショートカット 4 種。実装は
 `lib/services/app_shortcuts.dart`（`Intent` 定義 + `isFocusOnInteractiveControl()` /
 `InteractiveFocusAwareCallbackAction`）+ `lib/services/preview_selection.dart`
-（実処理: `cycleAdvancedFilter()` / `adjustPreviewStrength()`）+
+（実処理: `adjustPreviewStrength()`）+ `lib/services/filter_list_selection.dart`
+（↑↓ の順送り `nextFilterListEntry()`）+
 `lib/ui/screens/home_screen.dart`（標準 Flutter `Shortcuts`/`Actions`/`Focus` で配線。
 `hotkey_manager` の `GlobalShortcuts` は使わない — こちらはウィンドウ内フォーカス時だけの
 アプリ内ショートカットで、OS 全体に効くグローバルホットキーとは別物）。
 
 | キー | 効果 |
 |---|---|
-| `/` | advanced カタログ（`kVisionFilterCatalog`、30 件）にフォーカスを移す |
-| `↑` / `↓` | advanced カタログを逆送り/順送り（wraparound） |
+| `/` | 左カラムの検索欄（`FilterBrowserController.searchFocus`）にフォーカスを移し、入力済みの文字を全選択する |
+| `↑` / `↓` | 統合フィルタ一覧（色覚 7 型 + advanced 30 件）の、今見えている行を逆送り/順送り（wraparound） |
 | `←` / `→` | 選択中フィルタの強度を `kKeyboardStrengthStep`（5%）刻みで増減 |
 | `Esc` | クリックスルーが ON のとき解除する（クリックスルーの復帰経路。上記「クリックスルーの復帰経路」参照） |
 
-- **`/` は「検索欄が無ければ advanced のカタログにフォーカス」という Issue の
-  要求を字義どおり実装したもの**。現状アプリ内に検索欄は存在しないため、常に
-  advanced カタログへフォーカスする。将来検索欄が追加されたら、まず検索欄へ
-  フォーカスするよう分岐を足す。
-- **↑↓ の対象を advanced カタログ 30 件に固定した理由**: `/` が同じカタログに
-  フォーカスするため、↑↓ が動かす対象と一致させた。色覚クイック選択チップ
-  （7 種）は対象外 — Tab/マウスで十分に少なく選びやすいため、わざわざ
-  キーボードショートカットの対象に含める必要がないと判断した。
+- **`/` は検索欄へフォーカスする**（#72 で左カラムに検索欄が入った。それ以前は
+  advanced カタログへフォーカスしていた）。検索欄は `TextField` なので、フォーカス
+  中は `/` 自体を含むキー入力が本来の文字入力として通る（上記ガード）。
+- **↑↓ の対象は統合一覧の「今見えている行」**（#72）。色覚 7 型 + advanced 30 件を
+  1 つの一覧にまとめたので、順送りもその一覧を対象にする（`nextFilterListEntry()`。
+  検索・カテゴリで絞っていれば絞った行だけ）。体験プリセットは一覧の最上段にあるが
+  送りの対象外（選択は行のタップ/Enter）。検索欄は `TextField` なので ↑↓ を奪わない —
+  行を**ポインタで**選ぶと `HomeScreen` がショートカットの受け口へフォーカスを戻し、そこから
+  ↑↓・←→ が効く。**Enter/Space で選んだときはフォーカスを行に残す**（キーボード利用者の
+  現在位置を奪わない）。
+  スクロールの追従は経路が 2 つある。**行にフォーカスがある間の ↑↓** は、アプリのショートカットではなく
+  標準の方向フォーカス移動（隣の行へ移り、フレームワークのフォーカス走査が `Scrollable.ensureVisible`
+  で見える位置へスクロールする。`FilterListTile` は関与しない）。**フォーカスが行にないときの ↑↓**
+  （アプリのショートカット）は選択そのものを変え、選択中になった行の `FilterListTile` が
+  `didUpdateWidget` で反応して、一覧の内側のスクロールだけを最小限動かす（上方向・末尾から先頭への
+  折り返しにも対応。外側のページスクロールは動かさない）。`FilterListTile` が動かすのはこの
+  「選択が変わった」ときだけで、フォーカスの移動には反応しない。
+  **行にフォーカスがある間の ←→ も標準の方向フォーカス移動になり**、その 1 回では強度の 5% 刻み
+  調整は効かない。フォーカスは行から出て、実測（`home_screen_layout_test.dart`）では画面の
+  ショートカット受け口へ移るので、次の ←→ から強度が動く（移動先は方向によって別カラムの
+  コントロールになりうる）。ポインタで行を選び直しても、フォーカスはショートカット受け口へ戻る。
+  キーボード起点かポインタ起点かは、タップ処理の中で `HardwareKeyboard` の Enter/Space の
+  押下状態を見て判定する。
 - **`/`・↑↓・←→ はテキスト入力・ボタン・スイッチ等にフォーカスがある間は無効化される**
   （`isFocusOnInteractiveControl()` による `isEnabled` ガード、#63）。`Esc` だけは
   このガードの対象外 — クリックスルーからの復帰は常に効く必要があるため。
@@ -475,7 +491,7 @@ LoupeHud()])` として組み立て、`LoupeHud` を `HomeScreen` とは別の�
   #76）が非 null を返すときだけ表示する。押すと `ConsultNoticeBlock`
   （`lib/ui/widgets/consult_notice_block.dart`）で全文（免責文込み）をダイアログ
   表示する。advanced カタログ（`FilterParamPanel`）・体験プリセット
-  （`ExperiencePresets`）・PNG export と同じ解決経路・同じ表示ウィジェットを
+  （`ExperiencePresetTile` の選択後は `AdjustPanel`）・PNG export と同じ解決経路・同じ表示ウィジェットを
   共有する。
 - **原画比較ボタン**: 押している間だけ `VisionFilterState.bypassed` を true に
   し、離すと false に戻す（#63 のホットキー「押している間だけ原画」と同じ
@@ -706,8 +722,17 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
 
 ### 主要コンポーネント
 
-- `HomeScreen`: メイン画面。色覚クイック選択・強度スライダ・before/after プレビュー・
-  advanced カタログ・体験プリセット・PNG エクスポートをまとめる
+- `HomeScreen`: メイン画面（#72）。幅 1000dp 以上は 3 カラム（左「選ぶ」=`FilterBrowser`、
+  中央「見る」=`BeforeAfterView` + `ImageSourcePicker`、右「調整」=`AdjustPanel`）、
+  それ未満は プレビュー → 調整 → 選択 の縦積み。`FilterBrowser` は検索・カテゴリ・
+  統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行、ロジックは
+  `filter_list_selection.dart`）と体験プリセットの最上段を持つ。`AdjustPanel` は選んだ
+  症状の説明・強度（`IntensitySlider`）・受診喚起（`ConsultNoticeBlock` 常時展開）・
+  `FilterParamPanel` を持ち、未選択時は空状態を出す。起動モード・最前面・クリックスルー・
+  ホットキー一覧（`WindowModePanel`）は AppBar のダイアログに退避し、クリックスルー ON
+  の間は復帰方法を `ClickThroughRecoveryBanner` が画面最上部に常時出す（#63）。
+  PNG エクスポートはプレビュー側に置く。選択の状態は従来どおり `VisionFilterState` が
+  唯一の正本
 - `FilterService`: 色覚フィルタ（`ColorVisionType`）の選択状態管理。
   sensus `VisionFilter` へのマッピングを持つ純粋な状態モデル。強度
   （`intensity`）はタイプごとに `Map<ColorVisionType, double>` で個別記憶し、
@@ -772,8 +797,9 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   ない**。GPU と CPU の等価性は `test/vision_filter_golden_test.dart` 等の
   GPU golden テストが（production の呼び出しとは独立に）担保する
 - `ExportService`: フィルタ適用後（after）画像のメタ焼き込み PNG エクスポート
-- `ExperiencePresets`（`lib/ui/widgets/experience_presets.dart`）: sensus の
-  `experiences()` をワンタップ適用 UI として消費する（複合体験、#19）
+- `ExperiencePresetTile`（`lib/ui/widgets/experience_presets.dart`）: sensus の
+  `experiences()` をワンタップ適用の行として消費する（複合体験、#19）。統合一覧
+  `FilterBrowser` の最上段に並ぶ（#72）
 - `ImageSourceState`（`lib/services/image_source_state.dart`）: プレビューの
   **原画**（before ペインの元画像）の選択状態を持つ、唯一の正本（#78）。
   `VisionFilterState`（フィルタの選択）とは独立した軸で、内蔵サンプル 7 種
@@ -835,7 +861,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   `SettingsService.isFirstRun`（`filterType` が一度も永続化されていないかで
   判定 — 明示的な「Normal vision」選択との区別のため専用の永続化キーは
   持たない）を見て一度だけシードする。「ほかの見え方を選ぶ」は
-  `home_screen.dart` が `FilterSelector` と共有する `FocusNode` へ
+  `home_screen.dart` が `FilterBrowser` の検索欄（`FilterBrowserController.searchFocus`）へ
   `requestFocus()` してから dismiss する（#78 レビュー S8）。「自分の画像で
   試す」は `pickAndLoadUserImage` の成否（`bool`）を見て、キャンセル/失敗では
   dismiss しない（#78 レビュー Q3。ピッカーをキャンセルしただけなのにバナーが
