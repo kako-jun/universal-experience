@@ -454,6 +454,7 @@ void main() {
         symptomLabel: 'Protanopia',
         strengthLabel: 'Strength: 100%',
         isoDate: '2026-06-23',
+        simulationNotice: 'Simulation (approximation)',
       );
       final composed = await composeExportImage(base, caption);
       addTearDown(() {
@@ -471,6 +472,7 @@ void main() {
         symptomLabel: 'Tritanopia',
         strengthLabel: 'Strength: 60%',
         isoDate: '2026-01-05',
+        simulationNotice: 'Simulation (approximation)',
       );
       final composed = await composeExportImage(base, caption);
       final png = await encodeImagePng(composed);
@@ -490,6 +492,7 @@ void main() {
         strengthLabel: 'Strength: 80%',
         urgencyMessage: 'Sudden changes in vision can need prompt care.',
         isoDate: '2026-06-23',
+        simulationNotice: 'Simulation (approximation)',
       );
       final composed = await composeExportImage(base, caption);
       final png = await encodeImagePng(composed);
@@ -512,11 +515,13 @@ void main() {
         symptomLabel: 'BPPV Rotation',
         strengthLabel: 'Strength: 60%',
         isoDate: '2026-06-23',
+        simulationNotice: 'Simulation (approximation)',
       );
       const withGroups = ExportCaption(
         symptomLabel: 'BPPV Rotation',
         strengthLabel: 'Strength: 60%',
         isoDate: '2026-06-23',
+        simulationNotice: 'Simulation (approximation)',
         escalationGroups: [
           ExportEscalationGroup(
             header: 'See a doctor right away if:',
@@ -543,6 +548,115 @@ void main() {
       expect(composedWith.height, greaterThan(composedWithout.height));
       expect(pngWith, isNotNull);
       expect(pngWith!.isNotEmpty, isTrue);
+    });
+
+    /// [png] を実際にデコードして RGBA の生画素を返す（焼き込みの検証は
+    /// 描画命令ではなく、書き出される PNG の画素で行う）。
+    Future<({int width, int height, Uint8List rgba})> decodePng(
+        Uint8List png) async {
+      final codec = await ui.instantiateImageCodec(png);
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
+      final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      final result = (
+        width: image.width,
+        height: image.height,
+        rgba: data!.buffer.asUint8List()
+      );
+      image.dispose();
+      codec.dispose();
+      return result;
+    }
+
+    /// 帯の中で「注記の色（純白）」の画素が並ぶ行の塊（上から順）ごとの
+    /// 横方向の広がり（px）を返す。
+    List<int> whiteLineExtents(
+        ({int width, int height, Uint8List rgba}) img, int bandTop) {
+      final extents = <int>[];
+      var minX = -1;
+      var maxX = -1;
+      var inLine = false;
+      void flush() {
+        if (inLine) extents.add(maxX - minX + 1);
+        inLine = false;
+        minX = -1;
+        maxX = -1;
+      }
+
+      for (var y = bandTop; y < img.height; y++) {
+        var rowMin = -1;
+        var rowMax = -1;
+        for (var x = 0; x < img.width; x++) {
+          final o = (y * img.width + x) * 4;
+          if (img.rgba[o] == 0xFF &&
+              img.rgba[o + 1] == 0xFF &&
+              img.rgba[o + 2] == 0xFF) {
+            if (rowMin < 0) rowMin = x;
+            rowMax = x;
+          }
+        }
+        if (rowMin < 0) {
+          flush();
+        } else {
+          inLine = true;
+          minX = minX < 0 ? rowMin : (rowMin < minX ? rowMin : minX);
+          maxX = rowMax > maxX ? rowMax : maxX;
+        }
+      }
+      flush();
+      return extents;
+    }
+
+    test(
+        'simulationNotice は書き出した PNG の画素として焼き込まれ、'
+        '文言の長さに応じて広がる（#80）', () async {
+      final base = await makeBase(640, 40);
+      addTearDown(base.dispose);
+
+      Future<List<int>> extentsFor(String notice) async {
+        final composed = await composeExportImage(
+          base,
+          ExportCaption(
+            symptomLabel: 'Tritanopia',
+            strengthLabel: 'Strength: 60%',
+            isoDate: '2026-06-23',
+            simulationNotice: notice,
+          ),
+        );
+        final png = await encodeImagePng(composed);
+        composed.dispose();
+        return whiteLineExtents(await decodePng(png!), base.height);
+      }
+
+      final long = await extentsFor('Simulation (approximation)');
+      final short = await extentsFor('Sim');
+
+      // 純白の行の塊は 2 つ: 症状名（太字 18px）と、注記（14px）。
+      expect(long, hasLength(2));
+      expect(short, hasLength(2));
+      // 症状名は同じ、注記だけが文言に応じて変わる。
+      expect(long[0], short[0]);
+      expect(long[1], greaterThan(short[1] * 4));
+      expect(long[1], greaterThan(0));
+    });
+
+    test('simulationNotice は受診喚起の有無にかかわらず常に描かれる（#80）', () async {
+      final base = await makeBase(640, 40);
+      addTearDown(base.dispose);
+      final composed = await composeExportImage(
+        base,
+        const ExportCaption(
+          symptomLabel: 'Glaucoma',
+          strengthLabel: 'Strength: 80%',
+          isoDate: '2026-06-23',
+          simulationNotice: 'Simulation (approximation)',
+          urgencyMessage: 'Sudden changes in vision can need prompt care.',
+        ),
+      );
+      final png = await encodeImagePng(composed);
+      composed.dispose();
+      final extents = whiteLineExtents(await decodePng(png!), base.height);
+      expect(extents, hasLength(2));
     });
   });
 }

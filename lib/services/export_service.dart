@@ -90,6 +90,7 @@ class ExportCaption {
     required this.symptomLabel,
     required this.strengthLabel,
     required this.isoDate,
+    required this.simulationNotice,
     this.urgencyMessage,
     this.escalationGroups = const [],
     this.disclaimer,
@@ -100,6 +101,12 @@ class ExportCaption {
 
   /// 強度の表示文字列（例「強度: 100%」/ "Strength: 100%"）。
   final String strengthLabel;
+
+  /// 「これは近似のシミュレーションであり、実際の見え方そのものではない」旨の
+  /// 1 文（例「シミュレーション（近似）」/ "Simulation (approximation)"、#80）。
+  /// 書き出した画像だけが単体で共有されても、実際の見え方と誤解されないように
+  /// **必須**（省略できない）で、受診喚起の有無にかかわらず常に焼き込む。
+  final String simulationNotice;
 
   /// 受診喚起メッセージ。null = 喚起なし（色覚特性は緊急性 none のため通常 null）。
   final String? urgencyMessage;
@@ -137,7 +144,7 @@ class ExportEscalationGroup {
 /// [base] 画像の下部にキャプション帯を合成した新しい [ui.Image] を返す。
 ///
 /// `PictureRecorder` + `Canvas` で base をそのまま描き、下に半透明の帯を敷いて
-/// [TextPainter] で症状名 / 強度 / 受診喚起（あれば）/ escalation（段ごとの
+/// [TextPainter] で症状名 / 強度 / シミュレーション（近似）の注記 / 受診喚起（あれば）/ escalation（段ごとの
 /// 見出し + 条件文、あれば、#76 レビュー M1・再レビュー S-a）/ 免責文（あれば）
 /// / ISO 日付を描画する。戻り画像の高さは `base.height + 帯の高さ`、幅は
 /// `base.width`。
@@ -152,6 +159,7 @@ Future<ui.Image> composeExportImage(
   final lines = <_CaptionLine>[
     _CaptionLine(caption.symptomLabel, _Style.title),
     _CaptionLine(caption.strengthLabel, _Style.body),
+    _CaptionLine(caption.simulationNotice, _Style.notice),
     if (caption.urgencyMessage != null)
       _CaptionLine(caption.urgencyMessage!, _Style.note),
     for (final group in caption.escalationGroups) ...[
@@ -426,7 +434,7 @@ class _CaptionLine {
     final tp = TextPainter(
       text: TextSpan(text: text, style: style.textStyle),
       textDirection: TextDirection.ltr,
-      maxLines: style == _Style.note ? 2 : 1,
+      maxLines: (style == _Style.note || style == _Style.notice) ? 2 : 1,
       ellipsis: '…',
     )..layout(maxWidth: maxWidth);
     return tp;
@@ -437,6 +445,7 @@ class _CaptionLine {
 enum _Style {
   title,
   body,
+  notice,
   note,
   noteHeader,
   meta;
@@ -454,6 +463,15 @@ enum _Style {
         return const TextStyle(
           color: Color(0xFFE6E6E6),
           fontSize: 14,
+          height: 1.2,
+        );
+      // 「シミュレーション（近似）」。受診喚起（琥珀色）と混ざらない白系で、
+      // 強度行より目立つ太さにする。
+      case _Style.notice:
+        return const TextStyle(
+          color: Color(0xFFFFFFFF),
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
           height: 1.2,
         );
       case _Style.note:

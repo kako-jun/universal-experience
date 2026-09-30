@@ -624,6 +624,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         symptomLabel: visionFilterDisplayName(l10n, colorVisionType, filterId),
         strengthLabel: l10n.strengthLabel(strengthPercent),
         isoDate: date,
+        simulationNotice: l10n.exportSimulationNotice,
         urgencyMessage: notice?.message,
         // #76 再レビュー S-a: PNG でも emergency/earlyConsultation の見出しを
         // 分けて焼き込む。ConsultNotice.escalationGroups をそのまま詰め替える
@@ -674,8 +675,8 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
             // messenger は export 開始時に取ってあり context を使わないので、
             // ビューが外れた後でも失敗を必ず知らせる。
             if (!opened) {
-              messenger
-                  .showSnackBar(SnackBar(content: Text(l10n.exportRevealFailure)));
+              messenger.showSnackBar(
+                  SnackBar(content: Text(l10n.exportRevealFailure)));
             }
           },
         ),
