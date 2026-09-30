@@ -1,8 +1,9 @@
-/// The built-in preview sample images (#78) — self-made, procedurally
-/// generated scenes (see `tools/generate_samples.dart` +
-/// `assets/samples/README.md` for provenance; text is drawn with the OFL
-/// Noto Sans / Noto Sans JP bitmap fonts in `tools/fonts/`, #99) that replace
-/// the old meaningless hue-gradient placeholder with content where a
+/// The built-in preview sample images (#78) — scenes whose shapes are
+/// self-made and procedurally generated and whose text is OFL font (see
+/// `tools/generate_samples.dart` + `assets/samples/README.md` for provenance;
+/// text is drawn with the OFL Noto Sans / Noto Sans JP bitmap fonts in
+/// `tools/fonts/`, #99) that replace the old meaningless hue-gradient
+/// placeholder with content where a
 /// symptom's effect is actually legible: colour-coded lines, a chart legend,
 /// signage text at several sizes (Latin and Japanese), red/green fruit,
 /// night point-lights, a layered depth scene.

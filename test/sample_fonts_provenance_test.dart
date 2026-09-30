@@ -59,12 +59,18 @@ void main() {
       expect(text, contains('SIL OPEN FONT LICENSE Version 1.1'), reason: name);
       expect(text, startsWith('Copyright'), reason: name);
     }
+    expect(File('tools/fonts/OFL-NotoSans.txt').readAsStringSync(),
+        contains('The Noto Project Authors'));
+    expect(File('tools/fonts/OFL-NotoSansJP.txt').readAsStringSync(),
+        contains('Adobe'));
     final readme = File('tools/fonts/README.md').readAsStringSync();
     expect(readme, contains('SIL Open Font License 1.1'));
     expect(readme, contains('Noto Sans'));
     expect(readme, contains('025970232f4f8ff349310d9785431e87d20ed27c'));
     expect(readme, contains('f8d157532fbfaeda587e826d4cd5b21a49186f7c'));
     expect(readme, contains('https://github.com/notofonts/'));
+    expect(readme, contains('Noto Project Authors'));
+    expect(readme, contains('Adobe'));
   });
 
   test('フォントのソフトウェア本体（TTF/OTF）はリポに含めない', () {

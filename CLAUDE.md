@@ -101,7 +101,7 @@ tools/                       # シェーダ codegen（sensus の .frag → Impel
                               #   全文・著作権表示・出典は fonts/README.md、#99）
                               # + check_frb_drift.sh（FRB 生成物のドリフト検証。CI の check job が実行、#88）
 shaders/                     # 変換済み .frag（ビルド時 impellerc がコンパイル）
-assets/samples/              # サンプル画像集（自作・手続き生成、#78。文字は OFL フォント、#99）。出典は README.md
+assets/samples/              # サンプル画像集（図形は自作・手続き生成、#78。文字は OFL フォント、#99）。出典は README.md
 
 macos/                       # macOS ランナー（現行対応）
 linux/                       # Linux ランナー（現行対応）

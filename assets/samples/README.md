@@ -1,8 +1,8 @@
 # サンプル画像集（#78）
 
-このディレクトリの PNG はすべて**自作・手続き的生成**です。外部の画像素材・
+このディレクトリの PNG は、図形を自作し手続き的に生成しています。外部の画像素材・
 スクリーンショット・写真は一切使っていません。**人物の顔は含みません**。画像に
-描かれた文字は SIL OFL 1.1 のフォント（Noto Sans / Noto Sans JP）で描いています
+描かれた文字だけは SIL OFL 1.1 のフォント（Noto Sans / Noto Sans JP）で描いています
 （下の「文字の出典」）。
 
 ## 生成方法
@@ -22,7 +22,7 @@
 | 用途 | フォント | 版 | ライセンス | 配布元 |
 |---|---|---|---|---|
 | 英数字（路線図・グラフ・標識・案内板・夜景の看板） | Noto Sans Regular / Bold | [`notofonts.github.io` の `025970232f4f8ff349310d9785431e87d20ed27c`](https://github.com/notofonts/notofonts.github.io/tree/025970232f4f8ff349310d9785431e87d20ed27c/fonts/NotoSans/full/ttf) | SIL OFL 1.1（Copyright 2022 The Noto Project Authors） | <https://github.com/notofonts/latin-greek-cyrillic> |
-| 日本語（日本語の案内板） | Noto Sans JP（Noto Sans CJK JP）Regular / Bold | [`noto-cjk` の `f8d157532fbfaeda587e826d4cd5b21a49186f7c`](https://github.com/notofonts/noto-cjk/tree/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/SubsetOTF/JP) | SIL OFL 1.1（Copyright 2014-2021 Adobe） | <https://github.com/notofonts/noto-cjk> |
+| 日本語（日本語の案内板） | Noto Sans JP（Noto Sans CJK JP）Regular / Bold | [`noto-cjk` の `f8d157532fbfaeda587e826d4cd5b21a49186f7c`](https://github.com/notofonts/noto-cjk/tree/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/SubsetOTF/JP) | SIL OFL 1.1（Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'） | <https://github.com/notofonts/noto-cjk> |
 
 フォント本体（TTF/OTF）はリポに入れていません。サンプルに使う文字だけを固定
 サイズでラスタライズしたアトラスを `tools/fonts/` に置いています（生成は
