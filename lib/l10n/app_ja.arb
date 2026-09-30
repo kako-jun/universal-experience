@@ -52,6 +52,8 @@
 
   "exportButtonTooltip": "PNG でエクスポート",
   "exportSuccess": "エクスポートしました：{path}",
+  "exportRevealAction": "フォルダで表示",
+  "exportRevealFailure": "フォルダを開けませんでした。",
   "exportFailure": "エクスポートに失敗しました。もう一度お試しください。",
 
   "experienceSectionTitle": "体験プリセット",

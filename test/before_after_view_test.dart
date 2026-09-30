@@ -1020,6 +1020,7 @@ void main() {
         afterImageRenderer = BeforeAfterView.renderAfter;
         exportImageComposer = composeExportImage;
         pngSaver = savePng;
+        folderRevealer = revealInFolder;
         resetVisionFilterMetadataProviders();
       });
 
@@ -1117,6 +1118,128 @@ void main() {
         expect(savedFilename, isNotNull);
         expect(savedFilename, contains('100pct'));
         expect(savedFilename, isNot(contains('50pct')));
+      });
+
+      testWidgets(
+          'export 成功の SnackBar に保存先パスと「フォルダで表示」が出て、押すと'
+          'その保存先を開く。ファイル名は日付＋時刻を含む (#64)', (tester) async {
+        late ui.Image before1, after1, composedStub;
+        await tester.runAsync(() async {
+          before1 = await generateSampleImage(4);
+          after1 = await generateSampleImage(4);
+          composedStub = await generateSampleImage(4);
+        });
+        previewSourceImageLoader = (source, size) => Future.value(before1);
+        afterImageRenderer = (source, filter, strength) => Future.value(after1);
+        exportImageComposer = (base, caption) async => composedStub;
+
+        String? savedFilename;
+        pngSaver = (bytes, filename) async {
+          savedFilename = filename;
+          // 連番になった場合を模す: SnackBar には savePng が返した実パスが出る。
+          return '/fake/Downloads/${numberedFilename(filename, 2)}';
+        };
+        final revealed = <String>[];
+        folderRevealer = (path) async {
+          revealed.add(path);
+          return true;
+        };
+
+        final en = lookupAppLocalizations(const Locale('en'));
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
+          sampleSize: 16,
+        )));
+        await tester.pump();
+        await tester.pump();
+
+        await tester.tap(find.byTooltip(en.exportButtonTooltip));
+        await tester.runAsync(() async {
+          for (var i = 0; i < 50; i++) {
+            if (savedFilename != null) return;
+            await tester.pump(const Duration(milliseconds: 20));
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+          }
+        });
+        await tester.runAsync(() async {
+          for (var i = 0; i < 50; i++) {
+            if (find.byType(SnackBar).evaluate().isNotEmpty) return;
+            await tester.pump(const Duration(milliseconds: 20));
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+          }
+        });
+        await tester.pump(const Duration(milliseconds: 500));
+
+        expect(savedFilename, isNotNull);
+        expect(
+          savedFilename,
+          matches(RegExp(r'^ue-protanopia-100pct-\d{4}-\d{2}-\d{2}_\d{6}\.png$')),
+          reason: '同じ日に 2 回書き出しても同名にならないよう時刻を含む',
+        );
+        final savedPath = '/fake/Downloads/${numberedFilename(savedFilename!, 2)}';
+        expect(find.text(en.exportSuccess(savedPath)), findsOneWidget);
+        expect(find.text(en.exportRevealAction), findsOneWidget);
+        expect(revealed, isEmpty);
+
+        await tester.tap(find.text(en.exportRevealAction));
+        await tester.pump();
+        expect(revealed, [savedPath]);
+        expect(find.text(en.exportRevealFailure), findsNothing);
+      });
+
+      testWidgets('「フォルダで表示」が開けなかったら失敗を SnackBar で知らせる (#64)',
+          (tester) async {
+        late ui.Image before1, after1, composedStub;
+        await tester.runAsync(() async {
+          before1 = await generateSampleImage(4);
+          after1 = await generateSampleImage(4);
+          composedStub = await generateSampleImage(4);
+        });
+        previewSourceImageLoader = (source, size) => Future.value(before1);
+        afterImageRenderer = (source, filter, strength) => Future.value(after1);
+        exportImageComposer = (base, caption) async => composedStub;
+        var saved = false;
+        pngSaver = (bytes, filename) async {
+          saved = true;
+          return '/fake/Downloads/$filename';
+        };
+        folderRevealer = (path) async => false;
+
+        final en = lookupAppLocalizations(const Locale('en'));
+        await tester.pumpWidget(localized(const BeforeAfterView(
+          filter: VisionFilter.protanopia(),
+          filterId: 'protanopia',
+          strength: 1.0,
+          imageSource: SamplePreviewImageSource('test'),
+          sampleSize: 16,
+        )));
+        await tester.pump();
+        await tester.pump();
+
+        await tester.tap(find.byTooltip(en.exportButtonTooltip));
+        await tester.runAsync(() async {
+          for (var i = 0; i < 50; i++) {
+            if (saved) return;
+            await tester.pump(const Duration(milliseconds: 20));
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+          }
+        });
+        await tester.runAsync(() async {
+          for (var i = 0; i < 50; i++) {
+            if (find.byType(SnackBar).evaluate().isNotEmpty) return;
+            await tester.pump(const Duration(milliseconds: 20));
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+          }
+        });
+        await tester.pump(const Duration(milliseconds: 500));
+
+        await tester.tap(find.text(en.exportRevealAction));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(find.text(en.exportRevealFailure), findsOneWidget);
       });
 
       testWidgets('filter=null（原画）で export すると symptomLabel が previewPaneOriginal になる '

@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -70,6 +72,363 @@ void main() {
       }
       expect(name, endsWith('.png'));
     });
+  });
+
+  group('compactTime', () {
+    test('HHMMSS（24 時間・ゼロ埋め・コロン無し）で整形する', () {
+      expect(compactTime(DateTime(2026, 6, 23, 14, 5, 9)), '140509');
+      expect(compactTime(DateTime(2026, 6, 23, 0, 0, 0)), '000000');
+      expect(compactTime(DateTime(2026, 6, 23, 23, 59, 59)), '235959');
+    });
+  });
+
+  group('exportFilename の時刻 (#64)', () {
+    test('time を渡すと日付の後ろに _ 区切りで付く', () {
+      expect(
+        exportFilename(
+          symptomId: 'protanopia',
+          strengthPercent: 100,
+          isoDate: '2026-06-23',
+          time: '140509',
+        ),
+        'ue-protanopia-100pct-2026-06-23_140509.png',
+      );
+    });
+
+    test('同じ日でも time が違えば別名になる（同日 2 回目で同名にならない）', () {
+      String at(DateTime dt) => exportFilename(
+            symptomId: 'protanopia',
+            strengthPercent: 100,
+            isoDate: isoDate(dt),
+            time: compactTime(dt),
+          );
+      expect(
+        at(DateTime(2026, 6, 23, 14, 5, 9)),
+        isNot(at(DateTime(2026, 6, 23, 14, 5, 10))),
+      );
+    });
+
+    test('時刻入りでもファイル名に使えない文字（: / \\ など）を含まない', () {
+      final name = exportFilename(
+        symptomId: 'protanopia',
+        strengthPercent: 100,
+        isoDate: isoDate(DateTime(2026, 6, 23)),
+        time: compactTime(DateTime(2026, 6, 23, 14, 5, 9)),
+      );
+      for (final ch in <String>['/', '\\', ':', '*', '?']) {
+        expect(name.contains(ch), isFalse, reason: 'must not contain "$ch"');
+      }
+    });
+  });
+
+  group('numberedFilename (#64)', () {
+    test('1 回目は元の名前のまま', () {
+      expect(numberedFilename('a.png', 1), 'a.png');
+    });
+
+    test('2 回目以降は拡張子の前に -N を挟む', () {
+      expect(numberedFilename('a.png', 2), 'a-2.png');
+      expect(numberedFilename('a.png', 10), 'a-10.png');
+    });
+
+    test('名前に複数の . があっても最後の拡張子の前に挟む', () {
+      expect(numberedFilename('ue-x-100pct-2026-06-23_140509.png', 3),
+          'ue-x-100pct-2026-06-23_140509-3.png');
+      expect(numberedFilename('a.b.png', 2), 'a.b-2.png');
+    });
+
+    test('拡張子が無い名前は末尾に付ける', () {
+      expect(numberedFilename('noext', 2), 'noext-2');
+    });
+  });
+
+  group('writeBytesWithoutOverwrite (#64)', () {
+    late Directory dir;
+    setUp(() async {
+      dir = await Directory.systemTemp.createTemp('ue_export_test_');
+    });
+    tearDown(() async {
+      await dir.delete(recursive: true);
+    });
+
+    Uint8List bytes(int v) => Uint8List.fromList([v, v, v]);
+    String p(String name) => '${dir.path}${Platform.pathSeparator}$name';
+
+    test('空いている名前ならその名前で書き、フルパスを返す', () async {
+      final path = await writeBytesWithoutOverwrite(dir, bytes(1), 'a.png');
+      expect(path, p('a.png'));
+      expect(File(path).readAsBytesSync(), bytes(1));
+    });
+
+    test('同名が既にあれば上書きせず -2, -3 で保存し、元の内容が残る', () async {
+      final first = await writeBytesWithoutOverwrite(dir, bytes(1), 'a.png');
+      final second = await writeBytesWithoutOverwrite(dir, bytes(2), 'a.png');
+      final third = await writeBytesWithoutOverwrite(dir, bytes(3), 'a.png');
+
+      expect(first, p('a.png'));
+      expect(second, p('a-2.png'));
+      expect(third, p('a-3.png'));
+      expect(File(first).readAsBytesSync(), bytes(1));
+      expect(File(second).readAsBytesSync(), bytes(2));
+      expect(File(third).readAsBytesSync(), bytes(3));
+    });
+
+    test('連番の途中が空いていればそこを使う（a.png と a-3.png があれば a-2.png）', () async {
+      File(p('a.png')).writeAsBytesSync(bytes(1));
+      File(p('a-3.png')).writeAsBytesSync(bytes(3));
+      final path = await writeBytesWithoutOverwrite(dir, bytes(2), 'a.png');
+      expect(path, p('a-2.png'));
+      expect(File(p('a-3.png')).readAsBytesSync(), bytes(3));
+    });
+
+    test('同時に同名で書いても互いを上書きせず全部残る', () async {
+      final paths = await Future.wait([
+        for (var i = 1; i <= 5; i++)
+          writeBytesWithoutOverwrite(dir, bytes(i), 'a.png'),
+      ]);
+      expect(paths.toSet().length, 5, reason: '全て別のパスになる');
+      final contents = {
+        for (final path in paths) File(path).readAsBytesSync().first,
+      };
+      expect(contents, {1, 2, 3, 4, 5}, reason: '5 つとも内容が残っている');
+    });
+
+    test('作成後の書き込みに失敗したら作りかけのファイルを残さず、元の例外を投げる', () async {
+      await expectLater(
+        writeBytesWithoutOverwrite(
+          dir,
+          bytes(1),
+          'a.png',
+          writeFile: (file, b) async =>
+              throw const FileSystemException('disk full'),
+        ),
+        throwsA(isA<FileSystemException>()
+            .having((e) => e.message, 'message', 'disk full')),
+      );
+      expect(dir.listSync(), isEmpty, reason: '0 バイトのファイルが残っていない');
+
+      // 失敗のあとに同名で書き直せる（失敗した名前を占有し続けない）。
+      final path = await writeBytesWithoutOverwrite(dir, bytes(2), 'a.png');
+      expect(path, p('a.png'));
+    });
+
+    test('書き込み失敗で消すのは自分が作ったファイルだけ（既存の同名は無傷）', () async {
+      File(p('a.png')).writeAsBytesSync(bytes(1));
+      await expectLater(
+        writeBytesWithoutOverwrite(
+          dir,
+          bytes(2),
+          'a.png',
+          writeFile: (file, b) async => throw const FileSystemException('x'),
+        ),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(File(p('a.png')).readAsBytesSync(), bytes(1));
+      expect(File(p('a-2.png')).existsSync(), isFalse);
+    });
+
+    test('存在しないディレクトリへの書き込みは連番で握りつぶさず例外にする', () async {
+      final missing = Directory(p('no_such_dir'));
+      expect(
+        () => writeBytesWithoutOverwrite(missing, bytes(1), 'a.png'),
+        throwsA(isA<FileSystemException>()),
+      );
+    });
+  });
+
+  group('revealCommandFor (#64)', () {
+    test('macOS は /usr/bin/open -R でファイルを選択状態にし、終了コードで成否を見る', () {
+      final cmd = revealCommandFor('macos', '/Users/u/Downloads/a.png');
+      expect(cmd!.executable, '/usr/bin/open');
+      expect(cmd.arguments, ['-R', '/Users/u/Downloads/a.png']);
+      expect(cmd.mode, RevealMode.runAndCheckExit);
+    });
+
+    test('Windows は explorer /select, にパスを続け、終了コードは見ない', () {
+      final cmd = revealCommandFor('windows', r'C:\Users\u\Downloads\a.png');
+      expect(cmd!.executable, 'explorer');
+      expect(cmd.arguments, [r'/select,C:\Users\u\Downloads\a.png']);
+      expect(cmd.mode, RevealMode.runIgnoreExit);
+    });
+
+    test('Linux は含むフォルダを xdg-open で開き、切り離して起動する', () {
+      final cmd = revealCommandFor('linux', '/home/u/Downloads/a.png');
+      expect(cmd!.executable, 'xdg-open');
+      expect(cmd.arguments, ['/home/u/Downloads']);
+      expect(cmd.mode, RevealMode.startDetached);
+    });
+
+    test('未対応 OS は null', () {
+      expect(revealCommandFor('android', '/x/a.png'), isNull);
+    });
+  });
+
+  group('revealInFolder (#64)', () {
+    Future<bool> reveal(String platform, RevealRunner runner) =>
+        revealInFolder('/x/a.png', platform: platform, runner: runner);
+
+    test('macOS: 終了コード 0 は成功、非 0 は失敗', () async {
+      expect(await reveal('macos', (_) async => 0), isTrue);
+      expect(await reveal('macos', (_) async => 1), isFalse);
+    });
+
+    test('macOS: 起動できなければ（ProcessException）失敗', () async {
+      expect(
+        await reveal(
+            'macos', (_) async => throw const ProcessException('open', [])),
+        isFalse,
+      );
+    });
+
+    test('Windows: explorer は終了コード 1 でも成功として扱う', () async {
+      expect(await reveal('windows', (_) async => 1), isTrue);
+      expect(await reveal('windows', (_) async => 0), isTrue);
+    });
+
+    test('Windows: 起動できなければ失敗', () async {
+      expect(
+        await reveal('windows',
+            (_) async => throw const ProcessException('explorer', [])),
+        isFalse,
+      );
+    });
+
+    test('Linux: 切り離し起動（終了コード null）は起動できれば成功', () async {
+      expect(await reveal('linux', (_) async => null), isTrue);
+      expect(
+        await reveal(
+            'linux', (_) async => throw const ProcessException('xdg-open', [])),
+        isFalse,
+      );
+    });
+
+    test('runner には revealCommandFor と同じコマンドが渡る', () async {
+      RevealCommand? seen;
+      await reveal('macos', (cmd) async {
+        seen = cmd;
+        return 0;
+      });
+      final expected = revealCommandFor('macos', '/x/a.png')!;
+      expect(seen!.executable, expected.executable);
+      expect(seen!.arguments, expected.arguments);
+      expect(seen!.mode, expected.mode);
+    });
+
+    test('未対応 OS は runner を呼ばず失敗', () async {
+      var called = false;
+      final ok = await reveal('android', (_) async {
+        called = true;
+        return 0;
+      });
+      expect(ok, isFalse);
+      expect(called, isFalse);
+    });
+  });
+
+  group('savePngInto: シンボリックリンクを実パスに正規化する (#64)', () {
+    late Directory root;
+    late Directory realDir;
+    late String linkPath;
+    // Windows の CI ではシンボリックリンクを作れない環境がある。
+    final skipSymlink =
+        Platform.isWindows ? 'Windows では symlink を作れない場合がある' : null;
+
+    setUp(() async {
+      root = await Directory.systemTemp.createTemp('ue_export_link_');
+      // 一時ディレクトリ自体が symlink 配下のことがある（macOS の /var → /private/var）
+      // ので、期待値は実パスに解決したルートから作る。
+      final resolvedRoot = Directory(await root.resolveSymbolicLinks());
+      realDir =
+          await Directory('${resolvedRoot.path}${Platform.pathSeparator}real')
+              .create();
+      linkPath =
+          '${resolvedRoot.path}${Platform.pathSeparator}container-downloads';
+      if (skipSymlink == null) await Link(linkPath).create(realDir.path);
+    });
+    tearDown(() async {
+      await root.delete(recursive: true);
+    });
+
+    test('リンク経由で与えても、返るパスはリンク先の実パス（リンク側の名前ではない）', () async {
+      final path = await savePngInto(
+        Directory(linkPath),
+        Uint8List.fromList([1, 2, 3]),
+        'a.png',
+      );
+      expect(path, '${realDir.path}${Platform.pathSeparator}a.png');
+      expect(path, isNot(contains('container-downloads')));
+      expect(File(path).readAsBytesSync(), [1, 2, 3]);
+    }, skip: skipSymlink);
+
+    test('リンク越しでも同名は上書きせず連番、返るパスは実パス', () async {
+      final first = await savePngInto(
+          Directory(linkPath), Uint8List.fromList([1]), 'a.png');
+      final second = await savePngInto(
+          Directory(linkPath), Uint8List.fromList([2]), 'a.png');
+      expect(first, '${realDir.path}${Platform.pathSeparator}a.png');
+      expect(second, '${realDir.path}${Platform.pathSeparator}a-2.png');
+      expect(File(first).readAsBytesSync(), [1]);
+    }, skip: skipSymlink);
+
+    test('リンクでないディレクトリでもそのまま実パスを返す', () async {
+      final path = await savePngInto(realDir, Uint8List.fromList([9]), 'b.png');
+      expect(path, '${realDir.path}${Platform.pathSeparator}b.png');
+    });
+
+    test('resolveDirectoryOrSelf: 解決できない（存在しない）ディレクトリは元のまま', () async {
+      final missing =
+          Directory('${realDir.path}${Platform.pathSeparator}no_such_dir');
+      expect((await resolveDirectoryOrSelf(missing)).path, missing.path);
+    });
+
+    test('resolvePathOrSelf: 解決できないパスは元のまま', () async {
+      final missing = '${realDir.path}${Platform.pathSeparator}no_such.png';
+      expect(await resolvePathOrSelf(missing), missing);
+    });
+
+    test('リンク切れのディレクトリは、解決できず元のパスへ書こうとして例外になる', () async {
+      final broken = '${root.path}${Platform.pathSeparator}broken';
+      await Link(broken).create('${root.path}${Platform.pathSeparator}nowhere');
+      await expectLater(
+        savePngInto(Directory(broken), Uint8List.fromList([1]), 'a.png'),
+        throwsA(isA<FileSystemException>()),
+      );
+    }, skip: skipSymlink);
+  });
+
+  group('macOS entitlements (#64)', () {
+    // サンドボックス下でコンテナ内 Data/Downloads のリンク先（実 ~/Downloads）へ
+    // 書ける条件。どちらかから落ちる（またはコメントアウトされる）と書き込みが
+    // サンドボックスに拒否される。XML コメントを除いてから照合する。
+    bool hasDownloadsEntitlement(String plist) {
+      final active = plist.replaceAll(RegExp(r'<!--[\s\S]*?-->'), '');
+      return RegExp(
+        r'<key>com\.apple\.security\.files\.downloads\.read-write</key>\s*<true/>',
+      ).hasMatch(active);
+    }
+
+    test('検出関数: 有効なキーは true、XML コメントアウトされたキーは false', () {
+      const active =
+          '<dict><key>com.apple.security.files.downloads.read-write</key>'
+          '<true/></dict>';
+      const commented =
+          '<dict><!-- <key>com.apple.security.files.downloads.read-write'
+          '</key>\n<true/> --></dict>';
+      const falseValue =
+          '<dict><key>com.apple.security.files.downloads.read-write</key>'
+          '<false/></dict>';
+      expect(hasDownloadsEntitlement(active), isTrue);
+      expect(hasDownloadsEntitlement(commented), isFalse);
+      expect(hasDownloadsEntitlement(falseValue), isFalse);
+    });
+
+    for (final name in ['DebugProfile', 'Release']) {
+      test('$name.entitlements に有効な Downloads の読み書き entitlement がある', () {
+        final plist =
+            File('macos/Runner/$name.entitlements').readAsStringSync();
+        expect(hasDownloadsEntitlement(plist), isTrue);
+      });
+    }
   });
 
   group('composeExportImage', () {
