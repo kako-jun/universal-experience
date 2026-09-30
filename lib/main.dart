@@ -553,7 +553,11 @@ class NativeBridgeErrorApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      locale: locale ?? resolveSupportedLocale(null),
+      locale: locale,
+      // OS の言語が変わったら表示中のエラー画面も追従する（UniversalExperienceApp と
+      // 同じ関数）。
+      localeListResolutionCallback: (locales, _) =>
+          resolveSupportedLocale(null, systemLocales: locales),
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,

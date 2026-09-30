@@ -81,4 +81,40 @@ void main() {
     expect(find.byType(HomeScreen), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('表示中に OS の言語が変わると、エラー画面の文言も追従する',
+      (WidgetTester tester) async {
+    tester.platformDispatcher.localeTestValue = const Locale('ja');
+    tester.platformDispatcher.localesTestValue = const [Locale('ja')];
+    addTearDown(tester.platformDispatcher.clearLocaleTestValue);
+    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+
+    await tester.pumpWidget(const NativeBridgeErrorApp());
+    await tester.pumpAndSettle();
+    final ja = lookupAppLocalizations(const Locale('ja'));
+    final en = lookupAppLocalizations(const Locale('en'));
+    expect(find.text(ja.nativeBridgeInitFailed), findsOneWidget);
+
+    // [fr, en]: fr は未対応なので、次の候補 en になる。
+    tester.platformDispatcher.localeTestValue = const Locale('fr');
+    tester.platformDispatcher.localesTestValue = const [
+      Locale('fr'),
+      Locale('en'),
+    ];
+    await tester.pumpAndSettle();
+    expect(find.text(en.nativeBridgeInitFailed), findsOneWidget);
+    expect(find.text(ja.nativeBridgeInitFailed), findsNothing);
+  });
+
+  testWidgets('OS の言語リストが空なら en になる', (WidgetTester tester) async {
+    tester.platformDispatcher.localeTestValue = const Locale('xx');
+    tester.platformDispatcher.localesTestValue = const [];
+    addTearDown(tester.platformDispatcher.clearLocaleTestValue);
+    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+
+    await tester.pumpWidget(const NativeBridgeErrorApp());
+    await tester.pumpAndSettle();
+    final en = lookupAppLocalizations(const Locale('en'));
+    expect(find.text(en.nativeBridgeInitFailed), findsOneWidget);
+  });
 }
