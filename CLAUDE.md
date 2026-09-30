@@ -145,7 +145,7 @@ test/
 ├── tray_locale_sync_test.dart      # 言語の選択/OS ロケール変更でトレイの文言が更新される（#82）
 ├── tray_advanced_filters_test.dart # トレイの「高度なフィルタ」サブメニュー: 構造・チェック式（層の集合から導く）・クリック→状態・上限での灰色・UI との双方向同期・言語追従・click-through 不干渉（#65/#121）
 ├── vision_filter_snapshot_test.dart # 永続 JSON v2 の往復・層の不変条件・v1 → v2 変換・壊れた値/未知 id/範囲外のフォールバック（#65/#117）
-├── vision_filter_store_test.dart   # 永続化ストア・VisionFilterState.snapshot/restore・旧キーの取り込み（migrateLegacySettings: filterType のみ・版 1 のみ・origin 入り v2 の読み込み・書き込み失敗/壊れた保存で既定・intensityByType）（#65/#117/#124）
+├── vision_filter_store_test.dart   # 永続化ストア・VisionFilterState.snapshot/restore・旧キーの取り込み（migrateLegacySettings: filterType のみ・版 1 のみ・origin 入り v2 の読み込み・書き込み失敗でも結果はメモリへ入る・壊れた保存は filterType の層と旧強度で作り直す・intensityByType）（#65/#117/#124）
 ├── color_vision_alias_test.dart    # 色覚 7 種のキー（カタログ id + 別名 id）の解決・-omaly の既定強度 0.6・強度記憶の独立・同じ色覚の再選択・色覚グループの排他（#124）
 ├── vision_filter_persistence_app_test.dart # 実アプリ（buildRootApp）を作り直して選択が復元される・旧強度の取り込み（#65/#117）
 ├── vision_filter_stage_test.dart   # 段の表（30 フィルタがちょうど 1 段・段内は sensus 宣言順）と適用順・色覚の排他グループ（#117）
