@@ -22,10 +22,10 @@
 //   {wide|narrow}-{light|dark}-{ja|en}-compare-{off|on}.png
 //                                                  — 色覚 4 型の 2×2 比較（#84）の切替前/後
 //   wide-{light|dark}-{ja|en}-compare-export.png   — 2×2 の書き出し PNG（保存されたバイトそのもの）
-//   {wide|narrow}-{light|dark}-{ja|en}-compare-layers-on.png
+//   {wide-light-ja|wide-dark-en|narrow-light-ja}-compare-layers-on.png
 //                                                  — 色覚 + 他の層（光学・運動）を重ねた 2×2 比較（#122）。
 //                                                    4 セルは色覚以外の層を先に適用した画像の上に 4 型
-//   wide-{light|dark}-{ja|en}-compare-layers-export.png
+//   {wide-light-ja|wide-dark-en}-compare-layers-export.png
 //                                                  — 上の状態の 2×2 書き出し PNG
 //   {wide|narrow|narrow-xs}-{light|dark}-{ja|en}-multi.png
 //                                                  — 多層選択（3 層。チップ帯・層ごとの調整・見出しの要約、#120）

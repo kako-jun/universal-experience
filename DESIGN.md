@@ -346,7 +346,8 @@ UE_SCREENSHOTS=1 UE_SCREENSHOT_DIR=/path/to/out \
   `{wide|narrow}-{light|dark}-{ja|en}-explain-{deutan|cataract|floaters|tetrachromacy}.png`（出典・限界を両方開いた状態。
   色覚・advanced・seed 型・四色覚の「実験的」バッジ。#80。文言はレイアウト確認用の差し込みで実データではない）、
   `{wide|narrow}-{light|dark}-{ja|en}-compare-{off|on}.png`（色覚 4 型の 2×2 比較の切替前/後。#84）と
-  `{wide|narrow}-{light|dark}-{ja|en}-compare-layers-on.png` / `wide-{light|dark}-{ja|en}-compare-layers-export.png`（めまい + 近視 + 色覚を重ねた 2×2 と、その書き出し。土台の注記・症状名行つき。#122）、
+  `wide-light-ja-compare-layers-on.png` / `wide-dark-en-compare-layers-on.png` / `narrow-light-ja-compare-layers-on.png` と
+  `wide-light-ja-compare-layers-export.png` / `wide-dark-en-compare-layers-export.png`（めまい + 近視 + 色覚を重ねた 2×2 と、その書き出し。土台の注記・症状名行つき。#122）、
   `wide-{light|dark}-{ja|en}-compare-export.png`（2×2 の書き出しで保存された PNG のバイトそのもの。撮影時に
   デコードして 4 セルの色が互いに異なることも確かめる）。2×2 の撮影だけは、4 型が見分けられるよう型ごとに色味を
   変えた別のフェイクに差し替える（同じく色覚の正しさを示す画像ではない）。
