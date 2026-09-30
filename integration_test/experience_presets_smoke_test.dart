@@ -23,6 +23,7 @@ import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/preview_image_source.dart';
 import 'package:universal_experience/models/sample_catalog.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
+import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/native_bridge_service.dart';
 import 'package:universal_experience/services/preview_selection.dart';
@@ -87,7 +88,7 @@ Widget _presetsApp() {
 /// home_screen.dart のプレビュー結線（#60）を最小構成で再現したアプリ。
 /// 体験プリセットの行（[ExperiencePresetTile]）のタップが実際に [BeforeAfterView] の描画へつながる
 /// ことを、実ブリッジ（CPU `apply()`）込みで確かめる。
-Widget _previewWithPresetsApp() {
+Widget _previewWithPresetsApp(ScrollController scrollController) {
   final visionState = VisionFilterState();
   return MultiProvider(
     providers: [
@@ -108,6 +109,9 @@ Widget _previewWithPresetsApp() {
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: SingleChildScrollView(
+          // 外側のスクロールはテストが直接動かす（プリセットの行を確実にヒットテストできる
+          // 位置へ出すため）。
+          controller: scrollController,
           // home_screen.dart の ConstrainedBox(maxWidth: 800) を再現する
           // （#60）。これが無いと、幅無制限のウィンドウ上で
           // BeforeAfterView の左右ペインが横幅いっぱい（1000px超）の正方形に
@@ -210,7 +214,8 @@ void main() {
       expect(find.byType(ExperiencePresetTile), findsNWidgets(4));
     });
 
-    testWidgets('行をタップすると選択状態が変わる（色覚 FilterService は変更しない、#60）',
+    testWidgets(
+        '行をタップすると層がそのプリセット 1 つに置き換わり、色覚 FilterService も層から導かれて none になる（#120）',
         (tester) async {
       await tester.pumpWidget(_presetsApp());
       await tester.pumpAndSettle();
@@ -219,68 +224,67 @@ void main() {
       final visionState = context.read<VisionFilterState>();
       final filterService = context.read<FilterService>();
 
-      // タップ前に色覚フィルタを有効化しておき、体験プリセット適用で
-      // 変更されないことも合わせて確認する（widget test と同じ契約、#60）。
-      filterService.applyFilter(ColorVisionType.protanopia);
-      expect(visionState.selectedId, isNull);
+      // タップ前に色覚クイック選択（protanopia の層）を入れておく。体験プリセットは層を
+      // そのプリセット 1 つに置き換えるので、色覚の層は無くなり、FilterService の色覚型も
+      // 層の集合（色覚クイック選択の層が無い）から none に導かれる（#120。かつては
+      // プリセット適用が色覚の状態に干渉しない契約だった、#60）。
+      selectColorVision(filterService, visionState, ColorVisionType.protanopia);
+      expect(visionState.layers.map((l) => l.id), ['protanopia']);
+      expect(filterService.currentFilter, ColorVisionType.protanopia);
 
       final en = lookupAppLocalizations(const Locale('en'));
       await tester.tap(find.text(en.experienceMeniere));
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
+      expect(visionState.layers.map((l) => l.id), ['vertigo'],
+          reason: 'プリセット選択は層を全部そのプリセット 1 つに置き換える');
       expect(visionState.selectedId, 'vertigo');
       expect(visionState.selectedPresetId, 'meniere');
-      expect(filterService.currentFilter, ColorVisionType.protanopia,
-          reason: 'プリセット適用は色覚クイック選択の状態に干渉しない（#60）');
+      expect(filterService.currentFilter, ColorVisionType.none,
+          reason: '色覚クイック選択の層が無くなったので、FilterService も none に導かれる');
     });
   });
 
   group('プリセット → プレビュー結線（#60）', () {
-    /// [finder] が実際にヒットテストできる位置（ウィンドウの矩形内）に入るまで
-    /// [scrollableFinder] を実ジェスチャでドラッグし続ける（#60）。
+    /// [finder]（プリセットの行）が実際にヒットテストできる位置へ、一覧自身のスクロールと
+    /// 外側のスクロール（[scrollController]）を動かして出す。
     ///
-    /// `tester.scrollUntilVisible`（内部の `dragUntilVisible`）は
-    /// 「finder が要素ツリー上に見つかるまで」ドラッグする実装で、
-    /// `_previewWithPresetsApp` のようにカードが遅延構築（ListView.builder 等）
-    /// されず常時ビルド済みの場合は最初から見つかってしまい一切ドラッグしない。
-    /// `tester.ensureVisible`（`Scrollable.ensureVisible`）も呼んだが、CI（macOS
-    /// / Linux とも）でスクロールが反映されなかった（原因未特定）。本質的な
-    /// 原因はどちらでもなく、`_previewWithPresetsApp` が home_screen.dart の
-    /// 幅制約（`ConstrainedBox(maxWidth: 800)`）を欠いていてペインが無制限の
-    /// 幅いっぱいの巨大な正方形になり、後続のカードが大きく押し出されていた
-    /// こと（幅制約は追加済み）。このヘルパは実際の描画済み矩形
-    /// （`tester.getRect`）とウィンドウサイズを比較しながら実ジェスチャの
-    /// `drag` を繰り返すため、スクロール手段そのものの実装差に依存しない。
-    /// [maxAttempts] 回ドラッグしても収まらなければ、後続の `tap()` の
-    /// 分かりにくいヒットテスト失敗にする代わりに、ここで明示的に `fail()`
-    /// する（#60）。
-    Future<void> scrollUntilHitTestable(
+    /// 実ジェスチャの `drag` や `ensureVisible` には頼らない。外側のスクロールの中に一覧
+    /// 自身のスクロールが入れ子になっており、`drag` は画面中央の位置で始まるため、中央が
+    /// 一覧の上に来ると外側ではなく一覧側がスクロールする。また #120 では、プリセットを
+    /// タップすると層がそのプリセットの 1 つに置き換わり、置き換わった層に対応するフィルタの
+    /// 行（一覧の下の方）が選択中になって、[FilterListTile] が一覧の内側のスクロールを
+    /// その行まで動かす。すると一覧の最上段にあるほかのプリセットの行は、矩形が画面の中に
+    /// あっても一覧の表示領域の上へ出てしまい、ヒットテストが当たらない（2 枚目以降が
+    /// 外れる）。そのため、一覧を先頭へ戻し、外側を末尾まで動かして一覧の箱を画面の下端へ
+    /// 揃える。最後に実際のヒットテストで確かめ、外れるならタップの前に明示的に fail() する。
+    Future<void> revealPresetCard(
       WidgetTester tester,
       Finder finder,
-      Finder scrollableFinder, {
-      int maxAttempts = 30,
-    }) async {
-      for (var i = 0; i < maxAttempts; i++) {
-        final viewSize =
-            tester.view.physicalSize / tester.view.devicePixelRatio;
-        final rect = tester.getRect(finder);
-        if (rect.top >= 0 && rect.bottom <= viewSize.height) {
-          return; // 完全にウィンドウ内に収まっている。
-        }
-        final delta = rect.top < 0 ? 200.0 : -200.0;
-        await tester.drag(scrollableFinder, Offset(0, delta));
-        await tester.pump();
-      }
-      fail(
-        '$finder を $maxAttempts 回ドラッグしてもウィンドウ内に収まらなかった'
-        '（ヒットテストできない状態でタップすることになる）',
+      ScrollController scrollController,
+    ) async {
+      // 一覧自身のスクロール（行から見て最も近い Scrollable）を先頭へ戻す。
+      final listScrollable = tester.state<ScrollableState>(
+        find.ancestor(of: finder, matching: find.byType(Scrollable)).first,
       );
+      listScrollable.position.jumpTo(listScrollable.position.minScrollExtent);
+      scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      await tester.pump();
+      if (finder.hitTestable().evaluate().isEmpty) {
+        fail(
+          '$finder が外側を末尾までスクロールしてもヒットテストできない '
+          '(rect=${tester.getRect(finder)}, '
+          'window=${tester.view.physicalSize / tester.view.devicePixelRatio})',
+        );
+      }
     }
 
     testWidgets('プリセット 4 種すべてが、タップで実ブリッジ CPU apply() まで例外なく描画される',
         (tester) async {
-      await tester.pumpWidget(_previewWithPresetsApp());
+      final scrollController = ScrollController();
+      addTearDown(scrollController.dispose);
+      await tester.pumpWidget(_previewWithPresetsApp(scrollController));
       await tester.pumpAndSettle();
 
       final context = tester.element(find.byType(FilterBrowser));
@@ -328,13 +332,10 @@ void main() {
         ('labyrinthitis', visionFilterName(en, 'vertigo')),
       ];
 
-      final scrollableFinder = find.byType(Scrollable).first;
-
       for (final (experienceId, afterLabel) in cases) {
         final cardFinder = find.byKey(experienceCardKey(experienceId));
-        // プレビューペイン + 他のプリセットカードでスクロールが必要になる
-        // ことがあるため、タップ前に確実にビューポート内へ持ってくる。
-        await scrollUntilHitTestable(tester, cardFinder, scrollableFinder);
+        // プレビューペインの下にあるため、タップ前に確実にヒットテストできる位置へ出す。
+        await revealPresetCard(tester, cardFinder, scrollController);
 
         final renderCountBeforeTap = renderCount;
         await tester.tap(cardFinder);
