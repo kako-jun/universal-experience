@@ -432,8 +432,9 @@ Linux debug ビルド成功で代替している:
   適用する（ue に合成ロジックを持たない）。ライブ（GPU）経路は同じ順序の N パス多段にする。
 - 強度の出どころは 1 つにする: 記憶の鍵を `variantId ?? id` にして `FilterService` の強度記憶
   （`settings.intensityByType`）を第 1 段で `VisionFilterState` に統合し、`isColorQuickSelection` は
-  層ごとの属性に置き換える。
-- 永続 JSON は v2（`layers` 配列）に上げ、v1 は色覚クイック選択の強度の出どころを含めて移行して読む。
+  層ごとの属性に置き換える。層は強度を持たず、強度は per-key 記憶から読むときに導く。
+- 永続 JSON は v2（`layers` 配列）に上げ、旧状態は色覚クイック選択の強度の出どころを含めて移行して読む。
+  移行のきっかけは `settings.intensityByType` の存在で、v1 JSON が無くても行う（色覚シードより前）。
   `ColorVisionType` / `FilterService` の削除は最終段。
 
 段階ごとの実装は Issue #117〜#125、判断・代替案・根拠は

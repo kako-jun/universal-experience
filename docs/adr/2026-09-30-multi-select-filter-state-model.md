@@ -70,6 +70,14 @@ achromatopsia / protanomaly / deuteranomaly / tritanomaly。）
   （1 つにチェック）、`color_vision_compare.dart`（色覚カテゴリ選択中に 2×2）、
   `ExportCaption`（症状名・強度が 1 つずつ）、`resolveConsultNotice`（1 フィルタの urgency +
   escalation）、`vision_filter_snapshot.dart` / `vision_filter_store.dart`（永続 JSON v1 が 1 選択）。
+- `before_after_view.dart`: after 側の見出し（`visionFilterDisplayName(l10n, widget.colorVisionType,
+  widget.filterId)`、725 行付近）と、書き出しファイル名の `symptomId`（`colorVisionType?.id ??
+  filterId ?? 'none'`、648 行付近）が 1 フィルタ前提。見出しは #120（複数層なら HUD と同じ
+  「名前 + 名前 …（+N）」）、`symptomId` は書き出しの一部として #121（適用順の id を連結し、
+  長さの上限を設ける）が担当する。
+- `color_vision_compare_view.dart`: 4 セルが強度 1 つ（`strength`）と元画像だけを受け取る
+  1 フィルタ前提の構造で、土台（色覚以外の層の合成結果）を受け取れない。表示条件の
+  `isColorVisionFilterId(selectedId)`（`services/color_vision_compare.dart`）も 1 選択前提。#122 が担当する。
 - `main.dart`: 起動時に `settings.filterType` から色覚シード（**初回起動は deuteranomaly**）→
   `restoreAndBind` の順で復元。
 
@@ -94,7 +102,7 @@ achromatopsia / protanomaly / deuteranomaly / tritanomaly。）
 ### 1. 選択の単位は「カタログ id ごとに 1 つのレイヤー」の順序つき列
 
 ```text
-VisionLayer { id, strength, params, variantId?, origin }  // variantId = -omaly の別名（protanomaly 等）
+VisionLayer { id, params, variantId?, origin }             // variantId = -omaly の別名（protanomaly 等）。強度は持たない（決定 2）
 VisionFilterState.layers : List<VisionLayer>               // 適用順（下記 4）で並ぶ。id は重複しない
 VisionFilterState.focusedId : String?                      // 調整パネルが開く層・#78 の推奨サンプルの追従先
 ```
@@ -104,6 +112,7 @@ VisionFilterState.focusedId : String?                      // 調整パネルが
   移行期間中「フォーカス中の層」を見る薄い互換層として残す。
 - **定義と状態の分離を保つ**: min/max/default/options・段・排他グループ・-omaly の別名表はカタログ
   （定義）、どの層が選ばれているか・強度・payload は `VisionFilterState`（状態）。状態は id で定義を参照するだけ。
+  強度は層ではなく per-key 記憶（決定 2）が持ち、層の強度はそこから導く。
 - **排他グループ**: 色覚カテゴリ（protanopia / deuteranopia / tritanopia / achromatopsia /
   tetrachromacy と -omaly 3 種）は**同時に 1 つだけ**。色覚を選ぶと既存の色覚層を置き換える。
   ほかのカテゴリに排他はない（近視 + 遠視のような矛盾する組も、利用者が選べばそのまま重ねる。
@@ -124,29 +133,61 @@ VisionFilterState.focusedId : String?                      // 調整パネルが
 - **記憶の鍵を `variantId ?? id` にする**。`protanopia` / `achromatopsia` などは id、-omaly は
   `protanomaly` などの別名。これは `ColorVisionType.name` と一致するので、`settings.intensityByType` の
   キーをそのまま持ち込める。payload（params）の記憶は従来どおり id 単位。
+- **層は強度を持たず、強度は per-key 記憶の 1 か所だけが持つ**（二重化の再発防止）。層の強度は
+  `strengthByKey[variantId ?? id]`、無ければ既定（色覚 7 型は推奨強度 opia=1.0 / -omaly=0.6、
+  それ以外はカタログの既定）から**読むときに導く**。推奨強度へのフォールバックは記憶に**書き込まない**
+  （書き込むのは利用者が強度を変えたときだけ。スライダーを動かしていない型が推奨値のまま
+  「固定」されることを避ける）。永続 JSON の `layers[]` にも `strength` は持たせない。
 - **`FilterService` の強度記憶（#57）は `VisionFilterState` の per-key 記憶に統合する**。これを最終段
   でなく**第 1 段（#117）に前倒しする**。`FilterService.intensity` / `setIntensity` は
-  `VisionFilterState` への薄い委譲になり、強度を永続化する書き手は `settings.visionFilter` の 1 つだけに
-  なる。`settings.intensityByType` は起動時に 1 回だけ読み、移行して消す。これで `selectedStrength` /
+  per-key 記憶への薄い委譲になり、強度を永続化する書き手は `settings.visionFilter` の 1 つだけに
+  なる。`settings.intensityByType` は移行して消す（下記）。これで `selectedStrength` /
   `adjustPreviewStrength` / `showsAdvancedStrengthSlider` の「どちらから読むか」の分岐は強度について
-  不要になり（常に層の `strength`）、見た目の挙動は変わらない。
+  不要になり（常に per-key 記憶から導いた層の強度）、見た目の挙動は変わらない。
+- **通知経路**: `IntensitySlider` は `Consumer2<FilterService, VisionFilterState>`（`intensity_slider.dart`
+  25 行付近）なので、per-key 記憶の更新を `VisionFilterState` の通知として出せばスライダーは再描画される。
+  一方 `FilterService` の listener にはトレイ（`tray_service.dart` の `_onSelectionChanged`）と
+  `home_screen.dart` の `_persistFilterState` がある。これらを壊さないため、`FilterService.setIntensity`
+  は記憶への書き込み（`VisionFilterState` が通知）に加えて、**従来どおり自身も `notifyListeners()`
+  する**（中継ではなく、委譲先と自身の両方が通知する）。`Consumer` の差し替えは #124（`FilterService`
+  削除）まで行わない。
 - **`isColorQuickSelection`（全体に 1 つのフラグ）は、層ごとの属性 `origin`（クイック / advanced）に
   置き換える**。#117 で層の属性にし、`isColorQuickSelection` は「フォーカス中の層の origin」を返す
   互換 getter として残す（単一選択では従来と同じ値）。これで #117 までは挙動不変。UI 側の消費者
   （調整パネルの二重スライダー・一覧のハイライト）は #120、トレイの消費者は #121 で層単位の判定に
   移し、互換 getter と `origin` 自体は #124 で消す。#119（多選択 API）は層ごとの `origin` をそのまま使う。
-- **v1 → v2 の移行で色覚層の強度をどう決めるか**（`origin` と強度の出どころの食い違いを
-  引き継がない）:
+- **旧状態 → v2 の移行規則**（`origin` と強度の出どころの食い違いを引き継がない）。入力は
+  「v1 の保存 JSON（あってもなくてもよい）」と「`settings.intensityByType`（あってもなくてもよい）」
+  の 2 つで、**移行のきっかけは `settings.intensityByType` の存在**（v1 JSON の有無とは独立）:
+  - **背景**: 保存 JSON が無いと `VisionFilterStore.load()` は null を返す（`vision_filter_store.dart`
+    50 行付近）。また `main.dart` の色覚シード（229 行付近）は store の bind より前に走り、その後に
+    色覚クイックのスライダーだけを動かすと `settings.visionFilter` は作られず `intensityByType` だけが
+    書かれる。この状態は実在するので、「v1 JSON の初回読み込み」に結びつけると強度記憶が推奨値に戻り、
+    「挙動不変」が崩れる。
+  - **きっかけと順序**: 起動時、色覚シードより**前**に、次の条件で 1 回だけ折り畳む。
+    (a) `settings.intensityByType` がある **かつ** v2 の `settings.visionFilter` が無い → 移行する。
+    (b) `settings.intensityByType` がある **かつ** v2 がすでにある → v2 が新しい（移行後の編集は v2 にだけ
+    書かれる）ので、`intensityByType` は古い残骸として**消すだけ**（移行の書き込み後、キー削除の前に
+    落ちた場合の救済）。(c) どちらも無い → 何もしない。
+  - **折り畳みの内容**（(a)）: per-key 記憶を、v1 JSON があればその `strengthById`（ただし下の規則 3 で
+    除く鍵を除く）で初期化し、そのうえに `intensityByType` の各エントリを**上書き**で入れる。v1 JSON が
+    無ければ `intensityByType` だけで初期化する。**色覚シードはこの記憶ができた後に走る**ので、シードされた層
+    （初回起動の deuteranomaly や `settings.filterType`）の強度も `intensityByType` の値になる（層に
+    強度を持たせないので、シード層も記憶を読むだけで済む）。
+  - **書き込みの順序**: 折り畳んだ記憶を `settings.visionFilter`（v2）に書き、書けたことを確認して
+    から `settings.intensityByType` を消す（書けなければ消さず、次回の起動で再び (a) になる。折り畳みは
+    冪等）。v1 JSON は v2 で上書きされる。
   1. v1 に `colorVisionType = t`（≠ none）があれば、それは色覚クイック選択だった。層は
-     `{id: catalogId(t), variantId: t が -omaly なら t、そうでなければ null, origin: クイック}`、
-     **強度は `settings.intensityByType[t]`、無ければ推奨強度（opia=1.0、-omaly=0.6）**にする。
-     v1 の `strengthById[id]` は advanced 側の値なので使わない。
-  2. `colorVisionType` が無ければ advanced / プリセット由来で、強度は従来どおり `strengthById[id]`。
-  3. v2 の per-key 記憶は `strengthById`（advanced 側）をまず入れ、そのうえに
-     `intensityByType[t]`（7 型）を**上書き**で入れる。色覚 id は一覧の色覚行がクイック選択経由のため、
-     利用者が実際に見てきた値は `intensityByType` 側だから。`intensityByType` に無い型は `strengthById` を残す。
-  4. 移行は `VisionFilterStore` の初回読み込み 1 回だけ（`settings.intensityByType` の読み出しが必要なので
-     `main.dart` の復元で `FilterService` の永続値を渡す）。移行後は `settings.intensityByType` を消す。
+     `{id: catalogId(t), variantId: t が -omaly なら t、そうでなければ null, origin: クイック}`。
+     強度は per-key 記憶の `t`（= `intensityByType[t]`、無ければ記憶に書かず推奨強度で導く）。
+  2. `colorVisionType` が無ければ advanced / プリセット由来で、強度は従来どおり `strengthById[id]`
+     （per-key 記憶の `id`）。
+  3. **色覚クイックを経ずに書かれた色覚 id（`ColorVisionType` の 7 型の鍵）の advanced 側の強度は捨てる**
+     （`strengthById` のうち protanopia / deuteranopia / tritanopia / achromatopsia の鍵は移行しない。
+     色覚行は一覧でもトレイでも必ずクイック選択を通る — `selectColorVision` が唯一の橋 — ので、
+     利用者が実際に見てきた強度は `intensityByType` 側にあり、advanced 側の値は #72 以前の保存値など
+     実害の小さい残骸だから）。`tetrachromacy` は `ColorVisionType` に無く advanced 側だけなので
+     `strengthById` を移行する。
 
 ### 3. -omaly は「別名」としてカタログ層に持つ
 
@@ -237,8 +278,11 @@ optics に置く。）
   （bypass）は全層に対する 1 つのまま。
 - トレイ（#65）の高度なフィルタのサブメニューはチェック式（色覚クイック項目は排他のまま）。
   ホットキー（フィルタ解除）は全層解除で、新しいホットキーは足さない。
-- **2×2 比較（#84）**: 色覚を選んでいるとき従来どおり出す。4 枚は「色覚より前の全層を 1 回だけ適用した
-  結果」を共通の土台にして、その上に色覚 4 型を 1 枚ずつ適用する。層なしのときは現行と同じ（#122）。
+- **2×2 比較（#84）**: スイッチは**色覚層があるときだけ**出す（現行の `canCompare =
+  isColorVisionFilterId(selectedId)` と同じ条件を「層集合に色覚層がある」に広げるだけ。色覚層が 0 の
+  ときはスイッチを出さず、2×2 は表示されない）。4 枚は「色覚より前の全層を 1 回だけ適用した結果」を
+  共通の土台にして、その上に色覚 4 型を 1 枚ずつ適用する。色覚層だけのときは現行と同じ（土台 = 原画、
+  #122）。4 枚に共通の強度は色覚層の強度。
 - **書き出し（#80）**: `ExportCaption` を層ごとの行に拡張する（1 層は現行と同じ見た目）。受診喚起は
   「urgency は最大、escalation は段ごとにマージして重複を除く」を合成するヘルパで作る。実験的フィルタを
   含めば実験の注記を添え、「シミュレーション（近似）」は常に焼き込む（#121）。
@@ -247,14 +291,18 @@ optics に置く。）
 
 ```text
 { version: 2,
-  layers: [{ id, strength, params, variantId?, origin }],   // 適用順
+  layers: [{ id, params, variantId?, origin }],             // 適用順。強度は持たない
   focusedId, presetId,
-  strengthByKey: { <variantId ?? id>: number },              // 記憶（決定 2）
+  strengthByKey: { <variantId ?? id>: number },              // 強度の唯一の置き場（決定 2）
   paramsById:    { <id>: {...} } }
 ```
 
-- v1（単一選択）の移行規則は「2. 強度の出どころを 1 つにする」のとおり（-omaly・色覚クイック選択の
-  強度の決め方を含む）。`VisionFilterSnapshot.fromJson` は、現状「版が違えば丸ごと捨てて null」だが、
+- **層の強度は `strengthByKey[variantId ?? id]` から導く**（無ければ既定。決定 2）。`layers[]` に強度を
+  持たせないので「食い違い」は起きない。v1 → v2 に限らず、記憶に無い鍵を推奨強度のままにしておく
+  ことが、書き込み先を持たない規則 1 のフォールバックの扱い。
+- 旧状態（v1 JSON と `settings.intensityByType`）の移行規則は「2. 強度の出どころを 1 つにする」の
+  とおり。**きっかけは `settings.intensityByType` の存在で、v1 JSON が無くても起きる**（`load()` が null
+  を返す経路）。`VisionFilterSnapshot.fromJson` は、現状「版が違えば丸ごと捨てて null」だが、
   **v1 に限って移行して読む**ように変える（v2 より新しい版・壊れた JSON は従来どおり捨てる）。
 - 読み込み時の補正（未知 id を捨てる・範囲外を丸める・欠けを既定で埋める）に加え、重複・色覚グループ違反・
   上限超過は「最初の 1 つを残す」で直す。
@@ -272,7 +320,7 @@ optics に置く。）
 
 | 段 | Issue | 内容 | 依存 |
 |---|---|---|---|
-| 1 | #117 | `VisionFilterState` をレイヤー列に（挙動不変）+ 段の表（sensus 宣言順）+ 記憶鍵 `variantId ?? id` + `FilterService` 強度記憶の統合（`intensityByType` の移行）+ `origin` の層属性化 + 永続化 v2（v1 移行） | なし |
+| 1 | #117 | `VisionFilterState` をレイヤー列に（挙動不変）+ 段の表（sensus 宣言順）+ 記憶鍵 `variantId ?? id` + `FilterService` 強度記憶の統合（`intensityByType` の移行。きっかけはそのキーの存在で、v1 JSON が無くても行う）+ `origin` の層属性化 + 永続化 v2（v1 移行）+ 通知経路の維持 | なし |
 | 2 | #118 | bridge に Pipeline の複数ステップ CPU 適用 | なし（1 と並行可） |
 | 3 | #119 | 多選択 API（排他・上限・プリセット置換）+ 合成プレビュー + 合成順 golden + 推奨サンプルの `focusedId` 追従 | 1, 2 |
 | 4 | #120 | 統合一覧・調整パネル・HUD・キー操作の多選択 UI（`origin` の UI 消費者を層単位に） | 3 |
