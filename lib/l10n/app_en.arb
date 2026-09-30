@@ -730,7 +730,7 @@
       "max": { "type": "int" }
     }
   },
-  "filterListOrderSemantics": "Applied number {order}",
+  "filterListOrderSemantics": "Order {order}",
   "@filterListOrderSemantics": {
     "description": "Screen-reader label of the order badge on a checked row of the filter list: the position in the order the filters are stacked (#120).",
     "placeholders": {
@@ -753,7 +753,7 @@
   "@layerStripClearAll": {
     "description": "Button in the chip strip that removes every stacked filter at once (#120)."
   },
-  "layerChipLabel": "Number {order}, {name}",
+  "layerChipLabel": "Order {order}, {name}",
   "@layerChipLabel": {
     "description": "Screen-reader label of one chip in the strip: its application-order number and the filter name (#120).",
     "placeholders": {
@@ -778,7 +778,7 @@
       }
     }
   },
-  "layerSectionSummary": "Number {order}, {name}, strength {percent}%",
+  "layerSectionSummary": "Order {order}, {name}, strength {percent}%",
   "@layerSectionSummary": {
     "description": "Screen-reader label of a collapsed layer section in the adjust panel (application order, name, strength). Pressing it makes that filter the one being adjusted (#120).",
     "placeholders": {
