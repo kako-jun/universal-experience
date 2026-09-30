@@ -4,6 +4,8 @@
 - **記録日**: 2026-06-21（ADR 化）
 - **ステータス**: Accepted
 
+> **追記（#124）**: `FilterService` / `ColorVisionType`（と `visionFilterForColorVisionType`）は削除され、状態モデルは `VisionFilterState` に一本化された（色覚 7 種はカタログ id + 別名 id。`docs/adr/2026-09-30-multi-select-filter-state-model.md` 参照）。sensus-core への一元化の判断自体は有効。以下の `FilterService` 関連の記述は当時の経緯。
+
 ## 文脈（問題）
 
 ue は色覚シミュレーションのアルゴリズムを**二重に**持っていた。

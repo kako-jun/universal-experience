@@ -169,9 +169,8 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
   見出しに「いずれか 1 つ」と添える。層が 5 つに達したら、未選択の行はチェックを無効にして行内に理由
   （`filterListLimitReached`）を出す（色だけに頼らない）。既に色覚の層があるときの色覚行と体験プリセットの行は
   置き換えになるので有効のまま。プリセットの行が強調されるのは、層の集合がそのプリセット単体にちょうど
-  一致するときだけ。書き込みの入口は `toggleFilterListEntry`（一覧の行。色覚の行は `toggleColorVision` で
-  足す・外す・別の色覚へ置き換え、それ以外は `VisionFilterState.toggle`。どちらも呼んだあと FilterService を層へ合わせる）と
-  `selectExperiencePreset`（プリセットの行。`selectPreset` のあと同様に合わせる）で、`VisionFilterState` が唯一の正本。
+  一致するときだけ。書き込みの入口は `toggleFilterListEntry`（一覧の行。カタログ id と別名 id で `VisionFilterState.toggle` を呼び、
+  足す・外す、色覚は別の色覚へ置き換え）と `VisionFilterState.selectPreset`（プリセットの行）で、`VisionFilterState` が唯一の正本。
 - **中央「見る」**: 層が 2 つ以上のときだけ、先頭に `LayerChipStrip`（#120。適用順のチップ = 番号 + 名前 + ✕、
   末尾に「すべて解除」の `TextButton`）。チップを押すとその層が「調整中」になる（調整パネルの展開先・←→ の対象）。
   調整中のチップは塗り + 太い枠、それ以外は細い枠で、状態を形で示す。チップ・✕ とも 48dp。1 層のときは出さない

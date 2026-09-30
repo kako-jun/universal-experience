@@ -4,6 +4,8 @@
 - **記録日**: 2026-09-30（ADR 化）
 - **ステータス**: Accepted（実機の表示と書き出し PNG の読みやすさは kako-jun の確認待ち）
 
+> **追記（#124）**: `ColorVisionType` / `visionFilterForColorVisionType` は削除され、各セルのフィルタは `visionFilterForCatalogId`（カタログ id → sensus の固定 `VisionFilter`）から引く（`docs/adr/2026-09-30-multi-select-filter-state-model.md` 参照）。以下は #84 当時の記述。
+
 ## 文脈（問題）
 
 色覚の 4 型（protanopia / deuteranopia / tritanopia / achromatopsia）は、同じ画像がどう違って

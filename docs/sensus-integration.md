@@ -260,6 +260,8 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
 
 ## 5. 重複ロジック撤去（3/3）— #13 で完了
 
+> **追記（#124）**: この節の `FilterService` / `ColorVisionType` は #124 で削除され、状態モデルは `VisionFilterState` 1 系統になった（色覚 7 種はカタログ id + 別名 id。`docs/adr/2026-09-30-multi-select-filter-state-model.md` 参照）。以下は当時の経緯の記録。
+
 > → ADR: この一元化判断は `docs/adr/2026-05-31-sensus-core-consolidation.md` に昇格。
 
 ue が二重に持っていた色覚ロジックを撤去し、アルゴリズム正本を sensus に一本化した。
@@ -382,6 +384,8 @@ ue が二重に持っていた色覚ロジックを撤去し、アルゴリズ�
 
 ## 8. 色覚 3 型の Machado テーブル一元化・プレビュー UI 配線（#59、#34 解消）
 
+> **追記（#124）**: この節の `ColorVisionType` / `recommendedStrength`（後継は `colorVisionDefaultStrength`）は #124 で削除され、状態モデルは `VisionFilterState` 1 系統になった（色覚 7 種はカタログ id + 別名 id。`docs/adr/2026-09-30-multi-select-filter-state-model.md` 参照）。以下は当時の経緯の記録。
+
 §7 が見送った項目（ブリッジ経由の解決値取得、中間 strength 用 golden、
 deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の severity
 反映）
@@ -456,6 +460,8 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   で改めて必要な形（コード自体が変わっているはず）で作る。
 
 ## 9. プレビューを CPU `apply()` に統一（#85）
+
+> **追記（#124）**: この節の `FilterService` / `ColorVisionType` / `visionFilterForColorVisionType` / `selectColorVision` は #124 で削除され、状態モデルは `VisionFilterState` 1 系統になった（色覚 7 種はカタログ id + 別名 id。`docs/adr/2026-09-30-multi-select-filter-state-model.md` 参照）。以下は当時の経緯の記録。
 
 - **背景**: ブリッジには `apply_vision_cpu_rgba8`（sensus の `apply()`）が #10
   時点から存在していたが、UI からは一度も呼ばれておらず、テストでしか使われて
@@ -647,19 +653,18 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   体験プリセットのカードタイトル（旧 `ExperiencePresets`）（同じ `titleMedium` + bold）と見た目が
   衝突するため、`bodyLarge`（16px、太字）に変更した。
 - **#77: 推奨強度の唯一の正本**。`VisionFilterState` はフィルタ id ごとに
-  strength/payload を記憶する（`_strengthById` / `_paramsById`）。初めて
+  強度（キー `variantId ?? id`、`_strengthByKey`）と payload（カタログ id、`_paramsById`）を記憶する。初めて
   選ぶフィルタは `recommended_strength()` の値から始まり（旧仕様は全フィルタ
   一律 1.0 固定で、`tunnel_vision` を初めて選ぶとほぼ画面が真っ黒になっていた
   — #51 注記1）、以後はフィルタを切り替えても保持される。「推奨値に戻す」
   ボタン（`resetToRecommended()`）で強度・パラメータの両方を戻せる。体験
   プリセット（`selectPreset`）は #60 で入れていた「強制的に 1.0 に戻す」を
   「常に推奨値に戻す」へ置き換え、パラメータも常にカタログ既定値へ戻す
-  （#76）。既定値の組み立て（`_defaultParamsFor`）と推奨強度の
-  解決（`_recommendedStrength`）は `_selectInternal`/`resetToRecommended`/
-  `selectPreset` の 3 箇所が共有する（#76）。色覚のクイック選択
-  （#57）は従来どおり `FilterService`/`recommendedStrength(ColorVisionType)`
-  のタイプ別記憶を使う（sensus 0.6.1 の CVD 3 型の推奨値は 1.0、-omaly 相当の
-  `kAnomalyDefaultSeverity` は 0.6 のままで整合している）。
+  （#76）。既定値の組み立てと推奨強度の解決は、層を足す入口・
+  `resetToRecommended`・`selectPreset` が共有する（#76）。色覚 7 種（#57）の既定の強度は
+  `colorVisionDefaultStrength(key)`（`lib/models/vision_filter_catalog.dart`。-opia 4 種 = 1.0、
+  -omaly = `kAnomalyDefaultSeverity` の 0.6。sensus 0.6.1 の CVD 3 型の推奨値 1.0 と整合している）が返し、
+  記憶は他のフィルタと同じくキー（別名 id ?? カタログ id）ごとに持つ（#124）。
   **既知の限界（#76）**: `recommended_strength()` は sensus 側で
   `f32` として計算される。FRB は `f32` をそのまま Dart の `double`（f64）へ
   渡すため、ビット拡張時の丸め誤差（実用上は無視できる程度、1e-7 未満）が

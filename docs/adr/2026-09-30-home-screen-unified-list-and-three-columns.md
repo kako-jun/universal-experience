@@ -4,6 +4,9 @@
 - **記録日**: 2026-09-30（ADR 化）
 - **ステータス**: Accepted（狭幅の一覧は暫定。「結果・トレードオフ」参照）
 
+> **追記（#124）**: 本文の `selectColorVision` / `VisionFilterState.select` は #124 で削除され、書き込みの入口は
+> `toggleFilterListEntry` / `replaceWith` / `selectPreset` になった。詳細は `docs/adr/2026-09-30-multi-select-filter-state-model.md`。
+
 ## 文脈（問題）
 
 主画面は、色覚 7 型を選ぶ欄、advanced（sensus カタログ）30 フィルタを選ぶ欄、体験プリセット、

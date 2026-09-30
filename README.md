@@ -50,14 +50,12 @@ ue はそれを flutter_rust_bridge 経由で消費する薄いブリッジで�
 > vertigo / bppv_rotation のような時間依存フィルタは、プレビューでは動きのない
 > 静止フレームになります（その旨は注記します）。
 >
-> 色覚のクイック選択・advanced カタログ・体験プリセットは選択の起源として
-> 区別され（`lib/services/color_vision_selection.dart`）、色覚のクイック選択が
-> 起点のときだけプレビューの強度は色覚タイプごとの記憶（#57）を使います
-> （それ以外は advanced の strength スライダー自体の値）。advanced/プリセットを
-> 見ている間は色覚のクイック選択チップを点灯させず、advanced 側の strength
-> スライダーも色覚クイック選択中は出しません（動かしても反映されない
-> スライダーを見せないため）。-omaly（protanomaly 等）を選んだときは、
-> 見出し・export の caption・ファイル名にも -omaly の名前を正しく出します。
+> 選択状態は `VisionFilterState` の 1 系統です（#124）。色覚 7 種（-opia 4 + -omaly 3）も
+> カタログ id（protanopia 等）と別名 id（protanomaly 等。対応する -opia と同じカタログ id に
+> 写り、既定の強度 0.6 だけが違います。別名表は `lib/models/vision_filter_catalog.dart`）で
+> 選ぶだけで、強度は他のフィルタと同じくキー（別名 id またはカタログ id）ごとの記憶（#57/#117）を
+> 使います。-omaly（protanomaly 等）を選んだときは、見出し・export の caption・ファイル名にも
+> -omaly の名前を正しく出します。
 
 ### 視覚 advanced フィルタ（sensus カタログ）
 
@@ -135,8 +133,7 @@ emergency/earlyConsultation の見出しに分けて併記します。喚起文�
 （メニエール病・迷路炎）には「聴覚症状も含む」注記を出しますが、
 **音声再生は未実装**です。プリセットの選択は体験 id（`meniere` 等）で保持する
 ため、メニエール病と迷路炎（どちらも内部的には同じ vertigo フィルタ）を同時に
-選択中と誤表示することはありません。また、プリセットのタップは色覚のクイック
-選択（`FilterService`）を変更しません — 両者は独立に選択を保持します。
+選択中と誤表示することはありません。
 プリセットの組み合わせ（どの視覚・聴覚フィルタが組になるか）の正本は
 sensus-core の `experiences()` です。
 

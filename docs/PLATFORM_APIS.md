@@ -172,7 +172,8 @@ macOSでは、Private APIの使用はApp Store配布で却下される可能性�
 
 **1. ガンマテーブル方式**
 ```swift
-func applyColorFilter(type: ColorVisionType) {
+// type は当時の概念例の型（現行コードでは色覚 7 種をカタログ id + 別名 id で表し、この型は無い）
+func applyColorFilter(type: VisionType) {
     let tableSize: UInt32 = 256
     var redTable = [CGGammaValue](repeating: 0, count: Int(tableSize))
     var greenTable = [CGGammaValue](repeating: 0, count: Int(tableSize))
