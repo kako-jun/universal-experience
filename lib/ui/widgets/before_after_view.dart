@@ -724,14 +724,14 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
             ? PreviewErrorPlaceholder(theme: theme, label: l10n.previewFailed)
             : PreviewImageView(
                 image: _after,
-                // 画像があるときだけ付ける（読み込み中の空枠には付けない）。
                 // 何も選んでいないとき after は原画と同じで、見出し（afterName）が
                 // 説明を担うので付けない（二重読み上げの回避）。
-                semanticLabel: _after == null ||
-                        (widget.filterId == null &&
-                            widget.colorVisionType == null)
-                    ? null
-                    : l10n.previewImageFilteredSemantics(afterName),
+                // （`_before` と `_after` は同時に代入され、描画失敗なら上の
+                // `_failed` 分岐に入るので、ここで画像が無いことはない。）
+                semanticLabel:
+                    widget.filterId == null && widget.colorVisionType == null
+                        ? null
+                        : l10n.previewImageFilteredSemantics(afterName),
               );
         // #60: 時間依存の注記は widget.filterId（カタログ id）からカタログを
         // 引いて解決する。after ペインの見出しは widget.colorVisionType が

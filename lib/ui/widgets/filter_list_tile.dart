@@ -58,21 +58,16 @@ class FilterListTile extends StatefulWidget {
 }
 
 class _FilterListTileState extends State<FilterListTile> {
-  /// OS の「視差効果を減らす」等の現在値。post-frame コールバックの中で
-  /// context から読まないよう、依存の変化時にここへ取り込む（#45）。
-  bool _disableAnimations = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _disableAnimations = MediaQuery.disableAnimationsOf(context);
-  }
-
   @override
   void didUpdateWidget(FilterListTile oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.selected && !oldWidget.selected) {
-      _revealAfterFrame(disableAnimations: _disableAnimations);
+      // 「視差効果を減らす」等（disableAnimations）の値は、post-frame コールバックの
+      // 中ではなくここで読む。didUpdateWidget での MediaQuery の参照は許されており
+      // （initState だけが不可）、選択の変更と設定の変更が同じフレームでも最新の値になる（#45）。
+      _revealAfterFrame(
+        disableAnimations: MediaQuery.disableAnimationsOf(context),
+      );
     }
   }
 
