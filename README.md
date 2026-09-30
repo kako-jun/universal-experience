@@ -292,4 +292,5 @@ Rust は `rust/` の `cargo test` / clippy、flutter_rust_bridge の codegen に
 [MIT](LICENSE)
 
 > `rust_builder/LICENSE` は podspec が参照するための複製です（CocoaPods はパッケージ外の
-> ファイルを解決できないため）。ライセンス本文を変えるときは両方を揃えてください。
+> ファイルを解決できないため）。ライセンス本文を変えるときは両方を揃えてください（`test/license_files_test.dart` が
+> 一致を検査します）。
