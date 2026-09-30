@@ -77,7 +77,7 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 | `lib/ui/theme/app_theme.dart` | `seedColor` | カラートークン（colorScheme）の生成元そのもの |
 | `lib/main.dart` | `Colors.transparent` / `Colors.black` | OS ウィンドウの下地色。Flutter のテーマが立ち上がる前に `window_manager` へ渡す |
 | `lib/services/loupe_window_controller.dart` | `Color(0x00000000)` / `Color(0xFF000000)` | 同上（モード切替時の OS ウィンドウ下地色） |
-| `lib/services/export_service.dart` | キャプション帯・文字の各色 | 書き出す PNG に焼き込む画素。`BuildContext` を持たず、アプリのテーマにかかわらず同じ見た目で共有されるべき |
+| `lib/services/export_service.dart` | キャプション帯・文字の各色、2×2 比較の書き出しの背景色 | 書き出す PNG に焼き込む画素。`BuildContext` を持たず、アプリのテーマにかかわらず同じ見た目で共有されるべき |
 | `lib/rendering/image_fit.dart` | `kImageFitLetterboxColor`（中間グレー） | 画像内容の一部（フィルタに通る画素）。テーマで変わってはならない |
 
 サンプル画像（`assets/samples/`）や色覚テスト用の色見本は画像アセットであってコードの色ではないので、
@@ -133,7 +133,7 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 | 副次アクション | `OutlinedButton` / `TextButton` | |
 | 排他的な少数の選択（2〜4 個）: 起動モード・言語など | `SegmentedButton` | チップの並べ置き |
 | 多数の選択肢から 1 つ選ぶ（フィルタ選択・サンプル画像） | `ChoiceChip`（選択中がひと目で分かる） | 選択状態を色だけで示すボタン |
-| ON/OFF の切り替えが状態として残るもの | `FilterChip` / `Switch` | |
+| ON/OFF の切り替えが状態として残るもの（「2×2 で比較」など） | `FilterChip` / `Switch` | |
 | 大分類の切り替え（フィルタのカテゴリ） | `ChoiceChip` の `Wrap`（広幅・狭幅とも。「すべて」+ 7 カテゴリ、選択中はチェックと色） | ボタンで独自に作る |
 | 強度・パラメータ | `Slider`（`divisions` で刻む、値を必ずラベル表示） | 値が見えないスライダー |
 | 強度の上限付近に注意が要るフィルタ（`tunnel_vision`）の強度 | `Slider` の閾値位置に縦線の印（`StrengthCautionTrackShape`、`onSurface`）+ 下に注記（`StrengthCautionNote`）。閾値未満はアイコン `info_outline`・文字 `onSurfaceVariant` の補足、閾値以上はアイコン `warning_amber_rounded`（`primary`）・文字 `onSurface`/`w600` の警告に切り替える | 警告にコンテナ色（`tertiaryContainer`/`errorContainer`）を使う（受診喚起と混同する）、色だけで切り替える |
@@ -158,6 +158,12 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
   `VisionFilterState` が唯一の正本。
 - **中央「見る」**: `BeforeAfterView` と、それに隣接する `ImageSourcePicker`（サンプル画像の切替）。
   その下に `WelcomeBanner`（プレビューを最初のビューポートから押し出さない位置）。
+  色覚カテゴリを選んでいる間だけ、見出しの行に `FilterChip`「2×2 で比較」（`compareToggleLabel`）を出す。ON の間は
+  `BeforeAfterView` の代わりに `ColorVisionCompareView`（色覚 4 型を 2×2 に並べる。各セルは
+  `labelLarge` の型名 + 正方形の画像で、型名と強さを 1 つの Semantics ラベルにまとめる。強さは
+  4 セル共通で、`bodySmall` / `onSurfaceVariant` の一文で示す）を出す。書き出しボタンは既存と同じ
+  `IconButton`（tooltip 付き）。Before / After と同時には出さない（理由は
+  `docs/adr/2026-09-30-color-vision-2x2-compare.md`）。
 - **右「調整」**（`AdjustPanel`）: 選んだ症状の名前・カテゴリ・説明、`IntensitySlider` /
   `FilterParamPanel`（強度の上限付近に注意が要るフィルタでは、スライダの印と注記がここに入る。#66）、その下に `ConsultNoticeBlock`（常時展開）、最下段に
   `FilterProvenanceSection`（「モデルと出典」「表現できないこと」の折りたたみ 2 行、既定は閉じる。強度・パラメータ・受診喚起の位置を動かさない。#80）。
@@ -199,6 +205,8 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 - 「モデルと出典」「表現できないこと」は sensus の英文をそのまま出す（英語以外の UI では原文である旨を添え、
   読み上げの言語も英語にする）。sensus は出典が 10 フィルタにしか無く、無いものは「出典を示していない」と書く。
 - ちょうど 1000dp の広幅では中央カラムが 420dp を下回り、Before / After は縦に積み替わる。
+- 2×2 比較のセルは正方形の画像 2 列で、狭幅では 1 セルが小さくなる（縦積みの中央カラムの幅が 2 分割される）。
+  型名は 1 行で省略（`ellipsis`）し、全文は Semantics ラベルで読み上げる。
 - `export_service.dart` の PNG 書き出し用 `TextStyle(fontSize:)`（画面外の描画、`BuildContext` を持たない）は
   `textTheme` の対象外として残している。
 
@@ -303,7 +311,11 @@ UE_SCREENSHOTS=1 UE_SCREENSHOT_DIR=/path/to/out \
   `wide-{light|dark}-{ja|en}-languagedialog.png`（言語ダイアログ。light/ja と dark/en の 2 枚）、
   `wide-light-ja-tunnel-mid.png` / `wide-light-ja-tunnel-max.png` / `wide-dark-ja-tunnel-max.png` / `wide-light-en-tunnel-max.png` / `wide-light-ja-tunnel-max-hc.png`（tunnel_vision の強度スライダの印と警告の 5 通り。#66）、
   `{wide|narrow}-{light|dark}-{ja|en}-explain-{deutan|cataract|floaters|tetrachromacy}.png`（出典・限界を両方開いた状態。
-  色覚・advanced・seed 型・四色覚の「実験的」バッジ。#80。文言はレイアウト確認用の差し込みで実データではない）。
+  色覚・advanced・seed 型・四色覚の「実験的」バッジ。#80。文言はレイアウト確認用の差し込みで実データではない）、
+  `{wide|narrow}-{light|dark}-{ja|en}-compare-{off|on}.png`（色覚 4 型の 2×2 比較の切替前/後。#84）と
+  `wide-{light|dark}-{ja|en}-compare-export.png`（2×2 の書き出しで保存された PNG のバイトそのもの。撮影時に
+  デコードして 4 セルの色が互いに異なることも確かめる）。2×2 の撮影だけは、4 型が見分けられるよう型ごとに色味を
+  変えた別のフェイクに差し替える（同じく色覚の正しさを示す画像ではない）。
 - フォールバック: macOS のシステムフォント（ヒラギノ角ゴシック / Apple Symbols）と Flutter SDK 同梱の
   Roboto・Material Icons を `FontLoader` で読む。**フォントファイルはリポに入れない。** 見つからない環境では
   警告を出して既定フォント（四角）のまま進む。

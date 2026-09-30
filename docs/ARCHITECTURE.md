@@ -899,6 +899,20 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   `_rebuild` の実行を直列化し（同時に走るジョブは常に1本、#85 レビュー S3）、
   スライダーを連続操作しても実ブリッジ呼び出しが積み上がらないようにしている
   （#58 の世代管理・dispose・失敗表示の規約自体は変更していない）
+- `ColorVisionCompareView`（`lib/ui/widgets/color_vision_compare_view.dart`、#84）: 色覚 4 型の
+  2×2 比較。`HomeScreen` の「2×2 で比較」が ON（かつ色覚カテゴリ選択中）の間、`BeforeAfterView` の
+  代わりに `ImageSourcePicker` の中へ出る。並べる型は `kColorVisionCompareEntries`
+  （`lib/services/color_vision_compare.dart`。カタログの色覚カテゴリのうち `isExperimental` でないもの、
+  宣言順）、各セルのフィルタは色覚クイック選択と同じ `visionFilterForColorVisionType` から引く
+  （`colorVisionCompareFilter`）。専用のレンダラは持たず、`BeforeAfterView` と同じ経路
+  （`previewSourceImageLoader` / `afterImageRenderer`。本番コードからは公開ラッパー
+  `loadPreviewImage` / `renderPreviewAfter` 経由）で `CpuVisionRenderer` を 4 回、直列・最新優先で呼ぶ。
+  強さは呼び出し側（`previewStrength`）が決めた値を 4 セル共通で受け取り、選択状態は読まない。
+  書き出しは各セルを `buildExportCaption` + `composeExportImage`（単独の書き出しと同じキャプション）で
+  焼き込み、`composeCompareGrid`（`export_service.dart`。配置は pure な `compareGridLayout`）で
+  1 枚に並べる。キャプションは描画時点の強さから作り、保存・通知・失敗の扱いは
+  `savePngWithClipboard` / `showExportSuccess`（`BeforeAfterView` の書き出しと共通）を使う。
+  `BeforeAfterView` との関係は `docs/adr/2026-09-30-color-vision-2x2-compare.md`
 - `ShaderFilter`（`lib/rendering/shader_filter.dart`）: sensus 由来 GLSL を変換した
   Impeller `FragmentProgram` で `ui.Image` にフィルタを適用する。色覚 7 型
   （protanopia/deuteranopia/tritanopia/achromatopsia + 各 -omaly）に対応
