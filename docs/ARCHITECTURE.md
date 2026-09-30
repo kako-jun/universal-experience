@@ -790,7 +790,7 @@ ShaderFilter    (lib/rendering/) — Impeller FragmentProgram。将来のライ�
 `Consumer` を持つウィジェットだけが rebuild される。
 
 `rust/` crate は `rust_builder/`（cargokit 統合、#55）経由でビルドされ、
-macOS / Linux アプリに同梱される。`lib/main.dart` の `buildRootApp()`（`main()` から
+macOS / Linux アプリに同梱される。`lib/main.dart` の `buildRootApp()`（#55 で `main()` から
 切り出したルート Widget 組み立て関数）が `runApp`
 前に `services/native_bridge_service.dart` の `initNativeBridge()` を呼んで
 同梱された native lib をロードする（呼ばないと `RustLib.instance` が未初期化の
@@ -812,7 +812,7 @@ macOS / Linux アプリに同梱される。`lib/main.dart` の `buildRootApp()`
 差し替え可能な引数に取る。windowManager /
 trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に閉じたまま
 残している（デスクトップ専用の副作用をブリッジ初期化のテストに持ち込まない
-ため）。`integration_test/app_bootstrap_test.dart` は
+ため）。`integration_test/app_bootstrap_test.dart`（#55）は
 `main()` を直接は呼べない（windowManager 初期化を含むため）代わりに、新しい
 別プロセスから `buildRootApp()` を直接呼んで実ブリッジの初期化〜
 `UniversalExperienceApp` 描画までの実起動経路を再現し、`initBridge` を
@@ -875,8 +875,8 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   await 連鎖。`decodeImageFromPixels` は使わない — デコード失敗時にコール
   バックが呼ばれず呼び出し元がハングし得るため）の往復のみを行い、
   アルゴリズムは一切持たない。sensus は straight alpha、Flutter の `ui.Image`
-  は premultiplied alpha を前提とするため、境界でこの変換を明示的に行う。
-  任意の `VisionFilter`（payload 込み）を受け取れるため
+  は premultiplied alpha を前提とするため、境界でこの変換を明示的に行う
+  （#85）。任意の `VisionFilter`（payload 込み）を受け取れるため
   sensus 全 30 種を描画できる。`before_after_view.dart` はこの `VisionFilter`
   をそのまま（マッピングせず）中継するだけの presentational widget で、
   色覚のクイック選択・advanced カタログ・体験プリセットのどれで選んでも
@@ -889,7 +889,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   `afterImageRenderer` と同じ seam パターン、#58）に `@visibleForTesting` は
   付けていない（同一ライブラリ外の production コードから正当に参照するため）
 - `BeforeAfterView`（`lib/ui/widgets/before_after_view.dart`）: before/after
-  プレビューペイン。ペインの論理サイズ・
+  プレビューペイン。#85 で、ペインの論理サイズ・
   `devicePixelRatio` に連動して都度サイズを変えていた旧 GPU 時代の auto-sizing
   （#58）を撤去し、常に固定の正準サイズ（`canonicalSampleSize` = 1024）で
   `CpuVisionRenderer` に描画させ、表示側は `FilterQuality.medium` でスケールする
@@ -901,7 +901,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   退化してカーネルが中心 1 点だけになり完全な no-op になる（sensus-core の
   `build_ellipse_spans`、`integration_test/cpu_preview_all_filters_test.dart`
   参照）。CPU `apply()` は GPU シェーダより重いため、`_scheduleRebuild` が
-  `_rebuild` の実行を直列化し（同時に走るジョブは常に1本）、
+  `_rebuild` の実行を直列化し（同時に走るジョブは常に1本、#85）、
   スライダーを連続操作しても実ブリッジ呼び出しが積み上がらないようにしている
   （#58 の世代管理・dispose・失敗表示の規約自体は変更していない）
 - `ColorVisionCompareView`（`lib/ui/widgets/color_vision_compare_view.dart`、#84）: 色覚 4 型の
@@ -961,12 +961,12 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   subscribe-once パターン）が `followRecommendedSample` を呼び、そのフィルタの
   推奨サンプル（`kRecommendedSampleByFilterId`）に自動で切り替える — ただし
   ユーザー画像を表示中、または手動でサンプルを選んだ後（`selectSample`。同じ
-  サンプルの選び直しは no-op）は no-op になる
+  サンプルの選び直しは no-op、#78）は no-op になる
   （`resetToRecommended` で自動追従を再開）。
   ユーザー画像の `ui.Image` は本状態が所有し、差し替え・`clearUserImage`・
   `dispose()` のいずれでも確実に dispose する（#58/#85 と同じ規律）。ただし
   差し替え・`clearUserImage` 時の dispose は同期的には行わず
-  `SchedulerBinding.addPostFrameCallback` で次フレームまで遅らせる —
+  `SchedulerBinding.addPostFrameCallback` で次フレームまで遅らせる（#78）—
   `BeforeAfterView._rebuild` が `fitImageToSquare` でその
   画像をまだ参照中（`Picture` に描画コマンドとして記録済みだが `toImage()`
   のラスタライズ待ち）の可能性があるため。`dispose()`（サービス全体の
@@ -983,21 +983,22 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   「見えている画面の一部」として扱う設計）で正準サイズへ収めてから既存の
   世代管理・dispose（#58/#85）に載せる。`_rebuild` は `widget.imageSource` を
   冒頭で一度だけ `source` に固定し、読み込み・`_currentImageSource` の記録の
-  どちらにもこの値だけを使う。末尾で `widget.imageSource`
+  どちらにもこの値だけを使う（#78）— 末尾で `widget.imageSource`
   を再度読むと、読み込み中に親が別の source へ進んでいた場合に「実際に
   読み込んだ画像」と「記録される source」が食い違い、以後の
   `reuseBefore` 判定が新しい source への切替を誤ってスキップしてしまう
   （`test/before_after_view_image_source_test.dart` の回帰テスト参照）
 - `ImageSourcePicker`（`lib/ui/widgets/image_source_picker.dart`）:
   サンプルチップ・「画像を選ぶ」ボタン（`file_selector`）・drag & drop
-  （`desktop_drop` の `DropTarget`）・「画像を閉じる」ボタン（`clearUserImage`）をまとめた、`BeforeAfterView` を包むプレゼンテーション層。
+  （`desktop_drop` の `DropTarget`）・「画像を閉じる」ボタン（`clearUserImage`、
+  #78）をまとめた、`BeforeAfterView` を包むプレゼンテーション層。
   ファイル選択・ドロップのどちらも最終的に `loadUserImageFile`
   （サイズ確認 → デコード → `ImageSourceState.setUserImage`）という同じ 1 本の
-  経路を通る（取得からデコードまでを単一の try/catch に
+  経路を通る（#78: 取得からデコードまでを単一の try/catch に
   収め、どこで失敗しても同じ `imageSourcePickFailed` SnackBar に落ちる）。
   `loadUserImageFile` は `XFile.length()` を読んでから
   `kMaxUserImageFileBytes`（50MB）を超える場合はファイル本体を読まずに
-  拒否し、`decodeUserImageBytes`
+  拒否し（#78）、`decodeUserImageBytes`
   （`lib/rendering/image_fit.dart`。`ui.instantiateImageCodecWithSize` で
   `kUserImageMaxDimension`（2048px）を超える長辺をデコード時にダウンスケール
   する）でデコードする。画像はメモリ上の `ui.Image` に変換するだけで、
@@ -1032,9 +1033,9 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   判定 — 明示的な「Normal vision」選択との区別のため専用の永続化キーは
   持たない）を見て一度だけシードする。「ほかの見え方を選ぶ」は
   `home_screen.dart` が `FilterBrowser` の検索欄（`FilterBrowserController.searchFocus`）へ
-  `requestFocus()` してから dismiss する。「自分の画像で
+  `requestFocus()` してから dismiss する（#78）。「自分の画像で
   試す」は `pickAndLoadUserImage` の成否（`bool`）を見て、キャンセル/失敗では
-  dismiss しない（ピッカーをキャンセルしただけなのにバナーが
+  dismiss しない（#78。ピッカーをキャンセルしただけなのにバナーが
   消えると再度の呼び出し手段を失うため）
 
 ### 過去の設計: system-wide プラグイン（#13 で撤去）
@@ -1055,9 +1056,9 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   `ColorVisionType` → `VisionFilter` のマッピング契約（#57/#59 の不変条件）を
   検証する（実描画そのものは下記の実ブリッジ integration test が担う）。
   同ファイルは `_scheduleRebuild` が実行を直列化すること（同時に走るジョブは
-  常に1本）も検証する。`cpu_vision_renderer_test.dart` は
+  常に1本、#85）も検証する。`cpu_vision_renderer_test.dart` は
   実ブリッジなしで検証できる部分（straight⇄premultiplied 変換の正しさ・
-  `ImageDescriptor.raw` 経路のデコード失敗が例外として伝わること）を担う
+  `ImageDescriptor.raw` 経路のデコード失敗が例外として伝わること、#85）を担う
 - **GPU golden テスト**（`test/vision_filter_golden_test.dart` /
   `test/protanopia_golden_test.dart`）: sensus-core 正本由来の参照 PNG と GPU 描画結果を
   PSNR/maxDiff で比較（詳細は `docs/sensus-integration.md` §6）。プレビュー自体は
@@ -1080,7 +1081,7 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
     テスト自体を `fail()` させて検知する（`main()` 側はクラッシュせず
     `NativeBridgeErrorApp` に落ちるが、CI ではそれを「壊れている」として
     検知したいため）
-  - `app_bootstrap_test.dart`: 上記が自前の `setUpAll` で
+  - `app_bootstrap_test.dart`（#55）: 上記が自前の `setUpAll` で
     先に `initNativeBridge()` を呼んでしまうのに対し、こちらは新しい別プロセス
     （`RustLib` 未初期化）から `main()` が実際に呼ぶ `buildRootApp()` を直接
     呼んで実起動経路そのものを検証する。`buildRootApp()` 内の `initNativeBridge()`
@@ -1089,12 +1090,12 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   - `cpu_preview_all_filters_test.dart`（#85）: `kVisionFilterCatalog` の全 30
     エントリについて、`VisionFilterState.select()/build()` でカタログ既定値の
     payload を埋めた `VisionFilter` を組み立て、`CpuVisionRenderer.apply()`
-    （実ブリッジ）で production と同じ [canonicalSampleSize]（1024）の
+    （実ブリッジ）で production と同じ [canonicalSampleSize]（1024、#85）の
     サンプル画像に適用する。例外が出ないこと・出力が入力サイズと
     一致すること・出力ピクセルが入力と異なること（strength=1.0 で全フィルタが
     視覚的に効果を持つ設計であるため）を検証する。加えて protanopia について、
     strength=0.0 が原画とバイト一致すること・strength による出力の違い・
-    変化したピクセル比率の下限を検証する。golden 参照
+    変化したピクセル比率の下限を検証する（#85）。golden 参照
     （`protanopia_ref.png`）とのバイト一致比較も一度実装したが、
     デスクトップの integration_test はビルド済みアプリとして起動するため
     `File('test/golden/...')` のようなリポジトリルート相対パスが実行時
@@ -1120,13 +1121,13 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
 - **プレビュー原画（#78）**: `sample_catalog_test.dart`（カタログ完全性・
   `assets/samples/*.png` が `rootBundle` 経由でデコードでき正準サイズと一致
   すること・`kRecommendedSampleByFilterId` が全 30 catalog id を過不足なく
-  カバーすること・文字/グラフ素材の割り当て）、`image_source_state_test.dart`
-  （自動追従/手動選択の相互排他・同じサンプルの再選択が no-op であること・
-  ユーザー画像の世代管理と dispose・遅延 dispose を
+  カバーすること・文字/グラフ素材の割り当て変更（#78））、`image_source_state_test.dart`
+  （自動追従/手動選択の相互排他・同じサンプルの再選択が no-op であること
+  ・ユーザー画像の世代管理と dispose・遅延 dispose を
   `SchedulerBinding.scheduleFrame()` を明示的に呼んで検証）、
   `image_fit_test.dart`（レターボックスの余白・source を dispose しない契約）、
   `before_after_view_image_source_test.dart`（`imageSource` 変更時の
-  世代管理・再利用、#58/#85 と同じ規律を新しい軸で。回帰テストは
+  世代管理・再利用、#58/#85 と同じ規律を新しい軸で。source 切替の競合の回帰テストは
   `Completer` で読み込みを保留したまま source を切り替え、最終的に新しい
   source が読み込まれることを検証）、`image_source_picker_test.dart`
   （file_selector/desktop_drop は実 platform channel を要するため
