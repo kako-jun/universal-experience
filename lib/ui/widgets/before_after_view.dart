@@ -688,10 +688,14 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
           return SizedBox(
             height: 180,
             child: Center(
-              child: Text(
-                l10n.previewPreparing,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+              // 準備中→完了の切り替わりを、見えない人にも伝える（#45）。
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  l10n.previewPreparing,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ),
@@ -700,7 +704,10 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
 
         final beforePane = _Pane(
           label: l10n.previewPaneOriginal,
-          child: PreviewImageView(image: _before),
+          child: PreviewImageView(
+            image: _before,
+            semanticLabel: l10n.previewPaneOriginal,
+          ),
         );
         // 最新世代が失敗した場合は _failed が立ち、
         // _after は null にされている。stale/不整合な画像を出し続けるより
@@ -710,9 +717,18 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         // いなければこの分岐に来る前に上の `_loading` ガードで preparing 表示に
         // なる）。それでも [PreviewImageView] 自身が null を安全に扱うため、二分岐で
         // 十分（「描画は近日対応」プレースホルダは #86 で YAGNI と判断して撤去）。
+        final afterName = visionFilterDisplayName(
+            l10n, widget.colorVisionType, widget.filterId);
         final Widget afterChild = _failed
             ? PreviewErrorPlaceholder(theme: theme, label: l10n.previewFailed)
-            : PreviewImageView(image: _after);
+            : PreviewImageView(
+                image: _after,
+                // 何も選んでいないとき after は原画と同じなので、名前だけを読む。
+                semanticLabel:
+                    widget.filterId == null && widget.colorVisionType == null
+                        ? afterName
+                        : l10n.previewImageFilteredSemantics(afterName),
+              );
         // #60: 時間依存の注記は widget.filterId（カタログ id）からカタログを
         // 引いて解決する。after ペインの見出しは widget.colorVisionType が
         // あればそちらを優先する（#60: -omaly の名前を正しく出すため、
@@ -721,8 +737,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
             ? null
             : kVisionFilterCatalogById[widget.filterId];
         final afterPane = _Pane(
-          label: visionFilterDisplayName(
-              l10n, widget.colorVisionType, widget.filterId),
+          label: afterName,
           // Export is only meaningful when a real "after" image exists.
           // The failed state (null _after) gets no button.
           trailing: _after != null
@@ -810,8 +825,8 @@ ExportCaption buildExportCaption(
     simulationNotice: l10n.exportSimulationNotice,
     experimentalNotice:
         (kVisionFilterCatalogById[filterId]?.isExperimental ?? false)
-        ? l10n.exportExperimentalNotice
-        : null,
+            ? l10n.exportExperimentalNotice
+            : null,
     urgencyMessage: notice?.message,
     escalationGroups: [
       for (final g in notice?.escalationGroups ?? const [])
@@ -893,8 +908,9 @@ class _Pane extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        // 書き出しボタンを含む行は 48dp（タップ領域の下限、#45）。
         SizedBox(
-          height: 32,
+          height: 48,
           child: Row(
             children: [
               Expanded(
@@ -923,20 +939,28 @@ class _Pane extends StatelessWidget {
 
 /// A ui.Image drawn to fill its box (also used by the 2x2 color-vision compare
 /// view, #84). Shows a neutral placeholder box while [image] is null.
+///
+/// [semanticLabel] は画像の代替テキスト（スクリーンリーダー向け、#45）。null なら
+/// 読み上げ対象にしない（周囲の文言が説明を担うとき）。
 class PreviewImageView extends StatelessWidget {
-  const PreviewImageView({super.key, required this.image});
+  const PreviewImageView({super.key, required this.image, this.semanticLabel});
 
   final ui.Image? image;
+
+  /// 画像の代替テキスト。
+  final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
     final img = image;
-    if (img == null) {
-      return ColoredBox(
-        color: Theme.of(context).colorScheme.onSurface.withAlpha(0x11),
-      );
-    }
-    return CustomPaint(painter: _UiImagePainter(img), size: Size.infinite);
+    final Widget content = img == null
+        ? ColoredBox(
+            color: Theme.of(context).colorScheme.onSurface.withAlpha(0x11),
+          )
+        : CustomPaint(painter: _UiImagePainter(img), size: Size.infinite);
+    final label = semanticLabel;
+    if (label == null) return content;
+    return Semantics(image: true, label: label, child: content);
   }
 }
 
@@ -983,27 +1007,31 @@ class PreviewErrorPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: theme.colorScheme.errorContainer,
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.error_outline,
-                color: theme.colorScheme.onErrorContainer,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: ColoredBox(
+        color: theme.colorScheme.errorContainer,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.error_outline,
                   color: theme.colorScheme.onErrorContainer,
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onErrorContainer,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
