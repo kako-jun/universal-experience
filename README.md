@@ -120,9 +120,12 @@ sensus-core の `experiences()` です。
 を焼き込んだ PNG として書き出せます。プレビューが描画できるフィルタ（sensus
 全 30 種 + 原画表示）はすべてエクスポート可能です。
 
-- **保存先**: ダウンロードフォルダ（macOS のサンドボックスでも実際の `~/Downloads`。
-  `macos/Runner/*.entitlements` の `com.apple.security.files.downloads.read-write`）。
-  取得できない環境ではドキュメントフォルダ。
+- **保存先**: ダウンロードフォルダ（実際の `~/Downloads`）。取得できない環境では
+  ドキュメントフォルダ。macOS のサンドボックスでは `getDownloadsDirectory()` が
+  コンテナ内 `Data/Downloads`（実 `~/Downloads` へのシンボリックリンク）を返すため、
+  `macos/Runner/*.entitlements` の `com.apple.security.files.downloads.read-write`
+  が無いとリンク先への書き込みが拒否されます。表示・クリップボード・「フォルダで
+  表示」に使うパスは、シンボリックリンクを解決した実パスです。
 - **ファイル名**: `ue-<症状 id>-<強度>pct-<日付>_<時刻>.png`
   （例 `ue-protanopia-100pct-2026-06-23_140509.png`）。同名のファイルが既にあれば
   上書きせず `-2`, `-3` … と連番にします。

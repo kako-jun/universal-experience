@@ -797,11 +797,17 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   ない**。GPU と CPU の等価性は `test/vision_filter_golden_test.dart` 等の
   GPU golden テストが（production の呼び出しとは独立に）担保する
 - `ExportService`: フィルタ適用後（after）画像のメタ焼き込み PNG エクスポート。
-  書き出し先は Downloads（macOS は `files.downloads.read-write` entitlement が
-  必要。無いとサンドボックスのコンテナ内に出てユーザーに見えない、#64）。ファイル名
-  は日付＋時刻（`exportFilename`）で、同名があっても `writeBytesWithoutOverwrite`
-  が `File.create(exclusive: true)` で連番にし上書きしない。成功 SnackBar の
-  「フォルダで表示」は `revealInFolder`（コマンド決定は pure な `revealCommandFor`）
+  書き出し先は Downloads。macOS のサンドボックスでは `getDownloadsDirectory()` が
+  コンテナ内 `Data/Downloads`（実 `~/Downloads` へのシンボリックリンク）を返し、
+  `files.downloads.read-write` entitlement が無いとリンク先への書き込みが拒否される
+  （#64）。`savePngInto` は保存先とファイルの最終パスを `resolveSymbolicLinks` で
+  実パスにして返す（SnackBar・クリップボード・「フォルダで表示」用）。ファイル名は
+  日付＋時刻（`exportFilename`）で、同名があっても `writeBytesWithoutOverwrite` が
+  `File.create(exclusive: true)` で連番にし上書きしない（書き込み失敗時は作りかけの
+  ファイルを消す）。成功 SnackBar の「フォルダで表示」は `revealInFolder`
+  （コマンドと成功条件の決定は pure な `revealCommandFor`。macOS は終了コード 0、
+  Windows は終了コード無視、Linux は `xdg-open` を切り離して起動）。判断の経緯は
+  `docs/adr/2026-09-30-export-png-to-downloads.md`
 - `ExperiencePresetTile`（`lib/ui/widgets/experience_presets.dart`）: sensus の
   `experiences()` をワンタップ適用の行として消費する（複合体験、#19）。統合一覧
   `FilterBrowser` の最上段に並ぶ（#72）
