@@ -1009,7 +1009,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   （`colorVisionCompareFilter`）。専用のレンダラは持たず、`BeforeAfterView` と同じ経路
   （`previewSourceImageLoader` / `afterImageRenderer`。本番コードからは公開ラッパー
   `loadPreviewImage` / `renderPreviewAfter` 経由）で `CpuVisionRenderer` を 4 回、直列・最新優先で呼ぶ。
-  強さは呼び出し側（`previewStrength`）が決めた値を 4 セル共通で受け取り、選択状態は読まない。
+  強さは呼び出し側が決めた値（色覚層の強度。`colorVisionCompareInputOf` が決め、bypass 中は 0）を 4 セル共通で受け取り、選択状態は読まない。
   セルの Semantics ラベルと「4 型とも同じ強さ」の注記は、表示中の画像を描いた強さ（`_afterStrength`、
   まだ無ければ `widget.strength`）から作り、再描画中に新しい強さが古い画像に被らない。失敗したセルは
   「描画に失敗しました」の文言に切り替わる。新しい描画が控えている間（`_rebuildPending`）の失敗は
