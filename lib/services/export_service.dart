@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -91,6 +92,7 @@ class ExportCaption {
     required this.strengthLabel,
     required this.isoDate,
     required this.simulationNotice,
+    this.experimentalNotice,
     this.urgencyMessage,
     this.escalationGroups = const [],
     this.disclaimer,
@@ -108,17 +110,23 @@ class ExportCaption {
   /// **必須**（省略できない）で、受診喚起の有無にかかわらず常に焼き込む。
   final String simulationNotice;
 
+  /// 実験的なフィルタ（検証済みのモデルではなく可視化にとどまるもの。現在は
+  /// 四色覚）の書き出しにだけ添える 1 文（例「実験的な可視化」/
+  /// "Experimental visualization"、#80）。null = 添えない。[simulationNotice]
+  /// と同じく途中で省略せず、必ず全文を焼き込む。
+  final String? experimentalNotice;
+
   /// 受診喚起メッセージ。null = 喚起なし（色覚特性は緊急性 none のため通常 null）。
   final String? urgencyMessage;
 
   /// 条件付きエスカレーションを緊急度の段ごとにまとめたもの（解決済み、
-  /// #76 レビュー M1、再レビュー S-a: PNG でも段ごとの見出しを出す）。
+  /// PNG でも段ごとの見出しを出す）。
   /// [urgencyMessage] が null でも非空になり得る（urgency=none だが
   /// escalation を持つフィルタ、例: BPPV）。
   final List<ExportEscalationGroup> escalationGroups;
 
-  /// 免責文の短い形（`ConsultNotice.disclaimerShort`、#76 レビュー M1/M2、
-  /// 再レビュー M1': 診断ではない旨と根拠の両方を 1 行に収める）。
+  /// 免責文の短い形（`ConsultNotice.disclaimerShort`。診断ではない旨と根拠の
+  /// 両方を 1 行に収める）。
   /// null = 喚起なし（[urgencyMessage] と [escalationGroups] がどちらも無い）。
   final String? disclaimer;
 
@@ -144,9 +152,11 @@ class ExportEscalationGroup {
 /// [base] 画像の下部にキャプション帯を合成した新しい [ui.Image] を返す。
 ///
 /// `PictureRecorder` + `Canvas` で base をそのまま描き、下に半透明の帯を敷いて
-/// [TextPainter] で症状名 / 強度 / シミュレーション（近似）の注記 / 受診喚起（あれば）/ escalation（段ごとの
-/// 見出し + 条件文、あれば、#76 レビュー M1・再レビュー S-a）/ 免責文（あれば）
-/// / ISO 日付を描画する。戻り画像の高さは `base.height + 帯の高さ`、幅は
+/// [TextPainter] で症状名 / 強度 / シミュレーション（近似）の注記 /
+/// 実験的フィルタの注記（あれば）/ 受診喚起（あれば）/ escalation（段ごとの
+/// 見出し + 条件文、あれば）/ 免責文（あれば）/ ISO 日付を描画する。
+/// シミュレーション（近似）と実験的の注記は、狭い画像でも省略せず折り返して
+/// 全文を描く（画像だけが共有されても近似だと分かるようにするため）。戻り画像の高さは `base.height + 帯の高さ`、幅は
 /// `base.width`。
 ///
 /// **pure**: 引数の解決済み文字列のみを使い、enum/i18n をここで引かない（規律2）。
@@ -155,11 +165,13 @@ Future<ui.Image> composeExportImage(
     ui.Image base, ExportCaption caption) async {
   final width = base.width;
   // 行リストを組む（urgencyMessage/escalationGroups/disclaimer はいずれも
-  // 任意。#76 レビュー M1: 免責文と escalation の行も必ず焼き込む）。
+  // 任意。免責文と escalation の行も必ず焼き込む）。
   final lines = <_CaptionLine>[
     _CaptionLine(caption.symptomLabel, _Style.title),
     _CaptionLine(caption.strengthLabel, _Style.body),
     _CaptionLine(caption.simulationNotice, _Style.notice),
+    if (caption.experimentalNotice != null)
+      _CaptionLine(caption.experimentalNotice!, _Style.notice),
     if (caption.urgencyMessage != null)
       _CaptionLine(caption.urgencyMessage!, _Style.note),
     for (final group in caption.escalationGroups) ...[
@@ -174,7 +186,8 @@ Future<ui.Image> composeExportImage(
   const horizontalPadding = 16.0;
   const verticalPadding = 14.0;
   const lineGap = 6.0;
-  final maxTextWidth = width - horizontalPadding * 2;
+  // ごく狭い画像でも 0 以下にしない（その場合は 1 文字ずつ折り返して描く）。
+  final maxTextWidth = math.max(1.0, width - horizontalPadding * 2);
 
   // 各行の TextPainter を用意し、帯の高さを測る。
   final painters = <TextPainter>[];
@@ -431,11 +444,14 @@ class _CaptionLine {
   final _Style style;
 
   TextPainter buildPainter(double maxWidth) {
+    // 近似・実験的の注記は行数を制限しない（省略記号で「近似」が消えると、
+    // 画像だけが共有されたときに実際の見え方と誤解されるため）。
+    final unlimited = style == _Style.notice;
     final tp = TextPainter(
       text: TextSpan(text: text, style: style.textStyle),
       textDirection: TextDirection.ltr,
-      maxLines: (style == _Style.note || style == _Style.notice) ? 2 : 1,
-      ellipsis: '…',
+      maxLines: unlimited ? null : (style == _Style.note ? 2 : 1),
+      ellipsis: unlimited ? null : '…',
     )..layout(maxWidth: maxWidth);
     return tp;
   }
@@ -481,8 +497,8 @@ enum _Style {
           fontWeight: FontWeight.w500,
           height: 1.25,
         );
-      // escalation の段見出し（emergency/earlyConsultation、#76 再レビュー
-      // S-a）。note と同じ色だが太字にして、その下の条件文の行と区別する。
+      // escalation の段見出し（emergency/earlyConsultation）。note と同じ色
+      // だが太字にして、その下の条件文の行と区別する。
       case _Style.noteHeader:
         return const TextStyle(
           color: Color(0xFFFFD27F),

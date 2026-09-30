@@ -54,7 +54,7 @@ AfterImageRenderer afterImageRenderer = BeforeAfterView.renderAfter;
 /// [_BeforeAfterViewState._export] が使うキャプション合成ステップの型。
 ///
 /// 実体は [composeExportImage]。widget test が実ファイル I/O（[pngSaver]）に
-/// 触れずに export の挙動（#85 レビュー S8: caption が描画時の
+/// 触れずに export の挙動（caption が描画時の
 /// `(filterId, strength)` から作られること）を検証できるようにするための
 /// seam（#58 の `previewSourceImageLoader`/`afterImageRenderer` と同じパターン）。
 typedef ExportImageComposer = Future<ui.Image> Function(
@@ -156,7 +156,7 @@ class BeforeAfterView extends StatefulWidget {
   /// Explicit width/height (in pixels) for the generated square sample
   /// image. When `null` (the default, used by real callers), the resolution
   /// is [canonicalSampleSize] — **not** derived from the pane's layout size or
-  /// `devicePixelRatio` (#85 レビュー S4: this pane used to auto-size to the
+  /// `devicePixelRatio` (this pane used to auto-size to the
   /// rendered box × DPR, #58, but the CPU preview now always renders at a
   /// fixed canonical resolution and lets the display scale it — see
   /// [canonicalSampleSize] for why). Tests that want a small, fast image
@@ -172,7 +172,7 @@ class BeforeAfterView extends StatefulWidget {
   final PreviewImageSource imageSource;
 
   /// The fixed resolution (square side, pixels) the CPU preview renders at
-  /// when [sampleSize] is `null` (#85 レビュー S4).
+  /// when [sampleSize] is `null`.
   ///
   /// Rationale for a **canonical size** instead of sizing to the rendered
   /// pane × `devicePixelRatio` (the pre-#85 GPU-era behaviour, #58):
@@ -197,7 +197,7 @@ class BeforeAfterView extends StatefulWidget {
   ///   (astigmatism/presbyopia, ratio 1.1%).
   ///
   /// 1024 keeps every filter's effect comfortably visible. Per-filter CPU
-  /// `apply()` timing at this size (#85 レビュー S9) is recorded on Issue
+  /// `apply()` timing at this size is recorded on Issue
   /// #85 — see that Issue for the measured numbers/method rather than a
   /// number here that could silently go stale. The pane simply scales the
   /// rendered image up/down to fit (`_UiImagePainter.paint`,
@@ -267,17 +267,16 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   bool _loading = true;
   bool _exporting = false;
 
-  /// Set when the most recently *applied* generation failed (#58 レビュー
-  /// SHOULD-1). Gates the "after" pane to a [_ErrorPlaceholder] instead of a
+  /// Set when the most recently *applied* generation failed. Gates the "after" pane to a [_ErrorPlaceholder] instead of a
   /// stale/possibly-inconsistent image. Cleared back to `false` on the next
   /// successful generation. The actual exception/stack trace isn't retained
   /// here — it's reported once via [FlutterError.reportError] at the catch
-  /// site instead (#58 レビュー nit-1).
+  /// site instead.
   bool _failed = false;
 
   /// Resolution (square side, pixels) the currently-held [_before]/[_after]
   /// were generated at. `null` until the first generation completes (#58).
-  /// Since #85 レビュー S4 removed pane-size-driven auto-sizing, this only
+  /// Since pane-size-driven auto-sizing was removed, this only
   /// changes if [BeforeAfterView.sampleSize] itself changes (test-only in
   /// practice) — production always uses [BeforeAfterView.canonicalSampleSize].
   int? _currentSampleSize;
@@ -285,21 +284,21 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// The [PreviewImageSource] (#78) that actually produced the
   /// currently-held [_before]. `null` until the first generation completes.
   /// Set from the `source` local captured at the start of the [_rebuild]
-  /// call that produced [_before] (#78 レビュー M1) — **not** re-read from
+  /// call that produced [_before] — **not** re-read from
   /// `widget.imageSource` at assignment time, which could have already moved
   /// on to a newer value while this call was awaiting the loader (see
   /// [_rebuild]'s doc).
   PreviewImageSource? _currentImageSource;
 
   /// The `(filterId, colorVisionType, strength)` that actually produced the
-  /// currently-held [_after] (#85 レビュー S8, #60). `null` until the
+  /// currently-held [_after] (#60). `null` until the
   /// first successful render.
   ///
   /// [_export] must build its [ExportCaption] from these, **not** from
   /// `widget.filterId`/`widget.colorVisionType`/`widget.strength`: those
   /// reflect the *live* widget props, which can already have moved on (e.g.
   /// the user dragged the intensity slider again) while `_after` still shows
-  /// the previous render — [_scheduleRebuild] (#85 レビュー S3) coalesces the
+  /// the previous render — [_scheduleRebuild] coalesces the
   /// new request instead of applying it immediately, so there's a real
   /// window where the two diverge. Exporting during that window must burn a
   /// caption matching the pixels actually being exported, not the slider's
@@ -309,7 +308,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   double? _afterStrength;
 
   /// The actual [VisionFilter] that produced the currently-held [_after]
-  /// (#76). Captured alongside [_afterFilterId] for the same S8 reason: the
+  /// (#76). Captured alongside [_afterFilterId] for the same reason: the
   /// export caption's urgency note must reflect the filter that produced the
   /// exported pixels, not whatever `widget.filter` has moved on to while a
   /// slower re-render is still in flight.
@@ -318,13 +317,13 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// Monotonic request id. Bumped on every [_rebuild] call so a slow/late
   /// async result can tell it has been superseded by a newer request and
   /// discard (dispose) itself instead of overwriting `_before`/`_after` with
-  /// stale data or leaking GPU images (#58). [_scheduleRebuild] (#85 レビュー
-  /// S3) now serializes calls to [_rebuild] so at most one is ever in flight
+  /// stale data or leaking GPU images (#58). [_scheduleRebuild]
+  /// now serializes calls to [_rebuild] so at most one is ever in flight
   /// at a time, but this check stays as the defense against a slow result
   /// racing a `dispose()` (see [_rebuild]'s own `mounted` guards).
   int _generation = 0;
 
-  /// Whether a [_rebuild] is currently in flight (#85 レビュー S3). While
+  /// Whether a [_rebuild] is currently in flight. While
   /// `true`, [_scheduleRebuild] doesn't start another one — it just records
   /// the request in [_pendingRebuildSampleSize] so the CPU `apply()` path
   /// (heavier than the old GPU shader path) never has more than one job
@@ -332,7 +331,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   bool _rebuildInFlight = false;
 
   /// The most recently requested sample size while a [_rebuild] is already
-  /// running (#85 レビュー S3). Overwritten by each new request — only the
+  /// running. Overwritten by each new request — only the
   /// latest survives. Consumed (and cleared) by [_runRebuild] once the
   /// in-flight job finishes.
   int? _pendingRebuildSampleSize;
@@ -346,7 +345,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   @override
   void initState() {
     super.initState();
-    // #85 レビュー S4: the sample size no longer depends on the pane's
+    // The sample size no longer depends on the pane's
     // layout (it's canonical/fixed), so there's no need to wait for a
     // LayoutBuilder pass before triggering the first generation.
     _scheduleRebuild(_effectiveSampleSize);
@@ -365,7 +364,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     }
   }
 
-  /// Entry point for triggering a [_rebuild] (#85 レビュー S3). If one is
+  /// Entry point for triggering a [_rebuild]. If one is
   /// already running, records [sampleSize] as the pending request (replacing
   /// any earlier pending one) and returns without starting a second job —
   /// the CPU `apply()` path is heavier than the old GPU shader path, so
@@ -390,7 +389,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     try {
       await _rebuild(sampleSize);
     } finally {
-      // #85 レビュー N6: _rebuild が例外を投げても（現状は内部で catch して
+      // _rebuild が例外を投げても（現状は内部で catch して
       // いるため起きない想定だが）_rebuildInFlight が true のまま固着して
       // 以後の要求が永久に集約されたまま実行されなくなる事態を避ける。
       _rebuildInFlight = false;
@@ -403,15 +402,15 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     }
   }
 
-  /// Cleans up after a failed [_rebuild] (#58 レビュー S1/SHOULD-1): if this
+  /// Cleans up after a failed [_rebuild]: if this
   /// call is still the latest request, resets `_loading` so the UI doesn't
   /// stay stuck on the "preparing" placeholder, and shows a failure state
-  /// instead of the (possibly now-stale) `_after` (SHOULD-1). A permanent
+  /// instead of the (possibly now-stale) `_after`. A permanent
   /// failure doesn't retry itself (no timer, no auto-resize) — only a user
   /// action (`didUpdateWidget` seeing a filter/strength/sampleSize
   /// change) calls [_scheduleRebuild] again, so there's no busy-loop risk
-  /// (#85 レビュー S4 removed the resize-driven retry path that MUST-1
-  /// originally guarded; retrying is now inherently user-driven only). If a
+  /// (the resize-driven retry path no longer exists; retrying is now
+  /// inherently user-driven only). If a
   /// newer request has already superseded this one, does nothing (that newer
   /// request owns the state now).
   void _onRebuildFailed(int generation) {
@@ -429,7 +428,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     }
   }
 
-  /// #78 レビュー M1: [widget.imageSource] はこの関数の冒頭で一度だけ読み、
+  /// [widget.imageSource] はこの関数の冒頭で一度だけ読み、
   /// [source] に固定する。以後（[previewSourceImageLoader] の呼び出し・
   /// [_currentImageSource] への記録のどちらも）は必ずこの [source] を使い、
   /// `widget.imageSource` を読み直さない。
@@ -460,14 +459,14 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       try {
         before = await previewSourceImageLoader(source, sampleSize);
       } catch (e, st) {
-        // #58 レビュー nit-1: 静かに握りつぶさず Flutter のエラー報告経路に
+        // 静かに握りつぶさず Flutter のエラー報告経路に
         // 乗せる（crash reporting 等が拾えるように）。
         FlutterError.reportError(FlutterErrorDetails(
           exception: e,
           stack: st,
           library: 'before_after_view',
         ));
-        // #58 レビュー S1: 生成に失敗しても loading に固着させず、次の
+        // 生成に失敗しても loading に固着させず、次の
         // レイアウト/更新で再試行できるようにする。
         _onRebuildFailed(generation);
         return;
@@ -475,13 +474,13 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     }
 
     if (generation != _generation || !mounted) {
-      // #58 レビュー N3: generator の後・renderer の前でも世代を確認し、既に
+      // generator の後・renderer の前でも世代を確認し、既に
       // 追い越されていれば（GPU コストのかかる）renderer を呼ばずに捨てる。
       if (!reuseBefore && !identical(before, _before)) before.dispose();
       return;
     }
 
-    // #58 レビュー S2: `before` が再利用中の `_before` そのものだと、await
+    // `before` が再利用中の `_before` そのものだと、await
     // している間に別の（より新しい）`_rebuild` がそれを dispose する可能性が
     // ある。renderer には複製を渡し、`_before`/`_after` の実体には触れさせない。
     // 新規生成した `before` はまだどこにも共有されていないため複製不要。
@@ -496,7 +495,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         widget.strength,
       );
     } catch (e, st) {
-      // #58 レビュー nit-1: こちらも同様に報告する。
+      // こちらも同様に報告する。
       FlutterError.reportError(FlutterErrorDetails(
         exception: e,
         stack: st,
@@ -517,7 +516,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       // discard everything we produced instead of leaking or touching state
       // a newer request already owns.
       if (!reuseBefore && !identical(before, _before)) before.dispose();
-      // #58 レビュー SHOULD-2: `rendererInput` は clone された時点でこの呼び出し
+      // `rendererInput` は clone された時点でこの呼び出し
       // だけが所有する私有オブジェクト。`after` と同一（filter == null で
       // clone がそのまま返った場合）でも無条件に dispose する — 「同一なら
       // どちらかに任せる」という以前の条件分岐は、両方の条件が同時に false に
@@ -537,15 +536,14 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     setState(() {
       _before = before;
       _after = after;
-      _afterFilterId = widget.filterId; // #85 レビュー S8, #60
+      _afterFilterId = widget.filterId; // #60
       _afterColorVisionType = widget.colorVisionType; // #60
-      _afterStrength = widget.strength; // #85 レビュー S8
+      _afterStrength = widget.strength;
       _afterFilter = widget.filter; // #76
       _currentSampleSize = sampleSize;
-      _currentImageSource =
-          source; // #78 レビュー M1: widget.imageSource ではなく source
+      _currentImageSource = source; // widget.imageSource ではなく、冒頭で固定した source
       _loading = false;
-      _failed = false; // #58 レビュー SHOULD-1: 成功したら失敗表示を解除する。
+      _failed = false; // 成功したら失敗表示を解除する。
     });
 
     if (clonedInput && !identical(rendererInput, after)) {
@@ -583,7 +581,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// クリップボードへコピーし、SnackBar で結果を知らせる。画像そのものの
   /// クリップボード書き込みはプラグインを要し環境変更になるため非スコープ。
   ///
-  /// #85 レビュー S8: caption は [_afterFilterId]/[_afterColorVisionType]/
+  /// caption は [_afterFilterId]/[_afterColorVisionType]/
   /// [_afterStrength]（`_after` を描画した時点の値）から作る。
   /// `widget.filterId`/`widget.colorVisionType`/`widget.strength`
   /// （呼び出し時点の *現在* の値）を使うと、export をタップした瞬間までに
@@ -609,7 +607,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       final strengthPercent = contract_notes.strengthPercent(strength);
       final now = DateTime.now();
       final date = isoDate(now);
-      // #76 レビュー M1: プレビューの注記（FilterParamPanel・
+      // プレビューの注記（FilterParamPanel・
       // ExperiencePresetTile）と同じ正本・同じ解決経路（resolveConsultNotice）を
       // export の焼き込みにも使う。色覚 7 型は urgency=none かつ escalation も
       // 無いので notice は自然に null になる。
@@ -625,8 +623,14 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         strengthLabel: l10n.strengthLabel(strengthPercent),
         isoDate: date,
         simulationNotice: l10n.exportSimulationNotice,
+        // 実験的なフィルタ（四色覚）の PNG には、近似であることに加えて
+        // 「実験的」も焼き込む。対象は VisionFilterEntry.isExperimental が正本。
+        experimentalNotice:
+            (kVisionFilterCatalogById[filterId]?.isExperimental ?? false)
+                ? l10n.exportExperimentalNotice
+                : null,
         urgencyMessage: notice?.message,
-        // #76 再レビュー S-a: PNG でも emergency/earlyConsultation の見出しを
+        // PNG でも emergency/earlyConsultation の見出しを
         // 分けて焼き込む。ConsultNotice.escalationGroups をそのまま詰め替える
         // だけで、グルーピングのロジックはここに複製しない。
         escalationGroups: [
@@ -694,7 +698,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
 
-    // #85 レビュー S4: the CPU preview renders at a canonical fixed size
+    // The CPU preview renders at a canonical fixed size
     // (see [BeforeAfterView.canonicalSampleSize]) regardless of the pane's
     // layout size or devicePixelRatio — LayoutBuilder here only decides
     // whether to stack the panes, it no longer drives sample-size generation
@@ -727,14 +731,14 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
           label: l10n.previewPaneOriginal,
           child: _ImageView(image: _before),
         );
-        // #58 レビュー SHOULD-1: 最新世代が失敗した場合は _failed が立ち、
+        // 最新世代が失敗した場合は _failed が立ち、
         // _after は null にされている。stale/不整合な画像を出し続けるより
         // 失敗を明示する。全 30 種が実描画対応済み（#59/#85 で CPU 経路に切替、
         // #60 で advanced カタログ・プリセットも結線）なので、失敗以外で
         // `_after` が null のまま安定することはない（一度も成功して
         // いなければこの分岐に来る前に上の `_loading` ガードで preparing 表示に
         // なる）。それでも [_ImageView] 自身が null を安全に扱うため、二分岐で
-        // 十分（「描画は近日対応」プレースホルダは #86 レビューで YAGNI 判定・撤去）。
+        // 十分（「描画は近日対応」プレースホルダは #86 で YAGNI と判断して撤去）。
         final Widget afterChild = _failed
             ? _ErrorPlaceholder(theme: theme, label: l10n.previewFailed)
             : _ImageView(image: _after);
@@ -892,7 +896,7 @@ class _UiImagePainter extends CustomPainter {
 }
 
 /// Shown in the "after" pane when the latest generation/render attempt
-/// failed (#58 レビュー SHOULD-1). Colours come only from `colorScheme` roles
+/// failed. Colours come only from `colorScheme` roles
 /// (#72 の方針): the `error`/`onErrorContainer` family, not a hardcoded value.
 class _ErrorPlaceholder extends StatelessWidget {
   const _ErrorPlaceholder({required this.theme, required this.label});

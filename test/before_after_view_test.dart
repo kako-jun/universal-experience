@@ -1120,6 +1120,74 @@ void main() {
         expect(savedFilename, isNot(contains('50pct')));
       });
 
+      // 書き出し PNG の「シミュレーション（近似）」と、実験的フィルタの
+      // 「実験的な可視化」が、UI から caption に渡ること（焼き込み自体は
+      // export_service_test.dart が実画素で検証する）。
+      for (final c in [
+        (
+          id: 'protanopia',
+          filter: const VisionFilter.protanopia(),
+          experimental: false,
+        ),
+        (
+          id: 'tetrachromacy',
+          filter: const VisionFilter.tetrachromacy(),
+          experimental: true,
+        ),
+      ]) {
+        testWidgets(
+            'export の caption にシミュレーション注記を渡す（${c.id}: 実験的の注記は'
+            '${c.experimental ? "あり" : "なし"}）', (tester) async {
+          late ui.Image before1, after1, composedStub;
+          await tester.runAsync(() async {
+            before1 = await generateSampleImage(4);
+            after1 = await generateSampleImage(4);
+            composedStub = await generateSampleImage(4);
+          });
+          previewSourceImageLoader = (source, size) => Future.value(before1);
+          afterImageRenderer =
+              (source, filter, strength) => Future.value(after1);
+          ExportCaption? capturedCaption;
+          exportImageComposer = (base, caption) async {
+            capturedCaption = caption;
+            return composedStub;
+          };
+          String? savedFilename;
+          pngSaver = (bytes, filename) async {
+            savedFilename = filename;
+            return '/fake/downloads/$filename';
+          };
+          final en = lookupAppLocalizations(const Locale('en'));
+
+          await tester.pumpWidget(localized(BeforeAfterView(
+            filter: c.filter,
+            filterId: c.id,
+            strength: 1.0,
+            imageSource: const SamplePreviewImageSource('test'),
+            sampleSize: 16,
+          )));
+          await tester.pump();
+          await tester.pump();
+
+          await tester.tap(find.byTooltip(en.exportButtonTooltip));
+          await tester.runAsync(() async {
+            for (var i = 0; i < 50; i++) {
+              if (savedFilename != null) return;
+              await tester.pump(const Duration(milliseconds: 20));
+              await Future<void>.delayed(const Duration(milliseconds: 20));
+            }
+          });
+          await tester.pump();
+
+          expect(capturedCaption, isNotNull);
+          expect(capturedCaption!.simulationNotice, en.exportSimulationNotice);
+          expect(
+            capturedCaption!.experimentalNotice,
+            c.experimental ? en.exportExperimentalNotice : isNull,
+          );
+        });
+      }
+
       testWidgets(
           'export 成功の SnackBar に保存先パスと「フォルダで表示」が出て、押すと'
           'その保存先を開く。ファイル名は日付＋時刻を含む (#64)', (tester) async {

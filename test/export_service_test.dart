@@ -507,9 +507,7 @@ void main() {
       expect(png!.isNotEmpty, isTrue);
     });
 
-    test(
-        'escalationGroups（段ごとの見出し + 条件文）ぶん、無しより高くなる '
-        '（#76 レビュー M1・再レビュー S-a）', () async {
+    test('escalationGroups（段ごとの見出し + 条件文）ぶん、無しより高くなる', () async {
       final base = await makeBase(80, 60);
       const withoutGroups = ExportCaption(
         symptomLabel: 'BPPV Rotation',
@@ -657,6 +655,98 @@ void main() {
       composed.dispose();
       final extents = whiteLineExtents(await decodePng(png!), base.height);
       expect(extents, hasLength(2));
+    });
+
+    /// 帯の中の純白（注記の色）の画素数。
+    int whitePixels(
+        ({int width, int height, Uint8List rgba}) img, int bandTop) {
+      var n = 0;
+      for (var y = bandTop; y < img.height; y++) {
+        for (var x = 0; x < img.width; x++) {
+          final o = (y * img.width + x) * 4;
+          if (img.rgba[o] == 0xFF &&
+              img.rgba[o + 1] == 0xFF &&
+              img.rgba[o + 2] == 0xFF) {
+            n++;
+          }
+        }
+      }
+      return n;
+    }
+
+    /// 幅 [width] の画像に焼き込まれた、simulationNotice だけの純白画素数。
+    /// 注記が空の同じ caption との差を取り、症状名などを除く。
+    Future<int> noticePixelsAtWidth(int width, {String? experimental}) async {
+      final base = await makeBase(width, 40);
+      addTearDown(base.dispose);
+      Future<int> count(String notice, String? exp) async {
+        final composed = await composeExportImage(
+          base,
+          ExportCaption(
+            symptomLabel: 'Tritanopia',
+            strengthLabel: 'Strength: 60%',
+            isoDate: '2026-06-23',
+            simulationNotice: notice,
+            experimentalNotice: exp,
+          ),
+        );
+        final png = await encodeImagePng(composed);
+        composed.dispose();
+        return whitePixels(await decodePng(png!), base.height);
+      }
+
+      return await count('Simulation (approximation)', experimental) -
+          await count('', null);
+    }
+
+    test(
+        'ごく狭い画像（64px・100px 幅）でも simulationNotice は省略されず全文が'
+        '描かれる（広い画像と同じ画素量。近似の注記が欠けない）（#80）', () async {
+      // 基準: 1 行に収まる幅 640px。テスト環境の文字（Ahem）は 1 文字が
+      // 塗りつぶしの正方形なので、全文が描かれていれば画素量は幅によらず
+      // ほぼ同じ（行送りの端数で縁がにじむぶんだけ差が出る）。
+      final wide = await noticePixelsAtWidth(640);
+      expect(wide, greaterThan(0));
+      for (final width in [64, 100]) {
+        final narrow = await noticePixelsAtWidth(width);
+        expect(narrow, greaterThan((wide * 0.8).round()),
+            reason: '$width px 幅で注記が欠けている（省略記号で切られている）');
+        expect(narrow, lessThan((wide * 1.2).round()), reason: '$width px 幅');
+      }
+    });
+
+    test('experimentalNotice は全文が別の行として焼き込まれ、狭い画像でも省略されない（#80）', () async {
+      // 広い画像: 症状名・シミュレーション注記・実験的注記の 3 行（純白の塊）。
+      final base = await makeBase(640, 40);
+      addTearDown(base.dispose);
+      final composed = await composeExportImage(
+        base,
+        const ExportCaption(
+          symptomLabel: 'Tetrachromacy',
+          strengthLabel: 'Strength: 100%',
+          isoDate: '2026-06-23',
+          simulationNotice: 'Simulation (approximation)',
+          experimentalNotice: 'Experimental visualization',
+        ),
+      );
+      final png = await encodeImagePng(composed);
+      composed.dispose();
+      final extents = whiteLineExtents(await decodePng(png!), base.height);
+      expect(extents, hasLength(3));
+
+      // 狭い画像でも、実験的注記ぶんの画素が広い画像と同じ量だけ増える。
+      final wideOnly = await noticePixelsAtWidth(640);
+      final wideBoth = await noticePixelsAtWidth(640,
+          experimental: 'Experimental visualization');
+      final expWide = wideBoth - wideOnly;
+      expect(expWide, greaterThan(0));
+
+      final narrowOnly = await noticePixelsAtWidth(100);
+      final narrowBoth = await noticePixelsAtWidth(100,
+          experimental: 'Experimental visualization');
+      final expNarrow = narrowBoth - narrowOnly;
+      expect(expNarrow, greaterThan((expWide * 0.8).round()));
+      expect(expNarrow, lessThan((expWide * 1.2).round()));
     });
   });
 }
