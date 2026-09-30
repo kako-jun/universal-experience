@@ -58,6 +58,17 @@ void deactivateColorVision(
   selectColorVision(filterService, visionState, ColorVisionType.none);
 }
 
+/// グローバルホットキー「フィルタ解除」（`HotkeyActions.deactivateFilters`）の配線（#63、#121）。
+///
+/// 重ねている全層（色覚を含む）を外し、[FilterService] も none に戻す。main.dart はこの関数の
+/// 戻り値を `HotkeyActions` へ渡すだけにして、テストも同じ関数を呼んで確かめる。
+void Function() hotkeyDeactivateFilters(
+  FilterService filterService,
+  VisionFilterState visionState,
+) {
+  return () => deactivateColorVision(filterService, visionState);
+}
+
 /// 色覚のクイック選択を**多選択の足し引き**（[VisionFilterState.toggle]）で行う入口（#120）。
 ///
 /// 統合一覧の色覚の行（排他のラジオ式）が呼ぶ。[selectColorVision] が「層を全部その 1 つに

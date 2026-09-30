@@ -267,7 +267,7 @@ void main() {
 
   group('HotkeyActions.emergencyExit', () {
     // #121: 「フィルタ解除」のホットキーは、重ねている全層を外す（新しいホットキーは足さない）。
-    // main.dart の配線（deactivateFilters → deactivateColorVision）と同じ組み立てで確かめる。
+    // main.dart が HotkeyActions へ渡す配線（hotkeyDeactivateFilters）そのものを使って確かめる。
     test('重ねている全層（色覚を含む）を外し、FilterService も none に戻す', () async {
       installVisionFilterMetadataFixture();
       addTearDown(resetVisionFilterMetadataProviders);
@@ -281,8 +281,7 @@ void main() {
       expect(filterService.currentFilter, ColorVisionType.protanopia);
 
       final actions = HotkeyActions(
-        deactivateFilters: () =>
-            deactivateColorVision(filterService, visionState),
+        deactivateFilters: hotkeyDeactivateFilters(filterService, visionState),
         setClickThrough: (value) async {},
         setAlwaysOnTop: (value) async {},
         getClickThrough: () => false,
