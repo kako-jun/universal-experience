@@ -21,7 +21,7 @@ lib/
 │   ├── disability_type.dart         # ColorVisionType（色覚 7 型 + none の安定識別子）。ファイル名は歴史的経緯
 │   ├── vision_filter_catalog.dart   # sensus カタログ（30種）の Dart 側定義
 │   ├── vision_filter_contract_notes.dart # sensus API 契約上の注意の定義（強度の上限付近の警告の対象・閾値、#66）
-│   ├── sample_catalog.dart          # サンプル画像集（7種）+ フィルタ id ごとの推奨サンプル（#78）
+│   ├── sample_catalog.dart          # サンプル画像集（8種）+ フィルタ id ごとの推奨サンプル（#78）
 │   └── preview_image_source.dart    # プレビュー原画の値型（サンプル/ユーザー画像、#78）
 ├── rendering/
 │   ├── cpu_vision_renderer.dart     # sensus CPU apply() 経由、プレビュー描画の正本（#85）
@@ -96,9 +96,12 @@ rust_builder/                 # cargokit 統合（#55）。flutter build/run 時
 
 tools/                       # シェーダ codegen（sensus の .frag → Impeller サブセットへ機械変換）
                               # + generate_samples.dart（サンプル画像集の生成、#78）
+                              # + generate_font_atlases.py（サンプル用フォントの生成、#99）
+                              # + fonts/（Noto Sans / Noto Sans JP 由来のビットマップフォント。OFL の
+                              #   全文・著作権表示・出典は fonts/README.md、#99）
                               # + check_frb_drift.sh（FRB 生成物のドリフト検証。CI の check job が実行、#88）
 shaders/                     # 変換済み .frag（ビルド時 impellerc がコンパイル）
-assets/samples/              # サンプル画像集（自作・手続き生成、#78）。出典は README.md
+assets/samples/              # サンプル画像集（自作・手続き生成、#78。文字は OFL フォント、#99）。出典は README.md
 
 macos/                       # macOS ランナー（現行対応）
 linux/                       # Linux ランナー（現行対応）

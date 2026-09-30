@@ -129,7 +129,7 @@ universal-experience/
 │   └── ui/                # UIコンポーネント
 ├── rust/                  # sensus-core を FRB で公開する Rust crate（Dart バインディング lib/src/rust/ の生成元）
 ├── rust_builder/          # cargokit 統合（#55）。flutter build/run 時に rust/ をビルドし同梱する FFI plugin
-├── tools/                 # シェーダ codegen（sensus の .frag → Impeller サブセット変換）、FRB 生成物のドリフト検証（check_frb_drift.sh）
+├── tools/                 # シェーダ codegen（sensus の .frag → Impeller サブセット変換）、FRB 生成物のドリフト検証（check_frb_drift.sh）、サンプル画像の生成（generate_samples.dart）と OFL フォントのアトラス（fonts/）
 ├── shaders/               # 変換済み .frag（ビルド時 impellerc がコンパイル）
 ├── macos/                 # macOS固有コード（現行対応）
 ├── linux/                 # Linux固有コード（現行対応）

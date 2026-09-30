@@ -186,16 +186,19 @@ sensus-core の `experiences()` です。
 
 ### プレビュー原画（サンプル画像集 / ユーザー画像）
 
-before/after プレビューの原画は、内蔵のサンプル画像集（自作・7 種）から選ぶか、
+before/after プレビューの原画は、内蔵のサンプル画像集（自作・8 種）から選ぶか、
 自分の画像を読み込んで試せます（#78）。
 
 - **サンプル画像集**: 路線図（色で区別する複数路線）・凡例付きグラフ
   （赤・緑・青・橙の系列）・信号標識・文字の多い案内板（大小の文字）・
   食べ物や果物（熟した赤・未熟な緑など）・夜景（点光源。広いベタ白は
-  置いていません）・奥行きのある風景（手前・中間・遠景）の 7 種類です。
-  すべて `tools/generate_samples.dart`（手続き的生成。外部素材は使いません）
-  で作った自作の PNG で、人物の顔は入れていません。出典・生成方法は
-  `assets/samples/README.md` に記載します。奥行きのある風景だけは深度マップ
+  置いていません）・奥行きのある風景（手前・中間・遠景）に、日本語の案内板
+  （出口・駅・営業中の看板とのりば案内の表）を加えた 8 種類です。
+  すべて `tools/generate_samples.dart`（手続き的生成。外部の画像素材は使いません）
+  で作った自作の PNG で、人物の顔は入れていません。文字は SIL OFL 1.1 の
+  Noto Sans / Noto Sans JP から作ったビットマップフォント（`tools/fonts/`）で
+  描いています。出典・ライセンス・生成方法は `assets/samples/README.md` と
+  `tools/fonts/README.md` に記載します。奥行きのある風景だけは深度マップ
   （`depth_landscape_depth.png`）も同梱していますが、これは将来の
   depth_aware_blur 体験向けの素材で、現状のプレビューでは使いません
   （配線は Issue #98、`docs/ARCHITECTURE.md`「今後の拡張」参照）。
@@ -352,6 +355,10 @@ Rust は `rust/` の `cargo test` / clippy、flutter_rust_bridge の codegen に
 ## ライセンス
 
 [MIT](LICENSE)
+
+> サンプル画像（`assets/samples/`）の文字は、SIL Open Font License 1.1 のフォント
+> （Noto Sans / Noto Sans JP）で描いています。出典・著作権表示・ライセンス全文は
+> [`tools/fonts/README.md`](tools/fonts/README.md) を参照してください。
 
 > `rust_builder/LICENSE` は podspec が参照するための複製です（CocoaPods はパッケージ外の
 > ファイルを解決できないため）。ライセンス本文を変えるときは両方を揃えてください（`test/license_files_test.dart` が
