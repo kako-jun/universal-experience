@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:provider/provider.dart';
@@ -128,18 +130,22 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Shortcuts(
-      shortcuts: const <ShortcutActivator, Intent>{
+      shortcuts: <ShortcutActivator, Intent>{
         // キー配列非依存にするため物理キーではなく文字で判定する (#63)。
-        CharacterActivator('/'): FocusFilterSearchIntent(),
-        SingleActivator(LogicalKeyboardKey.arrowUp):
-            CycleFilterIntent(forward: false),
-        SingleActivator(LogicalKeyboardKey.arrowDown):
-            CycleFilterIntent(forward: true),
-        SingleActivator(LogicalKeyboardKey.arrowLeft):
-            AdjustStrengthIntent(delta: -kKeyboardStrengthStep),
-        SingleActivator(LogicalKeyboardKey.arrowRight):
-            AdjustStrengthIntent(delta: kKeyboardStrengthStep),
-        SingleActivator(LogicalKeyboardKey.escape): ReleaseClickThroughIntent(),
+        const CharacterActivator('/'): const FocusFilterSearchIntent(),
+        const SingleActivator(LogicalKeyboardKey.arrowUp):
+            const CycleFilterIntent(forward: false),
+        const SingleActivator(LogicalKeyboardKey.arrowDown):
+            const CycleFilterIntent(forward: true),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft):
+            const AdjustStrengthIntent(delta: -kKeyboardStrengthStep),
+        const SingleActivator(LogicalKeyboardKey.arrowRight):
+            const AdjustStrengthIntent(delta: kKeyboardStrengthStep),
+        const SingleActivator(LogicalKeyboardKey.escape):
+            const ReleaseClickThroughIntent(),
+        // Cmd+V（macOS）/ Ctrl+V: クリップボードの画像を貼り付ける (#97)。
+        // 割り当てがプラットフォームで変わるので const マップには入れない。
+        pasteShortcutActivator(): const PasteImageIntent(),
       },
       child: Actions(
         actions: <Type, Action<Intent>>{
@@ -177,8 +183,15 @@ class _HomeScreenState extends State<HomeScreen> {
               return null;
             },
           ),
-          ReleaseClickThroughIntent:
-              CallbackAction<ReleaseClickThroughIntent>(
+          // テキスト入力にフォーカスがある間は奪わない（入力欄自身の貼り付けが
+          // 優先。ボタン等では奪う。isFocusOnTextInput 参照、#97）。
+          PasteImageIntent: TextInputAwareCallbackAction<PasteImageIntent>(
+            onInvoke: (_) {
+              unawaited(pasteUserImageFromClipboard(context));
+              return null;
+            },
+          ),
+          ReleaseClickThroughIntent: CallbackAction<ReleaseClickThroughIntent>(
             onInvoke: (_) {
               final loupeWindow = context.read<LoupeWindowController>();
               if (loupeWindow.clickThrough) {

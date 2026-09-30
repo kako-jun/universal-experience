@@ -10,6 +10,8 @@ import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/sample_catalog.dart';
 import '../../rendering/image_fit.dart';
+import '../../services/app_shortcuts.dart';
+import '../../services/clipboard_image_reader.dart';
 import '../../services/image_source_state.dart';
 import '../../services/vision_filter_state.dart';
 
@@ -95,18 +97,110 @@ Future<bool> loadUserImageFile(BuildContext context, XFile file) async {
     final bytes = await file.readAsBytes();
     decoded = await decodeUserImageBytes(bytes);
   } catch (e, st) {
-    FlutterError.reportError(FlutterErrorDetails(
-      exception: e,
-      stack: st,
-      library: 'image_source_picker',
-    ));
+    _reportUserImageError(e, st);
     if (!context.mounted) return false;
     final l10n = AppLocalizations.of(context)!;
-    final message = e is UserImageTooLargeException
-        ? l10n.imageSourceFileTooLarge(kMaxUserImageFileBytes ~/ (1024 * 1024))
-        : l10n.imageSourcePickFailed;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+    _showUserImageFailure(
+      context,
+      e is UserImageTooLargeException
+          ? l10n
+              .imageSourceFileTooLarge(kMaxUserImageFileBytes ~/ (1024 * 1024))
+          : l10n.imageSourcePickFailed,
+    );
+    return false;
+  }
+  imageSourceState.setUserImage(decoded);
+  return true;
+}
+
+/// Reports [error] via [FlutterError.reportError] (same convention as
+/// `before_after_view.dart`). Shared by every user-image entry point
+/// ([loadUserImageFile], [pasteUserImageFromClipboard]).
+void _reportUserImageError(Object error, StackTrace stack) {
+  FlutterError.reportError(FlutterErrorDetails(
+    exception: error,
+    stack: stack,
+    library: 'image_source_picker',
+  ));
+}
+
+/// Shows [message] in a SnackBar. The caller checks `context.mounted` first
+/// (after the async gap), so [context] is never used across it here.
+void _showUserImageFailure(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+}
+
+/// Thrown by [pasteUserImageFromClipboard] when the clipboard holds no image
+/// (#97) — the most common failure for a paste (text copied, or nothing),
+/// so it gets its own SnackBar (`imageSourcePasteNoImage`) telling the
+/// person to copy an image first.
+class ClipboardHasNoImageException implements Exception {
+  const ClipboardHasNoImageException();
+
+  @override
+  String toString() => 'ClipboardHasNoImageException';
+}
+
+/// Thrown by [pasteUserImageFromClipboard] when the clipboard image's bytes
+/// can't be decoded (#97) — an image format Flutter's codec doesn't read.
+class ClipboardImageUnsupportedException implements Exception {
+  const ClipboardImageUnsupportedException(this.cause);
+
+  final Object cause;
+
+  @override
+  String toString() => 'ClipboardImageUnsupportedException: $cause';
+}
+
+/// Pastes the clipboard's image as the preview's user image (#97, Cmd/Ctrl+V
+/// and the "Paste" button). Goes through the **same** decode + hand-over
+/// path as [loadUserImageFile] — [decodeUserImageBytes] (downscales during
+/// decode, so a 8K screenshot is bounded to [kUserImageMaxDimension]) →
+/// `ImageSourceState.setUserImage` — so the single source of truth is
+/// unchanged; only the byte source differs ([clipboardImageReader], a test
+/// seam). Nothing is written to disk or sent anywhere.
+///
+/// Failures never touch `ImageSourceState` and are reported via
+/// [FlutterError.reportError] + a SnackBar (only if [context] is still
+/// mounted): no image on the clipboard ([ClipboardHasNoImageException],
+/// `imageSourcePasteNoImage`), more than [kMaxUserImageFileBytes] of image
+/// data ([UserImageTooLargeException], `imageSourcePasteTooLarge` — checked
+/// before decoding), bytes the codec can't read
+/// ([ClipboardImageUnsupportedException], `imageSourcePasteUnsupported`), or
+/// the clipboard read itself failing (`imageSourcePasteFailed`).
+///
+/// Returns `true` on success, `false` on failure.
+Future<bool> pasteUserImageFromClipboard(BuildContext context) async {
+  final imageSourceState = context.read<ImageSourceState>();
+  ui.Image decoded;
+  try {
+    final bytes = await clipboardImageReader.readImageBytes();
+    if (bytes == null || bytes.isEmpty) {
+      throw const ClipboardHasNoImageException();
+    }
+    if (bytes.length > kMaxUserImageFileBytes) {
+      throw UserImageTooLargeException(bytes.length);
+    }
+    try {
+      decoded = await decodeUserImageBytes(bytes);
+    } catch (e) {
+      throw ClipboardImageUnsupportedException(e);
+    }
+  } catch (e, st) {
+    _reportUserImageError(e, st);
+    if (!context.mounted) return false;
+    final l10n = AppLocalizations.of(context)!;
+    _showUserImageFailure(
+      context,
+      switch (e) {
+        ClipboardHasNoImageException() => l10n.imageSourcePasteNoImage,
+        UserImageTooLargeException() => l10n.imageSourcePasteTooLarge(
+            kMaxUserImageFileBytes ~/ (1024 * 1024),
+          ),
+        ClipboardImageUnsupportedException() =>
+          l10n.imageSourcePasteUnsupported,
+        _ => l10n.imageSourcePasteFailed,
+      },
     );
     return false;
   }
@@ -125,7 +219,7 @@ Future<bool> pickAndLoadUserImage(BuildContext context) async {
 }
 
 /// Drag-and-drop target for [child] + sample-picker chips + "choose a photo"
-/// button (#78).
+/// and "paste" buttons (#78, #97).
 ///
 /// Wraps [child] (the `BeforeAfterView` preview) in a `desktop_drop`
 /// [DropTarget] so dropping an image file anywhere over the preview loads
@@ -230,14 +324,23 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
           IconButton(
             icon: const Icon(Icons.close, size: 18),
             tooltip: l10n.imageSourceClosePhotoTooltip,
-            onPressed: () =>
-                imageSourceState.clearUserImage(recommendedId),
+            onPressed: () => imageSourceState.clearUserImage(recommendedId),
           ),
         ],
         OutlinedButton.icon(
           onPressed: () => pickAndLoadUserImage(context),
           icon: const Icon(Icons.photo_outlined, size: 18),
           label: Text(l10n.imageSourcePickButton),
+        ),
+        // #97: クリップボードの画像を貼り付ける。Cmd/Ctrl+V（home_screen.dart）
+        // と同じ経路（pasteUserImageFromClipboard）を通る。
+        Tooltip(
+          message: l10n.imageSourcePasteTooltip(pasteShortcutLabel()),
+          child: OutlinedButton.icon(
+            onPressed: () => pasteUserImageFromClipboard(context),
+            icon: const Icon(Icons.content_paste, size: 18),
+            label: Text(l10n.imageSourcePasteButton),
+          ),
         ),
         Text(
           l10n.imageSourceDropHint,
@@ -246,8 +349,7 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
         ),
         if (!imageSourceState.isFollowingRecommended)
           TextButton(
-            onPressed: () =>
-                imageSourceState.resetToRecommended(recommendedId),
+            onPressed: () => imageSourceState.resetToRecommended(recommendedId),
             child: Text(l10n.imageSourceResetToRecommended),
           ),
       ],

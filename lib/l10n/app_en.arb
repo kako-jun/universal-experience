@@ -521,6 +521,37 @@
     }
   },
 
+  "imageSourcePasteButton": "Paste",
+  "@imageSourcePasteButton": {
+    "description": "Button that loads an image from the clipboard as the preview image (#97)."
+  },
+  "imageSourcePasteTooltip": "Paste an image from the clipboard ({shortcut})",
+  "@imageSourcePasteTooltip": {
+    "description": "Tooltip of the Paste button; also tells the keyboard shortcut, which differs by platform (#97).",
+    "placeholders": {
+      "shortcut": { "type": "String", "example": "Cmd+V" }
+    }
+  },
+  "imageSourcePasteNoImage": "There's no image on the clipboard. Copy an image first, then paste.",
+  "@imageSourcePasteNoImage": {
+    "description": "SnackBar shown when pasting but the clipboard holds no image (text only, or empty) (#97)."
+  },
+  "imageSourcePasteTooLarge": "The clipboard image is too large (max {maxMegabytes} MB).",
+  "@imageSourcePasteTooLarge": {
+    "description": "SnackBar shown when the clipboard image's data exceeds kMaxUserImageFileBytes (#97). Checked before decoding.",
+    "placeholders": {
+      "maxMegabytes": { "type": "int" }
+    }
+  },
+  "imageSourcePasteUnsupported": "Couldn't read the clipboard image. It may be in a format that isn't supported.",
+  "@imageSourcePasteUnsupported": {
+    "description": "SnackBar shown when the clipboard has image data that can't be decoded (#97)."
+  },
+  "imageSourcePasteFailed": "Couldn't read the clipboard. Please try again.",
+  "@imageSourcePasteFailed": {
+    "description": "SnackBar shown when reading the clipboard itself fails (platform error) (#97)."
+  },
+
   "welcomeBannerTitle": "New here?",
   "@welcomeBannerTitle": {
     "description": "Title of the first-run welcome banner (#78)."
