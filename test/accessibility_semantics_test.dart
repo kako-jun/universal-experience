@@ -6,18 +6,30 @@
 // 実際の読み上げ（VoiceOver 等）は実機でしか確かめられない
 // （docs/accessibility.md の【kako-jun 実機】）。
 
+import 'dart:async';
 import 'dart:ui' as ui;
 import 'dart:ui' show Tristate;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/services/filter_service.dart';
+import 'package:universal_experience/services/loupe_window_controller.dart';
+import 'package:universal_experience/services/vision_filter_metadata.dart';
+import 'package:universal_experience/services/vision_filter_state.dart';
+import 'package:universal_experience/src/rust/api/sensus_bridge.dart'
+    show Urgency;
 import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 import 'package:universal_experience/ui/widgets/image_source_picker.dart';
+import 'package:universal_experience/ui/widgets/loupe_hud.dart';
 
 import 'support/home_screen_harness.dart';
 import 'support/sample_image_generator.dart';
@@ -50,7 +62,7 @@ void main() {
     }
   }
 
-  /// [matcher] に合う唯一のノードの、読み上げ用のデータ。
+  /// [finder] に合う唯一のノードの、読み上げ用のデータ。
   SemanticsData dataOf(WidgetTester tester, Finder finder) =>
       tester.getSemantics(finder).getSemanticsData();
 
@@ -218,8 +230,21 @@ void main() {
     });
   });
 
-  group('プレビュー画像の代替テキスト', () {
-    testWidgets('画像の読み込み前後で、元・適用後の画像に名前がつく', (tester) async {
+  group('プレビュー画像の代替テキスト（読み上げツリーで確かめる）', () {
+    // 読み上げツリー（find.bySemanticsLabel / getSemantics）で見る。ウィジェットの
+    // Semantics プロパティだけを見ると、ExcludeSemantics で包んで読み上げから
+    // 消えてしまっても通ってしまう。プレビューの見出し・画像は貼り付け領域の
+    // ノードにまとめて読まれるので、そのまとまりの label を行ごとに見る。
+    Finder previewNode() =>
+        find.bySemanticsLabel(RegExp(r'ビフォー / アフター|Before / After'));
+
+    List<String> readLines(WidgetTester tester) {
+      final node = previewNode();
+      expect(node, findsOneWidget);
+      return dataOf(tester, node).label.split('\n');
+    }
+
+    testWidgets('適用後の画像は「〇〇を適用した画像」と読まれる', (tester) async {
       final handle = tester.ensureSemantics();
       await installFakes(tester);
       final h = await pumpHomeScreen(tester, size: wide);
@@ -227,20 +252,28 @@ void main() {
           h.filterService, h.visionState, ColorVisionType.protanopia);
       await settle(tester);
 
-      final labels = [
-        for (final e in tester.widgetList<Semantics>(find.descendant(
-            of: find.byType(PreviewImageView),
-            matching: find.byType(Semantics))))
-          if (e.properties.image == true) e.properties.label,
-      ];
-      expect(labels, hasLength(2));
-      expect(labels.first, '元の画像');
-      expect(labels.last, endsWith('を適用した画像'));
+      final lines = readLines(tester);
+      expect(lines.where((l) => l.endsWith('を適用した画像')), hasLength(1));
+      expect(dataOf(tester, previewNode()).flagsCollection.isImage, isTrue,
+          reason: 'image の役割が読み上げに含まれる');
       await h.filterService.flush();
       handle.dispose();
     });
 
-    testWidgets('en の適用後画像の名前は Image with … applied', (tester) async {
+    testWidgets('「元の画像」は 1 回だけ読まれる（見出しと代替テキストの二重読み上げの回避）', (tester) async {
+      final handle = tester.ensureSemantics();
+      await installFakes(tester);
+      final h = await pumpHomeScreen(tester, size: wide);
+      selectColorVision(
+          h.filterService, h.visionState, ColorVisionType.protanopia);
+      await settle(tester);
+
+      expect(readLines(tester).where((l) => l == '元の画像'), hasLength(1));
+      await h.filterService.flush();
+      handle.dispose();
+    });
+
+    testWidgets('en の適用後画像は Image with … applied', (tester) async {
       final handle = tester.ensureSemantics();
       await installFakes(tester);
       final h =
@@ -249,14 +282,50 @@ void main() {
           h.filterService, h.visionState, ColorVisionType.protanopia);
       await settle(tester);
 
-      final labels = [
-        for (final e in tester.widgetList<Semantics>(find.descendant(
-            of: find.byType(PreviewImageView),
-            matching: find.byType(Semantics))))
-          if (e.properties.image == true) e.properties.label,
-      ];
-      expect(labels.first, 'Original');
-      expect(labels.last, matches(RegExp(r'^Image with .+ applied$')));
+      expect(
+        readLines(tester)
+            .where((l) => RegExp(r'^Image with .+ applied$').hasMatch(l)),
+        hasLength(1),
+      );
+      await h.filterService.flush();
+      handle.dispose();
+    });
+
+    testWidgets('何も選んでいないときは、見出し以外に画像の代替テキストを足さない', (tester) async {
+      final handle = tester.ensureSemantics();
+      await installFakes(tester);
+      await pumpHomeScreen(tester, size: wide);
+      await settle(tester);
+
+      final lines = readLines(tester);
+      expect(lines.where((l) => l.endsWith('を適用した画像')), isEmpty);
+      // 左右の見出しの 2 回だけ。画像の代替テキストで増えない。
+      expect(lines.where((l) => l == '元の画像'), hasLength(2));
+      handle.dispose();
+    });
+
+    testWidgets('描画が済むまでの空枠には代替テキストを付けない', (tester) async {
+      final handle = tester.ensureSemantics();
+      await installFakes(tester);
+      final pending = Completer<ui.Image>();
+      late ui.Image rendered;
+      await tester.runAsync(() async {
+        rendered = await generateSampleImage(64);
+      });
+      addTearDown(rendered.dispose);
+      afterImageRenderer = (source, filter, strength) => pending.future;
+      final h = await pumpHomeScreen(tester, size: wide);
+      selectColorVision(
+          h.filterService, h.visionState, ColorVisionType.protanopia);
+      await settle(tester);
+
+      expect(readLines(tester).where((l) => l.endsWith('を適用した画像')), isEmpty,
+          reason: '描画待ちの空枠は「画像」として読まない');
+
+      pending.complete(rendered.clone());
+      await settle(tester);
+      expect(
+          readLines(tester).where((l) => l.endsWith('を適用した画像')), hasLength(1));
       await h.filterService.flush();
       handle.dispose();
     });
@@ -308,6 +377,114 @@ void main() {
       await setDisableAnimations(tester, false);
       await pumpHomeScreen(tester, size: wide);
       expect(pickerDropDuration(tester), greaterThan(Duration.zero));
+    });
+
+    /// ルーペ HUD を出して、そのフェード（AnimatedOpacity）の長さを返す。
+    Future<Duration> hudFadeDuration(WidgetTester tester) async {
+      visionFilterUrgencyProvider = (_) => Urgency.none;
+      visionFilterUrgencyEscalationProvider = (_) => const [];
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final visionState = VisionFilterState()..select('photophobia');
+      final filterService = FilterService();
+      final loupe = LoupeWindowController();
+      await tester.runAsync(() => loupe.setAppMode(AppMode.loupe));
+      tester.view.physicalSize = const Size(900, 300);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
+            ChangeNotifierProvider<FilterService>.value(value: filterService),
+            ChangeNotifierProvider<LoupeWindowController>.value(value: loupe),
+          ],
+          child: const MaterialApp(
+            localizationsDelegates: [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(body: LoupeHud()),
+          ),
+        ),
+      );
+      await settle(tester);
+      final fade = find.descendant(
+          of: find.byType(LoupeHud), matching: find.byType(AnimatedOpacity));
+      expect(fade, findsOneWidget);
+      return tester.widget<AnimatedOpacity>(fade).duration;
+    }
+
+    testWidgets('ON: ルーペ HUD のフェードが 0', (tester) async {
+      await setDisableAnimations(tester, true);
+      expect(await hudFadeDuration(tester), Duration.zero);
+    });
+
+    testWidgets('OFF: ルーペ HUD のフェードは従来どおり（0 でない）', (tester) async {
+      await setDisableAnimations(tester, false);
+      expect(await hudFadeDuration(tester), greaterThan(Duration.zero));
+    });
+
+    /// 縦長の一覧で末尾の行を選び、選択の 20ms 後と落ち着いた後のスクロール量を返す。
+    /// 瞬時なら 20ms 後にもう最終位置にいて、アニメーションならまだ途中にいる。
+    Future<(double, double)> scrollAfterSelecting(WidgetTester tester) async {
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      var selected = -1;
+      late StateSetter rebuild;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SizedBox(
+              height: 300,
+              child: StatefulBuilder(
+                builder: (context, setState) {
+                  rebuild = setState;
+                  // ListView だと画面外の行は作られず State が無いので、全行を作る。
+                  return SingleChildScrollView(
+                    controller: controller,
+                    child: Column(
+                      children: [
+                        for (var i = 0; i < 30; i++)
+                          FilterListTile(
+                            key: ValueKey(i),
+                            title: 'row $i',
+                            selected: i == selected,
+                            onTap: () {},
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      rebuild(() => selected = 25);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 20));
+      final early = controller.offset;
+      await tester.pumpAndSettle();
+      return (early, controller.offset);
+    }
+
+    testWidgets('ON: 選んだ行へのスクロールが瞬時', (tester) async {
+      await setDisableAnimations(tester, true);
+      final (early, end) = await scrollAfterSelecting(tester);
+      expect(end, greaterThan(100), reason: '末尾の行まで実際にスクロールしている');
+      expect(early, closeTo(end, 0.5), reason: '20ms 後にはもう最終位置');
+    });
+
+    testWidgets('OFF: 選んだ行へのスクロールはアニメーション（20ms 後は途中）', (tester) async {
+      await setDisableAnimations(tester, false);
+      final (early, end) = await scrollAfterSelecting(tester);
+      expect(end, greaterThan(100));
+      expect(early, lessThan(end - 1), reason: '20ms 後はまだ途中');
     });
   });
 
