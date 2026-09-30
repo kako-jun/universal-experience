@@ -244,6 +244,27 @@ void main() {
       return dataOf(tester, node).label.split('\n');
     }
 
+    /// 読み上げツリー全体で、[text] が読み上げに出てくる回数。
+    /// まとまったノード（貼り付け領域）の中だけを数えると、画像が別ノードに分かれたときの
+    /// 二重読み上げを見逃す。ほかのノードに畳み込まれたノードは、畳み込み先の label に
+    /// 含まれるので数えない。
+    int readoutCount(WidgetTester tester, String text) {
+      var count = 0;
+      void visit(SemanticsNode node) {
+        if (!node.isMergedIntoParent) {
+          count += text.allMatches(node.getSemanticsData().label).length;
+        }
+        node.visitChildren((child) {
+          visit(child);
+          return true;
+        });
+      }
+
+      visit(tester
+          .binding.renderViews.first.owner!.semanticsOwner!.rootSemanticsNode!);
+      return count;
+    }
+
     testWidgets('適用後の画像は「〇〇を適用した画像」と読まれる', (tester) async {
       final handle = tester.ensureSemantics();
       await installFakes(tester);
@@ -268,7 +289,8 @@ void main() {
           h.filterService, h.visionState, ColorVisionType.protanopia);
       await settle(tester);
 
-      expect(readLines(tester).where((l) => l == '元の画像'), hasLength(1));
+      expect(readoutCount(tester, '元の画像'), 1,
+          reason: '見出しだけが読む。画像に同じ文言の代替テキストを足すと 2 になる');
       await h.filterService.flush();
       handle.dispose();
     });
@@ -297,14 +319,13 @@ void main() {
       await pumpHomeScreen(tester, size: wide);
       await settle(tester);
 
-      final lines = readLines(tester);
-      expect(lines.where((l) => l.endsWith('を適用した画像')), isEmpty);
+      expect(readLines(tester).where((l) => l.endsWith('を適用した画像')), isEmpty);
       // 左右の見出しの 2 回だけ。画像の代替テキストで増えない。
-      expect(lines.where((l) => l == '元の画像'), hasLength(2));
+      expect(readoutCount(tester, '元の画像'), 2);
       handle.dispose();
     });
 
-    testWidgets('描画が済むまでの空枠には代替テキストを付けない', (tester) async {
+    testWidgets('描画が済むまでは「準備中」だけで、適用後画像の代替テキストは読まれない', (tester) async {
       final handle = tester.ensureSemantics();
       await installFakes(tester);
       final pending = Completer<ui.Image>();
@@ -319,13 +340,29 @@ void main() {
           h.filterService, h.visionState, ColorVisionType.protanopia);
       await settle(tester);
 
-      expect(readLines(tester).where((l) => l.endsWith('を適用した画像')), isEmpty,
-          reason: '描画待ちの空枠は「画像」として読まない');
+      expect(find.text('プレビューを準備中…'), findsOneWidget);
+      expect(readoutCount(tester, 'を適用した画像'), 0, reason: '準備中は画像として読まない');
 
       pending.complete(rendered.clone());
       await settle(tester);
       expect(
           readLines(tester).where((l) => l.endsWith('を適用した画像')), hasLength(1));
+      await h.filterService.flush();
+      handle.dispose();
+    });
+
+    testWidgets('準備中の表示は liveRegion として読み上げられる', (tester) async {
+      final handle = tester.ensureSemantics();
+      await installFakes(tester);
+      // 描画が終わらないようにして、`_loading && _before == null` の準備中表示を保つ。
+      afterImageRenderer =
+          (source, filter, strength) => Completer<ui.Image>().future;
+      final h = await pumpHomeScreen(tester, size: wide);
+      await settle(tester);
+
+      final preparing = find.text('プレビューを準備中…');
+      expect(preparing, findsOneWidget);
+      expect(dataOf(tester, preparing).flagsCollection.isLiveRegion, isTrue);
       await h.filterService.flush();
       handle.dispose();
     });
