@@ -13,7 +13,7 @@ void main() {
         [for (final e in kColorVisionCompareEntries) e.id],
         ['protanopia', 'deuteranopia', 'tritanopia', 'achromatopsia'],
       );
-      expect(colorVisionCompareCellCount, 4);
+      expect(kColorVisionCompareEntries.length, 4);
     });
 
     test('実験的な四色覚は含まない（他の 4 型と同列に比べる対象ではない）', () {

@@ -138,10 +138,15 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
 
   void _onRebuildFailed(int generation) {
     if (generation != _generation || !mounted) return;
+    // すぐ後ろに新しい入力の描画が控えている間は、失敗を出さない（表示中の画像を
+    // 残す）。スライダーのドラッグ中に、打ち切り直前の 1 回の失敗が失敗表示を
+    // 点滅させるのを防ぐ。最新の入力の描画が失敗したときだけ失敗を出す。
+    if (_rebuildPending) return;
     final old = _afters;
     setState(() {
       _failed = true;
       _afters = null;
+      _afterStrength = null;
     });
     if (old != null) {
       for (final image in old) {
@@ -335,16 +340,24 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       );
     }
 
-    final percent = contract_notes.strengthPercent(widget.strength);
+    // 強さの表示は「いま見えている画像」に対応する値（描画した時点の強さ）にする。
+    // 再描画の待ちの間に widget.strength だけ先へ進んでも、新しい強さを古い画像に
+    // 被せない。まだ描けていない・失敗した間は入力の強さを出す。
+    final percent =
+        contract_notes.strengthPercent(_afterStrength ?? widget.strength);
     final entries = kColorVisionCompareEntries;
     final cells = <Widget>[
       for (var i = 0; i < entries.length; i++)
         _CompareCell(
           label: visionFilterName(l10n, entries[i].id),
-          semanticsLabel: l10n.compareCellSemanticsLabel(
-            visionFilterName(l10n, entries[i].id),
-            percent,
-          ),
+          semanticsLabel: afters == null
+              ? l10n.compareCellFailedSemanticsLabel(
+                  visionFilterName(l10n, entries[i].id),
+                )
+              : l10n.compareCellSemanticsLabel(
+                  visionFilterName(l10n, entries[i].id),
+                  percent,
+                ),
           child: afters == null
               ? PreviewErrorPlaceholder(theme: theme, label: l10n.previewFailed)
               : PreviewImageView(image: afters[i]),

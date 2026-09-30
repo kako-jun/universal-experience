@@ -16,9 +16,6 @@ final List<VisionFilterEntry> kColorVisionCompareEntries = List.unmodifiable([
     if (e.category == VisionFilterCategory.colorVision && !e.isExperimental) e,
 ]);
 
-/// 2×2 比較のセルの数（= [kColorVisionCompareEntries] の数）。
-int get colorVisionCompareCellCount => kColorVisionCompareEntries.length;
-
 /// 選択中のフィルタ id [selectedId] が色覚カテゴリなら true（2×2 比較の切替を出す条件）。
 ///
 /// 色覚のクイック選択（-omaly を含む）・advanced カタログ・体験プリセットの

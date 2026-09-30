@@ -297,6 +297,37 @@ void main() {
       expect(find.text(en.compareSharedStrengthNote(90)), findsOneWidget);
     });
 
+    testWidgets('再描画中は、セルのラベルと「同じ強さ」の注記が画像の強さのまま（新しい強さが古い画像に被らない）',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      final pending = Completer<void>();
+      // 1〜4 回目（強さ 1.0）は即完了、5 回目（強さ 0.5 の再描画）は止めておく。
+      await installFakes(tester, gate: (n) => n >= 5 ? pending.future : null);
+      final en = lookupAppLocalizations(enLocale);
+      String label(int percent) => en.compareCellSemanticsLabel(
+          visionFilterName(en, kColorVisionCompareEntries.first.id), percent);
+
+      await tester.pumpWidget(localized(view(1.0)));
+      await settle(tester);
+      expect(find.text(en.compareSharedStrengthNote(100)), findsOneWidget);
+
+      await tester.pumpWidget(localized(view(0.5)));
+      await tester.pump();
+      // 表示中の画像は 100% のまま。
+      expect(find.text(en.compareSharedStrengthNote(100)), findsOneWidget);
+      expect(find.text(en.compareSharedStrengthNote(50)), findsNothing);
+      expect(find.bySemanticsLabel(label(100)), findsOneWidget);
+      expect(find.bySemanticsLabel(label(50)), findsNothing);
+
+      pending.complete();
+      await settle(tester);
+      expect(find.text(en.compareSharedStrengthNote(50)), findsOneWidget);
+      expect(find.text(en.compareSharedStrengthNote(100)), findsNothing);
+      expect(find.bySemanticsLabel(label(50)), findsOneWidget);
+      expect(find.bySemanticsLabel(label(100)), findsNothing);
+      handle.dispose();
+    });
+
     testWidgets('連続して強さを変えても、保留は最新の 1 件に畳まれる', (tester) async {
       final first = Completer<void>();
       final fakes = await installFakes(
@@ -358,6 +389,60 @@ void main() {
       expect(find.text(en.previewFailed), findsNothing);
       expect(find.byType(PreviewImageView), findsNWidgets(4));
       expect(find.byTooltip(en.exportButtonTooltip), findsOneWidget);
+    });
+
+    testWidgets('失敗したセルの Semantics ラベルは「描画に失敗」の文言になる（en / ja）', (tester) async {
+      _suppressFlutterErrorReporting();
+      final handle = tester.ensureSemantics();
+      await installFakes(tester, failOn: (n) => StateError('boom'));
+      for (final locale in [enLocale, jaLocale]) {
+        await tester.pumpWidget(localized(view(0.6), locale: locale));
+        await settle(tester);
+        final l10n = lookupAppLocalizations(locale);
+        for (final entry in kColorVisionCompareEntries) {
+          final name = visionFilterName(l10n, entry.id);
+          expect(
+              find.bySemanticsLabel(l10n.compareCellFailedSemanticsLabel(name)),
+              findsOneWidget,
+              reason: '${locale.languageCode}: $name は失敗文言');
+          expect(
+              find.bySemanticsLabel(l10n.compareCellSemanticsLabel(name, 60)),
+              findsNothing,
+              reason: '失敗したセルを「強さ 60%」と読み上げない');
+        }
+      }
+      handle.dispose();
+    });
+
+    testWidgets('再描画の失敗は、新しい描画が控えている間は出さない（失敗表示の点滅防止）', (tester) async {
+      _suppressFlutterErrorReporting();
+      final first = Completer<void>();
+      final second = Completer<void>();
+      await installFakes(
+        tester,
+        gate: (n) => n == 1 ? first.future : (n == 2 ? second.future : null),
+        failOn: (n) => n == 1 ? StateError('boom') : null,
+      );
+      final en = lookupAppLocalizations(enLocale);
+
+      await tester.pumpWidget(localized(view(0.3)));
+      await tester.pump();
+      // 描画中に強さが変わる（新しい描画が控える）。
+      await tester.pumpWidget(localized(view(0.9)));
+      await tester.pump();
+
+      // 進行中の描画が失敗で終わる。控えの描画があるので失敗は出ない。
+      first.complete();
+      await tester.pump();
+      await tester.pump();
+      // 控えの描画は 2 回目の呼び出しで止めてあるので、失敗が出るなら今ここで見える。
+      expect(find.text(en.previewFailed), findsNothing);
+
+      second.complete();
+      await settle(tester);
+      expect(find.text(en.previewFailed), findsNothing);
+      expect(find.byType(PreviewImageView), findsNWidgets(4),
+          reason: '控えの描画が成功して、そのまま 4 型が出る');
     });
 
     testWidgets('画像の読み込みが失敗しても失敗表示になる', (tester) async {
