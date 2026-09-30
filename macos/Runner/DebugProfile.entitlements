@@ -15,5 +15,10 @@
 	     ドロップされたファイルを読める。 -->
 	<key>com.apple.security.files.user-selected.read-only</key>
 	<true/>
+	<!-- PNG エクスポート (#64)。サンドボックス下で getDownloadsDirectory() が
+	     コンテナ内（ユーザーに見えない場所）でなく実際の ~/Downloads を返し、
+	     そこへ書き出せるようにする。 -->
+	<key>com.apple.security.files.downloads.read-write</key>
+	<true/>
 </dict>
 </plist>

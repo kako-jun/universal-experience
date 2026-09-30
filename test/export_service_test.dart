@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -70,6 +72,175 @@ void main() {
       }
       expect(name, endsWith('.png'));
     });
+  });
+
+  group('compactTime', () {
+    test('HHMMSS（24 時間・ゼロ埋め・コロン無し）で整形する', () {
+      expect(compactTime(DateTime(2026, 6, 23, 14, 5, 9)), '140509');
+      expect(compactTime(DateTime(2026, 6, 23, 0, 0, 0)), '000000');
+      expect(compactTime(DateTime(2026, 6, 23, 23, 59, 59)), '235959');
+    });
+  });
+
+  group('exportFilename の時刻 (#64)', () {
+    test('time を渡すと日付の後ろに _ 区切りで付く', () {
+      expect(
+        exportFilename(
+          symptomId: 'protanopia',
+          strengthPercent: 100,
+          isoDate: '2026-06-23',
+          time: '140509',
+        ),
+        'ue-protanopia-100pct-2026-06-23_140509.png',
+      );
+    });
+
+    test('同じ日でも time が違えば別名になる（同日 2 回目で同名にならない）', () {
+      String at(DateTime dt) => exportFilename(
+            symptomId: 'protanopia',
+            strengthPercent: 100,
+            isoDate: isoDate(dt),
+            time: compactTime(dt),
+          );
+      expect(
+        at(DateTime(2026, 6, 23, 14, 5, 9)),
+        isNot(at(DateTime(2026, 6, 23, 14, 5, 10))),
+      );
+    });
+
+    test('時刻入りでもファイル名に使えない文字（: / \\ など）を含まない', () {
+      final name = exportFilename(
+        symptomId: 'protanopia',
+        strengthPercent: 100,
+        isoDate: isoDate(DateTime(2026, 6, 23)),
+        time: compactTime(DateTime(2026, 6, 23, 14, 5, 9)),
+      );
+      for (final ch in <String>['/', '\\', ':', '*', '?']) {
+        expect(name.contains(ch), isFalse, reason: 'must not contain "$ch"');
+      }
+    });
+  });
+
+  group('numberedFilename (#64)', () {
+    test('1 回目は元の名前のまま', () {
+      expect(numberedFilename('a.png', 1), 'a.png');
+    });
+
+    test('2 回目以降は拡張子の前に -N を挟む', () {
+      expect(numberedFilename('a.png', 2), 'a-2.png');
+      expect(numberedFilename('a.png', 10), 'a-10.png');
+    });
+
+    test('名前に複数の . があっても最後の拡張子の前に挟む', () {
+      expect(numberedFilename('ue-x-100pct-2026-06-23_140509.png', 3),
+          'ue-x-100pct-2026-06-23_140509-3.png');
+      expect(numberedFilename('a.b.png', 2), 'a.b-2.png');
+    });
+
+    test('拡張子が無い名前は末尾に付ける', () {
+      expect(numberedFilename('noext', 2), 'noext-2');
+    });
+  });
+
+  group('writeBytesWithoutOverwrite (#64)', () {
+    late Directory dir;
+    setUp(() async {
+      dir = await Directory.systemTemp.createTemp('ue_export_test_');
+    });
+    tearDown(() async {
+      await dir.delete(recursive: true);
+    });
+
+    Uint8List bytes(int v) => Uint8List.fromList([v, v, v]);
+    String p(String name) => '${dir.path}${Platform.pathSeparator}$name';
+
+    test('空いている名前ならその名前で書き、フルパスを返す', () async {
+      final path = await writeBytesWithoutOverwrite(dir, bytes(1), 'a.png');
+      expect(path, p('a.png'));
+      expect(File(path).readAsBytesSync(), bytes(1));
+    });
+
+    test('同名が既にあれば上書きせず -2, -3 で保存し、元の内容が残る', () async {
+      final first = await writeBytesWithoutOverwrite(dir, bytes(1), 'a.png');
+      final second = await writeBytesWithoutOverwrite(dir, bytes(2), 'a.png');
+      final third = await writeBytesWithoutOverwrite(dir, bytes(3), 'a.png');
+
+      expect(first, p('a.png'));
+      expect(second, p('a-2.png'));
+      expect(third, p('a-3.png'));
+      expect(File(first).readAsBytesSync(), bytes(1));
+      expect(File(second).readAsBytesSync(), bytes(2));
+      expect(File(third).readAsBytesSync(), bytes(3));
+    });
+
+    test('連番の途中が空いていればそこを使う（a.png と a-3.png があれば a-2.png）',
+        () async {
+      File(p('a.png')).writeAsBytesSync(bytes(1));
+      File(p('a-3.png')).writeAsBytesSync(bytes(3));
+      final path = await writeBytesWithoutOverwrite(dir, bytes(2), 'a.png');
+      expect(path, p('a-2.png'));
+      expect(File(p('a-3.png')).readAsBytesSync(), bytes(3));
+    });
+
+    test('同時に同名で書いても互いを上書きせず全部残る', () async {
+      final paths = await Future.wait([
+        for (var i = 1; i <= 5; i++)
+          writeBytesWithoutOverwrite(dir, bytes(i), 'a.png'),
+      ]);
+      expect(paths.toSet().length, 5, reason: '全て別のパスになる');
+      final contents = {
+        for (final path in paths) File(path).readAsBytesSync().first,
+      };
+      expect(contents, {1, 2, 3, 4, 5}, reason: '5 つとも内容が残っている');
+    });
+
+    test('存在しないディレクトリへの書き込みは連番で握りつぶさず例外にする', () async {
+      final missing = Directory(p('no_such_dir'));
+      expect(
+        () => writeBytesWithoutOverwrite(missing, bytes(1), 'a.png'),
+        throwsA(isA<FileSystemException>()),
+      );
+    });
+  });
+
+  group('revealCommandFor (#64)', () {
+    test('macOS は open -R でファイルを選択状態にする', () {
+      final cmd = revealCommandFor('macos', '/Users/u/Downloads/a.png');
+      expect(cmd!.executable, 'open');
+      expect(cmd.arguments, ['-R', '/Users/u/Downloads/a.png']);
+    });
+
+    test('Windows は explorer /select, にパスを続ける', () {
+      final cmd = revealCommandFor('windows', r'C:\Users\u\Downloads\a.png');
+      expect(cmd!.executable, 'explorer');
+      expect(cmd.arguments, [r'/select,C:\Users\u\Downloads\a.png']);
+    });
+
+    test('Linux は含むフォルダを xdg-open で開く', () {
+      final cmd = revealCommandFor('linux', '/home/u/Downloads/a.png');
+      expect(cmd!.executable, 'xdg-open');
+      expect(cmd.arguments, ['/home/u/Downloads']);
+    });
+
+    test('未対応 OS は null', () {
+      expect(revealCommandFor('android', '/x/a.png'), isNull);
+    });
+  });
+
+  group('macOS entitlements (#64)', () {
+    // サンドボックス下で getDownloadsDirectory() が実 ~/Downloads を返す条件。
+    // どちらかから落ちると、書き出し先がコンテナ内（ユーザーに見えない場所）に戻る。
+    for (final name in ['DebugProfile', 'Release']) {
+      test('$name.entitlements に Downloads の読み書き entitlement がある', () {
+        final plist = File('macos/Runner/$name.entitlements').readAsStringSync();
+        expect(
+          RegExp(
+            r'<key>com\.apple\.security\.files\.downloads\.read-write</key>\s*<true/>',
+          ).hasMatch(plist),
+          isTrue,
+        );
+      });
+    }
   });
 
   group('composeExportImage', () {

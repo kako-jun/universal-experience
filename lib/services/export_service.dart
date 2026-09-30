@@ -13,8 +13,10 @@ import 'package:path_provider/path_provider.dart';
 /// `AppLocalizations` で解決し、[ExportCaption] として渡す。これによりサービスは
 /// pure（テスト容易・ロケール非依存）に保たれる。
 ///
-/// 規律3（I/O 隔離）に従い、ファイル書き込みは [savePng] のみに閉じ込め、
-/// 画像合成 [composeExportImage] と文字列生成（[isoDate] / [exportFilename]）は
+/// 規律3（I/O 隔離）に従い、ファイル書き込み（[savePng] /
+/// [writeBytesWithoutOverwrite]）と保存先を示す [revealInFolder] だけを I/O とし、
+/// 画像合成 [composeExportImage]・文字列生成（[isoDate] / [compactTime] /
+/// [exportFilename] / [numberedFilename]）・コマンド決定（[revealCommandFor]）は
 /// 副作用を持たない純粋関数とする。
 
 /// [DateTime] を `YYYY-MM-DD`（ゼロ埋め・スラッシュ禁止・ISO 固定）に整形する。
@@ -28,18 +30,45 @@ String isoDate(DateTime dt) {
   return '$y-$m-$d';
 }
 
+/// [DateTime] の時刻を `HHMMSS`（24 時間・ゼロ埋め・コロン無し）に整形する。
+///
+/// ファイル名用。コロンは Windows / macOS Finder で使えないため区切りを入れない。
+/// [isoDate] と同じく引数の [dt] だけを使う（決定論的）。
+String compactTime(DateTime dt) {
+  final h = dt.hour.toString().padLeft(2, '0');
+  final m = dt.minute.toString().padLeft(2, '0');
+  final s = dt.second.toString().padLeft(2, '0');
+  return '$h$m$s';
+}
+
 /// エクスポート PNG のファイル名を決定論的に組み立てる。
 ///
-/// 例: `ue-protanopia-100pct-2026-06-23.png`。[symptomId] が `none` などでも妥当な
-/// 名前になり、ファイル名に使えない文字（パス区切り・予約文字）は `-` に正規化する。
-/// pure・決定論的（同じ入力なら常に同じ出力）。
+/// 例: `ue-protanopia-100pct-2026-06-23.png`。[time]（[compactTime] の文字列）を
+/// 渡すと日付の後ろに `_` 区切りで付き、`ue-protanopia-100pct-2026-06-23_140509.png`
+/// になる（同じ日に何度書き出しても別名になる、#64）。[symptomId] が `none` などでも
+/// 妥当な名前になり、ファイル名に使えない文字（パス区切り・予約文字）は `-` に
+/// 正規化する。pure・決定論的（同じ入力なら常に同じ出力）。
 String exportFilename({
   required String symptomId,
   required int strengthPercent,
   required String isoDate,
+  String? time,
 }) {
   final safeId = _sanitizeForFilename(symptomId);
-  return 'ue-$safeId-${strengthPercent}pct-$isoDate.png';
+  final stamp = time == null ? isoDate : '${isoDate}_$time';
+  return 'ue-$safeId-${strengthPercent}pct-$stamp.png';
+}
+
+/// [filename] の [attempt] 番目の候補名を返す（#64: 同名を上書きしない）。
+///
+/// `attempt <= 1` は [filename] そのもの。2 以上は拡張子の前に `-N` を挟む
+/// （`a.png` → `a-2.png` → `a-3.png`）。拡張子が無い名前は末尾に付ける。
+/// pure・決定論的。実際に空いている名前を探す I/O は [writeBytesWithoutOverwrite]。
+String numberedFilename(String filename, int attempt) {
+  if (attempt <= 1) return filename;
+  final dot = filename.lastIndexOf('.');
+  if (dot <= 0) return '$filename-$attempt';
+  return '${filename.substring(0, dot)}-$attempt${filename.substring(dot)}';
 }
 
 /// ファイル名に使えない文字を `-` に置換し、連続・前後の `-` を畳む。
@@ -182,17 +211,94 @@ Future<ui.Image> composeExportImage(
   }
 }
 
+/// [numberedFilename] で空きを探す上限。これを超えたら [StateError]。
+const int kMaxExportNumbering = 1000;
+
+/// [dir] に [filename] で [bytes] を書く。**既存のファイルは決して上書きしない**（#64）。
+///
+/// 同名があれば [numberedFilename] の連番（`-2`, `-3`, ...）で空きを探す。
+/// 存在確認と作成は `File.create(exclusive: true)` で 1 操作にしてあるので、
+/// 同時に 2 回書き出しても、確認と作成の間に割り込まれて上書きすることがない。
+/// 書き込んだファイルのフルパスを返す。規律3: I/O はここと [savePng] だけ。
+Future<String> writeBytesWithoutOverwrite(
+  Directory dir,
+  Uint8List bytes,
+  String filename,
+) async {
+  for (var attempt = 1; attempt <= kMaxExportNumbering; attempt++) {
+    final file = File(
+      '${dir.path}${Platform.pathSeparator}${numberedFilename(filename, attempt)}',
+    );
+    try {
+      await file.create(exclusive: true);
+    } on PathExistsException {
+      continue;
+    } on FileSystemException {
+      // Windows は既存ファイルで PathExistsException でなく別の
+      // FileSystemException を返すことがある。存在するなら次の候補へ、
+      // 存在しないなら本当の書き込み失敗なので呼び出し側へ返す。
+      if (await file.exists()) continue;
+      rethrow;
+    }
+    await file.writeAsBytes(bytes, flush: true);
+    return file.path;
+  }
+  throw StateError('No free file name for $filename in ${dir.path}');
+}
+
 /// PNG バイト列をダウンロード or ドキュメントディレクトリへ書き出し、フルパスを返す。
 ///
-/// 規律3: I/O はこの関数だけに閉じ込める。デスクトップでは
-/// [getDownloadsDirectory]、取得できない環境では
-/// [getApplicationDocumentsDirectory] にフォールバックする。
+/// 規律3: I/O はこの関数と [writeBytesWithoutOverwrite] だけに閉じ込める。
+/// デスクトップでは [getDownloadsDirectory]、取得できない環境では
+/// [getApplicationDocumentsDirectory] にフォールバックする。macOS のサンドボックス
+/// では `com.apple.security.files.downloads.read-write` entitlement が無いと
+/// [getDownloadsDirectory] がアプリのコンテナ内（ユーザーに見えない場所）を返す
+/// ため、`macos/Runner/*.entitlements` にその entitlement を入れてある（#64）。
+/// 同名ファイルは上書きせず連番にする（[writeBytesWithoutOverwrite]）。
 Future<String> savePng(Uint8List bytes, String filename) async {
   final dir = (await getDownloadsDirectory()) ??
       (await getApplicationDocumentsDirectory());
-  final file = File('${dir.path}${Platform.pathSeparator}$filename');
-  await file.writeAsBytes(bytes, flush: true);
-  return file.path;
+  return writeBytesWithoutOverwrite(dir, bytes, filename);
+}
+
+/// 保存したファイルをファイルマネージャで示すコマンド（実行ファイルと引数）。
+typedef RevealCommand = ({String executable, List<String> arguments});
+
+/// [path] をファイルマネージャで示すコマンドを OS ごとに決める（#64）。
+///
+/// macOS は Finder でファイルを選択状態にする `open -R`、Windows は
+/// `explorer /select,`、それ以外（Linux）は選択の標準手段が無いので
+/// 含むフォルダを `xdg-open` で開く。pure（[platform] は
+/// `Platform.operatingSystem` の値を渡す）。未対応 OS は null。
+RevealCommand? revealCommandFor(String platform, String path) {
+  switch (platform) {
+    case 'macos':
+      return (executable: 'open', arguments: ['-R', path]);
+    case 'windows':
+      return (executable: 'explorer', arguments: ['/select,$path']);
+    case 'linux':
+      final sep = path.lastIndexOf('/');
+      final parent = sep > 0 ? path.substring(0, sep) : '/';
+      return (executable: 'xdg-open', arguments: [parent]);
+    default:
+      return null;
+  }
+}
+
+/// 保存したファイルの場所をファイルマネージャで開く。開けなかったら false。
+///
+/// 規律3: I/O。コマンドの決定は [revealCommandFor]（pure）。Windows の
+/// `explorer` は成功でも終了コード 1 を返すので終了コードは見ず、起動できたか
+/// だけで判定する。
+Future<bool> revealInFolder(String path) async {
+  final cmd = revealCommandFor(Platform.operatingSystem, path);
+  if (cmd == null) return false;
+  try {
+    await Process.run(cmd.executable, cmd.arguments);
+    return true;
+  } on ProcessException {
+    return false;
+  }
 }
 
 /// キャプション 1 行の文言とスタイル種別。
