@@ -124,10 +124,21 @@ class _ClickThroughDialogScopeState extends State<_ClickThroughDialogScope> {
 
   void _onChanged() {
     final on = _loupe?.clickThrough ?? false;
-    if (on && !_wasClickThrough && mounted) {
-      Navigator.of(context).maybePop();
-    }
+    if (on && !_wasClickThrough && mounted) _closeThisDialog();
     _wasClickThrough = on;
+  }
+
+  /// このダイアログのルートだけを閉じる。最上位のルートを無条件に pop すると、
+  /// 別のルート（別のダイアログなど）が上に載っているときにそちらを閉じてしまう。
+  void _closeThisDialog() {
+    final route = ModalRoute.of(context);
+    if (route == null || !route.isActive) return;
+    final navigator = Navigator.of(context);
+    if (route.isCurrent) {
+      navigator.pop();
+    } else {
+      navigator.removeRoute(route);
+    }
   }
 
   @override

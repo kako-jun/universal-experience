@@ -5,6 +5,8 @@
 // 反映されること、クリックスルー ON の復帰方法が主画面に常時見えること、`/` で検索欄へ
 // 移ること、何も選んでいないときの空状態を確認する。
 
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
@@ -481,6 +483,36 @@ void main() {
       await h.filterService.flush();
     });
 
+    testWidgets('行にフォーカスがある間の ←→ は強度を動かさず、標準のフォーカス移動になる',
+        (tester) async {
+      final h = await pumpHomeScreen(tester, size: wide);
+      final protan = entry('cv:protanopia');
+      await tester.tap(find.byType(TextField));
+      await tester.pump();
+      await tabUntilTile(tester, filterListTileKey(protan));
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(selectedFilterListEntry(h.visionState), protan);
+      final before = h.filterService.intensity;
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+
+      expect(h.filterService.intensity, before,
+          reason: '行にフォーカスがある間は ←→ を奪わない（強度は動かない）');
+      expect(focusedTile(tester), isNull,
+          reason: '代わりに標準の方向フォーカス移動で行の外へ移る');
+
+      // 移った先がショートカットの受け口なら、次の ←→ からは強度が動く。
+      if (tester.binding.focusManager.primaryFocus?.debugLabel ==
+          'homeShortcuts') {
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+        await tester.pump();
+        expect(h.filterService.intensity, lessThan(before));
+      }
+      await h.filterService.flush();
+    });
+
     testWidgets('ポインタで選ぶとショートカット受け口へフォーカスが戻り ←→ が効く', (tester) async {
       final h = await pumpHomeScreen(tester, size: wide);
       final tile = find.byKey(filterListTileKey(entry('cv:protanopia')));
@@ -608,6 +640,33 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(AlertDialog), findsNothing);
       expect(find.text(banner), findsOneWidget);
+
+      await tester.runAsync(() => h.loupe.setClickThrough(false));
+      await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
+    });
+
+    testWidgets('別のダイアログが上に載っているときは、そちらを閉じずに起動モードのダイアログだけ閉じる',
+        (tester) async {
+      final h = await pumpHomeScreen(tester, size: wide);
+      await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
+      await tester.tap(find.byTooltip('起動モード'));
+      await tester.pumpAndSettle();
+      expect(find.byType(WindowModePanel), findsOneWidget);
+
+      unawaited(showDialog<void>(
+        context: tester.element(find.byType(WindowModePanel)),
+        builder: (_) => const AlertDialog(content: Text('別のダイアログ')),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('別のダイアログ'), findsOneWidget);
+
+      await tester.runAsync(() => h.loupe.setClickThrough(true));
+      await tester.pumpAndSettle();
+
+      expect(find.text('別のダイアログ'), findsOneWidget,
+          reason: '最上位の別ルートを誤って pop しない');
+      expect(find.byType(WindowModePanel), findsNothing,
+          reason: '起動モードのダイアログ自身は閉じる');
 
       await tester.runAsync(() => h.loupe.setClickThrough(false));
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
