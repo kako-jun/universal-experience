@@ -29,7 +29,6 @@ class SettingsService extends ChangeNotifier {
   static const String keyThemeMode = 'settings.themeMode';
   static const String keyFilterType = 'settings.filterType';
   static const String keyLocale = 'settings.locale';
-
   /// #78: whether the first-run welcome banner has been dismissed.
   static const String keyWelcomeBannerDismissed =
       'settings.welcomeBannerDismissed';
@@ -93,7 +92,8 @@ class SettingsService extends ChangeNotifier {
       if (isSupportedLanguage(saved)) _locale = saved;
     }
 
-    _welcomeBannerDismissed = prefs.getBool(keyWelcomeBannerDismissed) ?? false;
+    _welcomeBannerDismissed =
+        prefs.getBool(keyWelcomeBannerDismissed) ?? false;
 
     notifyListeners();
   }

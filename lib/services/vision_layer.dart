@@ -83,7 +83,7 @@ class VisionLayerResult {
   const VisionLayerResult._(this.change, this.blockedBy);
 
   const VisionLayerResult.blocked(VisionLayerBlockReason reason)
-      : this._(VisionLayerChange.blocked, reason);
+    : this._(VisionLayerChange.blocked, reason);
 
   static const added = VisionLayerResult._(VisionLayerChange.added, null);
   static const removed = VisionLayerResult._(VisionLayerChange.removed, null);

@@ -912,8 +912,8 @@ ExportCaption buildExportCaption(
     simulationNotice: l10n.exportSimulationNotice,
     experimentalNotice:
         (kVisionFilterCatalogById[filterId]?.isExperimental ?? false)
-            ? l10n.exportExperimentalNotice
-            : null,
+        ? l10n.exportExperimentalNotice
+        : null,
     urgencyMessage: notice?.message,
     escalationGroups: [
       for (final g in notice?.escalationGroups ?? const [])

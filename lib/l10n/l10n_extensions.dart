@@ -387,7 +387,7 @@ String escalationConditionText(AppLocalizations l10n, String condition) {
     case 'persistent pain or a change in vision':
       return l10n.escalationConditionDryEyePersistent;
     case 'a sudden drop in hearing, especially in one ear (possible sudden '
-          'sensorineural hearing loss)':
+        'sensorineural hearing loss)':
       return l10n.escalationConditionHearingSuddenOneEar;
     case 'a new or worsening change, particularly in one ear':
       return l10n.escalationConditionHearingNewWorseningOneEar;
@@ -472,8 +472,7 @@ ConsultNotice? resolveConsultNotice(
 
   final emergencyLines = [
     for (final e in escalation)
-      if (e.urgency == Urgency.emergency)
-        escalationConditionText(l10n, e.condition),
+      if (e.urgency == Urgency.emergency) escalationConditionText(l10n, e.condition),
   ];
   final earlyLines = [
     for (final e in escalation)
@@ -518,7 +517,8 @@ TrayMenuLabels trayMenuLabelsFrom(AppLocalizations l10n) {
     // 色覚行（-omaly を含む 7 型）を全てカバーする。
     filterLabels: {
       for (final type in ColorVisionType.values)
-        if (type != ColorVisionType.none) type: colorVisionTypeName(l10n, type),
+        if (type != ColorVisionType.none)
+          type: colorVisionTypeName(l10n, type),
     },
     advancedFilters: l10n.trayAdvancedFilters,
     categoryLabels: {

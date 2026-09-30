@@ -69,8 +69,7 @@ class ImageSourceState extends ChangeNotifier {
   /// Whether the shown sample auto-follows the filter's recommendation.
   /// Always false while [isUsingUserImage] is true (there's no "sample"
   /// being shown to follow anything).
-  bool get isFollowingRecommended =>
-      _autoFollowRecommended && !_isUsingUserImage;
+  bool get isFollowingRecommended => _autoFollowRecommended && !_isUsingUserImage;
 
   /// The [PreviewImageSource] `home_screen.dart` passes to
   /// `BeforeAfterView.imageSource`.
@@ -93,9 +92,7 @@ class ImageSourceState extends ChangeNotifier {
   /// cases is still a real state change (pins the sample / switches off the
   /// photo).
   void selectSample(String sampleId) {
-    if (!_isUsingUserImage &&
-        !_autoFollowRecommended &&
-        _sampleId == sampleId) {
+    if (!_isUsingUserImage && !_autoFollowRecommended && _sampleId == sampleId) {
       return;
     }
     _isUsingUserImage = false;

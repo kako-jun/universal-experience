@@ -335,7 +335,8 @@ class VisionFilterState extends ChangeNotifier {
     if (blocked != null) return VisionLayerResult.blocked(blocked);
 
     final layer = _newLayer(id, variantId, origin);
-    final replacing = isVisionColorGroupId(id) &&
+    final replacing =
+        isVisionColorGroupId(id) &&
         _layers.any((l) => isVisionColorGroupId(l.id));
     _layers = normalizeVisionLayers([
       for (final l in _layers)
