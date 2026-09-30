@@ -12,8 +12,9 @@
 > shader_filter.dart`）は将来のライブ画面キャプチャ（#1/#3/#4）向けに残置して
 > あるが、現状 production コードから呼ばれることはなく、GPU golden テスト
 > （`test/vision_filter_golden_test.dart` 等）だけが検証のために使う。
-> `FilterService` は選択状態のみを保持する。他アプリ含む全画面への適用は
-> 画面キャプチャ経路（#1/#3/#4）の実装後。
+> `FilterService` は色覚クイック選択の型だけを保持し、強度は `VisionFilterState` の
+> 記憶を読み書きする（#117）。他アプリ含む全画面への適用は画面キャプチャ経路
+> （#1/#3/#4）の実装後。
 >
 > **追補（現状）**: 以下も実装済み。多言語化（#18・`flutter_localizations` +
 > ARB、ja/en、`lib/l10n/`）、sensus の複合体験 API の FRB 公開（#10・
@@ -183,8 +184,8 @@
 - **起動モード・最前面・クリックスルーは独立して永続化する (#63)**:
   `LoupeWindowController` 自身が `SharedPreferences`
   (`loupeWindow.appMode` / `loupeWindow.alwaysOnTop` / `loupeWindow.clickThrough`)
-  に即時書き込みする (`FilterService` の per-type intensity のようなデバウンスは
-  不要な、頻度の低いトグルのため)。`main()` は `windowManager.ensureInitialized()`
+  に即時書き込みする (`VisionFilterStore` のようなデバウンスは不要な、頻度の低い
+  トグルのため)。`main()` は `windowManager.ensureInitialized()`
   の直後、`WindowOptions` を組み立てる前に `loupeWindow.load()` を呼んで復元し、
   `loupeWindow.initialize()` が実際の window_manager へ反映する。
 - **クリックスルーの `forward` はプラットフォーム差あり**: `forward` 引数は
@@ -282,9 +283,8 @@ main.dart が `windowManager.show()` / `hide()` を `onShowLoupe` / `onHideLoupe
 11. **設定を開く…** — フィルタ選択 UI はメインウィンドウ内にあるため
    `windowManager.show()` + `focus()` でウィンドウを表示する
 12. (区切り線)
-13. **終了** — 先頭で `FilterService.flush()`（#57、保留中の intensity
-   デバウンス書き込みを取りこぼさない）・`VisionFilterStore.flush()`（#65、
-   フィルタ選択の保留書き込み）した上で、トレイを破棄し
+13. **終了** — 先頭で `VisionFilterStore.flush()`（#65・#117、フィルタ選択と
+   強度の保留書き込みを取りこぼさない）した上で、トレイを破棄し
    `setPreventClose(false)` の上で `windowManager.destroy()`
 
 `TrayService._rebuildMenu` は、組み立てたメニュー構造が直前にネイティブへ送った
@@ -305,8 +305,8 @@ main.dart が `windowManager.show()` / `hide()` を `onShowLoupe` / `onHideLoupe
 
 - **トレイが使える環境 (`hideToTray`)** — `windowManager.hide()` するだけ。
 - **トレイ初期化が失敗した環境 (`exitApp`)** — トレイから復帰できずアプリが
-  行方不明になるため close = 終了にフォールバックする。ただし intensity の
-  デバウンス永続化 (#57) を取りこぼさないよう、`FilterService.flush()` →
+  行方不明になるため close = 終了にフォールバックする。ただしフィルタ選択・強度の
+  デバウンス永続化 (#65・#117) を取りこぼさないよう、`VisionFilterStore.flush()` →
   `setPreventClose(false)` → `windowManager.destroy()` の順で終了する
   (`flush()` は `try`、残り 2 つは `finally` で必ず実行)。
 
@@ -382,31 +382,36 @@ Linux debug ビルド成功で代替している:
 
 `VisionFilterState`（プレビューの選択の唯一の正本）を再起動をまたいで残す。
 
-- **保存するもの**: 選択中のカタログ id・体験プリセット id・色覚クイック選択の型・
-  フィルタ id ごとの強度と payload パラメータ（選択中のものを含む）。原画比較
-  （bypass）など一時的な状態は保存しない。JSON は `version`（現在 1）つきで、
-  seed（u64）は double を経由して精度が落ちないよう 10 進文字列で持つ。
+- **保存するもの**: 重ねている層の列（各層はカタログ id・payload・別名 `variantId`
+  （-omaly。quick 層だけが持つ）・起源 `origin`（quick / advanced））・フォーカス中の層の id・体験プリセット
+  id・強度の記憶（キー `variantId ?? id` ごと）・カタログ id ごとの payload の記憶
+  （#117。層自身は強度を持たない）。原画比較（bypass）など一時的な状態は保存しない。
+  JSON は `version`（現在 2）つきで、seed（u64）は double を経由して精度が落ちないよう
+  10 進文字列で持つ。版 1（選択 1 つ + フィルタ id ごとの強度）は読めて、v2 へ変換して
+  復元する（次に状態が変わったとき v2 で書かれる）。
 - **定義と状態を分ける**: 保存するのは状態だけで、min/max/default/options は
   カタログ（`vision_filter_catalog.dart`）が正本のまま。**読み込み時に**
   `VisionFilterSnapshot.fromJson` / `sanitizeVisionParams` がカタログに照らして補正する
   — 未知のフィルタ id・定義に無いパラメータは捨て、範囲外は min/max に丸め、
   型違い・NaN・未知の選択肢・範囲外の seed は既定値に戻し、欠けたパラメータは既定値で
-  埋める。版が違う・JSON が壊れている・旧形式のときは丸ごと捨てて既定で起動する。
+  埋める。版 1（旧形式）は v2 の形へ変換して復元する。未知の版（新しすぎる・古すぎる・
+  版なし）・Map でない値・JSON が壊れているときだけ丸ごと捨てて既定で起動する。
   したがって sensus 側でフィルタ id やパラメータが変わっても起動は止まらない
   （`test/vision_filter_snapshot_test.dart` が固定）。
-- **復元の順序（`buildRootApp`）**: 設定の `filterType` による色覚シード（初回起動は
-  deuteranomaly）→ `VisionFilterStore.restoreAndBind`。復元できる保存値があれば
+- **復元の順序（`buildRootApp`）**: `VisionFilterStore.migrateLegacyStrengths`（旧
+  `settings.intensityByType` の取り込み、下記）→ 設定の `filterType` による色覚シード（初回
+  起動は deuteranomaly）→ `VisionFilterStore.restoreAndBind`。復元できる保存値があれば
   それが勝つ（「解除して終了」した場合、設定側に前回の色覚が残っていても
-  未選択で始まる）。保存値が無い・空・壊れているときは state に触れず、色覚シードの
-  まま。色覚クイック選択が復元されたときは `FilterService.applyFilter` も呼び、
+  未選択で始まる。読める v2 は層が空でも復元する）。保存値が無い・壊れている・空の版 1
+  （選択も強度も payload も持たない。-opia の強度だけを持つ版 1 は、変換で強度を落としても
+  旧実装どおり空とみなさず復元する）のときは state に触れず、色覚シードのまま。色覚クイック選択が復元されたときは `FilterService.applyFilter` も呼び、
   トレイとウィンドウ内 UI が同じ `FilterService` を見るようにする。advanced 選択中の
   `FilterService` は従来どおり古いまま（消費側は `isColorQuickSelection` で判定する）。
 - **体験プリセット**: 保存された体験 id が今の体験一覧にあり、かつそのフィルタが
   保存されたカタログ id と一致するときだけプリセット選択として戻す。一覧から消えて
   いれば advanced の選択として戻す（`isValidExperiencePreset`。widget を経由せず
   main から使えるよう `lib/services/experience_source.dart` に置く）。
-- **書き込み**: `FilterService` の per-type 強度（#57）と同じ作法で、変更は 300ms
-  デバウンスで書き、JSON が直前と同じ変化（原画比較の切替など）は書かない。
+- **書き込み**: 変更は 300ms デバウンスで書き、JSON が直前と同じ変化（原画比較の切替など）は書かない。
   終了経路（トレイの終了・`onExitRequested`・ウィンドウクローズ）で `flush()` する。
   書き込み失敗は握りつぶす（次回は既定値で起動するだけ）。`flush()` は、タイマー発火後
   にすでに走っている書き込みの完了も待つ。
@@ -414,11 +419,32 @@ Linux debug ビルド成功で代替している:
   例外が出ても起動は止めない。`VisionFilterState.restore` は失敗時に呼び出し前の
   状態へ巻き戻して rethrow し、`VisionFilterStore.restoreAndBind` が握って、色覚シード
   のまま以後の保存だけ始める。
-- **テスト**: 往復・補正・フォールバックの純粋テスト（`test/vision_filter_snapshot_test.dart`・
-  `test/vision_filter_store_test.dart`）と、`buildRootApp` を 2 回起動して復元を確かめる
-  実アプリ経路のテスト（`test/vision_filter_persistence_app_test.dart`）。
+- **旧 per-type 強度の取り込み（#117）**: かつて `FilterService` が
+  `settings.intensityByType`（`ColorVisionType.name` → 0..1）に持っていた強度は、
+  `migrateLegacyStrengths(seedType:)` が**そのキーの存在**を合図に一度だけ v2 の強度の記憶へ
+  取り込む（v1 JSON が無くても行う）。(a) 読める v2 が無い（無い・版 1・壊れている・未知の版）:
+  版 1 の強度（-opia 4 種を除く。旧 per-type 強度のほうが新しい正本のため）に、旧 per-type
+  強度（有効な色覚型名だけ・0..1 に丸める）を重ねて記憶にし、層は版 1 のもの（選択が無く
+  空なら `seedType` の quick 層、none なら層なし）にして v2 を書く。(b) 読める v2 がある:
+  v2 に無いキーだけ旧強度で補う。(c) 旧キーが無い: 何もしない。旧キーは**書き込みに成功
+  してから**消し、失敗したら残して次回起動でもう一度取り込む（取り込み結果は
+  `restoreAndBind(snapshot:)` 経由で書き込み失敗時もメモリへ入る）。さらに古い単一キー
+  `settings.intensity`（#57 で撤去）は値を見ずに消す。
+- **テスト**: 往復・補正・フォールバック・層の不変条件・v1 → v2 変換の純粋テスト
+  （`test/vision_filter_snapshot_test.dart`・`test/vision_filter_store_test.dart`）、取り込みの
+  (a)(b)(c) と失敗系（JSON 欠落・破損・空・書き込み失敗）（同 store テスト）、`buildRootApp` を
+  2 回起動して復元・取り込みを確かめる実アプリ経路のテスト
+  （`test/vision_filter_persistence_app_test.dart`）。
 
-## 状態モデルの統一と多症状の同時適用 (#32 / #41、設計のみ・未実装)
+## 状態モデルの統一と多症状の同時適用 (#32 / #41、第 1 段 #117 まで実装)
+
+> **実装状況**: 第 1 段（#117）で、`VisionFilterState` がレイヤー列（`lib/services/vision_layer.dart`）と
+> 段の表（`lib/models/vision_filter_stage.dart`）を持ち、強度の記憶が `variantId ?? id` キーの 1 つに
+> 統一され、永続化が v2 になった。**選択はまだ常に 1 層**（`select` / `selectColorVisionType` /
+> `selectPreset` は「全部外して 1 つ足す」）で、複数層を作る API・合成描画は第 3 段（#119）。
+> `FilterService` は色覚クイック選択の型を持ち、強度は `VisionFilterState` の記憶へ委譲する薄い窓に
+> なった（`ColorVisionType` / `FilterService` の削除は最終段 #124）。下の「現状は状態が 2 系統」
+> 以降は設計時点の記述。
 
 現状は状態が 2 系統ある（`VisionFilterState` = カタログ 30 フィルタ、`FilterService` =
 `ColorVisionType` 8 値 = none + 7 型）うえ、選択は常に 1 つだけ。両方を解く方針として、**選択の単位を
@@ -438,8 +464,8 @@ Linux debug ビルド成功で代替している:
   `ColorVisionType` / `FilterService` の削除は最終段。
 
 段階ごとの実装は Issue #117〜#125、判断・代替案・根拠は
-`docs/adr/2026-09-30-multi-select-filter-state-model.md`。実装が入るまでは、上の「フィルタ選択の永続化
-(#65)」と下の各サービスの記述が現行の挙動。
+`docs/adr/2026-09-30-multi-select-filter-state-model.md`。実装済みの範囲は上の実装状況と、
+「フィルタ選択の永続化 (#65)」・下の各サービスの記述が現行の挙動。
 
 ## グローバルホットキー (#63)
 
@@ -598,9 +624,9 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
 - **`/`・↑↓・←→ はテキスト入力・ボタン・スイッチ等にフォーカスがある間は無効化される**
   （`isFocusOnInteractiveControl()` による `isEnabled` ガード、#63）。`Esc` だけは
   このガードの対象外 — クリックスルーからの復帰は常に効く必要があるため。
-- ←→ の強度調整は `previewStrength` と同じ判定（`isColorQuickSelection`）に
-  従う: 色覚クイック選択中は `FilterService.intensity`、advanced/プリセット
-  選択中は `VisionFilterState.strength` を動かす。
+- ←→ の強度調整は `adjustPreviewStrength(visionState, delta)` が、フォーカス中の層の
+  強度の記憶（`VisionFilterState.strength`）を動かす。色覚クイック選択でも advanced でも
+  同じ記憶で、`FilterService.intensity` は同じ値を読む（#117）。
 
 ## ルーペ窓 HUD (#79)
 
@@ -813,8 +839,8 @@ ShaderFilter    (lib/rendering/) — Impeller FragmentProgram。将来のライ�
 `VisionFilterState` が状態変更時に `notifyListeners()` を呼び、それを購読する
 `Consumer` を持つウィジェットだけが rebuild される。
 
-状態モデルが 2 系統（`FilterService` と `VisionFilterState`）並行している現状を 1 系統に畳み、
-複数症状の同時適用に拡張する方針は「状態モデルの統一と多症状の同時適用 (#32 / #41)」節と
+`FilterService`（色覚クイック選択の型）と `VisionFilterState`（層・強度）の 2 つが残る現状を 1 系統に畳み、
+複数症状の同時適用に拡張する方針（第 1 段 #117 で強度の正本は `VisionFilterState` に一本化済み）は「状態モデルの統一と多症状の同時適用 (#32 / #41)」節と
 `docs/adr/2026-09-30-multi-select-filter-state-model.md`。
 
 `rust/` crate は `rust_builder/`（cargokit 統合、#55）経由でビルドされ、
@@ -875,22 +901,26 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   の間は復帰方法を `ClickThroughRecoveryBanner` が画面最上部に常時出す（#63）。
   PNG エクスポートはプレビュー側に置く。選択の状態は従来どおり `VisionFilterState` が
   唯一の正本
-- `FilterService`: 色覚フィルタ（`ColorVisionType`）の選択状態管理。
-  sensus `VisionFilter` へのマッピングを持つ純粋な状態モデル。強度
-  （`intensity`）はタイプごとに `Map<ColorVisionType, double>` で個別記憶し、
-  初めて選ぶタイプは推奨強度（-opia/achromatopsia=1.0、-omaly=0.6）が初期値
-  になる（#57）。永続化・通知も本サービス自身が担う（300ms デバウンスした
-  SharedPreferences 書き込み + 自前の `ChangeNotifier`）。`SettingsService`
-  は `notifyListeners` を購読する `MaterialApp`（テーマ/ロケール用）を持つため、
-  intensity のようにスライダー 1 目盛りごとに変わる値をそちらに混ぜると
-  アプリ全体が毎回再構築されてしまう。それを避けるため intensity は
-  `SettingsService` を経由しない。一方 filterType（どのタイプを選んでいるか）は
-  `SettingsService.setFilterType` 経由で引き続き通知・永続化する。フィルタの
-  選び直しはユーザー操作としてスライダー操作ほど高頻度ではないため、
-  `MaterialApp` 再構築が起きること自体は許容している
-- `VisionFilterState`: advanced カタログ（sensus 全 30 種）の選択・パラメータ状態。
-  選択（id・体験プリセット id・色覚クイック選択の型）とフィルタ id ごとの
-  強度・payload の記憶は `snapshot()` / `restore()` で `VisionFilterSnapshot`
+- `FilterService`: 色覚クイック選択（`ColorVisionType`）の選択状態。sensus `VisionFilter`
+  へのマッピングを持つ。**強度は自前で持たず**、コンストラクタで受け取る `VisionFilterState` の
+  強度の記憶（キー `ColorVisionType.name`）を読み書きする（#117。かつての per-type
+  `Map` とその SharedPreferences 書き込みは撤去）。`intensity` は記憶があればそれ、無ければ
+  推奨強度（-opia/achromatopsia=1.0、-omaly=0.6。記憶へは書かない、none は 0.0）。
+  `setIntensity` / `applyFilter(intensity:)` は記憶へ書き、`VisionFilterState` と自身の
+  listener の両方に通知する（スライダー・トレイは `FilterService`、プレビューは
+  `VisionFilterState` を見るため）。`SettingsService` は `notifyListeners` を購読する
+  `MaterialApp`（テーマ/ロケール用）を持つため、intensity のようにスライダー 1 目盛りごとに
+  変わる値はそちらに混ぜず、`SettingsService` を経由しない。一方 filterType（どのタイプを
+  選んでいるか）は `SettingsService.setFilterType` 経由で引き続き通知・永続化する
+- `VisionFilterState`: 選択・パラメータ・強度の状態（sensus 全 30 種 + 色覚クイック選択）。
+  重ねる層の列 `layers`（`VisionLayer`: id・payload・別名 `variantId`・起源 `origin`。層は強度を
+  持たない）、フォーカス中の層 `focusedId`、強度の記憶 `strengthByKey`（キー `variantId ?? id`、
+  読むときに導出: 記憶 → 色覚は `recommendedStrength` → それ以外は sensus の推奨値。
+  導出した値は記憶へ書かない）、カタログ id ごとの payload の記憶を持つ。`selectedId` /
+  `strength` / `params` / `isColorQuickSelection` などは、フォーカス中の層を指す互換の読み口。
+  適用順は段（`lib/models/vision_filter_stage.dart`）で決まり、上限は `kMaxVisionLayers`（5）。
+  層の列は `normalizeVisionLayers` が不変条件（有効な id・重複なし・色覚は排他・上限・
+  適用順）に整える。これらは `snapshot()` / `restore()` で `VisionFilterSnapshot`
   （`lib/services/vision_filter_snapshot.dart`）と往復し、`VisionFilterStore`
   （`lib/services/vision_filter_store.dart`）が `SharedPreferences`
   （キー `settings.visionFilter`、版つき JSON）へ永続化する（#65。下記

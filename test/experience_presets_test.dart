@@ -73,7 +73,7 @@ void main() {
     experiencesProvider = _fixtureExperiences;
     installVisionFilterMetadataFixture();
     visionState = VisionFilterState();
-    filterService = FilterService();
+    filterService = FilterService(visionState: visionState);
   });
   tearDown(() {
     browser.dispose();
@@ -279,8 +279,7 @@ void main() {
     expect(find.text(en.experienceIncludesHearingNote), findsNothing);
   });
 
-  testWidgets(
-      '体験の説明文は選んだあと右カラムに出る（一覧の行には出ない）', (tester) async {
+  testWidgets('体験の説明文は選んだあと右カラムに出る（一覧の行には出ない）', (tester) async {
     await pumpPresets(tester, const Locale('en'));
     final en = lookupAppLocalizations(const Locale('en'));
     expect(find.text(en.experienceBppvDesc), findsNothing);
@@ -291,14 +290,13 @@ void main() {
     expect(find.text(en.experienceBppvDesc), findsOneWidget);
   });
 
-  testWidgets(
-      'escalation は Experience.vision から取得し、ConsultNoticeBlock で表示する',
+  testWidgets('escalation は Experience.vision から取得し、ConsultNoticeBlock で表示する',
       (tester) async {
     // urgency=none の bppv でも、Experience.vision（bppvRotation）に対する
     // escalation フィクスチャがあれば ConsultNoticeBlock の escalation ブロックが
     // 出ることを確認する（喚起文そのものは urgency=none のため出ない）。
-    visionFilterUrgencyEscalationProvider = (filter) =>
-        filter == const VisionFilter.bppvRotation()
+    visionFilterUrgencyEscalationProvider =
+        (filter) => filter == const VisionFilter.bppvRotation()
             ? const [
                 UrgencyEscalation(
                   urgency: Urgency.earlyConsultation,
@@ -327,9 +325,7 @@ void main() {
     );
   });
 
-  testWidgets(
-      '免責文・根拠 URL は喚起があるときだけ、右カラムの強度の下に 1 回出る（#72）',
-      (tester) async {
+  testWidgets('免責文・根拠 URL は喚起があるときだけ、右カラムの強度の下に 1 回出る（#72）', (tester) async {
     await pumpPresets(tester, const Locale('en'));
     final en = lookupAppLocalizations(const Locale('en'));
 

@@ -19,7 +19,7 @@
 ue はそれを flutter_rust_bridge 経由で消費する薄いブリッジです（ue 側で LMS 等の
 変換ロジックを再実装する方針は取りません）。フィルタの見え方は sensus の CPU
 `apply()`（`lib/rendering/cpu_vision_renderer.dart`）で計算し、強度調整も可能です。
-強度は**色覚タイプごとに個別記憶**します（`FilterService`、#57）。まだ選んだ
+強度は**フィルタごとに個別記憶**します（色覚は -omaly と -opia を別々に。`VisionFilterState`、#57・#117）。まだ選んだ
 ことのないタイプを選ぶと推奨強度（-opia / achromatopsia は 1.0、-omaly は
 0.6）が初期値になり、フィルタを切り替えても切替前のタイプの強度は保持されます。
 
@@ -126,7 +126,7 @@ emergency/earlyConsultation の見出しに分けて併記します。喚起文�
 **音声再生は未実装**です。プリセットの選択は体験 id（`meniere` 等）で保持する
 ため、メニエール病と迷路炎（どちらも内部的には同じ vertigo フィルタ）を同時に
 選択中と誤表示することはありません。また、プリセットのタップは色覚のクイック
-選択（`FilterService`）を変更しません — 両者は独立に状態を保持します。
+選択（`FilterService`）を変更しません — 両者は独立に選択を保持します。
 プリセットの組み合わせ（どの視覚・聴覚フィルタが組になるか）の正本は
 sensus-core の `experiences()` です。
 

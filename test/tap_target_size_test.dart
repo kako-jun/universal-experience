@@ -39,7 +39,7 @@ void main() {
     'macOS でも主要な操作要素は 48dp 以上（チップ・解除・クリア・AppBar・行・比較の切替・スライダー）',
     (tester) async {
       expect(defaultTargetPlatform, TargetPlatform.macOS);
-      final h = await pumpHomeScreen(
+      await pumpHomeScreen(
         tester,
         size: const Size(1280, 800),
         theme: AppTheme.lightTheme,
@@ -89,7 +89,6 @@ void main() {
           label,
         );
       }
-      await h.filterService.flush();
     },
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
   );

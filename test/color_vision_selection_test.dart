@@ -27,8 +27,8 @@ void main() {
 
   setUp(() {
     installVisionFilterMetadataFixture();
-    filterService = FilterService();
     visionState = VisionFilterState();
+    filterService = FilterService(visionState: visionState);
   });
   tearDown(resetVisionFilterMetadataProviders);
 
@@ -42,7 +42,8 @@ void main() {
       expect(visionState.colorVisionType, ColorVisionType.protanopia);
     });
 
-    test('-omaly はカタログ id が base の -opia に写りつつ colorVisionType は -omaly のまま保持する',
+    test(
+        '-omaly はカタログ id が base の -opia に写りつつ colorVisionType は -omaly のまま保持する',
         () {
       selectColorVision(
           filterService, visionState, ColorVisionType.deuteranomaly);
@@ -54,7 +55,8 @@ void main() {
           reason: '見出し・caption・ファイル名で -omaly の名前を正しく出すために保持する');
     });
 
-    test('ColorVisionType.none を渡すと解除と同じ効果になり isColorQuickSelection は false のまま',
+    test(
+        'ColorVisionType.none を渡すと解除と同じ効果になり isColorQuickSelection は false のまま',
         () {
       selectColorVision(filterService, visionState, ColorVisionType.none);
 
@@ -86,8 +88,7 @@ void main() {
 
     test(
         '回帰: advanced を経由したあとに同じ色覚型を再選択しても正しく反映される '
-        '（#60。以前の listener ミラーは currentFilter が変わらないため反応しなかった）',
-        () {
+        '（#60。以前の listener ミラーは currentFilter が変わらないため反応しなかった）', () {
       // 1. protanopia を選ぶ（FilterBrowser のチップ、またはトレイのメニュー
       //    どちらも selectColorVision を呼ぶだけなので区別なく再現できる）。
       selectColorVision(filterService, visionState, ColorVisionType.protanopia);

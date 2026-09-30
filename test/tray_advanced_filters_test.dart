@@ -191,8 +191,8 @@ void main() {
       addTearDown(() => messenger.setMockMethodCallHandler(
           const MethodChannel('tray_manager'), null));
 
-      filterService = FilterService();
       visionState = VisionFilterState();
+      filterService = FilterService(visionState: visionState);
       loupeWindow = LoupeWindowController();
       loupeNotifications = 0;
       loupeWindow.addListener(() => loupeNotifications++);

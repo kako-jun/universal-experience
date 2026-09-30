@@ -48,7 +48,7 @@ export 'tray_menu_labels.dart';
 ///    終了しない。
 ///  * トレイが立ち上がらなかった環境 (`exitApp`) — クローズ = 終了。ただし
 ///    intensity のデバウンス永続化 (#57) を取りこぼさないよう、実際に
-///    ウィンドウを破棄する前に `FilterService.flush()` → `setPreventClose(false)`
+///    ウィンドウを破棄する前に `VisionFilterStore.flush()` → `setPreventClose(false)`
 ///    → `windowManager.destroy()` の順で行う。
 ///
 /// トレイのクリック "終了" (`onQuit`) も同じ理由で先頭に `flush()` を置く。

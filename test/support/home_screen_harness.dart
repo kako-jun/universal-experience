@@ -139,8 +139,8 @@ Future<HomeScreenHarness> pumpHomeScreen(
   SharedPreferences.setMockInitialValues(<String, Object>{});
   final settings = SettingsService();
   await settings.load();
-  final filterService = FilterService();
   final visionState = VisionFilterState();
+  final filterService = FilterService(visionState: visionState);
   final loupe = LoupeWindowController();
   final imageSource = ImageSourceState();
   select?.call(filterService, visionState);

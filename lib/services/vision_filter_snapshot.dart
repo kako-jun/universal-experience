@@ -1,10 +1,14 @@
-import '../models/disability_type.dart';
 import '../models/vision_filter_catalog.dart';
+import 'vision_layer.dart';
 
 /// [VisionFilterSnapshot] の JSON スキーマ版。形式を変えるときに上げる。
-/// 未知の版（新しすぎる・壊れている）は丸ごと捨てて既定値で起動する
-/// （[VisionFilterSnapshot.fromJson] が null を返す）。
-const int kVisionFilterSnapshotVersion = 1;
+/// 版 1（単一選択）は [VisionFilterSnapshot.fromJson] が v2 の形へ変換して読む。
+/// それ以外の未知の版（新しすぎる・壊れている）は丸ごと捨てて既定値で起動する
+/// （null を返す）。
+const int kVisionFilterSnapshotVersion = 2;
+
+/// 読み込みだけは今も受け付ける旧版（単一選択 + フィルタ id ごとの強度）。
+const int _kLegacySnapshotVersion = 1;
 
 /// [entry] の payload パラメータを、カタログの defaultValue から組み立てる
 /// （純粋関数）。seed は sensus の u64 なので [BigInt] 化する（int/double を
@@ -93,13 +97,13 @@ double _clampToDefinition(VisionParam p, double v) {
   return out;
 }
 
-/// [VisionFilterState] の「再起動をまたいで残す部分」の値オブジェクト（#65）。
+/// [VisionFilterState] の「再起動をまたいで残す部分」の値オブジェクト（#65, #117 で v2）。
 ///
 /// 保持するもの:
-/// - 選択（[selectedId]・体験プリセット [presetId]・色覚クイック選択の
-///   [colorVisionType]）
-/// - フィルタ id ごとの強度・payload パラメータの記憶（[strengthById] /
-///   [paramsById]。選択中の値もここに含まれる）
+/// - 重ねているレイヤー列 [layers]（適用順。各層は id・payload・別名・起源）と、
+///   フォーカス中の層 [focusedId]、体験プリセット [presetId]
+/// - キーごとの強度の記憶 [strengthByKey]（キーは別名 id ?? カタログ id。層に強度は
+///   持たせない）と、カタログ id ごとの payload の記憶 [paramsById]
 ///
 /// 保持しないもの: 原画比較（bypass）など一時的な状態。
 ///
@@ -110,54 +114,70 @@ double _clampToDefinition(VisionParam p, double v) {
 /// 補正する**だけで、カタログの値そのものは保存しない。
 class VisionFilterSnapshot {
   const VisionFilterSnapshot({
-    this.selectedId,
+    this.layers = const [],
+    this.focusedId,
     this.presetId,
-    this.colorVisionType,
-    this.strengthById = const {},
+    this.strengthByKey = const {},
     this.paramsById = const {},
+    this.fromLegacy = false,
+    this.legacyHadContent = false,
   });
 
-  /// 選択中のカタログ id。未選択なら null。
-  final String? selectedId;
+  /// 適用順に並んだレイヤー列。
+  final List<VisionLayer> layers;
+
+  /// フォーカス中の層のカタログ id。[layers] のどれかの id のときだけ有効。
+  final String? focusedId;
 
   /// 選択中の体験プリセット id（`Experience.id`）。プリセット経由でなければ null。
+  /// 層がちょうど 1 つのときだけ持つ。
   final String? presetId;
 
-  /// 色覚クイック選択で選んだ型。色覚クイック選択でなければ null。
-  final ColorVisionType? colorVisionType;
+  /// キー（別名 id ?? カタログ id）ごとの強度（0.0..1.0）。
+  final Map<String, double> strengthByKey;
 
-  /// フィルタ id ごとの強度（0.0..1.0）。
-  final Map<String, double> strengthById;
-
-  /// フィルタ id ごとの payload パラメータ（seed は [BigInt]）。
+  /// カタログ id ごとの payload パラメータ（seed は [BigInt]）。
   final Map<String, Map<String, Object>> paramsById;
 
-  /// 何も保存すべきものが無い（未選択・記憶なし）か。
-  bool get isEmpty =>
-      selectedId == null && strengthById.isEmpty && paramsById.isEmpty;
+  /// 版 1 の保存値から変換した snapshot か。v2 として書き戻されるまでの間だけ true
+  /// （[VisionFilterStore] が、旧 per-type 強度の取り込みの要否の判断に使う）。
+  final bool fromLegacy;
 
-  Map<String, Object?> toJson() {
-    final filters = <String, Object?>{};
-    final ids = {...strengthById.keys, ...paramsById.keys};
-    for (final id in ids) {
-      final params = paramsById[id];
-      final strength = strengthById[id];
-      filters[id] = {
-        if (strength != null) 'strength': strength,
-        if (params != null)
-          'params': {
-            for (final e in params.entries) e.key: _paramToJson(e.value),
-          },
+  /// 版 1 の保存値が、変換で落とした記憶（-opia 4 種の強度）を含め何かを持っていたか。
+  /// 変換後の見かけが空でも、旧実装は「空でない保存値」として復元していた（未選択で
+  /// 始まった）。その挙動を保つため、[isEmpty] はこれも見る。
+  final bool legacyHadContent;
+
+  /// 何も保存すべきものが無い（層なし・記憶なし・版 1 の内容なし）か。
+  bool get isEmpty =>
+      layers.isEmpty &&
+      strengthByKey.isEmpty &&
+      paramsById.isEmpty &&
+      !legacyHadContent;
+
+  Map<String, Object?> toJson() => {
+        'version': kVisionFilterSnapshotVersion,
+        'layers': [
+          for (final l in layers)
+            {
+              'id': l.id,
+              'params': {
+                for (final e in l.params.entries) e.key: _paramToJson(e.value),
+              },
+              if (l.variantId != null) 'variantId': l.variantId,
+              'origin': l.origin.name,
+            },
+        ],
+        'focusedId': focusedId,
+        'presetId': presetId,
+        'strengthByKey': Map<String, double>.of(strengthByKey),
+        'paramsById': {
+          for (final e in paramsById.entries)
+            e.key: {
+              for (final p in e.value.entries) p.key: _paramToJson(p.value),
+            },
+        },
       };
-    }
-    return {
-      'version': kVisionFilterSnapshotVersion,
-      'selectedId': selectedId,
-      'presetId': presetId,
-      'colorVisionType': colorVisionType?.id,
-      'filters': filters,
-    };
-  }
 
   static Object _paramToJson(Object value) =>
       value is BigInt ? value.toString() : value;
@@ -165,16 +185,119 @@ class VisionFilterSnapshot {
   /// [json]（`jsonDecode` の結果）から復元する。カタログに照らして補正済みの
   /// 値だけを持つ snapshot を返す。
   ///
-  /// 復元できない（Map でない・版が違う・版が無い）ときは null。それ以外の
-  /// 部分的な破損（未知のフィルタ id・範囲外・型違い・欠損）は、その部分だけを
-  /// 捨てる/補正し、起動を止めない。sensus 側のフィルタ id・パラメータ定義が
-  /// 変わっても、古い保存値は安全に既定値へ落ちる。
+  /// 復元できない（Map でない・版が違う・版が無い）ときは null。版 1 は v2 の形へ
+  /// 変換して読む（[fromLegacy] が true）。それ以外の部分的な破損（未知のフィルタ id・
+  /// 範囲外・型違い・欠損）は、その部分だけを捨てる/補正し、起動を止めない。層の列は
+  /// [normalizeVisionLayers] の規則（重複・色覚排他・上限は先のものを残す）で整える。
   static VisionFilterSnapshot? fromJson(Object? json) {
     if (json is! Map) return null;
-    if (json['version'] != kVisionFilterSnapshotVersion) return null;
+    final version = json['version'];
+    if (version == kVisionFilterSnapshotVersion) return _fromV2(json);
+    if (version == _kLegacySnapshotVersion) return _fromV1(json);
+    return null;
+  }
 
-    final strengthById = <String, double>{};
+  static const Set<String> _quickCapableIds = {
+    'protanopia',
+    'deuteranopia',
+    'tritanopia',
+    'achromatopsia',
+  };
+
+  static Map<String, double> _sanitizeStrengths(Object? raw) {
+    final out = <String, double>{};
+    if (raw is! Map) return out;
+    for (final e in raw.entries) {
+      final key = e.key;
+      final v = e.value;
+      if (key is String && isValidStrengthKey(key) && v is num && v.isFinite) {
+        out[key] = v.toDouble().clamp(0.0, 1.0);
+      }
+    }
+    return out;
+  }
+
+  static VisionFilterSnapshot _fromV2(Map json) {
     final paramsById = <String, Map<String, Object>>{};
+    final rawParams = json['paramsById'];
+    if (rawParams is Map) {
+      for (final e in rawParams.entries) {
+        final key = e.key;
+        final entry = key is String ? kVisionFilterCatalogById[key] : null;
+        if (entry == null || entry.parameters.isEmpty) continue;
+        paramsById[entry.id] = sanitizeVisionParams(entry, e.value);
+      }
+    }
+
+    final rawLayers = json['layers'];
+    final parsed = <VisionLayer>[];
+    if (rawLayers is List) {
+      for (final raw in rawLayers) {
+        if (raw is! Map) continue;
+        final id = raw['id'];
+        final entry = id is String ? kVisionFilterCatalogById[id] : null;
+        if (entry == null) continue;
+        final origin = raw['origin'] == VisionLayerOrigin.quick.name &&
+                _quickCapableIds.contains(entry.id)
+            ? VisionLayerOrigin.quick
+            : VisionLayerOrigin.advanced;
+        // 別名（-omaly）は quick 層だけが持つ。advanced 層に付いていたら捨てる。
+        final variant = raw['variantId'];
+        final variantId = origin == VisionLayerOrigin.quick &&
+                variant is String &&
+                isValidVariantFor(entry.id, variant)
+            ? variant
+            : null;
+        // 層の params が無い・壊れているときは、id ごとの記憶 → 既定値の順で補う。
+        final params = entry.parameters.isEmpty
+            ? const <String, Object>{}
+            : raw.containsKey('params')
+                ? sanitizeVisionParams(entry, raw['params'])
+                : (paramsById[entry.id] ?? defaultVisionParams(entry));
+        parsed.add(VisionLayer(
+          id: entry.id,
+          params: params,
+          variantId: variantId,
+          origin: origin,
+        ));
+      }
+    }
+    final layers = normalizeVisionLayers(parsed);
+    // 層に載っている payload は、id ごとの記憶にも反映しておく（層が正本）。
+    for (final l in layers) {
+      if (l.params.isNotEmpty) paramsById[l.id] = Map.of(l.params);
+    }
+
+    final focused = json['focusedId'];
+    final focusedId = focused is String && layers.any((l) => l.id == focused)
+        ? focused
+        : null;
+
+    final preset = json['presetId'];
+    final presetId = layers.length == 1 && preset is String && preset.isNotEmpty
+        ? preset
+        : null;
+
+    return VisionFilterSnapshot(
+      layers: layers,
+      focusedId: focusedId,
+      presetId: presetId,
+      strengthByKey: _sanitizeStrengths(json['strengthByKey']),
+      paramsById: paramsById,
+    );
+  }
+
+  /// 版 1（単一選択）→ v2 の形。
+  ///
+  /// 選択は層 1 つに、色覚クイック選択は quick 層（-omaly は別名つき）になる。
+  /// 版 1 の強度はカタログ id ごとに 1 つだったが、色覚 -opia の強度の正本は
+  /// 旧 `settings.intensityByType` 側（[VisionFilterStore.migrateLegacyStrengths]
+  /// が取り込む）だったため、-opia 4 種（quick/advanced の別を区別できない記憶）は
+  /// 持ち越さない。tetrachromacy は advanced 専用だったので持ち越す。
+  static VisionFilterSnapshot _fromV1(Map json) {
+    final strengthByKey = <String, double>{};
+    final paramsById = <String, Map<String, Object>>{};
+    var droppedStrength = false;
     final filters = json['filters'];
     if (filters is Map) {
       for (final e in filters.entries) {
@@ -184,10 +307,12 @@ class VisionFilterSnapshot {
         if (entry == null || body is! Map) continue;
         final strength = body['strength'];
         if (strength is num && strength.isFinite) {
-          strengthById[entry.id] = strength.toDouble().clamp(0.0, 1.0);
+          if (_quickCapableIds.contains(entry.id)) {
+            droppedStrength = true;
+          } else {
+            strengthByKey[entry.id] = strength.toDouble().clamp(0.0, 1.0);
+          }
         }
-        // 引数を持たないフィルタは params が無くてよい。持つフィルタは
-        // 記憶があるときだけ補正して残す（無ければ初回選択の既定値になる）。
         if (entry.parameters.isNotEmpty && body.containsKey('params')) {
           paramsById[entry.id] = sanitizeVisionParams(entry, body['params']);
         }
@@ -195,30 +320,41 @@ class VisionFilterSnapshot {
     }
 
     final selected = json['selectedId'];
-    final selectedId =
-        selected is String && kVisionFilterCatalogById.containsKey(selected)
-            ? selected
-            : null;
-
-    final preset = json['presetId'];
-    final presetId = selectedId != null && preset is String && preset.isNotEmpty
-        ? preset
-        : null;
-
-    ColorVisionType? colorVisionType;
-    final rawType = json['colorVisionType'];
-    if (selectedId != null && rawType is String) {
-      for (final t in ColorVisionType.values) {
-        if (t != ColorVisionType.none && t.id == rawType) colorVisionType = t;
+    final entry =
+        selected is String ? kVisionFilterCatalogById[selected] : null;
+    var layers = <VisionLayer>[];
+    String? presetId;
+    if (entry != null) {
+      final rawType = json['colorVisionType'];
+      final type = rawType is String ? colorVisionTypeByName(rawType) : null;
+      // 旧保存値の colorVisionType は ColorVisionType.id（= name と同じ文字列）。
+      final quick = type == null ? null : quickColorVisionLayer(type);
+      if (quick != null && quick.id == entry.id) {
+        layers = [quick];
+      } else {
+        layers = [
+          VisionLayer(
+            id: entry.id,
+            params: entry.parameters.isEmpty
+                ? const {}
+                : (paramsById[entry.id] ?? defaultVisionParams(entry)),
+          ),
+        ];
+        final preset = json['presetId'];
+        if (preset is String && preset.isNotEmpty) presetId = preset;
+      }
+      if (layers.first.params.isNotEmpty) {
+        paramsById[entry.id] = Map.of(layers.first.params);
       }
     }
-
     return VisionFilterSnapshot(
-      selectedId: selectedId,
+      layers: layers,
+      focusedId: entry?.id,
       presetId: presetId,
-      colorVisionType: colorVisionType,
-      strengthById: strengthById,
+      strengthByKey: strengthByKey,
       paramsById: paramsById,
+      fromLegacy: true,
+      legacyHadContent: droppedStrength,
     );
   }
 }

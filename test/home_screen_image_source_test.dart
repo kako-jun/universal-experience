@@ -92,11 +92,10 @@ void main() {
     return imageSourceState;
   }
 
-  testWidgets(
-      '色覚クイック選択でフィルタを切り替えると selectedSampleId が推奨サンプルに追従する',
+  testWidgets('色覚クイック選択でフィルタを切り替えると selectedSampleId が推奨サンプルに追従する',
       (tester) async {
-    final filterService = FilterService();
     final visionState = VisionFilterState();
+    final filterService = FilterService(visionState: visionState);
     final imageSourceState = await pumpHome(
       tester,
       filterService: filterService,
@@ -117,11 +116,10 @@ void main() {
         recommendedSampleIdForFilter('deuteranopia'));
   });
 
-  testWidgets(
-      'advanced カタログでフィルタを切り替えても selectedSampleId が追従する',
+  testWidgets('advanced カタログでフィルタを切り替えても selectedSampleId が追従する',
       (tester) async {
-    final filterService = FilterService();
     final visionState = VisionFilterState();
+    final filterService = FilterService(visionState: visionState);
     final imageSourceState = await pumpHome(
       tester,
       filterService: filterService,
@@ -138,8 +136,8 @@ void main() {
   testWidgets(
       'ユーザー画像を選んでいる間はフィルタを切り替えても自動切り替えが働かない'
       '（#78）', (tester) async {
-    final filterService = FilterService();
     final visionState = VisionFilterState();
+    final filterService = FilterService(visionState: visionState);
     final imageSourceState = await pumpHome(
       tester,
       filterService: filterService,

@@ -1,10 +1,11 @@
-// VisionFilterSnapshot（#65）のテスト。
+// VisionFilterSnapshot（#65, #117 で v2）のテスト。
 //
-// - JSON の往復で、カタログ全 30 フィルタの payload（seed の u64 全域を含む）・
-//   強度・選択の起源が失われない。
-// - 読み込みはカタログの定義（min/max/default/options）に照らして補正する:
-//   範囲外は丸め、型違い・未知の選択肢・NaN は既定値、未知の id・引数は捨てる。
-// - 未知・欠落の版、Map でない値は丸ごと捨てる（null）。起動を止めない。
+// - JSON の往復で、レイヤー列・フォーカス・強度の記憶・payload（seed の u64 全域を
+//   含む）が失われない。
+// - 読み込みはカタログの定義（min/max/default/options）と層の不変条件（重複なし・
+//   色覚グループ排他・上限 5・適用順）に照らして補正する。
+// - 版 1（単一選択）は v2 の形へ変換して読む（fromLegacy）。未知・欠落の版、Map でない
+//   値は丸ごと捨てる（null）。起動を止めない。
 //
 // 補正の期待値はテスト内にカタログの値を直書きせず、カタログの定義から導く
 // （定義が変わってもテストが追従する。ただし「範囲外を作る」ための入力は
@@ -13,23 +14,55 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
+import 'package:universal_experience/models/vision_filter_stage.dart';
 import 'package:universal_experience/services/vision_filter_snapshot.dart';
+import 'package:universal_experience/services/vision_layer.dart';
 
+/// v2 の JSON。[layers] は JSON の層（Map）の列。
 Map<String, Object?> _json({
   Object? version = kVisionFilterSnapshotVersion,
+  Object? layers = const <Object?>[],
+  String? focusedId,
+  String? presetId,
+  Object? strengthByKey = const <String, Object?>{},
+  Object? paramsById = const <String, Object?>{},
+}) =>
+    {
+      'version': version,
+      'layers': layers,
+      'focusedId': focusedId,
+      'presetId': presetId,
+      'strengthByKey': strengthByKey,
+      'paramsById': paramsById,
+    };
+
+/// 版 1（単一選択）の JSON。
+Map<String, Object?> _v1({
   String? selectedId,
   String? presetId,
   String? colorVisionType,
   Object? filters = const <String, Object?>{},
 }) =>
     {
-      'version': version,
+      'version': 1,
       'selectedId': selectedId,
       'presetId': presetId,
       'colorVisionType': colorVisionType,
       'filters': filters,
+    };
+
+Map<String, Object?> _layer(
+  String id, {
+  String? variantId,
+  String? origin,
+  Object? params,
+}) =>
+    {
+      'id': id,
+      if (variantId != null) 'variantId': variantId,
+      if (origin != null) 'origin': origin,
+      if (params != null) 'params': params,
     };
 
 /// 定義の内側で、既定値とは違う値。
@@ -49,23 +82,45 @@ Object _nonDefaultValue(VisionParam p) {
 
 VisionFilterEntry _entry(String id) => kVisionFilterCatalogById[id]!;
 
+Map<String, Object> _nonDefaultParams(String id) => {
+      for (final p in _entry(id).parameters) p.name: _nonDefaultValue(p),
+    };
+
+List<String> _ids(VisionFilterSnapshot s) => [for (final l in s.layers) l.id];
+
 void main() {
   group('JSON の往復', () {
-    test('カタログ全フィルタの強度・payload が jsonEncode を経ても一致する', () {
-      final strengthById = <String, double>{};
+    test('層・フォーカス・強度の記憶・payload が jsonEncode を経ても一致する', () {
+      // 適用順に並んだ 5 層（上限ちょうど）。層の payload は既定値と違う値にする。
+      const layerIds = [
+        'starbursts',
+        'floaters',
+        'glaucoma',
+        'teichopsia',
+        'deuteranopia',
+      ];
+      final layers = [
+        for (final id in layerIds)
+          VisionLayer(
+            id: id,
+            params: _nonDefaultParams(id),
+            origin: id == 'deuteranopia'
+                ? VisionLayerOrigin.quick
+                : VisionLayerOrigin.advanced,
+          ),
+      ];
+      final strengthByKey = <String, double>{};
       final paramsById = <String, Map<String, Object>>{};
       var i = 0;
       for (final e in kVisionFilterCatalog) {
-        strengthById[e.id] = 0.1 + (i++ % 9) * 0.1;
-        if (e.parameters.isNotEmpty) {
-          paramsById[e.id] = {
-            for (final p in e.parameters) p.name: _nonDefaultValue(p),
-          };
-        }
+        strengthByKey[e.id] = 0.1 + (i++ % 9) * 0.1;
+        if (e.parameters.isNotEmpty) paramsById[e.id] = _nonDefaultParams(e.id);
       }
+      strengthByKey['tritanomaly'] = 0.35; // 別名キーの記憶
       final snapshot = VisionFilterSnapshot(
-        selectedId: 'starbursts',
-        strengthById: strengthById,
+        layers: layers,
+        focusedId: 'glaucoma',
+        strengthByKey: strengthByKey,
         paramsById: paramsById,
       );
 
@@ -73,9 +128,17 @@ void main() {
         jsonDecode(jsonEncode(snapshot.toJson())),
       )!;
 
-      expect(restored.selectedId, 'starbursts');
-      expect(restored.strengthById, strengthById);
+      expect(_ids(restored), layerIds);
+      for (var k = 0; k < layers.length; k++) {
+        expect(restored.layers[k].params, layers[k].params,
+            reason: layers[k].id);
+        expect(restored.layers[k].origin, layers[k].origin,
+            reason: layers[k].id);
+      }
+      expect(restored.focusedId, 'glaucoma');
+      expect(restored.strengthByKey, strengthByKey);
       expect(restored.paramsById, paramsById);
+      expect(restored.fromLegacy, isFalse);
       expect(paramsById.isNotEmpty, isTrue,
           reason: 'payload を持つフィルタが 1 つも無いと往復の検証にならない');
     });
@@ -88,7 +151,10 @@ void main() {
         kSeedMax,
       ]) {
         final snapshot = VisionFilterSnapshot(
-          selectedId: 'floaters',
+          layers: [
+            VisionLayer(id: 'floaters', params: {'seed': seed}),
+          ],
+          focusedId: 'floaters',
           paramsById: {
             'floaters': {'seed': seed},
           },
@@ -97,50 +163,86 @@ void main() {
 
         final restored = VisionFilterSnapshot.fromJson(decoded)!;
 
+        expect(restored.layers.single.params['seed'], seed);
         expect(restored.paramsById['floaters']!['seed'], seed);
       }
     });
 
-    test('選択の起源（プリセット・色覚クイック選択）も往復する', () {
+    test('プリセット・quick 層・別名（-omaly）も往復する', () {
       final preset = VisionFilterSnapshot.fromJson(jsonDecode(jsonEncode(
-        const VisionFilterSnapshot(
-          selectedId: 'vertigo',
+        VisionFilterSnapshot(
+          layers: [VisionLayer(id: 'vertigo')],
+          focusedId: 'vertigo',
           presetId: 'labyrinthitis',
         ).toJson(),
       )))!;
       expect(preset.presetId, 'labyrinthitis');
-      expect(preset.colorVisionType, isNull);
+      expect(preset.layers.single.origin, VisionLayerOrigin.advanced);
 
-      final color = VisionFilterSnapshot.fromJson(jsonDecode(jsonEncode(
-        const VisionFilterSnapshot(
-          selectedId: 'protanopia',
-          colorVisionType: ColorVisionType.protanomaly,
+      final omaly = VisionFilterSnapshot.fromJson(jsonDecode(jsonEncode(
+        VisionFilterSnapshot(
+          layers: [
+            VisionLayer(
+              id: 'protanopia',
+              variantId: 'protanomaly',
+              origin: VisionLayerOrigin.quick,
+            ),
+          ],
+          focusedId: 'protanopia',
         ).toJson(),
       )))!;
-      expect(color.colorVisionType, ColorVisionType.protanomaly);
-      expect(color.presetId, isNull);
+      expect(omaly.layers.single.variantId, 'protanomaly');
+      expect(omaly.layers.single.origin, VisionLayerOrigin.quick);
+      expect(omaly.layers.single.strengthKey, 'protanomaly');
+      expect(omaly.presetId, isNull);
     });
 
-    test('toJson はスキーマ版を書き、seed を文字列で書く', () {
+    test('toJson はスキーマ版 2 を書き、seed を文字列で、層に強度を書かない', () {
       final json = VisionFilterSnapshot(
-        selectedId: 'floaters',
-        paramsById: {
-          'floaters': {'seed': BigInt.two},
-        },
+        layers: [
+          VisionLayer(id: 'floaters', params: {'seed': BigInt.two}),
+        ],
+        focusedId: 'floaters',
+        strengthByKey: const {'floaters': 0.5},
       ).toJson();
 
-      expect(json['version'], kVisionFilterSnapshotVersion);
-      final floaters = (json['filters'] as Map)['floaters'] as Map;
-      expect((floaters['params'] as Map)['seed'], '2');
+      expect(json['version'], 2);
+      expect(kVisionFilterSnapshotVersion, 2);
+      final layer = (json['layers'] as List).single as Map;
+      expect((layer['params'] as Map)['seed'], '2');
+      expect(layer.containsKey('strength'), isFalse,
+          reason: '強度は層でなくキーごとの記憶に持つ');
+      expect(layer['origin'], 'advanced');
+      expect(layer.containsKey('variantId'), isFalse);
+      expect((json['strengthByKey'] as Map)['floaters'], 0.5);
+    });
+
+    test('isEmpty は層・強度の記憶・payload の記憶がすべて空のときだけ true', () {
+      expect(const VisionFilterSnapshot().isEmpty, isTrue);
+      expect(
+        VisionFilterSnapshot(layers: [VisionLayer(id: 'myopia')]).isEmpty,
+        isFalse,
+      );
+      expect(
+        const VisionFilterSnapshot(strengthByKey: {'myopia': 0.5}).isEmpty,
+        isFalse,
+      );
+      expect(
+        const VisionFilterSnapshot(paramsById: {
+          'floaters': {'seed': 1},
+        }).isEmpty,
+        isFalse,
+      );
     });
   });
 
   group('版・形式が合わない保存値は捨てる（null）', () {
     test('版が新しい / 古い / 無い / 型違い', () {
-      expect(VisionFilterSnapshot.fromJson(_json(version: 2)), isNull);
+      expect(VisionFilterSnapshot.fromJson(_json(version: 3)), isNull);
       expect(VisionFilterSnapshot.fromJson(_json(version: 0)), isNull);
       expect(VisionFilterSnapshot.fromJson(_json(version: null)), isNull);
-      expect(VisionFilterSnapshot.fromJson(_json(version: '1')), isNull);
+      expect(VisionFilterSnapshot.fromJson(_json(version: '2')), isNull);
+      expect(VisionFilterSnapshot.fromJson(_json(version: 2.5)), isNull);
     });
 
     test('旧形式（版を持たない素朴な Map）は復元しない', () {
@@ -160,49 +262,292 @@ void main() {
     });
   });
 
-  group('カタログに照らした補正', () {
-    test('未知のフィルタ id は選択も記憶も捨てる', () {
+  group('層の不変条件に照らした補正（v2）', () {
+    test('未知のカタログ id の層は捨てる', () {
       final s = VisionFilterSnapshot.fromJson(_json(
-        selectedId: 'removed_in_sensus',
-        filters: {
-          'removed_in_sensus': {'strength': 0.5},
-          'myopia': {'strength': 0.4},
+        layers: [_layer('removed_in_sensus'), _layer('myopia')],
+        focusedId: 'removed_in_sensus',
+      ))!;
+
+      expect(_ids(s), ['myopia']);
+      expect(s.focusedId, isNull);
+    });
+
+    test('同じ id の重複は先に現れた層を残す', () {
+      final p = _entry('astigmatism').parameters.single;
+      final s = VisionFilterSnapshot.fromJson(_json(layers: [
+        _layer('astigmatism', params: {p.name: p.min}),
+        _layer('astigmatism', params: {p.name: p.max}),
+      ]))!;
+
+      expect(_ids(s), ['astigmatism']);
+      expect(s.layers.single.params[p.name], p.min);
+    });
+
+    test('色覚グループは排他: 先に現れた 1 つだけ残す', () {
+      final s = VisionFilterSnapshot.fromJson(_json(layers: [
+        _layer('tritanopia'),
+        _layer('protanopia'),
+        _layer('tetrachromacy'),
+        _layer('myopia'),
+      ]))!;
+
+      expect(_ids(s), ['myopia', 'tritanopia']);
+    });
+
+    test('上限 5 を超える分は先のものを残して捨てる', () {
+      // すべて適用順に並べた 6 層。
+      const ids = [
+        'vertigo',
+        'myopia',
+        'floaters',
+        'glaucoma',
+        'teichopsia',
+        'protanopia',
+      ];
+      final s = VisionFilterSnapshot.fromJson(_json(layers: [
+        for (final id in ids) _layer(id),
+      ]))!;
+
+      expect(kMaxVisionLayers, 5);
+      expect(_ids(s), ids.take(5).toList());
+    });
+
+    test('保存順が適用順でなくても、読み込み後は適用順（段 → 段内の宣言順）に並ぶ', () {
+      final s = VisionFilterSnapshot.fromJson(_json(layers: [
+        _layer('protanopia'),
+        _layer('teichopsia'),
+        _layer('floaters'),
+        _layer('cataract'),
+        _layer('myopia'),
+      ]))!;
+
+      // 光学段は sensus の宣言順（myopia が cataract より先）。
+      expect(_ids(s),
+          ['myopia', 'cataract', 'floaters', 'teichopsia', 'protanopia']);
+      final orders = [for (final l in s.layers) visionFilterApplyOrder(l.id)!];
+      expect(orders, [...orders]..sort());
+    });
+
+    test('別名（variantId）は対応する -opia の quick 層にだけ付く', () {
+      final s = VisionFilterSnapshot.fromJson(_json(layers: [
+        _layer('protanopia', variantId: 'protanomaly', origin: 'quick'),
+      ]))!;
+      expect(s.layers.single.variantId, 'protanomaly');
+      expect(s.layers.single.origin, VisionLayerOrigin.quick);
+
+      // advanced 層（origin が無い・advanced）に付いた別名は捨てる。
+      for (final origin in [null, 'advanced']) {
+        final a = VisionFilterSnapshot.fromJson(_json(layers: [
+          _layer('protanopia', variantId: 'protanomaly', origin: origin),
+        ]))!;
+        expect(a.layers.single.origin, VisionLayerOrigin.advanced);
+        expect(a.layers.single.variantId, isNull, reason: 'origin=$origin');
+      }
+
+      for (final bad in [
+        ('deuteranopia', 'protanomaly'), // 対応しない別名
+        ('protanopia', 'protanopia'), // 別名でない
+        ('protanopia', 'not_a_type'),
+        ('myopia', 'protanomaly'),
+        ('achromatopsia', 'tritanomaly'),
+      ]) {
+        final t = VisionFilterSnapshot.fromJson(_json(layers: [
+          _layer(bad.$1, variantId: bad.$2, origin: 'quick'),
+        ]))!;
+        expect(t.layers.single.variantId, isNull, reason: '$bad');
+      }
+    });
+
+    test('quick の起源は -opia 4 種の層にだけ許し、他は advanced に落とす', () {
+      final s = VisionFilterSnapshot.fromJson(_json(layers: [
+        _layer('myopia', origin: 'quick'),
+        _layer('tetrachromacy', origin: 'quick'),
+      ]))!;
+      expect([
+        for (final l in s.layers) l.origin
+      ], [
+        VisionLayerOrigin.advanced,
+        VisionLayerOrigin.advanced,
+      ]);
+
+      final q = VisionFilterSnapshot.fromJson(_json(layers: [
+        _layer('achromatopsia', origin: 'quick'),
+      ]))!;
+      expect(q.layers.single.origin, VisionLayerOrigin.quick);
+
+      final unknown = VisionFilterSnapshot.fromJson(_json(layers: [
+        _layer('achromatopsia', origin: 'sideways'),
+      ]))!;
+      expect(unknown.layers.single.origin, VisionLayerOrigin.advanced);
+    });
+
+    test('focusedId は層に無ければ捨てる', () {
+      final withLayer = VisionFilterSnapshot.fromJson(_json(
+        layers: [_layer('myopia'), _layer('floaters')],
+        focusedId: 'floaters',
+      ))!;
+      expect(withLayer.focusedId, 'floaters');
+
+      final notInLayers = VisionFilterSnapshot.fromJson(_json(
+        layers: [_layer('myopia')],
+        focusedId: 'floaters',
+      ))!;
+      expect(notInLayers.focusedId, isNull);
+    });
+
+    test('presetId は層がちょうど 1 つのときだけ持つ', () {
+      final one = VisionFilterSnapshot.fromJson(_json(
+        layers: [_layer('vertigo')],
+        presetId: 'labyrinthitis',
+      ))!;
+      expect(one.presetId, 'labyrinthitis');
+
+      final two = VisionFilterSnapshot.fromJson(_json(
+        layers: [_layer('vertigo'), _layer('myopia')],
+        presetId: 'labyrinthitis',
+      ))!;
+      expect(two.presetId, isNull);
+
+      final none = VisionFilterSnapshot.fromJson(_json(
+        presetId: 'labyrinthitis',
+      ))!;
+      expect(none.presetId, isNull);
+
+      final empty = VisionFilterSnapshot.fromJson(_json(
+        layers: [_layer('vertigo')],
+        presetId: '',
+      ))!;
+      expect(empty.presetId, isNull);
+    });
+
+    test('layers が List でない・要素が Map でなくても他の部分は読む', () {
+      final broken = VisionFilterSnapshot.fromJson(_json(
+        layers: 'broken',
+        strengthByKey: {'myopia': 0.4},
+      ))!;
+      expect(broken.layers, isEmpty);
+      expect(broken.strengthByKey, {'myopia': 0.4});
+
+      final mixed = VisionFilterSnapshot.fromJson(_json(
+        layers: ['str', 7, null, _layer('myopia')],
+      ))!;
+      expect(_ids(mixed), ['myopia']);
+    });
+
+    test('層の params が無ければ id ごとの記憶 → 既定値の順で補う', () {
+      final p = _entry('astigmatism').parameters.single;
+      final mid = (p.min! + p.max!) / 2;
+      final memory = mid == p.defaultValue ? p.min! : mid;
+
+      final fromMemory = VisionFilterSnapshot.fromJson(_json(
+        layers: [_layer('astigmatism')],
+        paramsById: {
+          'astigmatism': {p.name: memory},
+        },
+      ))!;
+      expect(fromMemory.layers.single.params[p.name], memory);
+
+      final fromDefault = VisionFilterSnapshot.fromJson(_json(
+        layers: [_layer('astigmatism')],
+      ))!;
+      expect(fromDefault.layers.single.params,
+          defaultVisionParams(_entry('astigmatism')));
+    });
+
+    test('層に載った payload は id ごとの記憶にも反映される（層が正本）', () {
+      final p = _entry('astigmatism').parameters.single;
+      final s = VisionFilterSnapshot.fromJson(_json(
+        layers: [
+          _layer('astigmatism', params: {p.name: p.max}),
+        ],
+        paramsById: {
+          'astigmatism': {p.name: p.min},
         },
       ))!;
 
-      expect(s.selectedId, isNull);
-      expect(s.strengthById.keys, ['myopia']);
+      expect(s.layers.single.params[p.name], p.max);
+      expect(s.paramsById['astigmatism']![p.name], p.max);
+    });
+  });
+
+  group('強度の記憶の補正', () {
+    test('0..1 に丸め、数値でなければそのキーだけ捨てる', () {
+      final s = VisionFilterSnapshot.fromJson(_json(strengthByKey: {
+        'myopia': 5,
+        'hyperopia': -2,
+        'presbyopia': 'strong',
+        'cataract': double.nan,
+        'dry_eye': null,
+      }))!;
+
+      expect(s.strengthByKey['myopia'], 1.0);
+      expect(s.strengthByKey['hyperopia'], 0.0);
+      expect(s.strengthByKey.containsKey('presbyopia'), isFalse);
+      expect(s.strengthByKey.containsKey('cataract'), isFalse);
+      expect(s.strengthByKey.containsKey('dry_eye'), isFalse);
+    });
+
+    test('キーはカタログ id か -omaly の別名 id だけ。未知のキーは捨てる', () {
+      final s = VisionFilterSnapshot.fromJson(_json(strengthByKey: {
+        'removed_in_sensus': 0.5,
+        'protanomaly': 0.6,
+        'deuteranomaly': 0.7,
+        'tritanomaly': 0.8,
+        'none': 0.9,
+        'protanopia': 1.0,
+      }))!;
+
+      expect(s.strengthByKey, {
+        'protanomaly': 0.6,
+        'deuteranomaly': 0.7,
+        'tritanomaly': 0.8,
+        'protanopia': 1.0,
+      });
+    });
+
+    test('strengthByKey が Map でなければ空', () {
+      final s = VisionFilterSnapshot.fromJson(_json(
+        layers: [_layer('myopia')],
+        strengthByKey: [1, 2],
+      ))!;
+      expect(s.strengthByKey, isEmpty);
+      expect(_ids(s), ['myopia']);
+    });
+  });
+
+  group('payload のカタログに照らした補正', () {
+    Map<String, Object> restoreParams(String id, Object? rawParams) =>
+        VisionFilterSnapshot.fromJson(_json(paramsById: {
+          id: rawParams,
+        }))!
+            .paramsById[id]!;
+
+    test('未知のフィルタ id・引数を持たないフィルタの記憶は捨てる', () {
+      final s = VisionFilterSnapshot.fromJson(_json(paramsById: {
+        'removed_in_sensus': {'x': 1},
+        'myopia': {'x': 1},
+        'astigmatism': <String, Object?>{},
+      }))!;
+
+      expect(s.paramsById.keys, ['astigmatism']);
     });
 
     test('float は範囲外なら min/max へ丸める', () {
       final p = _entry('astigmatism').parameters.single; // axisDeg
-      final over = VisionFilterSnapshot.fromJson(_json(filters: {
-        'astigmatism': {
-          'params': {p.name: p.max! + 1000},
-        },
-      }))!;
-      final under = VisionFilterSnapshot.fromJson(_json(filters: {
-        'astigmatism': {
-          'params': {p.name: p.min! - 1000},
-        },
-      }))!;
 
-      expect(over.paramsById['astigmatism']![p.name], p.max);
-      expect(under.paramsById['astigmatism']![p.name], p.min);
+      expect(
+          restoreParams('astigmatism', {p.name: p.max! + 1000})[p.name], p.max);
+      expect(
+          restoreParams('astigmatism', {p.name: p.min! - 1000})[p.name], p.min);
     });
 
     test('int は四捨五入して範囲へ丸め、int 型で返す', () {
       final p = _entry('starbursts')
           .parameters
           .firstWhere((p) => p.kind == VisionParamKind.intValue);
-      Object? restore(Object? v) => VisionFilterSnapshot.fromJson(_json(
-            filters: {
-              'starbursts': {
-                'params': {p.name: v},
-              },
-            },
-          ))!
-              .paramsById['starbursts']![p.name];
+      Object? restore(Object? v) =>
+          restoreParams('starbursts', {p.name: v})[p.name];
 
       expect(restore(p.max! + 500), p.max!.toInt());
       expect(restore(p.min! - 500), p.min!.toInt());
@@ -221,35 +566,29 @@ void main() {
         double.infinity,
         <Object?>[],
       ]) {
-        final params = VisionFilterSnapshot.fromJson(_json(filters: {
-          'astigmatism': {
-            'params': {p.name: bad},
-          },
-        }))!
-            .paramsById['astigmatism']!;
-
-        expect(params[p.name], p.defaultValue, reason: 'bad=$bad');
+        expect(
+            restoreParams('astigmatism', {p.name: bad})[p.name], p.defaultValue,
+            reason: 'bad=$bad');
       }
+    });
+
+    test('層の params も同じ規則で補正する', () {
+      final p = _entry('astigmatism').parameters.single;
+      final s = VisionFilterSnapshot.fromJson(_json(layers: [
+        _layer('astigmatism', params: {p.name: p.max! + 1000}),
+      ]))!;
+
+      expect(s.layers.single.params[p.name], p.max);
     });
 
     test('enum は選択肢に無い値を既定値に戻す', () {
       final p = _entry('glaucoma').parameters.single; // mode
-      final params = VisionFilterSnapshot.fromJson(_json(filters: {
-        'glaucoma': {
-          'params': {p.name: 'removed_option'},
-        },
-      }))!
-          .paramsById['glaucoma']!;
-      expect(params[p.name], p.defaultValue);
+      expect(restoreParams('glaucoma', {p.name: 'removed_option'})[p.name],
+          p.defaultValue);
 
       final valid = p.options.firstWhere((o) => o.value != p.defaultValue);
-      final kept = VisionFilterSnapshot.fromJson(_json(filters: {
-        'glaucoma': {
-          'params': {p.name: valid.value},
-        },
-      }))!
-          .paramsById['glaucoma']!;
-      expect(kept[p.name], valid.value);
+      expect(restoreParams('glaucoma', {p.name: valid.value})[p.name],
+          valid.value);
     });
 
     test('seed は u64 の範囲外・数字でない文字列を既定値に戻す', () {
@@ -271,14 +610,8 @@ void main() {
         1.5,
         null,
       ]) {
-        final params = VisionFilterSnapshot.fromJson(_json(filters: {
-          'floaters': {
-            'params': {p.name: bad},
-          },
-        }))!
-            .paramsById['floaters']!;
-
-        expect(params[p.name], BigInt.zero, reason: 'bad=$bad');
+        expect(restoreParams('floaters', {p.name: bad})[p.name], BigInt.zero,
+            reason: 'bad=$bad');
       }
     });
 
@@ -288,12 +621,8 @@ void main() {
           .firstWhere((p) => p.kind == VisionParamKind.float)
           .name;
 
-      final params = VisionFilterSnapshot.fromJson(_json(filters: {
-        'floaters': {
-          'params': {keep: 0.25, 'removed_param': 7},
-        },
-      }))!
-          .paramsById['floaters']!;
+      final params =
+          restoreParams('floaters', {keep: 0.25, 'removed_param': 7});
 
       expect(params.containsKey('removed_param'), isFalse);
       expect(params[keep], 0.25);
@@ -303,51 +632,162 @@ void main() {
         reason: '保存に無かった引数も既定値で揃う',
       );
     });
+  });
 
-    test('強度は 0..1 に丸め、数値でなければその id の強度だけ捨てる', () {
-      final s = VisionFilterSnapshot.fromJson(_json(filters: {
+  group('版 1（単一選択）の変換', () {
+    test('選択は advanced 層 1 つになり、fromLegacy が立つ', () {
+      final s = VisionFilterSnapshot.fromJson(_v1(
+        selectedId: 'myopia',
+        filters: {
+          'myopia': {'strength': 0.4},
+        },
+      ))!;
+
+      expect(s.fromLegacy, isTrue);
+      expect(_ids(s), ['myopia']);
+      expect(s.layers.single.origin, VisionLayerOrigin.advanced);
+      expect(s.focusedId, 'myopia');
+      expect(s.strengthByKey, {'myopia': 0.4});
+    });
+
+    test('色覚クイック選択は quick 層になり、-omaly は別名つきになる', () {
+      final opia = VisionFilterSnapshot.fromJson(_v1(
+        selectedId: 'protanopia',
+        colorVisionType: 'protanopia',
+      ))!;
+      expect(opia.layers.single.origin, VisionLayerOrigin.quick);
+      expect(opia.layers.single.variantId, isNull);
+
+      final omaly = VisionFilterSnapshot.fromJson(_v1(
+        selectedId: 'deuteranopia',
+        colorVisionType: 'deuteranomaly',
+      ))!;
+      expect(omaly.layers.single.id, 'deuteranopia');
+      expect(omaly.layers.single.variantId, 'deuteranomaly');
+      expect(omaly.layers.single.origin, VisionLayerOrigin.quick);
+      expect(omaly.presetId, isNull);
+    });
+
+    test('colorVisionType が選択 id と食い違えば quick にせず advanced 層にする', () {
+      final s = VisionFilterSnapshot.fromJson(_v1(
+        selectedId: 'tritanopia',
+        colorVisionType: 'protanopia',
+      ))!;
+
+      expect(s.layers.single.id, 'tritanopia');
+      expect(s.layers.single.origin, VisionLayerOrigin.advanced);
+      expect(s.layers.single.variantId, isNull);
+    });
+
+    test('プリセット由来は advanced 層 + presetId を引き継ぐ', () {
+      final s = VisionFilterSnapshot.fromJson(_v1(
+        selectedId: 'vertigo',
+        presetId: 'labyrinthitis',
+      ))!;
+
+      expect(s.presetId, 'labyrinthitis');
+      expect(s.layers.single.origin, VisionLayerOrigin.advanced);
+    });
+
+    test('-opia 4 種の強度は持ち越さず、tetrachromacy と他のフィルタの強度は残す', () {
+      final s = VisionFilterSnapshot.fromJson(_v1(filters: {
+        'protanopia': {'strength': 0.3},
+        'deuteranopia': {'strength': 0.3},
+        'tritanopia': {'strength': 0.3},
+        'achromatopsia': {'strength': 0.3},
+        'tetrachromacy': {'strength': 0.7},
         'myopia': {'strength': 5},
-        'hyperopia': {'strength': -2},
-        'presbyopia': {'strength': 'strong'},
-        'cataract': {'strength': double.nan},
-        'dry_eye': 'not a map',
+        'hyperopia': {'strength': 'strong'},
       }))!;
 
-      expect(s.strengthById['myopia'], 1.0);
-      expect(s.strengthById['hyperopia'], 0.0);
-      expect(s.strengthById.containsKey('presbyopia'), isFalse);
-      expect(s.strengthById.containsKey('cataract'), isFalse);
-      expect(s.strengthById.containsKey('dry_eye'), isFalse);
+      expect(s.strengthByKey, {'tetrachromacy': 0.7, 'myopia': 1.0});
     });
 
-    test('filters が Map でなくても選択だけは復元する', () {
-      final s = VisionFilterSnapshot.fromJson(
-        _json(selectedId: 'myopia', filters: 'broken'),
-      )!;
+    test('選択が無い・未知の id なら層は空（強度の記憶だけ残る）', () {
+      final none = VisionFilterSnapshot.fromJson(_v1(filters: {
+        'myopia': {'strength': 0.4},
+      }))!;
+      expect(none.layers, isEmpty);
+      expect(none.focusedId, isNull);
+      expect(none.strengthByKey, {'myopia': 0.4});
+      expect(none.isEmpty, isFalse);
 
-      expect(s.selectedId, 'myopia');
-      expect(s.strengthById, isEmpty);
-      expect(s.paramsById, isEmpty);
-    });
-
-    test('選択が無ければプリセット・色覚の起源も捨てる', () {
-      final s = VisionFilterSnapshot.fromJson(_json(
+      final unknown = VisionFilterSnapshot.fromJson(_v1(
         selectedId: 'removed_in_sensus',
         presetId: 'meniere',
         colorVisionType: 'protanopia',
       ))!;
+      expect(unknown.layers, isEmpty);
+      expect(unknown.presetId, isNull);
+      expect(unknown.isEmpty, isTrue);
+    });
 
-      expect(s.presetId, isNull);
-      expect(s.colorVisionType, isNull);
+    test('-opia の強度だけを持つ版 1 は、強度を持ち越さなくても空として扱わない', () {
+      final s = VisionFilterSnapshot.fromJson(_v1(filters: {
+        'protanopia': {'strength': 1.0},
+      }))!;
+
+      expect(s.layers, isEmpty);
+      expect(s.strengthByKey, isEmpty);
+      expect(s.legacyHadContent, isTrue);
+      expect(s.isEmpty, isFalse, reason: '旧実装は非空の保存値として復元した');
+
+      final truly = VisionFilterSnapshot.fromJson(_v1())!;
+      expect(truly.legacyHadContent, isFalse);
+      expect(truly.isEmpty, isTrue);
+    });
+
+    test('選択中フィルタの payload は層と id ごとの記憶の両方に入る', () {
+      final p = _entry('astigmatism').parameters.single;
+      final s = VisionFilterSnapshot.fromJson(_v1(
+        selectedId: 'astigmatism',
+        filters: {
+          'astigmatism': {
+            'params': {p.name: p.max! + 1000},
+          },
+        },
+      ))!;
+
+      expect(s.layers.single.params[p.name], p.max);
+      expect(s.paramsById['astigmatism']![p.name], p.max);
+    });
+
+    test('filters が Map でなくても選択だけは読む', () {
+      final s = VisionFilterSnapshot.fromJson(
+        _v1(selectedId: 'myopia', filters: 'broken'),
+      )!;
+
+      expect(_ids(s), ['myopia']);
+      expect(s.strengthByKey, isEmpty);
     });
 
     test('色覚型は none・未知の名前を受け付けない', () {
       for (final bad in ['none', 'tetrachromacy_x', '']) {
         final s = VisionFilterSnapshot.fromJson(
-          _json(selectedId: 'protanopia', colorVisionType: bad),
+          _v1(selectedId: 'protanopia', colorVisionType: bad),
         )!;
-        expect(s.colorVisionType, isNull, reason: 'bad=$bad');
+        expect(s.layers.single.origin, VisionLayerOrigin.advanced,
+            reason: 'bad=$bad');
       }
+    });
+
+    test('v1 を変換して v2 で書き戻すと、そのまま v2 として読める（fromLegacy は落ちる）', () {
+      final legacy = VisionFilterSnapshot.fromJson(_v1(
+        selectedId: 'protanopia',
+        colorVisionType: 'protanomaly',
+        filters: {
+          'myopia': {'strength': 0.4},
+        },
+      ))!;
+
+      final again = VisionFilterSnapshot.fromJson(
+        jsonDecode(jsonEncode(legacy.toJson())),
+      )!;
+
+      expect(again.fromLegacy, isFalse);
+      expect(again.layers.single.variantId, 'protanomaly');
+      expect(again.layers.single.origin, VisionLayerOrigin.quick);
+      expect(again.strengthByKey, {'myopia': 0.4});
     });
   });
 

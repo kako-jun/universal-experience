@@ -285,8 +285,7 @@ void main() {
       );
     });
 
-    test('glaucoma の fieldLossMode は常に darken で構築される（カタログに公開しない、#56）',
-        () {
+    test('glaucoma の fieldLossMode は常に darken で構築される（カタログに公開しない、#56）', () {
       final state = VisionFilterState()..select('glaucoma');
       // fieldLossMode はカタログにパラメータが無いため setParam しても build() の
       // switch は _raw() ではなく VisionFieldLossMode.darken を直接使う。
@@ -389,7 +388,7 @@ void main() {
     });
 
     test('strength は 0..1 に clamp して notify', () {
-      final state = VisionFilterState();
+      final state = VisionFilterState()..select('cataract');
       var notified = 0;
       state.addListener(() => notified++);
       state.setStrength(0.5);

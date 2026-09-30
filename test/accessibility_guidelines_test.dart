@@ -70,7 +70,7 @@ void main() {
     required Locale locale,
   }) async {
     await installFakes(tester);
-    final h = await pumpHomeScreen(
+    await pumpHomeScreen(
       tester,
       size: size,
       theme: theme,
@@ -78,7 +78,6 @@ void main() {
       select: (f, s) => selectColorVision(f, s, ColorVisionType.protanopia),
     );
     await settle(tester);
-    addTearDown(h.filterService.flush);
   }
 
   const wide = Size(1280, 800);
@@ -154,7 +153,6 @@ void main() {
         await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
         await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
         await expectLater(tester, meetsGuideline(textContrastGuideline));
-        await h.filterService.flush();
         handle.dispose();
       });
     }
@@ -172,7 +170,6 @@ void main() {
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
       await expectLater(tester, meetsGuideline(textContrastGuideline));
-      await h.filterService.flush();
       handle.dispose();
     });
   });
@@ -194,7 +191,6 @@ void main() {
           entry.value(h);
           await settle(tester);
           await expectLater(tester, meetsGuideline(textContrastGuideline));
-          await h.filterService.flush();
           handle.dispose();
         });
       }
@@ -228,7 +224,7 @@ void main() {
       visionFilterUrgencyEscalationProvider = (_) => const [];
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final visionState = VisionFilterState()..select('photophobia');
-      final filterService = FilterService();
+      final filterService = FilterService(visionState: visionState);
       final loupe = LoupeWindowController();
       await tester.runAsync(() => loupe.setAppMode(AppMode.loupe));
       tester.view.physicalSize = const Size(900, 300);

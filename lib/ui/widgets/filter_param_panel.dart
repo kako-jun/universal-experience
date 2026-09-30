@@ -27,8 +27,9 @@ import 'strength_caution.dart';
 ///
 /// strength スライダは、選択が色覚クイック選択（統合一覧の色覚の行/トレイ）
 /// 由来のときは出さない（`lib/services/preview_selection.dart` の
-/// `showsAdvancedStrengthSlider` を参照。その場合の強度は #57 のタイプ別
-/// 記憶が決め、このスライダーを動かしても反映されないため、#60）。
+/// `showsAdvancedStrengthSlider` を参照。その場合の強度は `IntensitySlider` が
+/// 同じキーごとの記憶（`VisionFilterState.strengthByKey`、#117）を動かすので、
+/// 2 本のスライダーが並ぶのを避けるため、#60）。
 /// 文言はすべて i18n で解決する（カタログは識別子/enum のみ持つ: #18）。
 class FilterParamPanel extends StatelessWidget {
   const FilterParamPanel({super.key, this.noticeOverride});
@@ -61,10 +62,10 @@ class FilterParamPanel extends StatelessWidget {
         // 表示は ConsultNoticeBlock（プリセットカード・export と共有）に委ねる。
         final notice =
             noticeOverride ?? resolveConsultNotice(l10n, urgency, escalation);
-        // 色覚クイック選択由来の選択では、強度は previewStrength が
-        // FilterService のタイプ別記憶（#57）から決める — この strength
-        // スライダーを動かしても実際のプレビューには反映されないので出さない
-        // （判定は showsAdvancedStrengthSlider に集約、#60）。
+        // 色覚クイック選択由来の選択では、強度は IntensitySlider が同じ
+        // キーごとの記憶（VisionFilterState.strengthByKey、#117）を動かす。
+        // 同じ記憶を動かす 2 本のスライダーを並べないよう、この strength
+        // スライダーは出さない（判定は showsAdvancedStrengthSlider に集約、#60）。
         final showStrength = showsAdvancedStrengthSlider(state);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

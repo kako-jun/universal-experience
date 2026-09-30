@@ -141,16 +141,14 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
-      )
-          .firstWhere((e) => e.kind == TrayMenuKind.toggleLoupe);
+      ).firstWhere((e) => e.kind == TrayMenuKind.toggleLoupe);
       final hidden = buildTrayMenuSpec(
         loupeVisible: false,
         labels: _labels,
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
-      )
-          .firstWhere((e) => e.kind == TrayMenuKind.toggleLoupe);
+      ).firstWhere((e) => e.kind == TrayMenuKind.toggleLoupe);
 
       expect(visible.label, 'ルーペ窓を隠す');
       expect(visible.checked, isTrue);
@@ -184,8 +182,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
-      )
-          .firstWhere((e) => e.kind == TrayMenuKind.clearFilter);
+      ).firstWhere((e) => e.kind == TrayMenuKind.clearFilter);
       final inactive = buildTrayMenuSpec(
         loupeVisible: true,
         labels: _labels,
@@ -371,8 +368,8 @@ void main() {
     late TrayService trayService;
 
     setUp(() {
-      filterService = FilterService();
       visionFilterState = VisionFilterState();
+      filterService = FilterService(visionState: visionFilterState);
       trayService = TrayService(
         filterService: filterService,
         visionFilterState: visionFilterState,
@@ -440,9 +437,10 @@ void main() {
     test('表示中なら onHideLoupe を呼び、非表示中なら onShowLoupe を呼ぶ', () async {
       var showCalls = 0;
       var hideCalls = 0;
+      final vs = VisionFilterState();
       final trayService = TrayService(
-        filterService: FilterService(),
-        visionFilterState: VisionFilterState(),
+        filterService: FilterService(visionState: vs),
+        visionFilterState: vs,
         loupeWindow: LoupeWindowController(),
         iconPath: 'assets/tray/tray_icon.png',
         labels: _labels,
@@ -481,9 +479,10 @@ void main() {
     test('init() のあと loupeWindow の変化で listener が発火する', () async {
       SharedPreferences.setMockInitialValues({});
       final loupeWindow = LoupeWindowController();
+      final vs = VisionFilterState();
       final trayService = TrayService(
-        filterService: FilterService(),
-        visionFilterState: VisionFilterState(),
+        filterService: FilterService(visionState: vs),
+        visionFilterState: vs,
         loupeWindow: loupeWindow,
         iconPath: 'assets/tray/tray_icon.png',
         labels: _labels,
@@ -505,14 +504,14 @@ void main() {
 
     test(
         'loupeWindow.setAppMode/setAlwaysOnTop/setClickThrough で '
-        'トレイが参照する状態が反転する（クリックハンドラが最終的に呼ぶメソッド）',
-        () async {
+        'トレイが参照する状態が反転する（クリックハンドラが最終的に呼ぶメソッド）', () async {
       SharedPreferences.setMockInitialValues({});
       final loupeWindow = LoupeWindowController();
       await loupeWindow.load();
+      final vs = VisionFilterState();
       TrayService(
-        filterService: FilterService(),
-        visionFilterState: VisionFilterState(),
+        filterService: FilterService(visionState: vs),
+        visionFilterState: vs,
         loupeWindow: loupeWindow,
         iconPath: 'assets/tray/tray_icon.png',
         labels: _labels,
@@ -525,9 +524,7 @@ void main() {
 
       expect(loupeWindow.appMode, AppMode.settings);
       await loupeWindow.setAppMode(
-        loupeWindow.appMode == AppMode.loupe
-            ? AppMode.settings
-            : AppMode.loupe,
+        loupeWindow.appMode == AppMode.loupe ? AppMode.settings : AppMode.loupe,
       );
       expect(loupeWindow.appMode, AppMode.loupe);
 
@@ -560,9 +557,10 @@ void main() {
       advancedFilters: 'Advanced filters',
     );
 
+    final vs = VisionFilterState();
     TrayService buildTray() => TrayService(
-          filterService: FilterService(),
-          visionFilterState: VisionFilterState(),
+          filterService: FilterService(visionState: vs),
+          visionFilterState: vs,
           loupeWindow: LoupeWindowController(),
           iconPath: 'assets/tray/tray_icon.png',
           labels: _labels,

@@ -41,7 +41,8 @@ lib/
 │   │                                 # isValidExperiencePreset（永続化した選択の検証、#65）
 │   ├── filter_list_selection.dart   # 統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行）の
 │   │                                 # 検索・選択入口・↑↓ の順送りの純粋ロジック（#72）
-│   ├── filter_service.dart          # 選択状態モデル（sensus VisionFilter へのマッピング）
+│   ├── filter_service.dart          # 色覚クイック選択の型と、sensus VisionFilter へのマッピング。
+│   │                                 # 強度は VisionFilterState の記憶へ委譲（#117）
 │   ├── hotkey_actions.dart          # グローバルホットキー4アクションの実処理（#63）
 │   ├── hotkey_service.dart          # hotkey_manager 登録の副作用層（#63）
 │   ├── image_source_state.dart      # プレビュー原画（サンプル/ユーザー画像）の選択の唯一の正本（#78）
@@ -54,14 +55,18 @@ lib/
 │   ├── tray_service.dart            # タスクトレイ（updateLocalization で文言を差し替える #82・
 │   │                                 # カテゴリ別「高度なフィルタ」サブメニューで UI と双方向同期 #65）
 │   ├── tray_locale_sync.dart        # 言語の選択/OS ロケール変更をトレイの文言へ橋渡し（#82）
-│   ├── vision_filter_snapshot.dart  # 選択・payload・強度の永続 JSON（版つき）と、カタログ定義に
-│   │                                 # 照らした補正 sanitizeVisionParams（#65）
+│   ├── vision_filter_snapshot.dart  # 層・強度の記憶・payload の永続 JSON（v2。v1 も読む）と、
+│   │                                 # カタログ定義に照らした補正 sanitizeVisionParams（#65/#117）
 │   ├── vision_filter_store.dart     # VisionFilterState の SharedPreferences 永続化・起動時復元・
-│   │                                 # 300ms デバウンス・flush（#65）
+│   │                                 # 300ms デバウンス・flush（#65）・旧 settings.intensityByType の
+│   │                                 # 取り込み migrateLegacyStrengths（#117）
+│   ├── vision_layer.dart            # VisionLayer（id・payload・別名・起源）・強度の記憶キー・
+│   │                                 # 層の列の不変条件 normalizeVisionLayers（#117）
 │   ├── vision_filter_metadata.dart  # urgency/urgency_escalation/recommended_strength の
 │   │                                 # provider seam（sensus ブリッジが唯一の正本、#76/#77）。
 │   │                                 # citation/limitations も同じ seam（#80）
-│   └── vision_filter_state.dart     # フィルタ id ごとの強度・パラメータの記憶（#77）
+│   └── vision_filter_state.dart     # 層の列・フォーカス・強度の記憶（キー variantId ?? id）・
+│                                     # パラメータの記憶（#77/#117）
 ├── src/rust/                        # flutter_rust_bridge 生成コード（sensus-core 連携）
 └── ui/
     ├── screens/home_screen.dart
@@ -127,9 +132,11 @@ test/
 ├── language_dialog_test.dart       # 言語ピッカー: 切替で追従・永続化・自称名の網羅と読み上げ言語・画面とトレイの言語一致（#82）
 ├── tray_locale_sync_test.dart      # 言語の選択/OS ロケール変更でトレイの文言が更新される（#82）
 ├── tray_advanced_filters_test.dart # トレイの「高度なフィルタ」サブメニュー: 構造・チェック・クリック→状態・UI との双方向同期・言語追従・click-through 不干渉（#65）
-├── vision_filter_snapshot_test.dart # 永続 JSON の往復・壊れた値/未知 id/範囲外/旧形式のフォールバック（#65）
-├── vision_filter_store_test.dart   # 永続化ストアと VisionFilterState.snapshot/restore（#65）
-├── vision_filter_persistence_app_test.dart # 実アプリ（buildRootApp）を作り直して選択が復元される（#65）
+├── vision_filter_snapshot_test.dart # 永続 JSON v2 の往復・層の不変条件・v1 → v2 変換・壊れた値/未知 id/範囲外のフォールバック（#65/#117）
+├── vision_filter_store_test.dart   # 永続化ストア・VisionFilterState.snapshot/restore・旧 intensityByType の取り込み (a)(b)(c) と失敗系（#65/#117）
+├── vision_filter_persistence_app_test.dart # 実アプリ（buildRootApp）を作り直して選択が復元される・旧強度の取り込み（#65/#117）
+├── vision_filter_stage_test.dart   # 段の表（30 フィルタがちょうど 1 段・段内は sensus 宣言順）と適用順・色覚の排他グループ（#117）
+├── vision_layer_test.dart          # 強度の記憶キー・別名の検証・層の列の正規化（上限・排他・重複・適用順）（#117）
 ├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品（プレビューの読み込み/適用は Rust 非依存のフェイクに固定）
 ├── support/screenshot_harness.dart # スクリーンショット用フォント読込・PNG 書出し（フォントはコミットしない）
 └── ui_screenshots/                 # HomeScreen の PNG 書出し。`UE_SCREENSHOTS=1` のときだけ実行（DESIGN.md §8）
@@ -236,13 +243,14 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 再利用する（専用レンダラを持たない）。Before / After との関係と理由は
 `docs/adr/2026-09-30-color-vision-2x2-compare.md`。
 
-### 状態モデルの統一と多症状の同時適用（設計のみ）
+### 状態モデルの統一と多症状の同時適用（第 1 段 #117 まで実装）
 
-状態が 2 系統（`FilterService` の `ColorVisionType` 8 値（none + 7 型）/ `VisionFilterState` の 30 フィルタ）並行し、
+状態が 2 系統（`FilterService` の `ColorVisionType` 8 値（none + 7 型）/ `VisionFilterState` の 30 フィルタ。強度の記憶は #117 で後者に一本化済み）並行し、
 選択も 1 つだけという現状を、「カタログ id ごとに 1 つのレイヤー」の順序つき列（最大 5、色覚は排他、
 適用順は段で固定）に統一し、sensus の `Pipeline` で合成する方針。実装は Issue #117〜#125 の段階移行で、
 `ColorVisionType` / `FilterService` の削除は最後。判断・代替案は
-`docs/adr/2026-09-30-multi-select-filter-state-model.md`。実装が入るまでは現行の単一選択の記述が正。
+`docs/adr/2026-09-30-multi-select-filter-state-model.md`。第 1 段（#117）で層の列・強度の記憶の一本化・
+永続化 v2 が入った（選択はまだ常に 1 層。複数層の API・合成は #119）。
 
 ### iOS非対応
 

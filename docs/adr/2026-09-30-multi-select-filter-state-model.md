@@ -363,6 +363,19 @@ optics に置く。）
 | 8 | #124 | `ColorVisionType` / `FilterService` / `origin` / `isColorQuickSelection` の削除・`filterType` 統合 | 4, 5, 6 |
 | 付帯 | #125 | 暫定の段表を sensus の標準順序 API に置き換え | sensus#191, #119 |
 
+**実装状況**
+
+- **第 1 段（#117）実装済み**: 層列化・段の表（`lib/models/vision_filter_stage.dart`、metamorphopsia は retina）・記憶鍵
+  `variantId ?? id`・`FilterService` の強度記憶の統合（`VisionFilterStore.migrateLegacyStrengths`）・`origin` の層属性化・
+  永続化 v2（v1 は読んで変換）を 1 PR で入れた。選択は常に 1 層のまま（複数層の API は #119）。決定どおりの実装で、
+  実装時に確定した点は次のとおり。
+  - 単一選択のままでは、色覚の quick 選択と advanced 選択が同じ色覚 id の強度の記憶を共有する（旧実装は別々だった）。
+    また推奨強度は初回選択で記憶へ書かず、読むときに導出する。体験プリセットと「推奨値に戻す」は当該キーの記憶を消す。
+  - `FilterService` は永続化（保存・デバウンス・flush・load）を持たず、`VisionFilterState` を必須引数に取る薄い窓になった。
+  - 旧 v1 の -opia 4 種の強度は移行時に持ち越さず、旧 per-type 強度（`intensityByType`）を正とした。
+  - 読める空の v2 は「未選択で終了」として復元し、設定側の色覚シードより優先する（空の v1 は従来どおり復元しない。
+    -opia の強度だけを持つ v1 は変換後に見かけが空でも、旧実装どおり非空として復元する）。
+
 **#120〜#122 の間の暫定挙動**（この間の退行を防ぐための取り決め）:
 
 - #120 がマージされた時点で多層を選べるようになるが、**複数層のとき PNG 書き出しは無効にして理由を

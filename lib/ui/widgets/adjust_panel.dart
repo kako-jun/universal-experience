@@ -18,8 +18,8 @@ import 'intensity_slider.dart';
 /// パラメータ → モデルと出典・表現できないこと（#80、折りたたみ）**。受診喚起は強度のすぐ下に常時展開で出す（動かさない・隠さない、
 /// DESIGN §6.2）。
 ///
-/// - 色覚の行を選んでいるとき: 強度は [IntensitySlider]（`FilterService` の
-///   タイプ別記憶 #57）。受診喚起・パラメータは [FilterParamPanel] が続けて出す
+/// - 色覚の行を選んでいるとき: 強度は [IntensitySlider]（`VisionFilterState` の
+///   キーごとの強度の記憶を動かす、#117）。受診喚起・パラメータは [FilterParamPanel] が続けて出す
 ///   （色覚 7 型に喚起は無いので実際には何も足されない）。
 /// - advanced の行・体験プリセットを選んでいるとき: 強度・受診喚起・パラメータは
 ///   [FilterParamPanel]。プリセットのときは体験としての緊急度
@@ -211,7 +211,8 @@ class _SelectedContent extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 16),
-        // 色覚の行: 強度はタイプ別記憶（FilterService）のスライダー。
+        // 色覚の行: 強度はキーごとの記憶（VisionFilterState.strengthByKey）を動かす
+        // スライダー。
         if (state.isColorQuickSelection) ...[
           const IntensitySlider(),
           const SizedBox(height: 16),

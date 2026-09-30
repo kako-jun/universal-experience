@@ -81,7 +81,6 @@ void main() {
       expect(data.label, startsWith('強さ'));
       expect(data.value, matches(RegExp(r'^\d+%$')));
       expect(data.flagsCollection.isSlider, isTrue);
-      await h.filterService.flush();
       handle.dispose();
     });
 
@@ -96,7 +95,6 @@ void main() {
 
       expect(
           dataOf(tester, find.byType(Slider)).label, startsWith('Intensity'));
-      await h.filterService.flush();
       handle.dispose();
     });
 
@@ -112,7 +110,6 @@ void main() {
       expect(strength.value, matches(RegExp(r'^\d+%$')));
       final dropdown = dataOf(tester, find.byType(DropdownButton<String>));
       expect(dropdown.label, contains('欠け方のタイプ'));
-      await h.filterService.flush();
       handle.dispose();
     });
 
@@ -135,7 +132,6 @@ void main() {
       }
       expect(named.map((d) => d.value),
           contains(matches(RegExp(r'^\d+\.\d{2}$'))));
-      await h.filterService.flush();
       handle.dispose();
     });
 
@@ -152,7 +148,6 @@ void main() {
           dataOf(tester, find.byType(Slider).at(i)).value,
       ];
       expect(values, contains(matches(RegExp(r'^\d+$'))));
-      await h.filterService.flush();
       handle.dispose();
     });
   });
@@ -211,7 +206,6 @@ void main() {
       }
       expect(count, greaterThan(1));
       expect(selected, 1);
-      await h.filterService.flush();
       handle.dispose();
     });
 
@@ -225,7 +219,6 @@ void main() {
       final checks = find.descendant(
           of: find.byType(FilterListTile), matching: find.byIcon(Icons.check));
       expect(checks, findsOneWidget);
-      await h.filterService.flush();
       handle.dispose();
     });
   });
@@ -277,7 +270,6 @@ void main() {
       expect(lines.where((l) => l.endsWith('を適用した画像')), hasLength(1));
       expect(dataOf(tester, previewNode()).flagsCollection.isImage, isTrue,
           reason: 'image の役割が読み上げに含まれる');
-      await h.filterService.flush();
       handle.dispose();
     });
 
@@ -291,7 +283,6 @@ void main() {
 
       expect(readoutCount(tester, '元の画像'), 1,
           reason: '見出しだけが読む。画像に同じ文言の代替テキストを足すと 2 になる');
-      await h.filterService.flush();
       handle.dispose();
     });
 
@@ -309,7 +300,6 @@ void main() {
             .where((l) => RegExp(r'^Image with .+ applied$').hasMatch(l)),
         hasLength(1),
       );
-      await h.filterService.flush();
       handle.dispose();
     });
 
@@ -347,7 +337,6 @@ void main() {
       await settle(tester);
       expect(
           readLines(tester).where((l) => l.endsWith('を適用した画像')), hasLength(1));
-      await h.filterService.flush();
       handle.dispose();
     });
 
@@ -357,13 +346,12 @@ void main() {
       // 描画が終わらないようにして、`_loading && _before == null` の準備中表示を保つ。
       afterImageRenderer =
           (source, filter, strength) => Completer<ui.Image>().future;
-      final h = await pumpHomeScreen(tester, size: wide);
+      await pumpHomeScreen(tester, size: wide);
       await settle(tester);
 
       final preparing = find.text('プレビューを準備中…');
       expect(preparing, findsOneWidget);
       expect(dataOf(tester, preparing).flagsCollection.isLiveRegion, isTrue);
-      await h.filterService.flush();
       handle.dispose();
     });
 
@@ -381,7 +369,6 @@ void main() {
       expect(tester.takeException(), isNotNull);
       final data = dataOf(tester, find.text('プレビューの描画に失敗しました'));
       expect(data.flagsCollection.isLiveRegion, isTrue);
-      await h.filterService.flush();
       handle.dispose();
     });
 
@@ -403,7 +390,6 @@ void main() {
       expect(data.flagsCollection.isLiveRegion, isTrue);
       expect(readoutCount(tester, 'を適用した画像'), 0,
           reason: '空の枠を「〇〇を適用した画像」と読まない');
-      await h.filterService.flush();
       handle.dispose();
     });
   });
@@ -444,7 +430,7 @@ void main() {
       visionFilterUrgencyEscalationProvider = (_) => const [];
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final visionState = VisionFilterState()..select('photophobia');
-      final filterService = FilterService();
+      final filterService = FilterService(visionState: visionState);
       final loupe = LoupeWindowController();
       await tester.runAsync(() => loupe.setAppMode(AppMode.loupe));
       tester.view.physicalSize = const Size(900, 300);

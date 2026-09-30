@@ -50,8 +50,7 @@ void main() {
     resetVisionFilterMetadataProviders();
   });
 
-  testWidgets(
-      'advanced カタログでフィルタを選ぶと、プレビューの filter/filterId が追従する（#60）',
+  testWidgets('advanced カタログでフィルタを選ぶと、プレビューの filter/filterId が追従する（#60）',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 4000);
     tester.view.devicePixelRatio = 1.0;
@@ -60,8 +59,8 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final settings = SettingsService();
     await settings.load();
-    final filterService = FilterService();
     final visionState = VisionFilterState();
+    final filterService = FilterService(visionState: visionState);
 
     await tester.pumpWidget(
       MultiProvider(
@@ -126,8 +125,7 @@ void main() {
         reason: 'payload の変更は filter の値等価性に反映され、再描画のトリガーになるべき');
   });
 
-  testWidgets(
-      'VisionFilterState.setStrength のあと、プレビューの strength が追従する（#60）',
+  testWidgets('VisionFilterState.setStrength のあと、プレビューの strength が追従する（#60）',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 4000);
     tester.view.devicePixelRatio = 1.0;
@@ -136,8 +134,8 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final settings = SettingsService();
     await settings.load();
-    final filterService = FilterService();
     final visionState = VisionFilterState()..select('cataract');
+    final filterService = FilterService(visionState: visionState);
 
     await tester.pumpWidget(
       MultiProvider(
@@ -193,8 +191,8 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final settings = SettingsService();
     await settings.load();
-    final filterService = FilterService();
     final visionState = VisionFilterState();
+    final filterService = FilterService(visionState: visionState);
 
     await tester.pumpWidget(
       MultiProvider(
@@ -254,7 +252,8 @@ void main() {
     // 3. 別の色覚クイック選択（deuteranomaly）に切り替える。プレビューは
     //    deuteranomaly の色覚フィルタに戻り、protanomaly で覚えた強度
     //    （0.25）はそのまま残っている（#57 の記憶がここで巻き戻らない）はず。
-    selectColorVision(filterService, visionState, ColorVisionType.deuteranomaly);
+    selectColorVision(
+        filterService, visionState, ColorVisionType.deuteranomaly);
     await tester.pump();
     expect(visionState.isColorQuickSelection, isTrue);
     expect(currentPreview().filterId, 'deuteranopia');
@@ -266,8 +265,6 @@ void main() {
     selectColorVision(filterService, visionState, ColorVisionType.protanomaly);
     await tester.pump();
     expect(currentPreview().strength, 0.25);
-
-    await filterService.flush();
   });
 
   testWidgets(
@@ -289,8 +286,8 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final settings = SettingsService();
     await settings.load();
-    final filterService = FilterService();
     final visionState = VisionFilterState();
+    final filterService = FilterService(visionState: visionState);
 
     await tester.pumpWidget(
       MultiProvider(
@@ -370,8 +367,7 @@ void main() {
     expect(protanopiaRowSelected(), isTrue);
   });
 
-  testWidgets(
-      'VisionFilterState.bypassed が true の間、プレビューに「原画表示中」バッジが出る (#63)',
+  testWidgets('VisionFilterState.bypassed が true の間、プレビューに「原画表示中」バッジが出る (#63)',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 4000);
     tester.view.devicePixelRatio = 1.0;
@@ -380,8 +376,8 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final settings = SettingsService();
     await settings.load();
-    final filterService = FilterService();
     final visionState = VisionFilterState();
+    final filterService = FilterService(visionState: visionState);
 
     await tester.pumpWidget(
       MultiProvider(
