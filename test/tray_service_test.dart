@@ -27,6 +27,7 @@ const _labels = TrayMenuLabels(
   appModeLoupeLabel: 'ルーペ窓',
   alwaysOnTopLabel: '最前面に固定',
   clickThroughLabel: 'クリックスルー',
+  advancedFilters: '高度なフィルタ',
 );
 
 void main() {
@@ -556,6 +557,7 @@ void main() {
       appModeLoupeLabel: 'Loupe window',
       alwaysOnTopLabel: 'Always on top',
       clickThroughLabel: 'Click-through',
+      advancedFilters: 'Advanced filters',
     );
 
     TrayService buildTray() => TrayService(
