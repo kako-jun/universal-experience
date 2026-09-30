@@ -91,8 +91,7 @@ void main() {
       expect(find.byIcon(Icons.warning_amber_rounded), findsNothing);
     });
 
-    testWidgets('閾値の直前（75%）は警告にならず、閾値ちょうど（80%）から警告になる',
-        (tester) async {
+    testWidgets('閾値の直前（75%）は警告にならず、閾値ちょうど（80%）から警告になる', (tester) async {
       state.select('tunnel_vision');
       state.setStrength(0.75);
       await pumpPanel(tester);
@@ -106,8 +105,7 @@ void main() {
       expect(find.byIcon(Icons.info_outline), findsNothing);
     });
 
-    testWidgets('100% では警告。スライダを動かして閾値をまたぐと表示が切り替わる',
-        (tester) async {
+    testWidgets('100% では警告。スライダを動かして閾値をまたぐと表示が切り替わる', (tester) async {
       state.select('tunnel_vision');
       state.setStrength(1.0);
       await pumpPanel(tester);
@@ -132,7 +130,8 @@ void main() {
 
       state.setStrength(1.0);
       await tester.pump();
-      final warn = tester.widget<Text>(find.text(en().strengthCautionNearLimit));
+      final warn =
+          tester.widget<Text>(find.text(en().strengthCautionNearLimit));
       expect(warn.style!.color, theme.colorScheme.onSurface);
       expect(warn.style!.fontWeight, FontWeight.w600);
       // 注記は bodySmall のサイズ（下限 12 を割らない、DESIGN §3）。
@@ -163,9 +162,11 @@ void main() {
       }
     });
 
-    testWidgets('印は閾値（80%）の位置に描かれる', (tester) async {
+    testWidgets('印は閾値（80%）のつまみ・目盛りと同じ x に描かれる', (tester) async {
+      // 強度 0.8（= 閾値）のとき、つまみの中心が印の x と一致する。実装と同じ式を
+      // 使わず、Slider が実際に描いたつまみ・目盛りの位置と直接比べる。
       state.select('tunnel_vision');
-      state.setStrength(0.5);
+      state.setStrength(0.8);
       await pumpPanel(tester);
 
       final sliderFinder = find.byType(Slider);
@@ -173,37 +174,109 @@ void main() {
       final shape = theme.trackShape as StrengthCautionTrackShape;
       expect(shape.threshold, 0.8);
 
+      double? markX;
+      double? thumbX;
+      double? tickX;
       final box = tester.renderObject<RenderBox>(sliderFinder);
-      final trackRect = shape.getPreferredRect(
-        parentBox: box,
-        offset: Offset.zero,
-        // Slider が内部で補う既定値（M3）に相当するものを明示する。
-        // 水平方向（left/width）は trackHeight に依存しない。
-        sliderTheme: theme.copyWith(
-          trackHeight: 4,
-          thumbShape: const RoundSliderThumbShape(),
-          overlayShape: const RoundSliderOverlayShape(),
-        ),
-        isEnabled: true,
-        isDiscrete: true,
-      );
-      final expectedX = trackRect.left + trackRect.width * 0.8;
       expect(
         box,
         paints
           ..something((Symbol method, List<dynamic> args) {
             if (method != #drawRRect) return false;
             final rrect = args[0] as RRect;
-            return (rrect.width - StrengthCautionTrackShape.markWidth).abs() <
-                    1e-6 &&
-                (rrect.center.dx - expectedX).abs() < 0.5 &&
-                rrect.height > 4;
+            if ((rrect.width - StrengthCautionTrackShape.markWidth).abs() >
+                    1e-6 ||
+                rrect.height <= 4) {
+              return false;
+            }
+            markX = rrect.center.dx;
+            return true;
+          })
+          ..something((Symbol method, List<dynamic> args) {
+            // つまみ（半径の大きい円）。目盛りは半径 2 未満の小さな円。
+            if (method != #drawCircle) return false;
+            final center = args[0] as Offset;
+            final radius = args[1] as double;
+            if (radius < 5) return false;
+            thumbX = center.dx;
+            return true;
           }),
       );
+      expect(markX, isNotNull);
+      expect(thumbX, isNotNull);
+      expect(markX!, closeTo(thumbX!, 0.01));
+
+      // 目盛り（20 分割の 16 番目）も同じ x。
+      expect(
+        box,
+        paints
+          ..something((Symbol method, List<dynamic> args) {
+            if (method != #drawCircle) return false;
+            final center = args[0] as Offset;
+            final radius = args[1] as double;
+            if (radius >= 5 || (center.dx - markX!).abs() > 0.01) return false;
+            tickX = center.dx;
+            return true;
+          }),
+      );
+      expect(tickX, isNotNull);
     });
 
-    testWidgets('受診喚起ブロックは強度（スライダと注記）のすぐ下に出続ける（位置・内容を動かさない）',
-        (tester) async {
+    testWidgets('無効なスライダでは印も無効表現（不透明度 38%）になる', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SliderTheme(
+              data: SliderThemeData(
+                trackHeight: 4,
+                trackShape: StrengthCautionTrackShape(
+                  threshold: 0.8,
+                  markColor: Color(0xFF102030),
+                ),
+              ),
+              child: Slider(value: 0.5, divisions: 20, onChanged: null),
+            ),
+          ),
+        ),
+      );
+      Color? markColor;
+      expect(
+        tester.renderObject<RenderBox>(find.byType(Slider)),
+        paints
+          ..something((Symbol method, List<dynamic> args) {
+            if (method != #drawRRect) return false;
+            final rrect = args[0] as RRect;
+            if ((rrect.width - StrengthCautionTrackShape.markWidth).abs() >
+                1e-6) {
+              return false;
+            }
+            markColor = (args[1] as Paint).color;
+            return true;
+          }),
+      );
+      expect(markColor, isNotNull);
+      expect(markColor!.a, closeTo(0.38, 0.01));
+    });
+
+    testWidgets('浮動小数の誤差（0.7999…）でも 80% の位置は警告になる', (tester) async {
+      // 0.1 + 0.7 は 0.7999999999999999。整数パーセントに丸めて比べるので警告側。
+      const almost = 0.1 + 0.7;
+      expect(almost, lessThan(0.8));
+      const caution = StrengthCaution(threshold: 0.8);
+      expect(
+          const StrengthCautionNote(caution: caution, strength: almost).isNearLimit,
+          isTrue);
+      expect(
+          const StrengthCautionNote(caution: caution, strength: 0.79)
+              .isNearLimit,
+          isFalse);
+      expect(
+          const StrengthCautionNote(caution: caution, strength: 0.8)
+              .isNearLimit,
+          isTrue);
+    });
+
+    testWidgets('受診喚起ブロックは強度（スライダと注記）のすぐ下に出続ける（位置・内容を動かさない）', (tester) async {
       visionFilterUrgencyProvider = (_) => Urgency.earlyConsultation;
       state.select('tunnel_vision');
       state.setStrength(1.0);
@@ -214,7 +287,7 @@ void main() {
       final noticeTop = tester.getTopLeft(find.byType(ConsultNoticeBlock)).dy;
       expect(noticeTop, greaterThan(noteBottom));
       // 注記と喚起の間は余白スケール 16 のまま。
-      expect(noticeTop - noteBottom, 16);
+      expect(noticeTop - noteBottom, closeTo(16, 0.01));
       expect(find.text(en().consultEarly), findsOneWidget);
       expect(find.text(en().consultDisclaimer), findsOneWidget);
     });

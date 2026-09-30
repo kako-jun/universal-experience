@@ -17,8 +17,10 @@ import '../../models/vision_filter_contract_notes.dart';
 
 /// 閾値位置に縦線の印を描くトラック形状。
 ///
-/// 目盛り（divisions）と同じトラック矩形を基準にするので、スライダの幅が
-/// 変わっても印は閾値の位置からずれない。
+/// Flutter のスライダは、目盛り（divisions）を打つとき（`isDiscrete`）トラックの
+/// 両端に丸みの分（トラックの高さ）の余白を取り、つまみ・目盛りを
+/// `left + v * (width - 高さ) + 高さ / 2` の位置に置く。印も同じ式で置くので、
+/// 閾値と同じ値のつまみ・目盛りにぴったり重なり、スライダの幅が変わってもずれない。
 class StrengthCautionTrackShape extends RoundedRectSliderTrackShape {
   const StrengthCautionTrackShape({
     required this.threshold,
@@ -70,7 +72,9 @@ class StrengthCautionTrackShape extends RoundedRectSliderTrackShape {
       isDiscrete: isDiscrete,
     );
     final t = textDirection == TextDirection.rtl ? 1 - threshold : threshold;
-    final x = trackRect.left + trackRect.width * t;
+    // divisions ありのとき、つまみ・目盛りと同じ式（Flutter の Slider と同じ）。
+    final pad = isDiscrete && isRounded ? trackRect.height : 0.0;
+    final x = trackRect.left + t * (trackRect.width - pad) + pad / 2;
     final half = trackRect.height / 2 + markOverhang;
     final markRect = Rect.fromLTRB(
       x - markWidth / 2,
@@ -80,7 +84,9 @@ class StrengthCautionTrackShape extends RoundedRectSliderTrackShape {
     );
     context.canvas.drawRRect(
       RRect.fromRectAndRadius(markRect, const Radius.circular(1)),
-      Paint()..color = markColor,
+      // 無効時は DESIGN §2.2 の無効表現（不透明度 38%）。
+      Paint()
+        ..color = isEnabled ? markColor : markColor.withValues(alpha: 0.38),
     );
   }
 }
@@ -88,9 +94,9 @@ class StrengthCautionTrackShape extends RoundedRectSliderTrackShape {
 /// スライダの下に置く注記。強度が閾値未満のあいだは印の説明（補足の見た目）、
 /// 閾値以上では警告（アイコン・太字・onSurface）に切り替わる。
 ///
-/// どちらの文言も sensus の契約（末期＝完全喪失の設計）を伝えるもので、
-/// 故障ではない旨を含む。`Semantics(liveRegion)` で、閾値をまたいだ変化を
-/// スクリーンリーダーにも伝える。
+/// どちらの文言も sensus の契約（最も進行した段階＝視野のほぼすべてを失った状態を
+/// 再現する設計）を伝えるもので、故障ではない旨を含む。
+/// `Semantics(liveRegion)` で、閾値をまたいだ変化をスクリーンリーダーにも伝える。
 class StrengthCautionNote extends StatelessWidget {
   const StrengthCautionNote({
     super.key,
@@ -104,7 +110,11 @@ class StrengthCautionNote extends StatelessWidget {
   final double strength;
 
   /// 強度が閾値以上か（警告表現にするか）。
-  bool get isNearLimit => strength >= caution.threshold;
+  ///
+  /// スライダは 5% 刻みで、浮動小数の誤差（0.7999…など）で 80% の位置が警告に
+  /// ならないよう、整数パーセントに丸めて比べる。
+  bool get isNearLimit =>
+      (strength * 100).round() >= (caution.threshold * 100).round();
 
   @override
   Widget build(BuildContext context) {

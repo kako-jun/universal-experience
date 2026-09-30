@@ -20,9 +20,11 @@ class StrengthCaution {
 /// フィルタ id（`kVisionFilterCatalog` の id）→ 上限付近の注意の定義。
 ///
 /// - `tunnel_vision`（#51 注記1）: 可視半径 = (1−strength)×0.5 の線形縮小で、
-///   strength=1.0 は**ほぼ全黒**（末期＝完全喪失の設計）。0.8 のとき可視半径は
-///   0.1（画像の幅の 20% の円）で、これより先は「見える部分がほとんど無い」
-///   領域になる。sensus の推奨強度は 0.5。
+///   strength=1.0 は**ほぼ全黒**（視野のほぼすべてを失った最も進行した
+///   段階を再現する設計）。0.8 のとき可視半径は 0.1。半径は画像の半対角線に対する
+///   比なので（sensus-core 0.6.1 の `field.rs` で `max_r` = 半対角線で割っている）、
+///   16:9 なら幅の約 1 割の円で、外側 0.05 はぼかしの帯。これより先は
+///   「見える部分がほとんど無い」領域になる。sensus の推奨強度は 0.5。
 const Map<String, StrengthCaution> kStrengthCautionByFilterId = {
   'tunnel_vision': StrengthCaution(threshold: 0.8),
 };
