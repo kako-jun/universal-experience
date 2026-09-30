@@ -12,8 +12,11 @@ cargokit and bundles it into the Universal Experience macOS app (#55).
 Not a standalone plugin; not published.
                        DESC
   s.homepage         = 'https://github.com/kako-jun/universal-experience'
-  # リポジトリ直下の LICENSE（MIT）を参照する。
-  s.license          = { :type => 'MIT', :file => '../../LICENSE' }
+  # rust_builder/LICENSE（リポジトリ直下 LICENSE の複製、MIT）を参照する。
+  # Flutter は pod を Flutter/ephemeral/.symlinks/plugins/... のシンボリックリンク
+  # 経由で読み、CocoaPods は `..` を字面で畳むため、パッケージ外（../../LICENSE）は
+  # 解決できない。パッケージ内に置く必要がある。
+  s.license          = { :type => 'MIT', :file => '../LICENSE' }
   s.author           = 'kako-jun'
 
   # This will ensure the source files in Classes/ are included in the native
