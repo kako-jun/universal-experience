@@ -16,7 +16,7 @@ import 'strength_caution.dart';
 ///
 /// - float / int → [Slider]
 /// - enum → [DropdownButton]
-/// - seed → 表示 + 乱数再生成ボタン
+/// - seed → 値は隠し、「パターンを変える」ボタンだけ（#80）
 ///
 /// 加えて strength スライダ・「推奨値に戻す」ボタン・受診喚起の注記ブロックを
 /// 表示する。並びは **強度 → 受診喚起 → パラメータ**（#72: 受診喚起は強度の
@@ -240,20 +240,26 @@ class FilterParamPanel extends StatelessWidget {
     );
   }
 
+  /// seed 系のパラメータ（#80）。シードは内部の乱数の種で、数値そのものに
+  /// 意味が無く一般の人には伝わらないため、値は表示せず「パターンを変える」
+  /// ボタンだけにする。ラベルは「何のパターンか」を示す名前（ARB）。
   Widget _buildSeed(
     AppLocalizations l10n,
     VisionFilterState state,
     VisionParam param,
   ) {
-    final value = state.paramValue(param);
     final label = visionParamLabel(l10n, param.labelKey);
-    return Row(
+    // 狭い右カラムでは、ラベルとボタンが横に収まらないので折り返す。
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      runSpacing: 4,
       children: [
-        Expanded(child: Text('$label: $value')),
-        TextButton.icon(
+        Text(label),
+        OutlinedButton.icon(
           onPressed: () => state.randomizeSeed(param.name),
-          icon: const Icon(Icons.casino),
-          label: Text(l10n.randomize),
+          icon: const Icon(Icons.shuffle, size: 18),
+          label: Text(l10n.changePattern),
         ),
       ],
     );
