@@ -760,6 +760,39 @@
       "count": { "type": "int" }
     }
   },
+  "layerStripSemantics": "Applied filters, in order",
+  "@layerStripSemantics": {
+    "description": "Screen-reader name of the chip strip above the preview that lists the stacked filters in application order (#120)."
+  },
+  "layerStripClearAll": "Clear all",
+  "@layerStripClearAll": {
+    "description": "Button in the chip strip that removes every stacked filter at once (#120)."
+  },
+  "layerChipLabel": "Number {order}, {name}",
+  "@layerChipLabel": {
+    "description": "Screen-reader label of one chip in the strip: its application-order number and the filter name (#120).",
+    "placeholders": {
+      "order": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "layerChipFocusHint": "Press to adjust this filter",
+  "@layerChipFocusHint": {
+    "description": "Screen-reader hint of a chip in the strip: pressing it makes that filter the one being adjusted (#120)."
+  },
+  "layerChipRemove": "Remove {name}",
+  "@layerChipRemove": {
+    "description": "Tooltip and screen-reader label of the x button of a chip: removes that one filter (#120).",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "adjustHeading": "Adjust",
   "@adjustHeading": {
     "description": "Heading of the right column (adjustment) on the home screen (#72)."

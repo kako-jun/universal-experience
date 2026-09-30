@@ -21,6 +21,7 @@ import '../widgets/filter_browser.dart';
 import '../widgets/filter_list_tile.dart';
 import '../widgets/image_source_picker.dart';
 import '../widgets/language_dialog.dart';
+import '../widgets/layer_chip_strip.dart';
 import '../widgets/welcome_banner.dart';
 import '../widgets/window_mode_panel.dart';
 
@@ -425,6 +426,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                   ],
                 ),
+                // 重ねている層のチップ帯（#120）。2 層以上のときだけ出る（1 層以下は高さ 0）。
+                if (visionState.layers.length > 1) ...[
+                  const SizedBox(height: 12),
+                  const LayerChipStrip(),
+                ],
                 const SizedBox(height: 12),
                 ImageSourcePicker(
                   child: comparing

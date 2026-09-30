@@ -115,8 +115,7 @@ class _FilterListTileState extends State<FilterListTile> {
       // （↓）なら下端に揃える。`keepVisibleAtEnd` だけだと上方向に効かない。
       final viewport = RenderAbstractViewport.maybeOf(renderObject);
       final position = scrollable.position;
-      final isBeforeViewport =
-          viewport != null &&
+      final isBeforeViewport = viewport != null &&
           viewport.getOffsetToReveal(renderObject, 0.0).offset <
               position.pixels;
       position.ensureVisible(
@@ -171,8 +170,8 @@ class _FilterListTileState extends State<FilterListTile> {
       final isRadio = widget.kind == FilterListTileKind.radio;
       final icon = isRadio
           ? (widget.selected
-                ? Icons.radio_button_checked
-                : Icons.radio_button_unchecked)
+              ? Icons.radio_button_checked
+              : Icons.radio_button_unchecked)
           : (widget.selected ? Icons.check_box : Icons.check_box_outline_blank);
       // 状態は行の Semantics（checked）が伝えるので、絵は読み上げから外す。
       leading = ExcludeSemantics(child: Icon(icon));
@@ -187,7 +186,7 @@ class _FilterListTileState extends State<FilterListTile> {
       trailing = Semantics(
         label: l10n.filterListOrderSemantics(order),
         excludeSemantics: true,
-        child: _OrderBadge(order: order),
+        child: LayerOrderBadge(order: order),
       );
     }
 
@@ -231,9 +230,10 @@ class _FilterListTileState extends State<FilterListTile> {
   }
 }
 
-/// 選択中の行の右端の「適用順」の番号（形で状態を伝える、DESIGN §7）。
-class _OrderBadge extends StatelessWidget {
-  const _OrderBadge({required this.order});
+/// 「適用順」の番号の丸（形で状態を伝える、DESIGN §7）。一覧の選択中の行の右端・調整パネルの
+/// 層の見出しで使う。
+class LayerOrderBadge extends StatelessWidget {
+  const LayerOrderBadge({super.key, required this.order});
 
   final int order;
 
