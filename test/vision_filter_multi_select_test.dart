@@ -473,6 +473,70 @@ void main() {
       expect(a.pipelineSteps(), hasLength(4));
     });
 
+    test('上限ちょうど 5 層: 選ぶ順を変えても、同じ 5 ステップが段順で並ぶ（リテラルで固定）', () {
+      // 段: motion / optics / retina / perception / colorVision。
+      const strengths = {
+        'vertigo': 0.1,
+        'myopia': 0.2,
+        'night_blindness': 0.3,
+        'teichopsia': 0.4,
+        'protanopia': 0.5,
+      };
+      const orders = [
+        ['vertigo', 'myopia', 'night_blindness', 'teichopsia', 'protanopia'],
+        ['protanopia', 'teichopsia', 'night_blindness', 'myopia', 'vertigo'],
+        ['night_blindness', 'protanopia', 'vertigo', 'teichopsia', 'myopia'],
+      ];
+      const expected = [
+        VisionStep(filter: VisionFilter.vertigo(), strength: 0.1),
+        VisionStep(filter: VisionFilter.myopia(), strength: 0.2),
+        VisionStep(filter: VisionFilter.nightBlindness(), strength: 0.3),
+        VisionStep(filter: VisionFilter.teichopsia(), strength: 0.4),
+        VisionStep(filter: VisionFilter.protanopia(), strength: 0.5),
+      ];
+      for (final order in orders) {
+        final s = VisionFilterState();
+        for (final id in order) {
+          expect(s.toggle(id), VisionLayerResult.added, reason: '$order');
+        }
+        strengths.forEach(s.setLayerStrength);
+        expect(s.layers, hasLength(kMaxVisionLayers));
+        expect(s.pipelineSteps(), expected, reason: '選択順 $order');
+
+        // 6 つ目は足せず、列も変わらない。
+        expect(
+          s.toggle('glaucoma'),
+          const VisionLayerResult.blocked(VisionLayerBlockReason.layerLimit),
+        );
+        expect(s.pipelineSteps(), expected);
+      }
+    });
+
+    test('同じ段の 2 層は段内の宣言順（選んだ順でなく）で並ぶ', () {
+      // optics 段の宣言順: myopia → hyperopia → astigmatism → presbyopia。
+      for (final order in const [
+        ['presbyopia', 'hyperopia', 'myopia'],
+        ['myopia', 'hyperopia', 'presbyopia'],
+        ['hyperopia', 'presbyopia', 'myopia'],
+      ]) {
+        final s = VisionFilterState();
+        for (final id in order) {
+          s.toggle(id);
+        }
+        s.setLayerStrength('myopia', 0.3);
+        s.setLayerStrength('hyperopia', 0.6);
+        s.setLayerStrength('presbyopia', 0.9);
+        expect(
+            s.pipelineSteps(),
+            const [
+              VisionStep(filter: VisionFilter.myopia(), strength: 0.3),
+              VisionStep(filter: VisionFilter.hyperopia(), strength: 0.6),
+              VisionStep(filter: VisionFilter.presbyopia(), strength: 0.9),
+            ],
+            reason: '選択順 $order');
+      }
+    });
+
     test('payload はそれぞれの層のものを使う', () {
       state.toggle('astigmatism');
       state.toggle('starbursts');

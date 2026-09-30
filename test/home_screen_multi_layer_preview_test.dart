@@ -16,8 +16,11 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:universal_experience/l10n/app_localizations.dart';
+import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/sample_catalog.dart';
 import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
+import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/preview_selection.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
@@ -205,6 +208,108 @@ void main() {
       h.visionState.releaseBypass(holder);
       await settle(tester);
       expect(currentPreview(tester).steps, hasLength(2));
+    });
+
+    testWidgets('フォーカスが動かず steps だけ変わる更新（FilterService 経由の強度）でも合成が再実行される',
+        (tester) async {
+      await installFakes(tester);
+      final h = await pumpHomeScreen(tester, size: wide);
+      // 色覚 quick（protanopia）を足してから myopia を足す。フォーカスは myopia。
+      selectColorVision(
+          h.filterService, h.visionState, ColorVisionType.protanopia);
+      h.visionState.toggle('myopia');
+      await settle(tester);
+      expect(h.visionState.focusedId, 'myopia');
+      final before = pipelineCalls.length;
+      expect(before, greaterThan(0));
+      final focusedFilter = currentPreview(tester).filter;
+      final focusedStrength = currentPreview(tester).strength;
+
+      // 色覚スライダー相当の経路。フォーカス中の層（myopia）の強度・filter は変わらず、
+      // protanopia の強度だけが変わる。
+      h.filterService.setIntensity(0.3);
+      await settle(tester);
+
+      expect(h.visionState.focusedId, 'myopia');
+      expect(currentPreview(tester).filter, focusedFilter);
+      expect(currentPreview(tester).strength, focusedStrength);
+      expect(pipelineCalls.length, before + 1,
+          reason: 'steps の差だけで didUpdateWidget が再描画を起こす');
+      expect(pipelineCalls.last.last,
+          const VisionStep(filter: VisionFilter.protanopia(), strength: 0.3));
+    });
+
+    testWidgets('steps が変わらない再 build では合成を呼び直さない', (tester) async {
+      await installFakes(tester);
+      final h = await pumpHomeScreen(tester, size: wide);
+      h.visionState.toggle('myopia');
+      h.visionState.toggle('vertigo');
+      await settle(tester);
+      final before = pipelineCalls.length;
+
+      // 同じ強度を書き直す（通知は飛ぶが steps は値として同じ）。
+      h.visionState.setStrengthForKey('myopia', 1.0);
+      await settle(tester);
+      expect(pipelineCalls.length, before);
+    });
+  });
+
+  group('合成経路の失敗と破棄（#119）', () {
+    final ja = lookupAppLocalizations(const Locale('ja'));
+
+    List<FlutterErrorDetails> suppressReports() {
+      final reported = <FlutterErrorDetails>[];
+      final original = FlutterError.onError;
+      FlutterError.onError = reported.add;
+      addTearDown(() => FlutterError.onError = original);
+      return reported;
+    }
+
+    testWidgets('applier が例外を投げたら失敗表示になり、次の更新で再試行できる', (tester) async {
+      await installFakes(tester);
+      final reported = suppressReports();
+      final h = await pumpHomeScreen(tester, size: wide);
+      CpuVisionRenderer.pipelineApplier = (source, steps) async {
+        throw StateError('boom');
+      };
+      h.visionState.toggle('myopia');
+      h.visionState.toggle('vertigo');
+      await settle(tester);
+
+      expect(find.text(ja.previewFailed), findsOneWidget);
+      expect(reported, isNotEmpty);
+
+      CpuVisionRenderer.pipelineApplier = (source, steps) async {
+        pipelineCalls.add(List.of(steps));
+        return master.clone();
+      };
+      h.visionState.setLayerStrength('myopia', 0.5);
+      await settle(tester);
+      expect(find.text(ja.previewFailed), findsNothing);
+      expect(pipelineCalls, isNotEmpty);
+    });
+
+    testWidgets('新しい合成結果に差し替わると、古い結果の画像は dispose される', (tester) async {
+      await installFakes(tester);
+      final outputs = <ui.Image>[];
+      CpuVisionRenderer.pipelineApplier = (source, steps) async {
+        pipelineCalls.add(List.of(steps));
+        final out = master.clone();
+        outputs.add(out);
+        return out;
+      };
+      final h = await pumpHomeScreen(tester, size: wide);
+      h.visionState.toggle('myopia');
+      h.visionState.toggle('vertigo');
+      await settle(tester);
+      expect(outputs, hasLength(1));
+      expect(outputs.first.debugDisposed, isFalse);
+
+      h.visionState.setLayerStrength('myopia', 0.5);
+      await settle(tester);
+      expect(outputs, hasLength(2));
+      expect(outputs.first.debugDisposed, isTrue, reason: '差し替えられた旧結果は破棄する');
+      expect(outputs.last.debugDisposed, isFalse);
     });
   });
 
