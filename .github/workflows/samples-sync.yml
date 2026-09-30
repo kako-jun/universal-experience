@@ -1,0 +1,79 @@
+name: Samples sync
+
+# assets/samples/*.png は tools/generate_samples.dart の生成物（コミット済み）。
+# スクリプト・フォントのアトラス・依存 (package:image) を変えたのに PNG を再生成し
+# 忘れた、あるいは PNG だけを手で差し替えた、という食い違いを検出する（#115）。
+#
+# 通常の CI (ci.yml の check / linux-build) から独立した別ワークフローにし、
+# 対象ファイルが変わった push/PR のときだけ起動する（`paths` はトリガ時点の
+# フィルタなので、無関係な PR ではジョブ自体が作られず CI 時間は増えない）。
+# 生成は純 Dart（Flutter エンジン不要・macOS 固有の描画なし）なので、macOS ではなく
+# ubuntu-latest で走らせる（macOS ランナーは高価で、ci.yml の check は golden のために
+# だけ macOS にしている）。
+#
+# このワークフローの check は必須チェックにしない前提（`paths` で起動しない PR では
+# 報告されないため）。ブランチ保護で必須にする場合は、この paths フィルタを外して
+# ジョブ内で差分判定する形に作り直すこと。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - tools/generate_samples.dart
+      - tools/fonts/**
+      - assets/samples/**
+      # package:image の版が変わると PNG のバイト列が変わりうる。
+      - pubspec.yaml
+      - pubspec.lock
+      - .github/workflows/samples-sync.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - tools/generate_samples.dart
+      - tools/fonts/**
+      - assets/samples/**
+      - pubspec.yaml
+      - pubspec.lock
+      - .github/workflows/samples-sync.yml
+  workflow_dispatch:
+
+concurrency:
+  group: samples-sync-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  samples-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      # 生成前に既存の PNG を消す。スクリプトがもう書き出さない古い PNG が
+      # 残っていても、削除として差分に出て落ちる。
+      - name: Regenerate samples
+        run: |
+          rm -f assets/samples/*.png
+          dart run tools/generate_samples.dart
+
+      # `git diff` だけだと新規（未追跡）ファイルを見逃すので `git status` で見る。
+      - name: Verify assets/samples match the generator output
+        run: |
+          changed=$(git status --porcelain --untracked-files=all -- assets/samples)
+          if [ -n "$changed" ]; then
+            echo "::error::assets/samples が tools/generate_samples.dart の生成結果と一致しません。"
+            echo "手元で次を実行し、差分の PNG をコミットしてください:"
+            echo "  dart run tools/generate_samples.dart"
+            echo
+            echo "$changed"
+            exit 1
+          fi
+          echo "assets/samples は生成結果と一致しています。"

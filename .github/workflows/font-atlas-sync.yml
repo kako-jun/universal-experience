@@ -1,0 +1,60 @@
+name: Font atlas sync
+
+# tools/fonts/ のビットマップフォント（*.fnt / *.png）は tools/generate_font_atlases.py が
+# 固定した版の OFL フォントを取得（SHA-256 検証）して再生成する生成物（#99）。
+# スクリプトを変えたのにアトラスを再生成し忘れた、といった食い違いを検出する（#115）。
+#
+# Python + ネットワーク（raw.githubusercontent.com からのフォント取得）を使うので、
+# 通常の CI とは別ワークフローにし、対象ファイルが変わった push/PR と手動実行
+# （workflow_dispatch）のときだけ走らせる。サンプル画像との同期は samples-sync.yml。
+#
+# アトラスのバイト列は Pillow に同梱される FreeType に依存する。生成スクリプトは
+# Pillow を固定しているが、OS/CPU をまたいだ一致は保証されない（tools/fonts/README.md）。
+# 手元（macOS）でコミットしたアトラスがここ（ubuntu-latest）で一致しない場合は、
+# このジョブのランナーを手元と同じ OS に合わせること。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - tools/generate_font_atlases.py
+      - tools/fonts/**
+      - .github/workflows/font-atlas-sync.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - tools/generate_font_atlases.py
+      - tools/fonts/**
+      - .github/workflows/font-atlas-sync.yml
+  workflow_dispatch:
+
+concurrency:
+  group: font-atlas-sync-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  font-atlas-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Regenerate font atlases
+        run: uv run --with pillow==12.3.0 python3 tools/generate_font_atlases.py
+
+      - name: Verify tools/fonts match the generator output
+        run: |
+          changed=$(git status --porcelain --untracked-files=all -- tools/fonts)
+          if [ -n "$changed" ]; then
+            echo "::error::tools/fonts が tools/generate_font_atlases.py の生成結果と一致しません。"
+            echo "手元で次を実行し、差分をコミットしてください（アトラスを変えたら PNG も再生成）:"
+            echo "  uv run --with pillow==12.3.0 python3 tools/generate_font_atlases.py"
+            echo "  dart run tools/generate_samples.dart"
+            echo
+            echo "$changed"
+            exit 1
+          fi
+          echo "tools/fonts は生成結果と一致しています。"
