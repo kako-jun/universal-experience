@@ -276,7 +276,7 @@ void main() {
   });
 
   group('ImageSourcePicker ウィジェット', () {
-    testWidgets('7 件のサンプルチップが表示され、選択中のものだけ selected になる',
+    testWidgets('サンプルチップ（全件）が表示され、選択中のものだけ selected になる',
         (tester) async {
       final imageSourceState = ImageSourceState(initialSampleId: 'chart');
       await tester.pumpWidget(localized(

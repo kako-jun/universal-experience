@@ -93,6 +93,7 @@ flutter:
     # rootBundle 経由でこのパスを解決する。
     - assets/tray/
     # サンプル画像集 (#78)。自作の手続き生成（tools/generate_samples.dart）。
+    # 文字は OFL の Noto Sans / Noto Sans JP（tools/fonts/、#99）で描いている。
     # 出典は assets/samples/README.md。#78: ディレクトリ丸ごと
     # ではなく PNG を個別に列挙する — assets/samples/README.md はアプリの
     # アセットバンドルに含めない（実行時に読まないドキュメントのため）。
@@ -102,6 +103,7 @@ flutter:
     - assets/samples/chart.png
     - assets/samples/traffic_signs.png
     - assets/samples/info_board.png
+    - assets/samples/info_board_ja.png
     - assets/samples/fruit_stand.png
     - assets/samples/night_scene.png
     - assets/samples/depth_landscape.png

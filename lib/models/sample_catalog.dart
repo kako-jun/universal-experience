@@ -1,10 +1,11 @@
 /// The built-in preview sample images (#78) — self-made, procedurally
 /// generated scenes (see `tools/generate_samples.dart` +
-/// `assets/samples/README.md` for provenance) that replace the old
-/// meaningless hue-gradient placeholder with content where a symptom's
-/// effect is actually legible: colour-coded lines, a chart legend, signage
-/// text at several sizes, red/green fruit, night point-lights, a layered
-/// depth scene.
+/// `assets/samples/README.md` for provenance; text is drawn with the OFL
+/// Noto Sans / Noto Sans JP bitmap fonts in `tools/fonts/`, #99) that replace
+/// the old meaningless hue-gradient placeholder with content where a
+/// symptom's effect is actually legible: colour-coded lines, a chart legend,
+/// signage text at several sizes (Latin and Japanese), red/green fruit,
+/// night point-lights, a layered depth scene.
 ///
 /// This is a pure data layer (no algorithm, no `dart:ui`) — mirrors the
 /// `VisionFilterCategory`/`VisionFilterEntry` split in
@@ -36,7 +37,8 @@ class SampleImageEntry {
   final String? depthAssetPath;
 }
 
-/// The 7 built-in scenes (#78 issue: minimum required set).
+/// The 8 built-in scenes (#78 issue: minimum required 7 + the Japanese
+/// signage board of #99).
 const List<SampleImageEntry> kSampleCatalog = [
   SampleImageEntry(
     id: 'route_map',
@@ -53,6 +55,10 @@ const List<SampleImageEntry> kSampleCatalog = [
   SampleImageEntry(
     id: 'info_board',
     assetPath: 'assets/samples/info_board.png',
+  ),
+  SampleImageEntry(
+    id: 'info_board_ja',
+    assetPath: 'assets/samples/info_board_ja.png',
   ),
   SampleImageEntry(
     id: 'fruit_stand',
