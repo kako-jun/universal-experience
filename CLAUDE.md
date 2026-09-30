@@ -35,6 +35,8 @@ lib/
 │   ├── color_vision_selection.dart  # 色覚クイック選択の唯一の入口（FilterService/
 │   │                                 # VisionFilterState を同時更新、#60）
 │   ├── export_service.dart          # PNG エクスポート（メタ焼き込み・Downloads へ非上書き保存・フォルダで表示、#43/#64）
+│   ├── experience_source.dart       # 体験プリセットの供給源 seam・availableExperiences・
+│   │                                 # isValidExperiencePreset（永続化した選択の検証、#65）
 │   ├── filter_list_selection.dart   # 統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行）の
 │   │                                 # 検索・選択入口・↑↓ の順送りの純粋ロジック（#72）
 │   ├── filter_service.dart          # 選択状態モデル（sensus VisionFilter へのマッピング）

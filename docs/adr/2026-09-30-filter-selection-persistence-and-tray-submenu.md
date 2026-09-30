@@ -37,9 +37,14 @@
    言語変更に追従する**（#82 の作法）。`TrayMenuLabels` は `tray_menu_labels.dart` に分け、
    `l10n_extensions.dart` ⇄ `filter_list_selection.dart` ⇄ `tray_service.dart` の循環を避ける。
 7. **メニュー構造が直前にネイティブへ送ったものと等しければ送り直さない**（スライダー操作で
-   `VisionFilterState` が連続通知されるため）。クリック直後だけは、ネイティブが先にチェックを
-   反転させる環境に備えて必ず送り直す。
-8. **フィルタ切替は `LoupeWindowController`（クリックスルー・最前面・モード、#63）に触れない。**
+   `VisionFilterState` が連続通知されるため）。「直前に送ったもの」は送信の完了を待たず
+   に記録する（送信中に A→B→A と変わっても最後の状態を送るため）。クリック直後だけは、
+   ネイティブが先にチェックを反転させる環境に備えて必ず送り直す。
+8. **トップレベルの色覚項目のチェックも統合一覧と同じ選択行から決める。** 色覚の base 型
+   （Protanopia 等）を高度なフィルタ側から選んでも同名のトップレベル項目に点灯する
+   （ウィンドウ内一覧が同じカタログ id の行を点灯させるのと同じ）。体験プリセット選択中は
+   トレイにプリセットを出さないので、何もチェックしない。
+9. **フィルタ切替は `LoupeWindowController`（クリックスルー・最前面・モード、#63）に触れない。**
 
 ## 代替案
 
@@ -66,6 +71,11 @@
 
 - 保存 JSON の形を変えるときは `kVisionFilterSnapshotVersion` を上げる。古い版は丸ごと
   捨てられ、既定値で起動する（移行は書かない）。
+- 復元中に sensus 呼び出しが例外を投げても起動は止まらない。`VisionFilterState.restore` が
+  失敗時に呼び出し前の状態へ巻き戻し、store が握って色覚シードのまま起動する。
+- 選択の保存先が 2 か所になっている: `SettingsService.filterType` は初回起動の判定と旧版
+  からの移行（色覚シード）のために残し、選択の正本は `settings.visionFilter`（復元は後者が
+  勝つ）。統一は #32（状態モデルの統合）で行う。
 - advanced 選択中の `FilterService` は従来どおり古いまま（消費側が `isColorQuickSelection`
   で判定する）。復元時に色覚クイック選択なら `FilterService.applyFilter` も呼んで揃える。
 - トレイの入れ子サブメニューの実機表示（macOS メニューバー・Windows 通知領域）は、この

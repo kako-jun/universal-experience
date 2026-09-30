@@ -262,16 +262,20 @@ main.dart が `windowManager.show()` / `hide()` を `onShowLoupe` / `onHideLoupe
 6. (区切り線)
 7. **即切替フィルタ** (`quickColorVisionFilters()`) — よく使う色覚シミュレーションを
    直接適用: Protanopia / Deuteranopia / Tritanopia / Achromatopsia。
-   `FilterService.applyFilter()` を呼び、アクティブなものにチェックが付く。トップ
-   レベルは短く保つため代表のみで、全フィルタは次項の「高度なフィルタ」サブメニュー
-   から選べる (#65)。
+   `selectColorVision`（`FilterService.applyFilter()` と `VisionFilterState` を
+   同時に更新する色覚クイック選択の入口）を通り、選択中のものにチェックが付く。
+   チェックは項番 8 と同じ選択行から決めるため、色覚の base 型（Protanopia 等）を
+   「高度なフィルタ」側から選んでも同名のトップレベル項目に点灯する（統合一覧と同じ）。
+   トップレベルは短く保つため代表のみで、全フィルタは次項の「高度なフィルタ」
+   サブメニューから選べる (#65)。
 8. **高度なフィルタ** (#65) — カテゴリ別の入れ子サブメニュー（7 カテゴリ）。統合
    フィルタ一覧 `kFilterListEntries`（色覚 7 型 + advanced 30 = 33 行、#72）の行を
    すべて並べ、選ぶとウィンドウ内一覧と同じ入口 `applyFilterListEntry`
    （色覚の行は `selectColorVision`、それ以外は `VisionFilterState.select`）を通る。
    チェックは `selectedFilterListEntry(visionFilterState)` で決めるため、
    ウィンドウ内 UI で選んだものもトレイに反映される（体験プリセット選択中は
-   一覧の行を点灯させない。ウィンドウ内一覧と同じ）。ラベルは `TrayMenuLabels` の
+   トレイに何もチェックを付けない。トレイにプリセットは出さず、ウィンドウ内一覧も
+   一覧の行を点灯させないため）。ラベルは `TrayMenuLabels` の
    `advancedFilters` / `categoryLabels` / `catalogNames` / `filterLabels` で、
    ARB（ja/en）から解決し `updateLocalization` で言語変更に追従する
 9. **フィルタを解除** — `deactivateColorVision`（色覚・advanced・プリセットを
@@ -401,11 +405,17 @@ Linux debug ビルド成功で代替している:
   `FilterService` は従来どおり古いまま（消費側は `isColorQuickSelection` で判定する）。
 - **体験プリセット**: 保存された体験 id が今の体験一覧にあり、かつそのフィルタが
   保存されたカタログ id と一致するときだけプリセット選択として戻す。一覧から消えて
-  いれば advanced の選択として戻す（`isValidExperiencePreset`）。
+  いれば advanced の選択として戻す（`isValidExperiencePreset`。widget を経由せず
+  main から使えるよう `lib/services/experience_source.dart` に置く）。
 - **書き込み**: `FilterService` の per-type 強度（#57）と同じ作法で、変更は 300ms
   デバウンスで書き、JSON が直前と同じ変化（原画比較の切替など）は書かない。
   終了経路（トレイの終了・`onExitRequested`・ウィンドウクローズ）で `flush()` する。
-  書き込み失敗は握りつぶす（次回は既定値で起動するだけ）。
+  書き込み失敗は握りつぶす（次回は既定値で起動するだけ）。`flush()` は、タイマー発火後
+  にすでに走っている書き込みの完了も待つ。
+- **復元の失敗**: 復元の途中（推奨強度の算出・体験一覧の取得など sensus 呼び出し）で
+  例外が出ても起動は止めない。`VisionFilterState.restore` は失敗時に呼び出し前の
+  状態へ巻き戻して rethrow し、`VisionFilterStore.restoreAndBind` が握って、色覚シード
+  のまま以後の保存だけ始める。
 - **テスト**: 往復・補正・フォールバックの純粋テスト（`test/vision_filter_snapshot_test.dart`・
   `test/vision_filter_store_test.dart`）と、`buildRootApp` を 2 回起動して復元を確かめる
   実アプリ経路のテスト（`test/vision_filter_persistence_app_test.dart`）。
