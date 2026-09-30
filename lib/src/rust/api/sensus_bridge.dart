@@ -8,8 +8,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:freezed_annotation/freezed_annotation.dart' hide protected;
 part 'sensus_bridge.freezed.dart';
 
-// These functions are ignored because they are not marked as `pub`: `color_matrix_flat`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `to_sensus`, `to_sensus`, `to_sensus`, `to_sensus`, `urgency_escalation_mirror`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These functions are ignored because they are not marked as `pub`: `color_matrix_flat`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `from_sensus`, `rgba8_to_dynamic_image`, `to_sensus`, `to_sensus`, `to_sensus`, `to_sensus`, `urgency_escalation_mirror`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// 指定フィルタの GLSL ES 3.00 ソースを返す。
 ///
@@ -89,6 +89,31 @@ Future<Uint8List> applyVisionCpuRgba8(
         width: width,
         height: height,
         strength: strength);
+
+/// 複数のフィルタを **`steps` の並びの順に**順番に適用する
+/// （`sensus_core::pipeline::Pipeline`）。
+///
+/// 並び順がそのまま適用順になる。ここでは並べ替えも重複除去もしない（どの順で並べるかは
+/// 呼び出し側の責務。ue では段順の表から作る）。各ステップは単体で
+/// [`apply_vision_cpu_rgba8`] を呼んだ結果と同じ挙動になる（sensus の `FilterStep::apply` は
+/// `apply` へ委譲する）。ただし 8bit ↔ f32 の往復が 1 ステップごとに入るため、
+/// 段数に応じて量子化誤差が累積する（sensus `pipeline.rs` 冒頭の注記）。
+/// どれかのステップが失敗したら、そのステップの番号とフィルタ名を含むエラー文字列を返す。
+///
+/// **空の `steps` は入力をそのまま返す**（エラーにしない）。sensus の空の `Pipeline` が
+/// 恒等写像であることに合わせ、「フィルタを 1 つも選んでいない」状態を呼び出し側が
+/// 特別扱いせずに済ませるため。ただしバッファ長の検証は空でも行う。
+///
+/// 入出力のレイアウトと非同期公開の理由は [`apply_vision_cpu_rgba8`] と同じ
+/// （生 RGBA8 `width * height * 4` バイト。`#[frb(sync)]` を付けず Rust 側スレッドプールで
+/// 実行する）。複数ステップは合計時間が層数に比例して重くなるため、UI スレッド上では走らせない。
+Future<Uint8List> applyVisionPipelineCpuRgba8(
+        {required List<VisionStep> steps,
+        required List<int> rgba8,
+        required int width,
+        required int height}) =>
+    RustLib.instance.api.crateApiSensusBridgeApplyVisionPipelineCpuRgba8(
+        steps: steps, rgba8: rgba8, width: width, height: height);
 
 /// sensus-core が正準化した複合体験のプリセット 4 種を Dart へ返す。
 ///
@@ -470,4 +495,33 @@ enum VisionGlaucomaMode {
   /// 両弧状暗点（進行例）。uMode=3。
   biarcuate,
   ;
+}
+
+/// [`apply_vision_pipeline_cpu_rgba8`] の 1 ステップ。
+/// `sensus_core::pipeline::FilterStep` の FRB 公開ミラー。
+///
+/// `strength` は [`apply_vision_cpu_rgba8`] の `strength` と同じ扱い（0.0..=1.0 の
+/// clamp / NaN の処理は sensus 側の責務で、ここでは加工せずそのまま渡す）。
+class VisionStep {
+  /// このステップで適用するフィルタ（payload 込み）。
+  final VisionFilter filter;
+
+  /// このステップの強度。
+  final double strength;
+
+  const VisionStep({
+    required this.filter,
+    required this.strength,
+  });
+
+  @override
+  int get hashCode => filter.hashCode ^ strength.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is VisionStep &&
+          runtimeType == other.runtimeType &&
+          filter == other.filter &&
+          strength == other.strength;
 }

@@ -68,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => -978312356;
+  int get rustContentHash => 1415993197;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -85,6 +85,12 @@ abstract class RustLibApi extends BaseApi {
       required int width,
       required int height,
       required double strength});
+
+  Future<Uint8List> crateApiSensusBridgeApplyVisionPipelineCpuRgba8(
+      {required List<VisionStep> steps,
+      required List<int> rgba8,
+      required int width,
+      required int height});
 
   List<Experience> crateApiSensusBridgeExperiences();
 
@@ -161,6 +167,38 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(
         debugName: 'apply_vision_cpu_rgba8',
         argNames: ['filter', 'rgba8', 'width', 'height', 'strength'],
+      );
+
+  @override
+  Future<Uint8List> crateApiSensusBridgeApplyVisionPipelineCpuRgba8(
+      {required List<VisionStep> steps,
+      required List<int> rgba8,
+      required int width,
+      required int height}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        var arg0 = cst_encode_list_vision_step(steps);
+        var arg1 = cst_encode_list_prim_u_8_loose(rgba8);
+        var arg2 = cst_encode_u_32(width);
+        var arg3 = cst_encode_u_32(height);
+        return wire
+            .wire__crate__api__sensus_bridge__apply_vision_pipeline_cpu_rgba8(
+                port_, arg0, arg1, arg2, arg3);
+      },
+      codec: DcoCodec(
+        decodeSuccessData: dco_decode_list_prim_u_8_strict,
+        decodeErrorData: dco_decode_String,
+      ),
+      constMeta: kCrateApiSensusBridgeApplyVisionPipelineCpuRgba8ConstMeta,
+      argValues: [steps, rgba8, width, height],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiSensusBridgeApplyVisionPipelineCpuRgba8ConstMeta =>
+      const TaskConstMeta(
+        debugName: 'apply_vision_pipeline_cpu_rgba8',
+        argNames: ['steps', 'rgba8', 'width', 'height'],
       );
 
   @override
@@ -573,6 +611,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<VisionStep> dco_decode_list_vision_step(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_vision_step).toList();
+  }
+
+  @protected
   String? dco_decode_opt_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_String(raw);
@@ -753,6 +797,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  VisionStep dco_decode_vision_step(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return VisionStep(
+      filter: dco_decode_vision_filter(arr[0]),
+      strength: dco_decode_f_32(arr[1]),
+    );
+  }
+
+  @protected
   String sse_decode_String(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_list_prim_u_8_strict(deserializer);
@@ -896,6 +952,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <UrgencyEscalation>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_urgency_escalation(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<VisionStep> sse_decode_list_vision_step(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <VisionStep>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_vision_step(deserializer));
     }
     return ans_;
   }
@@ -1104,6 +1172,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  VisionStep sse_decode_vision_step(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_filter = sse_decode_vision_filter(deserializer);
+    var var_strength = sse_decode_f_32(deserializer);
+    return VisionStep(filter: var_filter, strength: var_strength);
+  }
+
+  @protected
   bool sse_decode_bool(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint8() != 0;
@@ -1288,6 +1364,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_urgency_escalation(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_vision_step(
+      List<VisionStep> self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_vision_step(item, serializer);
     }
   }
 
@@ -1489,6 +1575,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       VisionGlaucomaMode self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_vision_step(VisionStep self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_vision_filter(self.filter, serializer);
+    sse_encode_f_32(self.strength, serializer);
   }
 
   @protected
