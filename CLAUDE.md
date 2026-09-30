@@ -142,7 +142,7 @@ test/
 ├── vision_filter_persistence_app_test.dart # 実アプリ（buildRootApp）を作り直して選択が復元される・旧強度の取り込み（#65/#117）
 ├── vision_filter_stage_test.dart   # 段の表（30 フィルタがちょうど 1 段・段内は sensus 宣言順）と適用順・色覚の排他グループ（#117）
 ├── vision_layer_test.dart          # 強度の記憶キー・別名の検証・層の列の正規化（上限・排他・重複・適用順）（#117）
-├── vision_filter_multi_select_test.dart # 多選択 API: toggle/remove・色覚の排他と置き換え・上限 5 と例外・プリセット置換と破棄・強度/パラメータ・単一選択の互換・pipelineSteps・上限ちょうど 5 層・同段 2 層の pipelineSteps 列のリテラル固定・永続化 v2 の往復（#119）
+├── vision_filter_multi_select_test.dart # 多選択 API: toggle/remove・色覚の排他と置き換え・上限 5 と例外・プリセット置換と破棄・強度/パラメータ・単一選択の互換・pipelineSteps・上限ちょうど 5 層・同段 3 層の pipelineSteps 列のリテラル固定・永続化 v2 の往復（#119）
 ├── home_screen_multi_layer_preview_test.dart # 複数層のプレビュー: pipelineApplier をフェイクにして段順・強度・payload・強度 0 除外・単一層の従来経路・bypass・steps だけ変わる更新での再合成・合成失敗の表示と旧結果の dispose を確認、推奨サンプルの focusedId 追従（#119）
 ├── consult_input_merge_test.dart   # 複数層の相談喚起入力の統合: urgency は最大・escalation は段ごとに重複除去（#119）
 ├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品（プレビューの読み込み/適用は Rust 非依存のフェイクに固定）

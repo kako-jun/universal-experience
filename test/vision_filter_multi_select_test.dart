@@ -512,7 +512,7 @@ void main() {
       }
     });
 
-    test('同じ段の 2 層は段内の宣言順（選んだ順でなく）で並ぶ', () {
+    test('同じ段の 3 層は段内の宣言順（選んだ順でなく）で並ぶ', () {
       // optics 段の宣言順: myopia → hyperopia → astigmatism → presbyopia。
       for (final order in const [
         ['presbyopia', 'hyperopia', 'myopia'],

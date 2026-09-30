@@ -36,9 +36,9 @@ import 'vision_layer.dart';
 /// [setLayerStrength] / [setLayerParams] / [replaceWith] / [clear]（#119）。層・強度・
 /// payload の書き込み入口はこれらと、従来の単一選択 API（[select] / [selectColorVisionType] /
 /// [selectPreset] / [setStrength] / [setStrengthForKey] / [setParam] / [resetToRecommended] /
-/// [restore]）で、どれも層の列の不変条件を保つ。未知のカタログ id の扱いは入口で違う:
-/// 層を足す入口（[toggle] / [replaceWith] / [blockReasonFor] と、[select] 系）は
-/// [ArgumentError] を投げ、既存の層を操作する入口（[remove] / [setLayerStrength] /
+/// [randomizeSeed] / [restore]）で、どれも層の列の不変条件を保つ。未知のカタログ id の扱いは
+/// 入口で違う: 層を足す入口（[toggle] / [replaceWith] と、[select] 系）と足せるか確認する
+/// 入口（[blockReasonFor]）は [ArgumentError] を投げ、既存の層を操作する入口（[remove] / [setLayerStrength] /
 /// [setLayerParams]）は該当する層が無いものとして何もしない。適用順は
 /// 段（`vision_filter_stage.dart`）で決まり、選んだ順には依存しない。従来の単一選択
 /// API（[selectedId] / [strength] / [params] / [isColorQuickSelection] /
@@ -318,8 +318,9 @@ class VisionFilterState extends ChangeNotifier {
   /// 経路は #120 で入るので、そこで同期の持たせ方を決める。#119 時点の production は
   /// [toggle] を呼ばない。
   ///
-  /// [id] が未知のカタログ id なら [ArgumentError]（[variantId] が [id] の別名として不正なときも）。payload は id ごとの記憶
-  /// から、強度はキーごとの記憶から導出する。体験プリセットの選択は、層の集合がそのフィルタ
+  /// [id] が未知のカタログ id なら [ArgumentError]（[variantId] が [id] の別名として不正なときも）。
+  ///
+  /// payload は id ごとの記憶から、強度はキーごとの記憶から導出する。体験プリセットの選択は、層の集合がそのフィルタ
   /// 1 つ以外になった時点で外れる（戻さない）。原画比較（bypass）は解除する。
   VisionLayerResult toggle(
     String id, {

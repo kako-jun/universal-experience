@@ -257,17 +257,22 @@ void main() {
   group('合成経路の失敗と破棄（#119）', () {
     final ja = lookupAppLocalizations(const Locale('ja'));
 
-    List<FlutterErrorDetails> suppressReports() {
+    /// 報告された FlutterError を集める。`FlutterError.onError` を差し替えたままだと、
+    /// テストの失敗（expect の失敗）もここに吸われて報告されずハングするので、戻す関数
+    /// [restore] を返す。**アサーションの前に必ず [restore] を呼ぶ**（tearDown でも戻す）。
+    ({List<FlutterErrorDetails> reported, void Function() restore})
+        suppressReports() {
       final reported = <FlutterErrorDetails>[];
       final original = FlutterError.onError;
       FlutterError.onError = reported.add;
-      addTearDown(() => FlutterError.onError = original);
-      return reported;
+      void restore() => FlutterError.onError = original;
+      addTearDown(restore);
+      return (reported: reported, restore: restore);
     }
 
     testWidgets('applier が例外を投げたら失敗表示になり、次の更新で再試行できる', (tester) async {
       await installFakes(tester);
-      final reported = suppressReports();
+      final suppressed = suppressReports();
       final h = await pumpHomeScreen(tester, size: wide);
       CpuVisionRenderer.pipelineApplier = (source, steps) async {
         throw StateError('boom');
@@ -275,9 +280,10 @@ void main() {
       h.visionState.toggle('myopia');
       h.visionState.toggle('vertigo');
       await settle(tester);
+      suppressed.restore();
 
       expect(find.text(ja.previewFailed), findsOneWidget);
-      expect(reported, isNotEmpty);
+      expect(suppressed.reported, isNotEmpty);
 
       CpuVisionRenderer.pipelineApplier = (source, steps) async {
         pipelineCalls.add(List.of(steps));
