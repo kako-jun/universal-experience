@@ -384,6 +384,24 @@ optics に置く。）
   - 1 ステップの結果は単体適用とバイト一致し、2〜5 ステップは 1 つずつ単体適用した結果とバイト一致する
     （Rust テストで固定）。順序を入れ替えると結果が変わる組（ピクセル化とぼかし）で順序が結果に反映されることも固定した。
 
+- **第 3 段（#119）実装済み**: `VisionFilterState` に `toggle` / `remove` / `setLayerStrength` / `setLayerParams` /
+  `replaceWith` / `clear` と結果型 `VisionLayerResult` を追加し、`_previewCard` が層を段順で `BeforeAfterView.steps`
+  経由の 1 回の合成（#118）へ渡すようにした。実装時に確定した点・当初の記述との差は次のとおり。
+  - **層が 0〜1 のときは従来の単一フィルタの経路**（`afterImageRenderer`）のまま、2 層以上のときだけ
+    `pipelineApplier` を使う（単一層の挙動を変えないため。1 層でも合成経路へ寄せるかは #120 以降の判断）。
+  - 層の同一性は (id, variantId)。-opia と -omaly は同じカタログ id なので、片方を選んでいる状態で他方を
+    `toggle` すると色覚グループの置き換えになる（同じ別名を再度 `toggle` すれば外れる）。
+  - 上限での追加は no-op で `VisionLayerResult.blocked(layerLimit)` を返す。色覚の置き換え（既存の色覚層がある
+    とき）と体験プリセットは上限に当たらない。強度 0 の層は合成から除くが上限には数える。
+  - 体験プリセットは層集合がそのプリセット単体でなくなった時点で破棄し、集合が戻っても復元しない。
+  - `select` / `selectColorVisionType` / `selectPreset` は `replaceWith` ベースの薄い窓として残した
+    （`selectedId` はフォーカス層の id の別名。削除は #124）。推奨サンプル（#78）の 3 箇所は `focusedId` に変えた。
+  - 相談喚起の統合 `mergeConsultInputs`（urgency は最大、escalation は段ごとに重複除去）と
+    `consultInputForFilters` を追加した。UI・書き出しへの適用は #121。
+  - 見出し・書き出し・2×2 比較の出し分け・トレイは #120〜#122 まで単一（フォーカス層）の意味のまま。
+  - 合成のバイト一致は #118 の Rust テストが担う。#119 のテストは `pipelineApplier` をフェイクにして、
+    渡る列（段順・強度・payload・強度 0 の除外）と状態遷移を固定した。
+
 **#120〜#122 の間の暫定挙動**（この間の退行を防ぐための取り決め）:
 
 - #120 がマージされた時点で多層を選べるようになるが、**複数層のとき PNG 書き出しは無効にして理由を
