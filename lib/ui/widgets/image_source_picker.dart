@@ -32,7 +32,7 @@ ImageFilePicker pickImageFile = _defaultPickImageFile;
 Future<XFile?> _defaultPickImageFile() {
   const typeGroup = XTypeGroup(
     label: 'images',
-    extensions: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'],
+    extensions: kUserImageFileExtensions,
   );
   return openFile(acceptedTypeGroups: [typeGroup]);
 }
@@ -169,15 +169,41 @@ class ClipboardImageUnsupportedException implements Exception {
 /// ([ClipboardImageUnsupportedException], `imageSourcePasteUnsupported`), or
 /// the clipboard read itself failing (`imageSourcePasteFailed`).
 ///
-/// Returns `true` on success, `false` on failure.
+/// If the clipboard holds an image **file** (copied in a file manager) the
+/// file goes through [loadUserImageFile] instead — the byte-level check above
+/// applies to image data only. A second call while one is still running is
+/// ignored (returns `false`), so key repeat and double clicks don't stack up.
+///
+/// Returns `true` on success, `false` on failure (or when ignored).
 Future<bool> pasteUserImageFromClipboard(BuildContext context) async {
+  // 実行中の再入は無視する（キーリピート・ボタンの二度押しで、読み取りと
+  // デコードが重なって走るのを防ぐ）。例外でも必ず解除する。
+  if (_pasteInFlight) return false;
+  _pasteInFlight = true;
+  try {
+    return await _pasteUserImageFromClipboard(context);
+  } finally {
+    _pasteInFlight = false;
+  }
+}
+
+bool _pasteInFlight = false;
+
+Future<bool> _pasteUserImageFromClipboard(BuildContext context) async {
   final imageSourceState = context.read<ImageSourceState>();
   ui.Image decoded;
   try {
-    final bytes = await clipboardImageReader.readImageBytes();
-    if (bytes == null || bytes.isEmpty) {
+    final content = await clipboardImageReader.read();
+    if (content is ClipboardImageFile) {
+      // ファイルをコピーした場合（#97）: 選択・ドロップと同じ経路（サイズの
+      // 事前判定・縮小デコード・失敗の SnackBar は loadUserImageFile が持つ）。
+      if (!context.mounted) return false;
+      return loadUserImageFile(context, XFile(content.path));
+    }
+    if (content is! ClipboardImageData || content.bytes.isEmpty) {
       throw const ClipboardHasNoImageException();
     }
+    final bytes = content.bytes;
     if (bytes.length > kMaxUserImageFileBytes) {
       throw UserImageTooLargeException(bytes.length);
     }
