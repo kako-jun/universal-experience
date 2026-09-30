@@ -8,12 +8,12 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_contract_notes.dart' as contract_notes;
+import '../../services/layer_consult_notice.dart';
 import '../../services/loupe_window_controller.dart';
 import '../../services/preview_selection.dart';
 import '../../services/vision_filter_state.dart';
 import '../../src/rust/api/sensus_bridge.dart';
 import 'consult_notice_block.dart';
-import 'filter_param_panel.dart' show layerConsultNotice;
 
 /// [LoupeWindowController] から「全画面かどうか」を取り出す関数の型（#79）。
 typedef IsLoupeFullScreen = bool Function(LoupeWindowController controller);

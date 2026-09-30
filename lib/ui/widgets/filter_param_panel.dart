@@ -5,10 +5,8 @@ import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_catalog.dart';
 import '../../models/vision_filter_contract_notes.dart';
-
 import '../../services/vision_filter_metadata.dart';
 import '../../services/vision_filter_state.dart';
-import '../../services/vision_layer.dart';
 import '../../src/rust/api/sensus_bridge.dart';
 import 'consult_notice_block.dart';
 import 'strength_caution.dart';
@@ -31,22 +29,6 @@ import 'strength_caution.dart';
 /// #120 で 1 本に統合した）。動かす先は層ごとのキーの記憶（`VisionFilterState.strengthByKey`、
 /// #117）で、動かすと原画比較（bypass）は解除される。複数層の節の並びは `AdjustPanel` が持つ。
 /// 文言はすべて i18n で解決する（カタログは識別子/enum のみ持つ: #18）。
-/// [layer] 単体の受診喚起（#120）。複数層の合成（`mergeConsultInputs`）ではなく、その層だけを
-/// sensus の入口（[visionFilterUrgencyProvider] / [visionFilterUrgencyEscalationProvider]）に
-/// 渡して解決する。出す喚起が無ければ null。
-ConsultNotice? layerConsultNotice(
-  AppLocalizations l10n,
-  VisionFilterState state,
-  VisionLayer layer,
-) {
-  final filter = state.buildLayer(layer);
-  return resolveConsultNotice(
-    l10n,
-    visionFilterUrgencyProvider(filter),
-    visionFilterUrgencyEscalationProvider(filter),
-  );
-}
-
 class FilterParamPanel extends StatelessWidget {
   const FilterParamPanel({super.key, this.noticeOverride});
 

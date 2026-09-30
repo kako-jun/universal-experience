@@ -3,10 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
-import '../../services/color_vision_selection.dart';
 import '../../models/vision_filter_contract_notes.dart';
+import '../../services/color_vision_selection.dart';
 import '../../services/filter_service.dart';
-
+import '../../services/layer_consult_notice.dart';
 import '../../services/vision_filter_state.dart';
 import '../../services/vision_layer.dart';
 import 'consult_notice_block.dart';
