@@ -144,6 +144,17 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
   `padded` + `VisualDensity.standard` を設定済み。個別に `compact` を指定しない。
   `test/tap_target_size_test.dart` が macOS のプラットフォーム指定で 48dp を確認している）。
 - ツールチップ（`tooltip:`）は、アイコンだけのボタンには必ず付ける（Semantics ラベルを兼ねる）。
+  自前で `IconButton` を包むときは、外側に `Semantics(label:)` を足さず `Icon(semanticLabel:)` に名前を載せる
+  （外側の `Semantics` は押せるノードと別ノードになり、押せるノードが名前なしになる。`_HudIconButton`）。
+- **スライダー・ドロップダウンは名前を持たせる。** 上に置いた見出し `Text` は別ノードなので、
+  `MergeSemantics(child: Semantics(label: 名前, child: Slider(...)))` で束ね、値は
+  `semanticFormatterCallback` で読める書式にする（`IntensitySlider`・`FilterParamPanel`）。
+- 見出しの `Text` は `Semantics(header: true)`、画像（`PreviewImageView`）は `semanticLabel`、
+  状態が変わる文言（準備中・失敗）は `liveRegion`。
+- アニメーション（フェード・スクロール・枠の遷移）は `MediaQuery.disableAnimationsOf(context)` が真なら
+  `Duration.zero` にする。点滅は使わない。
+- ue 自身の UI のアクセシビリティの現状・既知の制約・実機確認の項目は
+  [`docs/accessibility.md`](docs/accessibility.md)（#45）。
 
 ## 6. 画面構成の原則
 
@@ -285,7 +296,7 @@ UI を組み替えるときは、`/`（検索へ）・`↑↓`（一覧の送り
 - サイズは `textTheme` のロール、余白は 4 の倍数スケール。
 - 状態（選択・無効・適用中）は、色に加えて形（チェックマーク・太字・アイコン）でも示す。
 - 操作できる要素は 48dp 以上、Tab 順が視覚の順（左→右、上→下）と一致する。
-- アイコンだけのボタンに `tooltip`。画像には `Semantics` ラベル。
+- アイコンだけのボタンに `tooltip`。画像には `Semantics` ラベル。スライダー・ドロップダウンには名前（§5、`docs/accessibility.md`）。
 - ライト・ダーク・ハイコントラストの 3 種でスクリーンショットを撮って確認する（§8）。
 - 文言は ARB に追加する（ja/en 両方）。長さが違っても崩れないレイアウトにする。
 
