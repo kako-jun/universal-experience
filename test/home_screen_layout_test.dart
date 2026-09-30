@@ -503,13 +503,13 @@ void main() {
       expect(focusedTile(tester), isNull,
           reason: '代わりに標準の方向フォーカス移動で行の外へ移る');
 
-      // 移った先がショートカットの受け口なら、次の ←→ からは強度が動く。
-      if (tester.binding.focusManager.primaryFocus?.debugLabel ==
-          'homeShortcuts') {
-        await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
-        await tester.pump();
-        expect(h.filterService.intensity, lessThan(before));
-      }
+      // 移った先は画面のショートカット受け口（ARCHITECTURE / DESIGN に観測事実として
+      // 記載）。挙動が変わればここで落とす。次の ←→ からは強度が動く。
+      expect(tester.binding.focusManager.primaryFocus?.debugLabel,
+          'homeShortcuts');
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
+      expect(h.filterService.intensity, lessThan(before));
       await h.filterService.flush();
     });
 
