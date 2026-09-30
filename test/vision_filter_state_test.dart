@@ -11,7 +11,7 @@
 // - seedInitialLayers は初回起動の層（deuteranomaly・強度 0.6）を入れる（#124）。
 //
 // 色覚 7 種のキー（別名を含む）の選択まわりの契約は
-// test/color_vision_selection_test.dart と test/experience_presets_test.dart
+// test/color_vision_alias_test.dart と test/experience_presets_test.dart
 // が担うので、ここでは重複させない。
 //
 // urgency/urgency_escalation/recommended_strength は sensus ブリッジ（#76/#77）
