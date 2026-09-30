@@ -155,7 +155,7 @@ class VisionFilterState extends ChangeNotifier {
   /// フィルタを選択する（advanced カタログ UI から。#60: プリセット/色覚
   /// クイック選択の記録は解除する — 手動での advanced 選択は「別のフィルタを
   /// 手動で選んだ」ことになるため）。強度・パラメータはフィルタ id ごとに
-  /// 記憶する（#77、#76 レビュー S5）: 既に選んだことのある id なら記憶値を
+  /// 記憶する（#77）: 既に選んだことのある id なら記憶値を
   /// 復元し、初めてなら既定パラメータ + sensus の推奨強度で初期化する
   /// （[_selectInternal] 参照）。
   void select(String id) {
@@ -211,11 +211,11 @@ class VisionFilterState extends ChangeNotifier {
   /// 体験プリセット（`ExperiencePresetTile`）からフィルタを選択する（#60）。
   /// [presetId] は `Experience.id`、[catalogId] はその体験の視覚フィルタに
   /// 対応するカタログ id。色覚クイック選択の記録は解除する。強度・パラメータは
-  /// 常に推奨値・既定値にする（#76 レビュー N1: advanced 側で当該 id を
+  /// 常に推奨値・既定値にする（advanced 側で当該 id を
   /// カスタマイズ済みでも、プリセットは常に『代表的な程度』で体験してもらう
   /// ため、[_selectInternal] の記憶優先ロジックは経由しない。#60 で入れていた
   /// 「強度を強制的に 1.0 に戻す」を #77 で「常に推奨値」へ置き換えた）。
-  /// notifyListeners は 1 回だけ呼ぶ（#76 レビュー N2）。
+  /// notifyListeners は 1 回だけ呼ぶ。
   void selectPreset(String presetId, String catalogId) {
     final entry = kVisionFilterCatalogById[catalogId];
     if (entry == null) {
@@ -237,7 +237,7 @@ class VisionFilterState extends ChangeNotifier {
 
   /// [entry] の payload パラメータを、カタログの defaultValue から組み立てる
   /// （純粋関数。副作用なし。実体は [defaultVisionParams]）。[_selectInternal] の
-  /// 初回選択・[resetToRecommended]・[selectPreset] が共有する（#76 レビュー N3）。
+  /// 初回選択・[resetToRecommended]・[selectPreset] が共有する。
   Map<String, Object> _defaultParamsFor(VisionFilterEntry entry) =>
       defaultVisionParams(entry);
 
@@ -246,7 +246,7 @@ class VisionFilterState extends ChangeNotifier {
   /// 経由）。urgency と同じく payload に依存しないため、呼び出し時点の
   /// payload（既定値・記憶値のどちらでも）をそのまま [build] してよい。未選択
   /// なら 1.0。[_selectInternal]・[resetToRecommended]・[selectPreset] が共有
-  /// する（#76 レビュー N3）。
+  /// する。
   double _recommendedStrength() {
     final builtFilter = build();
     return builtFilter == null
@@ -316,40 +316,80 @@ class VisionFilterState extends ChangeNotifier {
   ///
   /// snapshot は [VisionFilterSnapshot.fromJson] で補正済みの値を前提とする。
   /// 原画比較（bypass）は復元しない（常に解除）。
+  ///
+  /// 途中で例外が出たら、呼び出し前の状態へ巻き戻してから rethrow する
+  /// （state が半端に消えた状態を残さない）。
   void restore(
     VisionFilterSnapshot snapshot, {
     bool Function(String presetId, String catalogId)? isValidPreset,
   }) {
-    _strengthById
-      ..clear()
-      ..addAll(snapshot.strengthById);
-    _paramsById
-      ..clear()
-      ..addAll({
-        for (final e in snapshot.paramsById.entries)
+    // 復元の途中（推奨強度の算出・プリセット検証の FFI など）で例外が出ても
+    // 半端に消えた状態を残さないよう、変更前の内容を控えて巻き戻す。
+    final backup = (
+      strengthById: Map<String, double>.from(_strengthById),
+      paramsById: {
+        for (final e in _paramsById.entries)
           e.key: Map<String, Object>.from(e.value),
-      });
-    _bypassHolders.clear();
-    _selectedId = null;
-    _selectedPresetId = null;
-    _isColorQuickSelection = false;
-    _colorVisionType = null;
-    _params.clear();
+      },
+      params: Map<String, Object>.from(_params),
+      strength: _strength,
+      selectedId: _selectedId,
+      presetId: _selectedPresetId,
+      isColorQuick: _isColorQuickSelection,
+      colorVisionType: _colorVisionType,
+      bypassHolders: Set<Object>.of(_bypassHolders),
+    );
+    try {
+      _strengthById
+        ..clear()
+        ..addAll(snapshot.strengthById);
+      _paramsById
+        ..clear()
+        ..addAll({
+          for (final e in snapshot.paramsById.entries)
+            e.key: Map<String, Object>.from(e.value),
+        });
+      _bypassHolders.clear();
+      _selectedId = null;
+      _selectedPresetId = null;
+      _isColorQuickSelection = false;
+      _colorVisionType = null;
+      _params.clear();
 
-    final id = snapshot.selectedId;
-    if (id == null || !kVisionFilterCatalogById.containsKey(id)) {
-      notifyListeners();
-      return;
+      final id = snapshot.selectedId;
+      if (id == null || !kVisionFilterCatalogById.containsKey(id)) {
+        notifyListeners();
+        return;
+      }
+      final presetId = snapshot.presetId;
+      final type = snapshot.colorVisionType;
+      if (presetId != null && (isValidPreset?.call(presetId, id) ?? false)) {
+        _selectedPresetId = presetId;
+      } else if (type != null && _catalogIdOfColorVisionType(type) == id) {
+        _isColorQuickSelection = true;
+        _colorVisionType = type;
+      }
+      _selectInternal(id);
+    } catch (_) {
+      _strengthById
+        ..clear()
+        ..addAll(backup.strengthById);
+      _paramsById
+        ..clear()
+        ..addAll(backup.paramsById);
+      _params
+        ..clear()
+        ..addAll(backup.params);
+      _strength = backup.strength;
+      _selectedId = backup.selectedId;
+      _selectedPresetId = backup.presetId;
+      _isColorQuickSelection = backup.isColorQuick;
+      _colorVisionType = backup.colorVisionType;
+      _bypassHolders
+        ..clear()
+        ..addAll(backup.bypassHolders);
+      rethrow;
     }
-    final presetId = snapshot.presetId;
-    final type = snapshot.colorVisionType;
-    if (presetId != null && (isValidPreset?.call(presetId, id) ?? false)) {
-      _selectedPresetId = presetId;
-    } else if (type != null && _catalogIdOfColorVisionType(type) == id) {
-      _isColorQuickSelection = true;
-      _colorVisionType = type;
-    }
-    _selectInternal(id);
   }
 
   static String? _catalogIdOfColorVisionType(ColorVisionType type) {

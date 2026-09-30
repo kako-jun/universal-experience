@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'vision_filter_snapshot.dart';
@@ -33,6 +34,10 @@ class VisionFilterStore {
   VisionFilterState? _state;
   Timer? _debounce;
 
+  /// 実行中の書き込み。[flush] が、タイマー発火後にすでに走っている書き込み
+  /// （`_debounce` は発火時に null になる）の完了も待てるよう保持する。
+  Future<void>? _writing;
+
   /// 最後に書いた（または読んだ）JSON。変化が無い通知（原画比較の切替など）で
   /// 無駄に書き込まないための比較用。
   String? _lastJson;
@@ -54,8 +59,9 @@ class VisionFilterStore {
 
   /// 保存済みの内容を [state] に復元し、以後の変更を保存するよう購読する。
   ///
-  /// 復元できる snapshot が無ければ [state] は変更しない。購読は復元の成否に
-  /// 関わらず張る。復元済みかどうかを返す。
+  /// 復元できる snapshot が無い・復元が例外で失敗したときは [state] は変更しない
+  /// （後者は [VisionFilterState.restore] が巻き戻す）。購読は復元の成否に関わらず
+  /// 張る。復元済みかどうかを返す。
   Future<bool> restoreAndBind(
     VisionFilterState state, {
     bool Function(String presetId, String catalogId)? isValidPreset,
@@ -63,8 +69,15 @@ class VisionFilterStore {
     final snapshot = await load();
     var restored = false;
     if (snapshot != null && !snapshot.isEmpty) {
-      state.restore(snapshot, isValidPreset: isValidPreset);
-      restored = true;
+      try {
+        state.restore(snapshot, isValidPreset: isValidPreset);
+        restored = true;
+      } catch (error) {
+        // 復元中の例外（sensus 呼び出しの失敗など）は起動を止めない。
+        // [VisionFilterState.restore] が呼び出し前の状態へ巻き戻すので、
+        // 呼び出し側がシードした既定のまま起動し、以後の保存だけ始める。
+        debugPrint('VisionFilterStore: restore failed: $error');
+      }
     }
     bind(state);
     return restored;
@@ -82,7 +95,16 @@ class VisionFilterStore {
     _debounce?.cancel();
     _debounce = Timer(_debounceDuration, () {
       _debounce = null;
-      unawaited(_persist());
+      unawaited(_persistTracked());
+    });
+  }
+
+  /// [_persist] を実行し、その Future を [_writing] に保持する（完了で解除）。
+  Future<void> _persistTracked() {
+    final write = _persist();
+    _writing = write;
+    return write.whenComplete(() {
+      if (identical(_writing, write)) _writing = null;
     });
   }
 
@@ -102,12 +124,19 @@ class VisionFilterStore {
 
   /// 保留中のデバウンス書き込みを、タイマーの発火を待たず確定させる。終了
   /// シーケンス（トレイの終了・ウィンドウクローズ・`onExitRequested`）で呼ぶ。
-  /// 保留が無ければ何もしない。
+  /// すでに走っている書き込みがあればその完了も待つ（タイマー発火直後に終了が
+  /// 来ても、書き込み途中でプロセスが終わらない）。保留も実行中も無ければ何もしない。
   Future<void> flush() async {
-    if (_debounce == null) return;
-    _debounce!.cancel();
-    _debounce = null;
-    await _persist();
+    // 先に実行中の書き込みを待つ（古い書き込みと新しい書き込みが競合しない）。
+    await _writing;
+    final pending = _debounce;
+    if (pending != null) {
+      pending.cancel();
+      _debounce = null;
+      await _persistTracked();
+    }
+    // 待っている間にタイマーが発火して始まった書き込みも待つ。
+    await _writing;
   }
 
   /// 購読を外す。保留中の書き込みは飛ばしてから解除する。

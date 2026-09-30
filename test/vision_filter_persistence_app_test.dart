@@ -10,6 +10,8 @@
 // （filterService / visionFilterState / imageSourceState）を直接動かすため、
 // 各テストの後に初期状態へ戻す（test/first_run_seed_test.dart と同じ作法）。
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,6 +23,7 @@ import 'package:universal_experience/models/sample_catalog.dart';
 import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/services/vision_filter_snapshot.dart';
+import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/services/vision_filter_store.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart';
 import 'package:universal_experience/ui/widgets/adjust_panel.dart';
@@ -160,6 +163,24 @@ void main() {
     final third = await _launch();
     addTearDown(() => _quitAndResetSingletons(third.store));
     expect(visionFilterState.selectedId, 'vertigo');
+    expect(visionFilterState.selectedPresetId, isNull);
+  });
+
+  testWidgets('復元中に sensus 呼び出しが例外を投げても起動し、色覚シードで始まる', (_) async {
+    // 保存はプリセット選択。プリセットの有効性確認（体験一覧の取得）が失敗する。
+    final saved = VisionFilterState()..selectPreset('labyrinthitis', 'vertigo');
+    SharedPreferences.setMockInitialValues({
+      SettingsService.keyFilterType: ColorVisionType.protanopia.name,
+      VisionFilterStore.keySnapshot: jsonEncode(saved.snapshot().toJson()),
+    });
+    experiencesProvider = () => throw StateError('sensus failed');
+
+    final launched = await _launch();
+    addTearDown(() => _quitAndResetSingletons(launched.store));
+
+    // buildRootApp が例外で落ちないこと（体験一覧の取得は画面側でも使うため、
+    // 一覧が壊れたままの画面は出さず、起動処理だけを検証する）。
+    expect(visionFilterState.colorVisionType, ColorVisionType.protanopia);
     expect(visionFilterState.selectedPresetId, isNull);
   });
 

@@ -205,7 +205,7 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
 
   // Restore the shared FilterService's (#15) own per-type intensity store
   // (#57) before seeding it with the restored filter type. The old
-  // single-value key (if any leftover on disk) is not migrated (M1 review):
+  // single-value key (if any leftover on disk) is not migrated:
   // the app is pre-release, so there are no existing users to preserve it
   // for; load() just deletes it.
   await filterService.load();

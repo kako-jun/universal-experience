@@ -9,6 +9,7 @@
 //
 // urgency/推奨強度は sensus ブリッジを要求するためフィクスチャに差し替える。
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -105,6 +106,36 @@ void main() {
         expect(s.selectedId, 'vertigo');
         expect(s.selectedPresetId, isNull);
       }
+    });
+
+    test('復元の途中で例外が出たら、呼び出し前の状態へ巻き戻して rethrow する', () {
+      final s = VisionFilterState()
+        ..select('starbursts')
+        ..setStrength(0.35)
+        ..setParam('numRays', 12)
+        ..select('myopia');
+      final before = jsonEncode(s.snapshot().toJson());
+      final presetSnapshot = _viaJson(
+        (VisionFilterState()..selectPreset('labyrinthitis', 'vertigo'))
+            .snapshot(),
+      );
+      var notified = 0;
+      s.addListener(() => notified++);
+
+      expect(
+        () => s.restore(
+          presetSnapshot,
+          isValidPreset: (_, __) => throw StateError('sensus failed'),
+        ),
+        throwsStateError,
+      );
+
+      expect(jsonEncode(s.snapshot().toJson()), before,
+          reason: '記憶（強度・payload）も選択も半端に消えない');
+      expect(s.selectedId, 'myopia');
+      expect(s.selectedPresetId, isNull);
+      expect(notified, 0);
+      expect(s.build(), isNotNull);
     });
 
     test('色覚クイック選択: -omaly の型も含めて起源が戻る', () {
@@ -364,6 +395,53 @@ void main() {
       expect(state.build(), isNotNull);
     });
 
+    test('復元が例外で失敗しても起動は続き、state は元のまま・保存は始まる', () async {
+      final saved = VisionFilterState()
+        ..selectPreset('labyrinthitis', 'vertigo');
+      SharedPreferences.setMockInitialValues({
+        VisionFilterStore.keySnapshot: jsonEncode(saved.snapshot().toJson()),
+      });
+      state
+        ..select('myopia')
+        ..setStrength(0.6);
+      final store = VisionFilterStore();
+
+      final restored = await store.restoreAndBind(
+        state,
+        isValidPreset: (_, __) => throw StateError('sensus failed'),
+      );
+
+      expect(restored, isFalse);
+      expect(state.selectedId, 'myopia');
+      expect(state.strength, 0.6);
+
+      state.select('hyperopia');
+      await store.flush();
+      expect((await storedJson())!['selectedId'], 'hyperopia',
+          reason: '復元に失敗しても以後の変更は保存される');
+    });
+
+    test('flush は実行中の書き込みの完了も待つ', () async {
+      final prefs = _GatedPrefs();
+      final store = VisionFilterStore(
+        prefs: prefs,
+        debounce: const Duration(milliseconds: 5),
+      );
+      await store.restoreAndBind(state);
+      state.select('myopia');
+      await prefs.writeStarted.future; // タイマーが発火し、書き込みが走り始めた
+
+      var flushed = false;
+      final flushing = store.flush().then((_) => flushed = true);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(flushed, isFalse, reason: '書き込み中は終了を許可しない');
+
+      prefs.releaseWrite();
+      await flushing;
+      expect(flushed, isTrue);
+      expect(jsonDecode(prefs.written!)['selectedId'], 'myopia');
+    });
+
     test('dispose は保留分を確定して購読を外す', () async {
       final store = VisionFilterStore();
       await store.restoreAndBind(state);
@@ -379,4 +457,28 @@ void main() {
       expect(prefs.getString(VisionFilterStore.keySnapshot), afterDispose);
     });
   });
+}
+
+/// setString を外から解放するまで完了させない SharedPreferences（書き込み中の
+/// 状態を作るための差し替え）。使うのは getString / setString だけ。
+class _GatedPrefs implements SharedPreferences {
+  final Completer<void> writeStarted = Completer<void>();
+  final Completer<void> _release = Completer<void>();
+  String? written;
+
+  void releaseWrite() => _release.complete();
+
+  @override
+  String? getString(String key) => null;
+
+  @override
+  Future<bool> setString(String key, String value) async {
+    if (!writeStarted.isCompleted) writeStarted.complete();
+    await _release.future;
+    written = value;
+    return true;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
