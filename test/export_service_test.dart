@@ -941,11 +941,12 @@ void main() {
       return decodePng(png!);
     }
 
-    test('ExportCaption.layered: 名前を + でつないだ symptomLabel と、空の strengthLabel',
-        () {
+    test('ExportCaption.layered: 層ごとの名前と強度を持ち、症状名・強度の 2 行の文字列は空', () {
       final c = layeredCaption(3);
-      expect(c.symptomLabel, 'Layer 0 + Layer 1 + Layer 2');
+      expect(c.symptomLabel, isEmpty);
       expect(c.strengthLabel, isEmpty);
+      expect(c.layers.map((l) => l.name).toList(),
+          ['Layer 0', 'Layer 1', 'Layer 2']);
       expect(c.layers.map((l) => l.strengthLabel).toList(),
           ['Strength: 100%', 'Strength: 90%', 'Strength: 80%']);
     });

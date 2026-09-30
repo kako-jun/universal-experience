@@ -143,9 +143,7 @@ class ExportCaption {
   });
 
   /// 複数の層を重ねた書き出し用。[layers]（適用順、2 つ以上）の各行を、[symptomLabel] と
-  /// [strengthLabel] の 2 行の代わりに描く。[symptomLabel] は層の名前を `+` でつないだもの
-  /// （画像には描かない。全層の名前を 1 つの文字列で読めるようにしておく用）、
-  /// [strengthLabel] は空。
+  /// [strengthLabel] の 2 行の代わりに描く。この 2 つは描画も参照もしないので空にする。
   ExportCaption.layered({
     required this.layers,
     required this.isoDate,
@@ -155,7 +153,7 @@ class ExportCaption {
     this.escalationGroups = const [],
     this.disclaimer,
   })  : assert(layers.length > 1, 'layered caption needs 2 or more layers'),
-        symptomLabel = layers.map((l) => l.name).join(' + '),
+        symptomLabel = '',
         strengthLabel = '';
 
   /// 症状の表示名（例「1型2色覚（赤）」/ "Protanopia"）。
