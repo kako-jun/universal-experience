@@ -418,6 +418,29 @@ Linux debug ビルド成功で代替している:
   `test/vision_filter_store_test.dart`）と、`buildRootApp` を 2 回起動して復元を確かめる
   実アプリ経路のテスト（`test/vision_filter_persistence_app_test.dart`）。
 
+## 状態モデルの統一と多症状の同時適用 (#32 / #41、設計のみ・未実装)
+
+現状は状態が 2 系統ある（`VisionFilterState` = カタログ 30 フィルタ、`FilterService` =
+`ColorVisionType` 8 値 = none + 7 型）うえ、選択は常に 1 つだけ。両方を解く方針として、**選択の単位を
+「カタログ id ごとに 1 つのレイヤー」の順序つき列に統一**し、単一選択を 1 要素の多選択として扱う。
+要点:
+
+- 層は最大 5、色覚カテゴリは排他（同時に 1 つ）。体験プリセットは層全体を置き換える。
+- 適用順は段（motion → optics → media → retina → visualField → perception → colorVision）で
+  決め、選択した順には依存させない。結果は「層の集合」の関数になる。
+- プレビューは CPU `apply()`（1024px）のまま、sensus の `Pipeline` を bridge 経由で 1 回のジョブとして
+  適用する（ue に合成ロジックを持たない）。ライブ（GPU）経路は同じ順序の N パス多段にする。
+- 強度の出どころは 1 つにする: 記憶の鍵を `variantId ?? id` にして `FilterService` の強度記憶
+  （`settings.intensityByType`）を第 1 段で `VisionFilterState` に統合し、`isColorQuickSelection` は
+  層ごとの属性に置き換える。層は強度を持たず、強度は per-key 記憶から読むときに導く。
+- 永続 JSON は v2（`layers` 配列）に上げ、旧状態は色覚クイック選択の強度の出どころを含めて移行して読む。
+  移行のきっかけは `settings.intensityByType` の存在で、v1 JSON が無くても行う（色覚シードより前）。
+  `ColorVisionType` / `FilterService` の削除は最終段。
+
+段階ごとの実装は Issue #117〜#125、判断・代替案・根拠は
+`docs/adr/2026-09-30-multi-select-filter-state-model.md`。実装が入るまでは、上の「フィルタ選択の永続化
+(#65)」と下の各サービスの記述が現行の挙動。
+
 ## グローバルホットキー (#63)
 
 デスクトップ全体で効くグローバルホットキーを 4 種類提供する。実装は
@@ -789,6 +812,10 @@ ShaderFilter    (lib/rendering/) — Impeller FragmentProgram。将来のライ�
 状態管理は Provider の `ChangeNotifier` ベース: `FilterService` /
 `VisionFilterState` が状態変更時に `notifyListeners()` を呼び、それを購読する
 `Consumer` を持つウィジェットだけが rebuild される。
+
+状態モデルが 2 系統（`FilterService` と `VisionFilterState`）並行している現状を 1 系統に畳み、
+複数症状の同時適用に拡張する方針は「状態モデルの統一と多症状の同時適用 (#32 / #41)」節と
+`docs/adr/2026-09-30-multi-select-filter-state-model.md`。
 
 `rust/` crate は `rust_builder/`（cargokit 統合、#55）経由でビルドされ、
 macOS / Linux アプリに同梱される。`lib/main.dart` の `buildRootApp()`（#55 で `main()` から
