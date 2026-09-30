@@ -13,10 +13,11 @@
 // 中心的な回帰: 以前の実装（home_screen.dart の listener ミラー）は「色覚型が変わった
 // ときだけ」状態へ反映していたため、advanced/プリセットを経由したあとに *同じ* 色覚を
 // 再選択しても反映されなかった。選択の入口が「呼ばれるたびに無条件で反映する」ことを
-// 検証しておく（FilterBrowser のチップもトレイも同じ入口を通る）。
+// 検証しておく（回帰テストは FilterBrowser の行もトレイも通る toggleFilterListEntry で行う）。
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
+import 'package:universal_experience/services/filter_list_selection.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/services/vision_layer.dart';
 
@@ -200,24 +201,26 @@ void main() {
     });
 
     test(
-        '回帰: advanced を経由したあとに同じ色覚を再選択しても正しく反映される '
-        '（#60。以前の listener ミラーは色覚型が変わらないため反応しなかった）', () {
-      // 1. protanopia を選ぶ（FilterBrowser のチップ、またはトレイのメニュー
-      //    どちらも同じ選択の入口を通るので区別なく再現できる）。
-      selectColorVisionKey(visionState, 'protanopia');
+        '回帰: advanced を経由したあとに同じ色覚を選び直しても正しく反映される '
+        '（#60。本番の入口 toggleFilterListEntry を通す。以前の listener ミラーは色覚型が変わらないため反応しなかった）',
+        () {
+      final protanopia =
+          kFilterListEntries.firstWhere((e) => e.key == 'cv:protanopia');
+
+      // 1. protanopia を選ぶ（FilterBrowser の行もトレイのメニューも同じ入口）。
+      toggleFilterListEntry(visionState, protanopia);
       expect(visionState.selectedId, 'protanopia');
 
-      // 2. advanced へ切り替える。
+      // 2. advanced へ切り替える（単一選択として置き換える）。
       visionState.replaceWith('starbursts');
       expect(visionState.layers.map((l) => l.id), ['starbursts']);
 
-      // 3. 同じ protanopia を再選択する（トレイのチェックボックスを再クリックする
-      //    操作、または FilterBrowser の同じチップを再タップする操作に相当）。
-      selectColorVisionKey(visionState, 'protanopia');
+      // 3. 同じ protanopia の行を選び直す。
+      toggleFilterListEntry(visionState, protanopia);
 
       expect(visionState.selectedId, 'protanopia');
-      expect(visionState.layers.map((l) => l.id), ['protanopia'],
-          reason: '同じ色覚への再選択でも VisionFilterState は必ず反映されるべき');
+      expect(visionState.layers.map((l) => l.id), ['starbursts', 'protanopia'],
+          reason: '同じ色覚を選び直しても VisionFilterState は必ず反映されるべき');
     });
   });
 
