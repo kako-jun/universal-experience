@@ -8,7 +8,6 @@ import '../../l10n/l10n_extensions.dart';
 import '../../models/sample_catalog.dart';
 import '../../services/app_shortcuts.dart';
 import '../../services/color_vision_compare.dart';
-import '../../services/filter_list_selection.dart';
 import '../../services/filter_service.dart';
 import '../../services/image_source_state.dart';
 import '../../services/loupe_window_controller.dart';
@@ -167,19 +166,14 @@ class _HomeScreenState extends State<HomeScreen> {
               return null;
             },
           ),
-          CycleFilterIntent:
-              InteractiveFocusAwareCallbackAction<CycleFilterIntent>(
+          // ↑↓: 一覧の行の間でフォーカスだけを動かす（選択は変えない。足し引きは行の
+          // Space/Enter、#120）。行にフォーカスがある間も受ける（ListTile の標準の移動だと、
+          // 上限で無効の行や絞り込みの外へ出てしまうため）。ボタン・入力欄など行以外の
+          // 操作部品の上では奪わない。
+          CycleFilterIntent: _RowAwareCycleAction(
+            isRowFocused: () => _browser.isRowFocused,
             onInvoke: (intent) {
-              final filterService = context.read<FilterService>();
-              final visionState = context.read<VisionFilterState>();
-              final next = nextFilterListEntry(
-                _browser.visibleEntries,
-                selectedFilterListEntry(visionState),
-                forward: intent.forward,
-              );
-              if (next != null) {
-                applyFilterListEntry(filterService, visionState, next);
-              }
+              _browser.moveRowFocus(forward: intent.forward);
               return null;
             },
           ),
@@ -515,6 +509,19 @@ class _ThemeModeButton extends StatelessWidget {
         ThemeMode.light => ThemeMode.dark,
         ThemeMode.dark => ThemeMode.system,
       };
+}
+
+/// ↑↓ の行移動（[CycleFilterIntent]）。[isFocusOnInteractiveControl] が true の間は
+/// 無効（[InteractiveFocusAwareCallbackAction] と同じ）だが、フォーカスが一覧の行
+/// （[FilterBrowserController.isRowFocused]）にあるときは例外として有効にする。
+class _RowAwareCycleAction extends CallbackAction<CycleFilterIntent> {
+  _RowAwareCycleAction({required this.isRowFocused, required super.onInvoke});
+
+  final bool Function() isRowFocused;
+
+  @override
+  bool isEnabled(CycleFilterIntent intent) =>
+      isRowFocused() || !isFocusOnInteractiveControl();
 }
 
 /// 「選ぶ」カード（広幅は左カラム、狭幅は末尾）用のフォーカス走査。標準（読み順）と同じだが、**一覧の行にフォーカスが

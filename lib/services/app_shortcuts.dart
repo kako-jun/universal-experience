@@ -9,14 +9,16 @@ class FocusFilterSearchIntent extends Intent {
   const FocusFilterSearchIntent();
 }
 
-/// ↑↓（#63）: 統合フィルタ一覧（`FilterBrowser`、#72）の今見えている行を
-/// 順送り/逆送りして選択する。
+/// ↑↓（#63, #120）: 統合フィルタ一覧（`FilterBrowser`、#72）の今見えている行の間で、
+/// フォーカスを順送り/逆送りする。**選択（層の足し引き）は変えない**: 足し引きは行の
+/// Space/Enter。
 class CycleFilterIntent extends Intent {
   const CycleFilterIntent({required this.forward});
   final bool forward;
 }
 
-/// ←→（#63）: 選択中フィルタの強度を [kKeyboardStrengthStep] 刻みで動かす。
+/// ←→（#63, #120）: 調整中の層（`VisionFilterState.focusedId`）の強度を
+/// [kKeyboardStrengthStep] 刻みで動かす。
 class AdjustStrengthIntent extends Intent {
   const AdjustStrengthIntent({required this.delta});
   final double delta;

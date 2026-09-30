@@ -429,23 +429,31 @@ void main() {
       expect(h.filterService.intensity, closeTo(0.55, 1e-9));
     });
 
-    testWidgets('検索で絞ったあとの ↑↓ は、見えている行だけを順送りする', (tester) async {
+    testWidgets('検索で絞ったあとの ↑↓ は、見えている行だけでフォーカスを送り、選択は変えない', (tester) async {
       final h = await pumpHomeScreen(tester, size: wide);
       await tester.enterText(find.byType(TextField), 'protan');
       await tester.pump();
       final visible = visibleFilterListEntries(query: 'protan');
       expect(visible.length, greaterThanOrEqualTo(2));
 
-      // 行を選ぶと、フォーカスはショートカットの受け口へ戻る（検索欄に残らない）。
+      // 行をタップして選ぶと、フォーカスはショートカットの受け口へ戻る（検索欄に残らない）。
       final first = find.byKey(filterListTileKey(visible[0]));
       await tester.ensureVisible(first);
       await tester.tap(first);
       await tester.pump();
       expect(selectedFilterListEntry(h.visionState), visible[0]);
 
+      Key? focusedRowKey() => tester.binding.focusManager.primaryFocus?.context
+          ?.findAncestorWidgetOfExactType<FilterListTile>()
+          ?.key;
+
+      // 受け口からの ↓ は先頭の行に入る。以降は見えている行の順に進む。
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.pump();
-      expect(selectedFilterListEntry(h.visionState), visible[1]);
+      expect(focusedRowKey(), filterListTileKey(visible[0]));
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      expect(focusedRowKey(), filterListTileKey(visible[1]));
 
       // 絞り込みの外（一覧全体の次の行）へは出ない: 末尾から ↓ で先頭へ折り返す。
       for (var i = 2; i < visible.length; i++) {
@@ -454,7 +462,13 @@ void main() {
       }
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.pump();
-      expect(selectedFilterListEntry(h.visionState), visible[0]);
+      expect(focusedRowKey(), filterListTileKey(visible[0]));
+
+      // ↑↓ では選択（層の集合）は変わらない。Space で初めて足し引きされる。
+      expect(h.visionState.layers.map((l) => l.id), ['protanopia']);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      expect(h.visionState.layers.map((l) => l.id), ['protanopia']);
     });
   });
 
@@ -583,59 +597,62 @@ void main() {
     });
   });
 
-  group('↑↓ で選んだ行は一覧のビューポート内に追従する（両方向・折り返し）', () {
+  group('↑↓ で動いたフォーカス行は一覧のビューポート内に追従する（両方向・折り返し）', () {
     Rect listViewport(WidgetTester tester) => tester.getRect(find.descendant(
           of: find.byType(FilterBrowser),
           matching: find.byType(SingleChildScrollView),
         ));
 
-    void expectSelectedVisible(
-      WidgetTester tester,
-      FilterListEntry selected,
-      String reason,
-    ) {
-      final rect = tester.getRect(find.byKey(filterListTileKey(selected)));
-      final vp = listViewport(tester);
-      expect(rect.top, greaterThanOrEqualTo(vp.top - 1), reason: reason);
-      expect(rect.bottom, lessThanOrEqualTo(vp.bottom + 1), reason: reason);
+    Key? focusedRowKey(WidgetTester tester) =>
+        tester.binding.focusManager.primaryFocus?.context
+            ?.findAncestorWidgetOfExactType<FilterListTile>()
+            ?.key;
+
+    Finder focusedRow(WidgetTester tester) {
+      final key = focusedRowKey(tester);
+      expect(key, isNotNull, reason: '行にフォーカスがある');
+      return find.byKey(key!);
     }
 
-    testWidgets('↑ を連打して一覧の上方向へ進んでも選択行が見える', (tester) async {
-      final h = await pumpHomeScreen(tester, size: wide);
-      final start = kFilterListEntries[kFilterListEntries.length - 3];
-      final tile = find.byKey(filterListTileKey(start));
-      await tester.ensureVisible(tile);
-      await tester.tap(tile);
-      await tester.pumpAndSettle();
+    testWidgets('↑ を連打して一覧の上方向へ進んでもフォーカス行が見える', (tester) async {
+      await pumpHomeScreen(tester, size: wide);
 
       for (var i = 0; i < 25; i++) {
         await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
         await tester.pumpAndSettle();
-        expectSelectedVisible(
-          tester,
-          selectedFilterListEntry(h.visionState)!,
-          '↑ ${i + 1} 回目',
-        );
+        final rect = tester.getRect(focusedRow(tester));
+        final vp = listViewport(tester);
+        expect(rect.top, greaterThanOrEqualTo(vp.top - 1),
+            reason: '↑ ${i + 1} 回目');
+        expect(rect.bottom, lessThanOrEqualTo(vp.bottom + 1),
+            reason: '↑ ${i + 1} 回目');
       }
     });
 
     testWidgets('末尾で ↓ すると先頭へ折り返し、先頭で ↑ すると末尾へ折り返しても見える', (tester) async {
       final h = await pumpHomeScreen(tester, size: wide);
       final last = kFilterListEntries.last;
-      final tile = find.byKey(filterListTileKey(last));
-      await tester.ensureVisible(tile);
-      await tester.tap(tile);
+
+      // 受け口から ↑ で末尾の行へ入る。
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
       await tester.pumpAndSettle();
+      expect(focusedRowKey(tester), filterListTileKey(last));
 
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.pumpAndSettle();
-      expect(selectedFilterListEntry(h.visionState), kFilterListEntries.first);
-      expectSelectedVisible(tester, kFilterListEntries.first, '末尾→先頭');
+      expect(
+          focusedRowKey(tester), filterListTileKey(kFilterListEntries.first));
+      var rect = tester.getRect(focusedRow(tester));
+      expect(rect.top, greaterThanOrEqualTo(listViewport(tester).top - 1),
+          reason: '末尾→先頭');
 
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
       await tester.pumpAndSettle();
-      expect(selectedFilterListEntry(h.visionState), last);
-      expectSelectedVisible(tester, last, '先頭→末尾');
+      expect(focusedRowKey(tester), filterListTileKey(last));
+      rect = tester.getRect(focusedRow(tester));
+      expect(rect.bottom, lessThanOrEqualTo(listViewport(tester).bottom + 1),
+          reason: '先頭→末尾');
+      expect(h.visionState.layers, isEmpty, reason: '↑↓ では選ばない');
     });
   });
 
