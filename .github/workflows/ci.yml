@@ -50,7 +50,7 @@ jobs:
         run: flutter pub get
 
       # FRB codegen のドリフト検証（lib/src/rust/ と rust/src/frb_generated.rs が
-      # rust/src/api/ の Rust コードと同期していること）は #85 レビュー N4 で
+      # rust/src/api/ の Rust コードと同期していること）は
       # 一度追加したが、CI (macOS runner) の `flutter_rust_bridge_codegen
       # generate` が原因未特定のまま毎回ハングする（cargo-expand の自動
       # インストール成功後、MIR パーサのログ行まで到達した直後から応答が
@@ -58,7 +58,7 @@ jobs:
       # `timeout-minutes: 10` を付けても短縮されるだけで解消しなかった）ため、
       # ステップごと撤去した。詳細な調査結果・再挑戦の方針は #88 を参照。
       # 現状 CI ではこのドリフトを検知しない（手動での
-      # `flutter_rust_bridge_codegen generate` 実行 + レビューに依存する）。
+      # `flutter_rust_bridge_codegen generate` 実行と差分の目視確認に依存する）。
 
       # shaders/*.frag・pubspec.yaml の shaders: ブロックが tools/sensus_shaders.g.json
       # と同期していることを明示的に確認する（#56）。test/shader_codegen_test.dart
@@ -190,7 +190,7 @@ jobs:
       - name: Flutter build linux
         run: flutter build linux --debug
 
-      # 完了条件（#55 レビュー指摘）: Rust ライブラリが実際に Linux バンドルの
+      # 完了条件: Rust ライブラリが実際に Linux バンドルの
       # lib/ に同梱されていることを確認する。ls -la でバンドル内容を可視化した上で、
       # 同じステップ内の test -f が対象ファイルの有無を判定し、無ければこの
       # ステップ自体が fail する。

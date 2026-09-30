@@ -1475,7 +1475,7 @@ pub(crate) mod tests {
     /// (名前, field_loss_mode を受けて VisionFilter を組み立てるコンストラクタ)。
     type FieldLossModeFilterCtor = (&'static str, fn(VisionFieldLossMode) -> VisionFilter);
 
-    /// field_loss_mode を持つ 4 フィルタの構築ヘルパ一覧。S6 の a/b 両テストで共有する。
+    /// field_loss_mode を持つ 4 フィルタの構築ヘルパ一覧。複数のテストで共有する。
     fn field_loss_mode_filters() -> [FieldLossModeFilterCtor; 4] {
         [
             ("glaucoma", |m| VisionFilter::Glaucoma {
@@ -1817,8 +1817,8 @@ pub(crate) mod tests {
         }
     }
 
-    /// 全 14 バリアントを列挙するヘルパ（#76 レビュー N7 で
-    /// `hearing_filter_metadata_covers_all_variants` /
+    /// 全 14 バリアントを列挙するヘルパ
+    /// （`hearing_filter_metadata_covers_all_variants` /
     /// `hearing_filter_to_sensus_roundtrips_from_sensus` の重複を避けるために抽出）。
     const ALL_HEARING_FILTERS: [HearingFilter; 14] = [
         HearingFilter::HearingLoss,
@@ -1837,8 +1837,8 @@ pub(crate) mod tests {
         HearingFilter::Labyrinthitis,
     ];
 
-    /// HearingFilter::to_sensus は from_sensus の逆写像（#76 レビュー N7。
-    /// VisionFilter 側の `vision_filter_from_sensus_roundtrips_to_sensus` と対）。
+    /// HearingFilter::to_sensus は from_sensus の逆写像
+    /// （VisionFilter 側の `vision_filter_from_sensus_roundtrips_to_sensus` と対）。
     #[test]
     fn hearing_filter_to_sensus_roundtrips_from_sensus() {
         for f in ALL_HEARING_FILTERS {
@@ -1847,7 +1847,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// #76 レビュー S1: sensus 側の escalation 条件文が変わったら検知できるよう、
+    /// sensus 側の escalation 条件文が変わったら検知できるよう、
     /// ブリッジが返す全条件文が既知の集合と一致することを固定する。ue 側の
     /// `escalationConditionText`（l10n_extensions.dart）はこの集合をキーに
     /// ja/en 訳を引くため、ここで変化を検知できればすぐ Dart 側の対応漏れに
