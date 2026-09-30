@@ -529,7 +529,7 @@
   "@imageSourcePasteTooltip": {
     "description": "Tooltip of the Paste button; also tells the keyboard shortcut, which differs by platform (#97).",
     "placeholders": {
-      "shortcut": { "type": "String", "example": "Cmd+V" }
+      "shortcut": { "type": "String", "example": "Ctrl+V" }
     }
   },
   "imageSourcePasteNoImage": "There's no image on the clipboard. Copy an image first, then paste.",

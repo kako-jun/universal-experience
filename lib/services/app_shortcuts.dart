@@ -38,15 +38,26 @@ class PasteImageIntent extends Intent {
 
 /// 貼り付けのキー割り当て（#97）。macOS は Cmd+V、それ以外は Ctrl+V。
 /// プラットフォームで変わるため `const` の `Shortcuts` マップには入れられず、
-/// 呼び出し側（`home_screen.dart`）が実行時に足す。
+/// 呼び出し側（`home_screen.dart`）が実行時に足す。キーを押しっぱなしにした
+/// ときのリピートは無視する（`includeRepeats: false`）。
 SingleActivator pasteShortcutActivator() =>
     defaultTargetPlatform == TargetPlatform.macOS
-        ? const SingleActivator(LogicalKeyboardKey.keyV, meta: true)
-        : const SingleActivator(LogicalKeyboardKey.keyV, control: true);
+        ? const SingleActivator(
+            LogicalKeyboardKey.keyV,
+            meta: true,
+            includeRepeats: false,
+          )
+        : const SingleActivator(
+            LogicalKeyboardKey.keyV,
+            control: true,
+            includeRepeats: false,
+          );
 
 /// 貼り付けボタンのツールチップに出すキー表記（[pasteShortcutActivator] と対）。
+/// macOS は「⌘V」、それ以外は「Ctrl+V」。キーの記号なのでロケールで変わらず、
+/// ARB には置かない。
 String pasteShortcutLabel() =>
-    defaultTargetPlatform == TargetPlatform.macOS ? 'Cmd+V' : 'Ctrl+V';
+    defaultTargetPlatform == TargetPlatform.macOS ? '⌘V' : 'Ctrl+V';
 
 /// フォーカス中のウィジェットが「テキスト入力・ボタン・スイッチ等」のとき、
 /// アプリ内ショートカット（`/`・↑↓・←→）を奪うべきでないかを判定する
