@@ -140,6 +140,51 @@ void main() {
     expect(visionFilterState.isColorQuickSelection, isFalse);
   });
 
+  testWidgets('旧 settings.intensityByType は起動時に v2 へ取り込まれ、強度が画面側に出る（#117）',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({
+      SettingsService.keyFilterType: ColorVisionType.protanomaly.name,
+      VisionFilterStore.keyIntensityByType:
+          jsonEncode({'protanomaly': 0.35, 'deuteranopia': 0.8}),
+    });
+
+    final first = await _launch();
+    addTearDown(() => _quitAndResetSingletons(first.store));
+    await tester.pumpWidget(first.app);
+    await tester.pump();
+
+    expect(filterService.currentFilter, ColorVisionType.protanomaly);
+    expect(filterService.intensity, 0.35);
+    expect(visionFilterState.colorVisionType, ColorVisionType.protanomaly);
+    expect(visionFilterState.strength, 0.35);
+    expect(visionFilterState.strengthForKey('deuteranopia'), 0.8);
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.containsKey(VisionFilterStore.keyIntensityByType), isFalse,
+        reason: '取り込み後に旧キーは消える');
+    final saved = jsonDecode((await _stored())!) as Map<String, Object?>;
+    expect(saved['version'], 2);
+    expect(saved['strengthByKey'], {'protanomaly': 0.35, 'deuteranopia': 0.8});
+  });
+
+  testWidgets('取り込みの後の再起動では、取り込み済みの v2 がそのまま戻る（#117）', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      SettingsService.keyFilterType: ColorVisionType.protanopia.name,
+      VisionFilterStore.keyIntensityByType: jsonEncode({'protanopia': 0.4}),
+    });
+    final first = await _launch();
+    await _quitAndResetSingletons(first.store);
+
+    final second = await _launch();
+    addTearDown(() => _quitAndResetSingletons(second.store));
+    await tester.pumpWidget(second.app);
+    await tester.pump();
+
+    expect(visionFilterState.colorVisionType, ColorVisionType.protanopia);
+    expect(filterService.intensity, 0.4);
+    expect(visionFilterState.strength, 0.4);
+  });
+
   testWidgets('体験プリセットは今も有効なときだけプリセット選択として戻る', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final first = await _launch();

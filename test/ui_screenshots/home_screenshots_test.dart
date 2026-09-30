@@ -232,8 +232,8 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final settings = SettingsService();
     await settings.load();
-    final filterService = FilterService();
     final visionState = VisionFilterState();
+    final filterService = FilterService(visionState: visionState);
     final imageSourceState = ImageSourceState();
     // 初回起動と同じ状態: 2型3色覚（deuteranomaly）を推奨サンプルで選択。
     selectColorVision(

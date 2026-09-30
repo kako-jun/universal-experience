@@ -295,7 +295,6 @@ void main() {
       await tester.pump();
       expect(h.filterService.intensity, lessThan(before),
           reason: '次の ← から強度が動く');
-      await h.filterService.flush();
     });
   }
 }

@@ -20,8 +20,10 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
+import 'package:universal_experience/services/vision_layer.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 
 import 'support/vision_filter_metadata_fixture.dart';
@@ -47,8 +49,7 @@ void main() {
       expect(state.strength, 0.6);
     });
 
-    test('その filter id を advanced で既に記憶していても、プリセットは推奨値を優先する',
-        () {
+    test('その filter id を advanced で既に記憶していても、プリセットは推奨値を優先する', () {
       visionFilterRecommendedStrengthProvider = (_) => 0.6;
       // advanced 経由で vertigo を選び、独自に 0.9 へカスタマイズして記憶させる。
       state.select('vertigo');
@@ -66,11 +67,11 @@ void main() {
 
   group('フィルタごとの強度・パラメータの記憶 (#77)', () {
     test('初めて選ぶフィルタは推奨値から始まる', () {
-      visionFilterRecommendedStrengthProvider = (filter) =>
-          filter == const VisionFilter.tunnelVision(
+      visionFilterRecommendedStrengthProvider = (filter) => filter ==
+              const VisionFilter.tunnelVision(
                   fieldLossMode: VisionFieldLossMode.darken)
-              ? 0.5
-              : 1.0;
+          ? 0.5
+          : 1.0;
 
       state.select('tunnel_vision');
 
@@ -106,26 +107,174 @@ void main() {
       expect(state.paramValue(state.selectedEntry!.parameters.first), seed);
     });
 
-    // #76: このテストの意図は「色覚クイック選択でもプレビュー
-    // 強度が #77 のフィルタ別記憶に従う」ことではない — production の
-    // プレビュー強度は色覚クイック選択のとき常に FilterService のタイプ別
-    // 記憶（#57）を使い、この state.strength は使われない
-    // （`preview_selection.dart` の `previewStrength` 参照）。ここで見たいのは
-    // 「selectColorVisionType も内部的には _selectInternal を経由するので、
-    // 同じ記憶ロジック（_strengthById）が selectColorVisionType 経由でも
-    // 一貫して働く」という、実装の共有経路そのものの回帰である
-    // （advanced 経由の select() と選択元が違うだけで、記憶の仕組みは
-    // 分岐させていないことの検証）。
-    test('色覚クイック選択（selectColorVisionType）経由でも _strengthById の記憶ロジックは一貫して働く', () {
-      visionFilterRecommendedStrengthProvider = (_) => 0.6;
+    // #117: 色覚クイック選択の強度は -opia=1.0 / -omaly=0.6（recommendedStrength）
+    // から始まり（sensus の推奨値は使わない）、記憶はキー（別名 id ?? カタログ id）
+    // ごとに 1 つ。別名（-omaly）と本体（-opia）は別の記憶を持つ。
+    test('色覚クイック選択は -opia 1.0 / -omaly 0.6 から始まり、キーごとに記憶する', () {
+      visionFilterRecommendedStrengthProvider = (_) => 0.3; // 使われない
       state.selectColorVisionType(ColorVisionType.protanopia, 'protanopia');
-      expect(state.strength, 0.6);
+      expect(state.strength, 1.0);
 
       state.setStrength(0.2);
       state.selectColorVisionType(ColorVisionType.none);
       state.selectColorVisionType(ColorVisionType.protanopia, 'protanopia');
+      expect(state.strength, 0.2, reason: '外して戻しても記憶は残る');
 
-      expect(state.strength, 0.2);
+      state.selectColorVisionType(ColorVisionType.protanomaly, 'protanopia');
+      expect(state.strength, kAnomalyDefaultSeverity,
+          reason: '-omaly は別キー（protanomaly）なので -opia の記憶を継がない');
+      expect(state.strengthForKey('protanopia'), 0.2);
+    });
+  });
+
+  group('層と強度の導出（#117）', () {
+    test('select は advanced 起源の層を 1 つ作り、それにフォーカスする', () {
+      state.select('cataract');
+
+      expect(state.layers, hasLength(1));
+      expect(state.layers.single.id, 'cataract');
+      expect(state.layers.single.origin, VisionLayerOrigin.advanced);
+      expect(state.layers.single.variantId, isNull);
+      expect(state.focusedId, 'cataract');
+      expect(state.focusedLayer, same(state.layers.single));
+    });
+
+    test('別のフィルタを選ぶと層は置き換わる（単一選択の挙動は変わらない）', () {
+      state.select('cataract');
+      state.select('myopia');
+      expect([for (final l in state.layers) l.id], ['myopia']);
+
+      state.selectColorVisionType(ColorVisionType.tritanopia, 'tritanopia');
+      expect([for (final l in state.layers) l.id], ['tritanopia']);
+      expect(state.layers.single.origin, VisionLayerOrigin.quick);
+
+      state.clear();
+      expect(state.layers, isEmpty);
+      expect(state.focusedId, isNull);
+    });
+
+    test('-omaly のクイック選択は別名（variantId）を持つ層になる', () {
+      state.selectColorVisionType(
+          ColorVisionType.deuteranomaly, 'deuteranopia');
+
+      final layer = state.layers.single;
+      expect(layer.id, 'deuteranopia');
+      expect(layer.variantId, 'deuteranomaly');
+      expect(layer.strengthKey, 'deuteranomaly');
+    });
+
+    test('記憶が無い層の強度は推奨強度を導出するだけで、記憶へは書かない', () {
+      visionFilterRecommendedStrengthProvider = (_) => 0.45;
+
+      state.select('starbursts');
+      expect(state.strength, 0.45);
+      state.selectColorVisionType(
+          ColorVisionType.deuteranomaly, 'deuteranopia');
+      expect(state.strength, kAnomalyDefaultSeverity);
+
+      expect(state.strengthByKey, isEmpty);
+    });
+
+    test('記憶があれば推奨強度より優先される（推奨値が変わっても記憶は動かない）', () {
+      visionFilterRecommendedStrengthProvider = (_) => 0.45;
+      state.select('starbursts');
+      state.setStrength(0.9);
+
+      visionFilterRecommendedStrengthProvider = (_) => 0.1;
+
+      expect(state.strength, 0.9);
+      expect(state.strengthByKey, {'starbursts': 0.9});
+    });
+
+    test('同じ色覚 id の advanced 選択とクイック選択は強度の記憶を共有する', () {
+      state.select('protanopia');
+      state.setStrength(0.3);
+
+      state.selectColorVisionType(ColorVisionType.protanopia, 'protanopia');
+
+      expect(state.strength, 0.3);
+      state.setStrength(0.7);
+      state.select('protanopia');
+      expect(state.strength, 0.7);
+      expect(state.strengthByKey, {'protanopia': 0.7});
+    });
+
+    test('setStrength は 0..1 に丸めて記憶し、1 回だけ通知する', () {
+      state.select('cataract');
+      var notified = 0;
+      state.addListener(() => notified++);
+
+      state.setStrength(1.8);
+      expect(state.strength, 1.0);
+      state.setStrength(-0.2);
+      expect(state.strength, 0.0);
+
+      expect(state.strengthByKey, {'cataract': 0.0});
+      expect(notified, 2);
+    });
+
+    test('setStrengthForKey は選択に関わらず記憶へ書き、選択は動かさない', () {
+      state.select('cataract');
+
+      state.setStrengthForKey('protanomaly', 0.25);
+
+      expect(state.strengthForKey('protanomaly'), 0.25);
+      expect(state.focusedId, 'cataract');
+      expect(state.strength, 1.0, reason: '選択中の層は cataract のまま');
+    });
+
+    test('未選択のとき setStrength / setParam / randomizeSeed は何もしない（通知もしない）', () {
+      var notified = 0;
+      state.addListener(() => notified++);
+
+      state.setStrength(0.3);
+      state.setParam('axisDeg', 10.0);
+      state.randomizeSeed('seed');
+
+      expect(state.strengthByKey, isEmpty);
+      expect(state.layers, isEmpty);
+      expect(notified, 0);
+    });
+
+    test('selectPreset はそのキーの記憶を消して、推奨強度の導出に戻す', () {
+      visionFilterRecommendedStrengthProvider = (_) => 0.6;
+      state.select('vertigo');
+      state.setStrength(0.9);
+      state.setStrengthForKey('protanopia', 0.2);
+
+      state.selectPreset('meniere', 'vertigo');
+
+      expect(state.strengthByKey, {'protanopia': 0.2},
+          reason: 'vertigo の記憶だけが消える');
+      expect(state.strength, 0.6);
+    });
+
+    test('resetToRecommended はフォーカス中のキーの記憶だけを消す', () {
+      visionFilterRecommendedStrengthProvider = (_) => 0.4;
+      state.select('astigmatism');
+      state.setStrength(0.9);
+      state.setStrengthForKey('protanopia', 0.2);
+
+      state.resetToRecommended();
+
+      expect(state.strengthByKey, {'protanopia': 0.2});
+      expect(state.strength, 0.4);
+    });
+
+    test('snapshot は層・フォーカス・記憶を写し、restore で別インスタンスへ戻る', () {
+      state.selectColorVisionType(ColorVisionType.tritanomaly, 'tritanopia');
+      state.setStrength(0.35);
+      state.setStrengthForKey('myopia', 0.8);
+
+      final snap = state.snapshot();
+      final other = VisionFilterState()..restore(snap);
+
+      expect(snap.layers.single.variantId, 'tritanomaly');
+      expect(snap.focusedId, 'tritanopia');
+      expect(snap.strengthByKey, {'tritanomaly': 0.35, 'myopia': 0.8});
+      expect(other.colorVisionType, ColorVisionType.tritanomaly);
+      expect(other.strength, 0.35);
+      expect(other.strengthForKey('myopia'), 0.8);
     });
   });
 
@@ -140,8 +289,8 @@ void main() {
 
       expect(state.strength, 0.4);
       expect(
-        state.paramValue(
-            state.selectedEntry!.parameters.firstWhere((p) => p.name == 'axisDeg')),
+        state.paramValue(state.selectedEntry!.parameters
+            .firstWhere((p) => p.name == 'axisDeg')),
         90.0, // カタログの axisDeg 既定値
       );
     });

@@ -8,7 +8,6 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_contract_notes.dart' as contract_notes;
-import '../../services/filter_service.dart';
 import '../../services/loupe_window_controller.dart';
 import '../../services/preview_selection.dart';
 import '../../services/vision_filter_metadata.dart';
@@ -178,8 +177,8 @@ class _LoupeHudBar extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    return Consumer2<VisionFilterState, FilterService>(
-      builder: (context, visionState, filterService, _) {
+    return Consumer<VisionFilterState>(
+      builder: (context, visionState, _) {
         final filter = visionState.build();
         final symptomLabel = visionFilterDisplayName(
           l10n,
@@ -191,7 +190,7 @@ class _LoupeHudBar extends StatelessWidget {
         // あること自体は原画比較ボタンのアイコンの色で示す
         // （[_CompareOriginalButtonState] 参照）。
         final strengthPercent = contract_notes.strengthPercent(
-          selectedStrength(visionState, filterService),
+          selectedStrength(visionState),
         );
         // #76 と同じく、喚起の解決は resolveConsultNotice 1 箇所に集約する
         // （FilterParamPanel・ExperiencePresetTile・export と同じ経路）。

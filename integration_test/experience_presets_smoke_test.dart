@@ -59,10 +59,12 @@ class _BrowserBoxState extends State<_BrowserBox> {
 }
 
 Widget _presetsApp() {
+  final visionState = VisionFilterState();
   return MultiProvider(
     providers: [
-      ChangeNotifierProvider(create: (_) => VisionFilterState()),
-      ChangeNotifierProvider(create: (_) => FilterService()),
+      ChangeNotifierProvider.value(value: visionState),
+      ChangeNotifierProvider(
+          create: (_) => FilterService(visionState: visionState)),
     ],
     child: const MaterialApp(
       // システムロケールに追従させると、実行環境（このリポの開発機は ja）次第で
@@ -86,10 +88,12 @@ Widget _presetsApp() {
 /// 体験プリセットの行（[ExperiencePresetTile]）のタップが実際に [BeforeAfterView] の描画へつながる
 /// ことを、実ブリッジ（CPU `apply()`）込みで確かめる。
 Widget _previewWithPresetsApp() {
+  final visionState = VisionFilterState();
   return MultiProvider(
     providers: [
-      ChangeNotifierProvider(create: (_) => VisionFilterState()),
-      ChangeNotifierProvider(create: (_) => FilterService()),
+      ChangeNotifierProvider.value(value: visionState),
+      ChangeNotifierProvider(
+          create: (_) => FilterService(visionState: visionState)),
     ],
     // ConstrainedBox に const コンストラクタが無いため MaterialApp 以下は
     // const にできない。
@@ -134,12 +138,12 @@ class _PreviewFromState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<VisionFilterState, FilterService>(
-      builder: (context, visionState, filterService, _) {
+    return Consumer<VisionFilterState>(
+      builder: (context, visionState, _) {
         return BeforeAfterView(
           filter: visionState.build(),
           filterId: visionState.selectedId,
-          strength: previewStrength(visionState, filterService),
+          strength: previewStrength(visionState),
           // #78: imageSource は必須。実アセットからデコードできる既知の
           // サンプル id を使う（kDefaultSampleId、rootBundle 経由）。
           imageSource: const SamplePreviewImageSource(kDefaultSampleId),
@@ -378,8 +382,7 @@ void main() {
           matching: find.text(afterLabel),
         );
 
-        expect(caughtException, isNull,
-            reason: '$experienceId 選択後の描画で例外が発生した');
+        expect(caughtException, isNull, reason: '$experienceId 選択後の描画で例外が発生した');
         expect(afterLabelFinder, findsOneWidget,
             reason: '$experienceId 選択後、after ペインに "$afterLabel" が出ていない');
         expect(

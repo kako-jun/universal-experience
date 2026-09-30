@@ -112,12 +112,12 @@ class _HomeScreenState extends State<HomeScreen> {
         );
   }
 
-  // Only filterType is persisted through SettingsService. Intensity is owned
-  // and persisted by FilterService itself (its own debounced SharedPreferences
-  // store, #57) precisely so that dragging the slider — which fires this
-  // listener on every tick via FilterService.notifyListeners — never reaches
-  // SettingsService.notifyListeners, which the MaterialApp Consumer
-  // (main.dart) rebuilds on. setFilterType's own no-op guard (unchanged type)
+  // Only filterType is persisted through SettingsService. Intensity lives in
+  // VisionFilterState's per-key strength memory and is persisted by
+  // VisionFilterStore (#57, #117) precisely so that dragging the slider — which
+  // fires this listener on every tick via FilterService.notifyListeners —
+  // never reaches SettingsService.notifyListeners, which the MaterialApp
+  // Consumer (main.dart) rebuilds on. setFilterType's own no-op guard (unchanged type)
   // keeps this a no-op while only intensity is changing.
   void _persistFilterState() {
     final settings = context.read<SettingsService>();
@@ -186,7 +186,6 @@ class _HomeScreenState extends State<HomeScreen> {
             onInvoke: (intent) {
               adjustPreviewStrength(
                 context.read<VisionFilterState>(),
-                context.read<FilterService>(),
                 intent.delta,
               );
               return null;
@@ -375,13 +374,13 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 出す。強さは Before / After と同じ [previewStrength] を 4 セル共通で使うので、
   /// 原画に戻すホットキー（bypass）も 2×2 にそのまま効く。
   Widget _previewCard() {
-    return Consumer3<VisionFilterState, FilterService, ImageSourceState>(
-      builder: (context, visionState, filterService, imageSourceState, _) {
+    return Consumer2<VisionFilterState, ImageSourceState>(
+      builder: (context, visionState, imageSourceState, _) {
         final theme = Theme.of(context);
         final l10n = AppLocalizations.of(context)!;
         final canCompare = isColorVisionFilterId(visionState.selectedId);
         final comparing = canCompare && _compareColorVision;
-        final strength = previewStrength(visionState, filterService);
+        final strength = previewStrength(visionState);
         return Card(
           margin: EdgeInsets.zero,
           child: Padding(

@@ -103,18 +103,20 @@ void main() {
 
   group('選択の書き込み', () {
     test('色覚の行は selectColorVision 経由（色覚クイック選択になる）', () {
-      final filterService = FilterService();
       final state = VisionFilterState();
-      applyFilterListEntry(filterService, state, entryByKey('cv:deuteranomaly'));
+      final filterService = FilterService(visionState: state);
+      applyFilterListEntry(
+          filterService, state, entryByKey('cv:deuteranomaly'));
       expect(state.isColorQuickSelection, isTrue);
       expect(state.colorVisionType, ColorVisionType.deuteranomaly);
       expect(selectedFilterListEntry(state), entryByKey('cv:deuteranomaly'));
     });
 
     test('advanced だけの行は VisionFilterState.select 経由', () {
-      final filterService = FilterService();
       final state = VisionFilterState();
-      applyFilterListEntry(filterService, state, entryByKey('catalog:starbursts'));
+      final filterService = FilterService(visionState: state);
+      applyFilterListEntry(
+          filterService, state, entryByKey('catalog:starbursts'));
       expect(state.selectedId, 'starbursts');
       expect(state.isColorQuickSelection, isFalse);
       expect(selectedFilterListEntry(state), entryByKey('catalog:starbursts'));
@@ -137,16 +139,22 @@ void main() {
     });
 
     test('順に進み、端で折り返す', () {
-      expect(nextFilterListEntry(visible, visible[0], forward: true), visible[1]);
-      expect(nextFilterListEntry(visible, visible[2], forward: true), visible[0]);
-      expect(nextFilterListEntry(visible, visible[0], forward: false), visible[2]);
-      expect(nextFilterListEntry(visible, visible[2], forward: false), visible[1]);
+      expect(
+          nextFilterListEntry(visible, visible[0], forward: true), visible[1]);
+      expect(
+          nextFilterListEntry(visible, visible[2], forward: true), visible[0]);
+      expect(
+          nextFilterListEntry(visible, visible[0], forward: false), visible[2]);
+      expect(
+          nextFilterListEntry(visible, visible[2], forward: false), visible[1]);
     });
 
     test('今見えている行に現在の選択が無ければ、方向に応じて端から始める', () {
       final outside = kFilterListEntries.last;
-      expect(nextFilterListEntry(visible, outside, forward: true), visible.first);
-      expect(nextFilterListEntry(visible, outside, forward: false), visible.last);
+      expect(
+          nextFilterListEntry(visible, outside, forward: true), visible.first);
+      expect(
+          nextFilterListEntry(visible, outside, forward: false), visible.last);
     });
 
     test('空の一覧は null', () {

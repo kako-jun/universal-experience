@@ -43,8 +43,8 @@ void main() {
       );
 
   testWidgets('色覚を選んでいる間は「適用中」が出てスライダーを操作できる', (tester) async {
-    final filterService = FilterService();
     final visionState = VisionFilterState();
+    final filterService = FilterService(visionState: visionState);
     selectColorVision(filterService, visionState, ColorVisionType.protanopia);
 
     await tester.pumpWidget(harness(filterService, visionState));
@@ -54,8 +54,8 @@ void main() {
   });
 
   testWidgets('何も選んでいない間は状態表示が無く、スライダーは操作不能', (tester) async {
-    final filterService = FilterService();
     final visionState = VisionFilterState();
+    final filterService = FilterService(visionState: visionState);
 
     await tester.pumpWidget(harness(filterService, visionState));
 
@@ -64,8 +64,8 @@ void main() {
   });
 
   testWidgets('色覚を解除すると「適用中」が消えてスライダーが操作不能に戻る', (tester) async {
-    final filterService = FilterService();
     final visionState = VisionFilterState();
+    final filterService = FilterService(visionState: visionState);
     selectColorVision(filterService, visionState, ColorVisionType.deuteranopia);
     await tester.pumpWidget(harness(filterService, visionState));
     expect(find.text(en.intensityActive), findsOneWidget);
@@ -79,8 +79,8 @@ void main() {
 
   testWidgets('advanced フィルタを選ぶと、FilterService が色覚を覚えたままでも「適用中」は消えてスライダーは操作不能',
       (tester) async {
-    final filterService = FilterService();
     final visionState = VisionFilterState();
+    final filterService = FilterService(visionState: visionState);
     selectColorVision(filterService, visionState, ColorVisionType.protanopia);
     await tester.pumpWidget(harness(filterService, visionState));
     expect(find.text(en.intensityActive), findsOneWidget);
@@ -96,8 +96,8 @@ void main() {
 
   testWidgets('体験プリセットを選ぶと、FilterService が色覚を覚えたままでも「適用中」は消えてスライダーは操作不能',
       (tester) async {
-    final filterService = FilterService();
     final visionState = VisionFilterState();
+    final filterService = FilterService(visionState: visionState);
     selectColorVision(filterService, visionState, ColorVisionType.protanopia);
     await tester.pumpWidget(harness(filterService, visionState));
     expect(find.text(en.intensityActive), findsOneWidget);

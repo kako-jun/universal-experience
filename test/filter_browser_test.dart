@@ -37,8 +37,8 @@ void main() {
 
     controller = FilterBrowserController();
     addTearDown(controller.dispose);
-    filterService = FilterService();
     state = VisionFilterState();
+    filterService = FilterService(visionState: state);
     activated = 0;
 
     await tester.pumpWidget(
@@ -221,7 +221,6 @@ void main() {
         findsOneWidget,
       );
       expect(activated, 1);
-      await filterService.flush();
     });
 
     testWidgets('advanced だけの行は VisionFilterState.select で選ばれる',

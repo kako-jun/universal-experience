@@ -119,7 +119,6 @@ void main() {
 
       await tester.runAsync(() => h.loupe.setClickThrough(false));
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
-      await h.filterService.flush();
     });
 
     testWidgets('カテゴリのチップも一覧のスクロールに含まれ、届く・押せる', (tester) async {
@@ -233,7 +232,6 @@ void main() {
 
       expect(h.visionState.selectedId, isNull);
       expect(find.text('何も選択されていません'), findsOneWidget);
-      await h.filterService.flush();
     });
   });
 
@@ -258,7 +256,6 @@ void main() {
         find.descendant(of: tile, matching: find.byIcon(Icons.check)),
         findsOneWidget,
       );
-      await h.filterService.flush();
     });
 
     testWidgets('受診喚起のあるフィルタを選ぶと、強度の下に ConsultNoticeBlock が常時展開で出る',
@@ -395,7 +392,6 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pump();
       expect(h.filterService.intensity, closeTo(0.55, 1e-9));
-      await h.filterService.flush();
     });
 
     testWidgets('検索で絞ったあとの ↑↓ は、見えている行だけを順送りする', (tester) async {
@@ -424,7 +420,6 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.pump();
       expect(selectedFilterListEntry(h.visionState), visible[0]);
-      await h.filterService.flush();
     });
   });
 
@@ -469,7 +464,6 @@ void main() {
       await tester.pump();
       expect(focusedTile(tester)?.key, filterListTileKey(first));
       expect(selectedFilterListEntry(h.visionState), first);
-      await h.filterService.flush();
     });
 
     testWidgets('Space でも同じ（フォーカスを行に残す）', (tester) async {
@@ -483,7 +477,6 @@ void main() {
       await tester.pump();
       expect(selectedFilterListEntry(h.visionState), first);
       expect(focusedTile(tester)?.key, filterListTileKey(first));
-      await h.filterService.flush();
     });
 
     testWidgets('行にフォーカスがある間の ←→ は強度を動かさず、ショートカット受け口へ固定で出る', (tester) async {
@@ -511,7 +504,6 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
       await tester.pump();
       expect(h.filterService.intensity, lessThan(before));
-      await h.filterService.flush();
     });
 
     for (final (layoutLabel, size) in [('広幅', wide), ('狭幅', narrow)]) {
@@ -539,14 +531,13 @@ void main() {
             expect(focusedTile(tester), isNull);
             expect(tester.binding.focusManager.primaryFocus?.debugLabel,
                 'homeShortcuts');
-            await h.filterService.flush();
           });
         }
       }
     }
 
     testWidgets('ポインタで選ぶとショートカット受け口へフォーカスが戻り ←→ が効く', (tester) async {
-      final h = await pumpHomeScreen(tester, size: wide);
+      await pumpHomeScreen(tester, size: wide);
       final tile = find.byKey(filterListTileKey(entry('cv:protanopia')));
       await tester.ensureVisible(tile);
       await tester.tap(tile);
@@ -554,7 +545,6 @@ void main() {
 
       expect(tester.binding.focusManager.primaryFocus?.debugLabel,
           'homeShortcuts');
-      await h.filterService.flush();
     });
   });
 
@@ -592,7 +582,6 @@ void main() {
           '↑ ${i + 1} 回目',
         );
       }
-      await h.filterService.flush();
     });
 
     testWidgets('末尾で ↓ すると先頭へ折り返し、先頭で ↑ すると末尾へ折り返しても見える', (tester) async {
@@ -612,7 +601,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(selectedFilterListEntry(h.visionState), last);
       expectSelectedVisible(tester, last, '先頭→末尾');
-      await h.filterService.flush();
     });
   });
 

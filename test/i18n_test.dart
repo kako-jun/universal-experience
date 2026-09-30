@@ -211,8 +211,7 @@ void main() {
           contains('男性'));
     });
 
-    test('urgency 由来の受診喚起は none 以外でのみ出る（#76: sensus の Urgency が唯一の正本）',
-        () {
+    test('urgency 由来の受診喚起は none 以外でのみ出る（#76: sensus の Urgency が唯一の正本）', () {
       final en = lookupAppLocalizations(const Locale('en'));
       expect(urgencyConsultMessage(en, Urgency.none), isNull);
       expect(urgencyConsultMessage(en, Urgency.earlyConsultation),
@@ -335,15 +334,15 @@ void main() {
       final settings = SettingsService();
       await settings.load();
       await settings.setLocale(locale);
+      final visionState = VisionFilterState();
 
       await tester.pumpWidget(
         MultiProvider(
           providers: [
             ChangeNotifierProvider<SettingsService>.value(value: settings),
+            ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
             ChangeNotifierProvider<FilterService>(
-                create: (_) => FilterService()),
-            ChangeNotifierProvider<VisionFilterState>(
-                create: (_) => VisionFilterState()),
+                create: (_) => FilterService(visionState: visionState)),
             ChangeNotifierProvider<ImageSourceState>(
                 create: (_) => ImageSourceState()),
             ChangeNotifierProvider<LoupeWindowController>(

@@ -1,32 +1,32 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/services/filter_service.dart';
+import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 
 /// FilterService の選択状態モデルのテスト。
 ///
-/// #13 で plugin/simulator を撤去し、FilterService は「どのフィルタを・どの強度で
-/// 選んでいるか」だけを保持する純粋な状態モデルになった。ここではその選択状態と
+/// #13 で plugin/simulator を撤去し、FilterService は「どの色覚タイプを選んでいるか」
+/// だけを持つ。強度の正本は #117 で [VisionFilterState] のキーごとの記憶 1 つになり、
+/// FilterService はそれへの薄い窓になった（永続化は VisionFilterStore の担当で、
+/// vision_filter_store_test.dart が見る）。ここではその選択状態・委譲と
 /// ColorVisionType → sensus VisionFilter マッピングを検証する（GPU 描画は
 /// protanopia_golden_test.dart の担当）。
+FilterService _service([VisionFilterState? state]) =>
+    FilterService(visionState: state ?? VisionFilterState());
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  // 一部のテストは applyFilter(intensity:)/setIntensity 経由でデバウンス永続化
-  // （SharedPreferences 書き込み）を予約する。実行時間を気にしないテストでも
-  // その書き込みが（プラグイン未モックの）MissingPluginException で失敗しないよう、
-  // ファイル全体でモックしておく。
-  SharedPreferences.setMockInitialValues({});
 
   group('FilterService 選択状態', () {
     test('初期状態は none / 非アクティブ。intensity は none の recommendedStrength（0.0）', () {
-      final service = FilterService();
+      final service = _service();
       expect(service.currentFilter, ColorVisionType.none);
       expect(service.intensity, 0.0);
     });
 
     test('applyFilter で currentFilter が変わり notify される', () {
-      final service = FilterService();
+      final service = _service();
       var notified = 0;
       service.addListener(() => notified++);
 
@@ -37,7 +37,7 @@ void main() {
     });
 
     test('none を選ぶと currentFilter が none に戻る', () {
-      final service = FilterService();
+      final service = _service();
       service.applyFilter(ColorVisionType.protanopia);
       expect(service.currentFilter, ColorVisionType.protanopia);
 
@@ -46,14 +46,14 @@ void main() {
     });
 
     test('deactivate で none に戻る', () {
-      final service = FilterService();
+      final service = _service();
       service.applyFilter(ColorVisionType.tritanopia);
       service.deactivate();
       expect(service.currentFilter, ColorVisionType.none);
     });
 
     test('applyFilter の intensity は 0..1 に clamp される', () {
-      final service = FilterService();
+      final service = _service();
       service.applyFilter(ColorVisionType.protanopia, intensity: 1.7);
       expect(service.intensity, 1.0);
       service.applyFilter(ColorVisionType.protanopia, intensity: -0.5);
@@ -61,7 +61,7 @@ void main() {
     });
 
     test('setIntensity は 0..1 に clamp し notify する', () {
-      final service = FilterService();
+      final service = _service()..applyFilter(ColorVisionType.protanopia);
       var notified = 0;
       service.addListener(() => notified++);
 
@@ -104,7 +104,7 @@ void main() {
     });
 
     test('anomaly 型適用で intensity が渡した値のまま state に保持される', () {
-      final service = FilterService()
+      final service = _service()
         ..applyFilter(ColorVisionType.deuteranomaly, intensity: 0.6);
       expect(service.currentFilter, ColorVisionType.deuteranomaly);
       expect(service.intensity, 0.6);
@@ -150,7 +150,7 @@ void main() {
 
   group('強度はタイプごとに記憶する（#57）', () {
     test('intensity: を渡さない applyFilter は初めて選ぶタイプで recommendedStrength になる', () {
-      final service = FilterService();
+      final service = _service();
       service.applyFilter(ColorVisionType.protanomaly);
       expect(service.intensity, kAnomalyDefaultSeverity);
       service.applyFilter(ColorVisionType.protanopia);
@@ -158,7 +158,7 @@ void main() {
     });
 
     test('protanomaly と protanopia は既定強度が異なる（同じ見た目にならない）', () {
-      final service = FilterService();
+      final service = _service();
       service.applyFilter(ColorVisionType.protanomaly);
       final protanomalyIntensity = service.intensity;
       service.applyFilter(ColorVisionType.protanopia);
@@ -169,7 +169,7 @@ void main() {
     });
 
     test('タイプを切り替えても、切替前のタイプの強度は変わらず保持される', () {
-      final service = FilterService();
+      final service = _service();
       service.applyFilter(ColorVisionType.protanopia);
       service.setIntensity(0.3);
 
@@ -185,7 +185,7 @@ void main() {
     });
 
     test('applyFilter に intensity: を渡すと、そのタイプの記憶を明示的に上書きする', () {
-      final service = FilterService();
+      final service = _service();
       service.applyFilter(ColorVisionType.protanopia, intensity: 0.2);
       service.applyFilter(ColorVisionType.deuteranopia);
       service.applyFilter(ColorVisionType.protanopia);
@@ -193,7 +193,7 @@ void main() {
     });
 
     test('フィルタを切り替えても選択中でない他タイプの記憶は変わらない', () {
-      final service = FilterService();
+      final service = _service();
       service.applyFilter(ColorVisionType.protanomaly);
       service.setIntensity(0.4);
       // 選択を protanopia に切り替える（intensity: を渡さない = 記憶を壊さない）。
@@ -203,160 +203,96 @@ void main() {
     });
   });
 
-  group('永続化（#57）', () {
-    test('setIntensity はデバウンス後に per-type で保存され、別インスタンスの load で復元される', () async {
-      SharedPreferences.setMockInitialValues({});
-      final a = FilterService();
-      await a.load();
-      a.applyFilter(ColorVisionType.protanopia);
-      a.setIntensity(0.3);
-      a.applyFilter(ColorVisionType.deuteranomaly);
-      a.setIntensity(0.9);
-      await a.flush();
+  group('強度は VisionFilterState の記憶に委譲する（#117）', () {
+    test('setIntensity は state のキー（ColorVisionType.name）の記憶へ書く', () {
+      final state = VisionFilterState();
+      final service = _service(state);
+      service.applyFilter(ColorVisionType.deuteranomaly);
 
-      final b = FilterService();
-      await b.load();
-      b.applyFilter(ColorVisionType.protanopia);
-      expect(b.intensity, 0.3);
-      b.applyFilter(ColorVisionType.deuteranomaly);
-      expect(b.intensity, 0.9);
+      service.setIntensity(0.35);
+
+      expect(state.strengthForKey('deuteranomaly'), 0.35);
+      expect(state.strengthByKey, {'deuteranomaly': 0.35});
+      expect(service.intensity, 0.35);
     });
 
-    test('setIntensity の連続呼び出しはデバウンスされ、直近の値だけが保存される', () async {
-      SharedPreferences.setMockInitialValues({});
-      final a = FilterService(debounce: const Duration(milliseconds: 30));
-      await a.load();
-      a.applyFilter(ColorVisionType.protanopia);
-      a.setIntensity(0.1);
-      a.setIntensity(0.2);
-      a.setIntensity(0.3);
+    test('applyFilter(intensity:) も state の記憶へ書く（none には書かない）', () {
+      final state = VisionFilterState();
+      final service = _service(state);
 
-      // デバウンス窓の途中ではまだ書き込まれていない。
-      final prefsBefore = await SharedPreferences.getInstance();
-      expect(prefsBefore.getString(FilterService.keyIntensityByType), isNull);
+      service.applyFilter(ColorVisionType.tritanopia, intensity: 0.2);
+      expect(state.strengthByKey, {'tritanopia': 0.2});
 
-      await Future<void>.delayed(const Duration(milliseconds: 60));
-
-      final b = FilterService();
-      await b.load();
-      b.applyFilter(ColorVisionType.protanopia);
-      expect(b.intensity, 0.3);
-    });
-
-    test(
-        '旧単一 intensity キーが 1.0 で残っていても読まれない。load 後は protanomaly が '
-        'recommendedStrength になり、旧キーも消えている（移行は行わない）',
-        () async {
-      SharedPreferences.setMockInitialValues({
-        FilterService.legacyIntensityKey: 1.0,
-      });
-      final service = FilterService();
-      await service.load();
-
-      service.applyFilter(ColorVisionType.protanomaly);
-      // 旧キーの 1.0 に汚染されず、protanomaly の推奨強度になる
-      // （汚染されると #52 監査 must のバグ＝protanopia と同じ見た目に戻ってしまう）。
-      expect(service.intensity, kAnomalyDefaultSeverity);
-
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.containsKey(FilterService.legacyIntensityKey), isFalse);
-    });
-
-    test('範囲外の保存値は 0..1 に clamp して復元する', () async {
-      SharedPreferences.setMockInitialValues({
-        FilterService.keyIntensityByType:
-            '{"protanopia":5.0,"tritanopia":-3.0}',
-      });
-      final service = FilterService();
-      await service.load();
-
-      service.applyFilter(ColorVisionType.protanopia);
-      expect(service.intensity, 1.0);
-      service.applyFilter(ColorVisionType.tritanopia);
+      service.applyFilter(ColorVisionType.none, intensity: 0.9);
+      expect(state.strengthByKey, {'tritanopia': 0.2});
       expect(service.intensity, 0.0);
     });
 
-    test('壊れた JSON（構文エラー）は無視され、recommendedStrength にフォールバックする', () async {
-      SharedPreferences.setMockInitialValues({
-        FilterService.keyIntensityByType: '{broken',
-      });
-      final service = FilterService();
-      await service.load();
+    test('記憶が無いうちは推奨強度を返すだけで、記憶へは書かない', () {
+      final state = VisionFilterState();
+      final service = _service(state);
 
       service.applyFilter(ColorVisionType.protanomaly);
       expect(service.intensity, kAnomalyDefaultSeverity);
+      service.applyFilter(ColorVisionType.achromatopsia);
+      expect(service.intensity, 1.0);
+
+      expect(state.strengthByKey, isEmpty);
     });
 
-    test('JSON として妥当でも期待する形（オブジェクト）でなければ無視される（配列）', () async {
-      SharedPreferences.setMockInitialValues({
-        FilterService.keyIntensityByType: '[1,2]',
-      });
-      final service = FilterService();
-      await service.load();
-
+    test('state 側で変えた強度を intensity が読む（強度の持ち主は state 1 つ）', () {
+      final state = VisionFilterState();
+      final service = _service(state);
       service.applyFilter(ColorVisionType.protanopia);
-      expect(service.intensity, 1.0);
+
+      state.setStrengthForKey('protanopia', 0.45);
+
+      expect(service.intensity, 0.45);
     });
 
-    test('個々の値の型が不正なエントリだけ無視し、他の妥当なエントリは反映する', () async {
-      SharedPreferences.setMockInitialValues({
-        FilterService.keyIntensityByType:
-            '{"foo":0.3,"protanopia":"x","deuteranopia":0.4}',
-      });
-      final service = FilterService();
-      await service.load();
+    test('none で setIntensity しても記憶は書かれず、intensity は 0.0 のまま', () {
+      final state = VisionFilterState();
+      final service = _service(state);
 
-      // "foo" は ColorVisionType に存在しないキーなので無視。
-      // "protanopia" は値が文字列（num でない）ので無視 → recommendedStrength。
+      service.setIntensity(0.7);
+
+      expect(state.strengthByKey, isEmpty);
+      expect(service.intensity, 0.0);
+    });
+
+    test('setIntensity は state と FilterService の双方の listener に通知する', () {
+      final state = VisionFilterState();
+      final service = _service(state);
       service.applyFilter(ColorVisionType.protanopia);
-      expect(service.intensity, 1.0);
-      // "deuteranopia" は妥当な値なので反映される。
+      var stateNotified = 0;
+      var serviceNotified = 0;
+      state.addListener(() => stateNotified++);
+      service.addListener(() => serviceNotified++);
+
+      service.setIntensity(0.5);
+
+      expect(stateNotified, 1, reason: 'プレビューが再描画される');
+      expect(serviceNotified, 1, reason: 'スライダー・トレイが更新される');
+    });
+
+    test('同じ state を共有する 2 つの FilterService は同じ記憶を見る', () {
+      final state = VisionFilterState();
+      final a = _service(state)..applyFilter(ColorVisionType.tritanopia);
+      final b = _service(state)..applyFilter(ColorVisionType.tritanopia);
+
+      a.setIntensity(0.25);
+
+      expect(b.intensity, 0.25);
+    });
+
+    test('FilterService の選択（currentFilter）は state の層を変えない', () {
+      final state = VisionFilterState();
+      final service = _service(state);
+
       service.applyFilter(ColorVisionType.deuteranopia);
-      expect(service.intensity, 0.4);
-    });
-  });
 
-  group('flush（#57）', () {
-    test('flush は保留中のデバウンス書き込みを実タイマーの発火を待たず確定させる', () async {
-      SharedPreferences.setMockInitialValues({});
-      final service = FilterService(); // 既定 300ms デバウンス
-      await service.load();
-      service.applyFilter(ColorVisionType.protanopia);
-      service.setIntensity(0.42);
-
-      // デバウンスの実タイマーが発火するには早すぎるタイミングで flush する。
-      await service.flush();
-
-      final prefs = await SharedPreferences.getInstance();
-      final json = prefs.getString(FilterService.keyIntensityByType);
-      expect(json, contains('"protanopia":0.42'));
-    });
-
-    test('保留中の書き込みが無い状態で flush しても例外にならず、何も書き込まない', () async {
-      SharedPreferences.setMockInitialValues({});
-      final service = FilterService();
-      await service.load();
-      await service.flush();
-
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.containsKey(FilterService.keyIntensityByType), isFalse);
-    });
-
-    test('dispose 時に保留中の書き込みがあれば永続化される', () async {
-      SharedPreferences.setMockInitialValues({});
-      final service = FilterService();
-      await service.load();
-      service.applyFilter(ColorVisionType.protanopia);
-      service.setIntensity(0.77);
-
-      service.dispose();
-      // dispose() 自体は同期 API のため、内部の unawaited(_persist()) が
-      // マイクロタスクとして完了するのを待つ。
-      await Future<void>.delayed(Duration.zero);
-
-      final prefs = await SharedPreferences.getInstance();
-      final json = prefs.getString(FilterService.keyIntensityByType);
-      expect(json, contains('"protanopia":0.77'));
+      expect(state.layers, isEmpty);
+      expect(state.selectedId, isNull);
     });
   });
 }

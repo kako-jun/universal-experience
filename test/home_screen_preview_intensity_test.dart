@@ -57,8 +57,8 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final settings = SettingsService();
     await settings.load();
-    final filterService = FilterService();
     final visionState = VisionFilterState();
+    final filterService = FilterService(visionState: visionState);
     // #60: home_screen はもう FilterService の変化を VisionFilterState へ
     // ミラーしない。selectColorVision が両方を明示的に更新する唯一の入口。
     selectColorVision(filterService, visionState, ColorVisionType.protanopia);
@@ -110,11 +110,9 @@ void main() {
 
     // setIntensity が予約したデバウンス書き込みが pending timer のまま残ると
     // テストバインディングが失敗させる。確定させておく。
-    await filterService.flush();
   });
 
-  testWidgets(
-      '強度スライダーをドラッグすると VisionFilterState.bypassed が解除される（#63）',
+  testWidgets('強度スライダーをドラッグすると VisionFilterState.bypassed が解除される（#63）',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 4000);
     tester.view.devicePixelRatio = 1.0;
@@ -123,8 +121,8 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final settings = SettingsService();
     await settings.load();
-    final filterService = FilterService();
     final visionState = VisionFilterState();
+    final filterService = FilterService(visionState: visionState);
     selectColorVision(filterService, visionState, ColorVisionType.protanopia);
     visionState.acquireBypass('test');
     expect(visionState.bypassed, isTrue);
@@ -172,7 +170,5 @@ void main() {
     await tester.pump();
 
     expect(visionState.bypassed, isFalse);
-
-    await filterService.flush();
   });
 }

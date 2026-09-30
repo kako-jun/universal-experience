@@ -47,7 +47,7 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     installVisionFilterMetadataFixture();
     visionState = VisionFilterState();
-    filterService = FilterService();
+    filterService = FilterService(visionState: visionState);
     loupeWindow = LoupeWindowController();
   });
 

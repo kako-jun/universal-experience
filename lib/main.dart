@@ -35,17 +35,20 @@ import 'ui/widgets/loupe_hud.dart';
 /// 透過/最前面/クリックスルーの責務を持つ (詳細は docs/ARCHITECTURE.md)。
 final LoupeWindowController loupeWindow = LoupeWindowController();
 
-/// トレイとウィンドウ UI で共有する FilterService。
-/// トレイのクイックフィルタとウィンドウ内のドロップダウンが同じ状態を見るよう、
-/// アプリ最上位で 1 つだけ生成する (#15)。
-final FilterService filterService = FilterService();
-
 /// トレイとウィンドウ UI で共有する VisionFilterState（プレビューの選択の
 /// 唯一の正本、#60）。[filterService] と同じ理由でアプリ最上位に 1 つだけ
 /// 生成する — 色覚のクイック選択はトレイ・ウィンドウ内どちらから行っても
 /// `lib/services/color_vision_selection.dart` の `selectColorVision` を経由して
 /// 同じインスタンスを更新する必要があるため（#60）。
 final VisionFilterState visionFilterState = VisionFilterState();
+
+/// トレイとウィンドウ UI で共有する FilterService。
+/// トレイのクイックフィルタとウィンドウ内のドロップダウンが同じ状態を見るよう、
+/// アプリ最上位で 1 つだけ生成する (#15)。色覚タイプごとの強度は
+/// [visionFilterState] のキーごとの記憶を読み書きする（#117）ので、同じ
+/// [visionFilterState] を渡して生成する。
+final FilterService filterService =
+    FilterService(visionState: visionFilterState);
 
 /// [visionFilterState]（選んだフィルタ・payload・強度）の永続化（#65）。
 /// [buildRootApp] が復元して購読を張り、終了シーケンス（トレイの終了・ウィンドウ
@@ -72,7 +75,7 @@ final ImageSourceState imageSourceState = ImageSourceState();
 const String _trayIconPath = 'assets/tray/tray_icon.png';
 
 /// OS からの終了要求（macOS の Cmd+Q / メニューバーの「終了」/ ログアウト等）を
-/// 捕捉し、[FilterService.flush] を挟んでから終了を許可する（#57）。
+/// 捕捉し、[VisionFilterStore.flush] を挟んでから終了を許可する（#57, #65）。
 /// トレイ経由・ウィンドウクローズ経由の flush（[_setUpTray] /
 /// `onQuit`）は window_manager のクローズイベントしか見ておらず、Cmd+Q や
 /// ログアウトはそれらを経由せず直接プロセス終了に向かうため、二重の安全網として
@@ -141,9 +144,8 @@ TrayService _buildTrayService(SettingsService settings) {
       await windowManager.focus();
     },
     onQuit: () async {
-      // デバウンス中の intensity 永続化（#57）を、実タイマーの発火を待たず
+      // デバウンス中の選択・強度の永続化（#57, #65）を、実タイマーの発火を待たず
       // 確定させてから終了する（待たないと直近のスライダー操作が失われうる）。
-      await filterService.flush();
       await visionFilterStore.flush();
       // トレイアイコンを破棄し、prevent-close を解除してから実際に終了する。
       await trayService.dispose();
@@ -174,14 +176,13 @@ TrayService _buildTrayService(SettingsService settings) {
 ///   依存する機能を使わせないための最小構成）。integration test がテストダブルの
 ///   `initBridge` を注入して失敗系を確認できるよう関数として差し替え可能にしてある。
 /// - 成功時は [settings]（未指定なら新規 `SettingsService()`）を読み込み、
-///   トップレベル共有の `filterService`（#15、トレイとウィンドウ内 UI が同じ
-///   インスタンスを見る）に永続化済みの per-type 強度（#57）を読み込んでから、
-///   復元済みのフィルタ種別を `selectColorVision`（#60）で一度だけ適用して
-///   `bridgeReady: true` と [UniversalExperienceApp] を返す。`filterService`
-///   と `visionFilterState` の両方が同じ値になる。intensity 自体は
-///   `filterService.load()` が
-///   `FilterService` 自身の永続化ストアから復元する（`settings.intensity` は
-///   #57 で撤去済み。旧キーからの移行はしない）。
+///   旧 per-type 強度（`settings.intensityByType`）を v2 の保存へ一度だけ取り込み
+///   （[VisionFilterStore.migrateLegacyStrengths]、#117）、復元済みのフィルタ種別を
+///   `selectColorVision`（#60）で一度だけ適用して `bridgeReady: true` と
+///   [UniversalExperienceApp] を返す。トップレベル共有の `filterService`（#15、
+///   トレイとウィンドウ内 UI が同じインスタンスを見る）と `visionFilterState` の
+///   両方が同じ値になる。強度は `visionFilterState` のキーごとの記憶が正本
+///   （`settings.intensity` は #57 で撤去済み。旧キーからの移行はしない）。
 ///
 /// - 続けて [VisionFilterStore]（#65）が前回の選択・payload・強度を復元する
 ///   （[store] 未指定ならトップレベルの [visionFilterStore]）。
@@ -203,20 +204,6 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
   final s = settings ?? SettingsService();
   await s.load();
 
-  // Restore the shared FilterService's (#15) own per-type intensity store
-  // (#57) before seeding it with the restored filter type. The old
-  // single-value key (if any leftover on disk) is not migrated:
-  // the app is pre-release, so there are no existing users to preserve it
-  // for; load() just deletes it.
-  await filterService.load();
-
-  // Seed the shared FilterService and VisionFilterState (#15/#60) from the
-  // restored settings (#17) so the previously selected filter is reflected on
-  // startup — through selectColorVision (#60), the single entry point that
-  // keeps both services in sync, same as FilterBrowser/tray. No explicit
-  // intensity override here (#57): the type's own remembered/recommended
-  // strength (just loaded above) is used instead of resetting it.
-  //
   // #78: on a genuine first launch (s.isFirstRun — see that getter's doc),
   // seed deuteranomaly (at its recommended strength, same mechanism as any
   // other type) instead of s.filterType, and persist that choice immediately
@@ -224,8 +211,23 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
   // vision" pick persists `none` normally from then on (setFilterType's
   // no-op guard no longer short-circuits once the in-memory type has moved
   // off its struct default).
-  final seedType =
-      s.isFirstRun ? ColorVisionType.deuteranomaly : s.filterType;
+  final seedType = s.isFirstRun ? ColorVisionType.deuteranomaly : s.filterType;
+
+  // #117: fold the legacy per-type intensity store (settings.intensityByType,
+  // formerly owned by FilterService) into the v2 persisted state — once, before
+  // the color seed below and before restoreAndBind. The per-key strength memory
+  // in VisionFilterState is the only place strengths live now. The folded
+  // snapshot is handed to restoreAndBind directly so it reaches memory even if
+  // writing it failed (the legacy key is then kept and folded again next launch).
+  final vfStore = store ?? visionFilterStore;
+  final migrated = await vfStore.migrateLegacyStrengths(seedType: seedType);
+
+  // Seed the shared FilterService and VisionFilterState (#15/#60) from the
+  // restored settings (#17) so the previously selected filter is reflected on
+  // startup — through selectColorVision (#60), the single entry point that
+  // keeps both services in sync, same as FilterBrowser/tray. No explicit
+  // intensity override here (#57): the type's own remembered/recommended
+  // strength is used instead of resetting it.
   selectColorVision(filterService, visionFilterState, seedType);
   if (s.isFirstRun) {
     await s.setFilterType(seedType);
@@ -237,9 +239,10 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
   // する）。保存が無い・壊れている・カタログと合わない部分は既定値に落ち、
   // 起動は止まらない。色覚クイック選択に戻した場合は、トレイとウィンドウ内 UI の
   // 両方が見る filterService も同じ型に合わせる。
-  final restored = await (store ?? visionFilterStore).restoreAndBind(
+  final restored = await vfStore.restoreAndBind(
     visionFilterState,
     isValidPreset: isValidExperiencePreset,
+    snapshot: migrated,
   );
   final restoredColorType = visionFilterState.colorVisionType;
   if (restored && restoredColorType != null) {
@@ -262,12 +265,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // macOS の Cmd+Q・メニューバーの「終了」・ログアウト等（window_manager の
-  // クローズイベントを経由しない終了経路）でも intensity のデバウンス永続化
-  // （#57）を取りこぼさないための保険。トレイ・ウィンドウクローズ
+  // クローズイベントを経由しない終了経路）でも選択・強度のデバウンス永続化
+  // （#57, #65）を取りこぼさないための保険。トレイ・ウィンドウクローズ
   // 経由の flush はそのまま残す。
   appLifecycleListener = AppLifecycleListener(
     onExitRequested: () async {
-      await filterService.flush();
       await visionFilterStore.flush();
       return AppExitResponse.exit;
     },
@@ -411,8 +413,8 @@ void main() async {
 /// クローズ = 終了。よって分岐先（トレイに隠すか・実際に終了するか）は
 /// トレイ初期化の成否で決める。いずれの分岐も、実際にウィンドウが閉じる/
 /// 隠れる前に `windowManager.setPreventClose(true)` でいったん介入する
-/// （#57: トレイ不可時の「クローズ=終了」経路でも intensity のデバウンス
-/// 書き込み（[FilterService.flush]）を取りこぼさないため）。
+/// （#57: トレイ不可時の「クローズ=終了」経路でも選択・強度のデバウンス
+/// 書き込み（[VisionFilterStore.flush]）を取りこぼさないため）。
 Future<void> _setUpTray() async {
   await trayService.init();
 
@@ -430,12 +432,11 @@ Future<void> _setUpTray() async {
           return;
         }
         // トレイ非対応環境: ウィンドウを閉じる = アプリを終了する（最終結果は
-        // 元の実装と同じ）。デバウンス中の intensity 永続化（#57）を
+        // 元の実装と同じ）。デバウンス中の選択・強度の永続化（#57, #65）を
         // 取りこぼさないよう、実際に閉じる前に flush する。flush が万一失敗
-        // しても（`FilterService.flush` 自体は内部で握りつぶすが、念のため）
+        // しても（`VisionFilterStore` は内部で握りつぶすが、念のため）
         // ウィンドウを閉じずに固まらないよう、実際の終了は finally で行う。
         try {
-          await filterService.flush();
           await visionFilterStore.flush();
         } finally {
           await windowManager.setPreventClose(false);
