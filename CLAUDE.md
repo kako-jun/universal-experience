@@ -97,6 +97,7 @@ rust_builder/                 # cargokit 統合（#55）。flutter build/run 時
 tools/                       # シェーダ codegen（sensus の .frag → Impeller サブセットへ機械変換）
                               # + generate_samples.dart（サンプル画像集の生成、#78）
                               # + generate_font_atlases.py（サンプル用フォントの生成、#99）
+                              #   samples-sync / font-atlas-sync ワークフローが生成物との一致を検証（#115）
                               # + fonts/（Noto Sans / Noto Sans JP 由来のビットマップフォント。OFL の
                               #   全文・著作権表示・出典は fonts/README.md、#99）
                               # + check_frb_drift.sh（FRB 生成物のドリフト検証。CI の check job が実行、#88）
@@ -273,6 +274,17 @@ build より前に置く。rust 依存は crates.io のみ（sensus-core）な�
 確認）と、xvfb 上での実ブリッジ integration test を検証する。`Swatinem/rust-cache`
 によるキャッシュ対象は両ジョブで異なり、`linux-build` は cargokit のビルド出力も
 含めるが、`check`（macOS）は `rust/`（cargo target）+ crates.io 依存のみキャッシュする。
+
+`samples-sync`（`.github/workflows/samples-sync.yml`、ubuntu-latest、#115）は
+`assets/samples/*.png` が `tools/generate_samples.dart` の生成結果と一致することを検証する
+（既存 PNG を消して再生成し、`git status` に差分が出たら失敗）。`font-atlas-sync`
+（`.github/workflows/font-atlas-sync.yml`）は `tools/fonts/` について
+`tools/generate_font_atlases.py`（Python + ネットワーク）で同じ検証をする。どちらも
+`paths` フィルタで対象ファイルを変えた push/PR（と手動実行）のときだけ起動し、通常の
+PR の CI 時間は増えない（必須チェックにはしない前提）。落ちたら
+`dart run tools/generate_samples.dart`（アトラスなら
+`uv run --with pillow==12.3.0 python3 tools/generate_font_atlases.py` も）を実行して
+差分をコミットする。
 
 ## ロードマップ
 

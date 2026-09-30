@@ -17,6 +17,11 @@
 マップは使いません）。夜景の点光源の配置は固定シードの疑似乱数なので、再生成
 しても常に同じバイト列になります。
 
+この PNG が生成スクリプトの出力と一致していることは CI（`samples-sync`
+ワークフロー、`.github/workflows/samples-sync.yml`）が検証します。スクリプトや
+`tools/fonts/` を変えたら、必ず `dart run tools/generate_samples.dart` を実行して
+差分の PNG をコミットしてください（PNG だけを手で差し替えると CI が落ちます）。
+
 ## 文字の出典（#99）
 
 | 用途 | フォント | 版 | ライセンス | 配布元 |
