@@ -10,6 +10,7 @@ import 'dart:ui' show AppExitResponse;
 
 import 'l10n/app_localizations.dart';
 import 'l10n/l10n_extensions.dart';
+import 'l10n/locale_resolution.dart';
 import 'models/disability_type.dart';
 import 'models/sample_catalog.dart';
 import 'services/color_vision_selection.dart';
@@ -19,6 +20,7 @@ import 'services/vision_filter_state.dart';
 import 'services/hotkey_actions.dart';
 import 'services/hotkey_service.dart';
 import 'services/loupe_window_controller.dart';
+import 'services/tray_locale_sync.dart';
 import 'services/tray_service.dart';
 import 'services/native_bridge_service.dart';
 import 'services/settings_service.dart';
@@ -84,6 +86,10 @@ late final TrayService trayService;
 /// グローバルホットキー (#63)。トレイと同じくデスクトップのみ init() する。
 late final HotkeyService hotkeyService;
 
+/// トレイの文言を画面の言語へ追従させる購読 (#82)。トレイを初期化した後に
+/// [main] が開始する（アプリの寿命と同じなので dispose しない）。
+late final TrayLocaleSync trayLocaleSync;
+
 /// トレイ・ホットキーの可用性をまとめて provide する値オブジェクト (#63)。
 ///
 /// `Provider<bool>.value` は型が汎用的すぎて他の bool provider と衝突しうる
@@ -104,8 +110,9 @@ class WindowModeUiContext {
 ///
 /// トレイは BuildContext を持てないため、解決済みロケール（永続化設定 → 無ければ
 /// システム）の `AppLocalizations`（`lookupAppLocalizations`）から文言を取る。
+/// 起動後に言語が変わったときの差し替えは [TrayLocaleSync]（#82）。
 TrayService _buildTrayService(SettingsService settings) {
-  final locale = _resolveStartupLocale(settings.locale);
+  final locale = resolveSupportedLocale(settings.locale);
   final l10n = lookupAppLocalizations(locale);
   return TrayService(
     filterService: filterService,
@@ -139,29 +146,6 @@ TrayService _buildTrayService(SettingsService settings) {
       }
     },
   );
-}
-
-/// 設定の locale（null = システム追従）を、サポート対象 locale に解決する。
-///
-/// `lookupAppLocalizations` はサポート外 locale で投げるため、システム locale が
-/// 非対応のときは [AppLocalizations.supportedLocales] の先頭（en）へフォールバック。
-///
-/// `WidgetsBinding.instance.platformDispatcher` 経由で読む（`PlatformDispatcher.instance`
-/// を直接参照しない）。本番ではどちらも同じ実プラットフォームディスパッチャを指すため
-/// 挙動は変わらないが、`flutter_test` 下では `WidgetsBinding.instance` が
-/// `TestWidgetsFlutterBinding` になり、その `platformDispatcher` が
-/// `tester.platformDispatcher`（`localeTestValue` で差し替え可能な偽物）と一致するため、
-/// テストからロケールをオーバーライドできるようになる。
-Locale _resolveStartupLocale(Locale? preferred) {
-  bool isSupported(Locale l) => AppLocalizations.supportedLocales
-      .any((s) => s.languageCode == l.languageCode);
-
-  if (preferred != null && isSupported(preferred)) return preferred;
-
-  final system = WidgetsBinding.instance.platformDispatcher.locale;
-  if (isSupported(system)) return Locale(system.languageCode);
-
-  return AppLocalizations.supportedLocales.first;
 }
 
 /// アプリのルート Widget を組み立てる (#55)。Rust ブリッジ初期化・設定復元・
@@ -314,6 +298,19 @@ void main() async {
 
     // タスクトレイ常駐 + クローズ・ポリシー (#15)。
     await _setUpTray();
+
+    // 言語ピッカー・OS のロケール変更でトレイの文言を作り直す (#82)。
+    trayLocaleSync = TrayLocaleSync(
+      settings: settings,
+      initial: resolveSupportedLocale(settings.locale),
+      apply: (locale) {
+        final l10n = lookupAppLocalizations(locale);
+        return trayService.updateLocalization(
+          labels: trayMenuLabelsFrom(l10n),
+          tooltip: l10n.trayTooltip,
+        );
+      },
+    )..start();
 
     // グローバルホットキー (#63)。トレイ初期化の後に登録する
     // （非常口アクションがトレイ経由の showAndFocusLoupe を使うため）。
@@ -502,8 +499,8 @@ class UniversalExperienceApp extends StatelessWidget {
             highContrastTheme: AppTheme.highContrastTheme,
             highContrastDarkTheme: AppTheme.highContrastDarkTheme,
             themeMode: settings.themeMode,
-            // i18n (#18). locale = null はシステム追従。言語ピッカー UI は本 Issue
-            // 外（#16/#19）。SettingsService.setLocale が将来の足場。
+            // i18n (#18/#82). locale = null はシステム追従。AppBar の言語
+            // ピッカー（`LanguageDialog`）が SettingsService.setLocale で切り替える。
             locale: settings.locale,
             localizationsDelegates: const [
               AppLocalizations.delegate,
@@ -537,17 +534,17 @@ class UniversalExperienceApp extends StatelessWidget {
 /// 一切構築しない（Rust ブリッジに依存する機能を使わせないための最小構成）。
 /// ロケールはシステム追従（設定の読込前なので永続化ロケールは見られない）が、
 /// [locale] を渡せばテスト等から明示的に固定できる（未指定時は
-/// [_resolveStartupLocale] のフォールバックに従う）。
+/// [resolveSupportedLocale] のフォールバックに従う）。
 class NativeBridgeErrorApp extends StatelessWidget {
   const NativeBridgeErrorApp({super.key, this.locale});
 
-  /// 表示に使うロケール。null ならシステム追従（[_resolveStartupLocale]）。
+  /// 表示に使うロケール。null ならシステム追従（[resolveSupportedLocale]）。
   final Locale? locale;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      locale: locale ?? _resolveStartupLocale(null),
+      locale: locale ?? resolveSupportedLocale(null),
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,

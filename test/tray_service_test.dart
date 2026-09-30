@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/models/disability_type.dart';
@@ -536,6 +537,97 @@ void main() {
       expect(loupeWindow.clickThrough, isFalse);
       await loupeWindow.setClickThrough(!loupeWindow.clickThrough);
       expect(loupeWindow.clickThrough, isTrue);
+    });
+  });
+
+  group('TrayService.updateLocalization (#82)', () {
+    const enLabels = TrayMenuLabels(
+      showLoupe: 'Show loupe window',
+      hideLoupe: 'Hide loupe window',
+      clearFilter: 'Clear filter',
+      openSettings: 'Open settings…',
+      quit: 'Quit',
+      filterLabels: {
+        ColorVisionType.protanopia: 'Protanopia',
+        ColorVisionType.deuteranopia: 'Deuteranopia',
+        ColorVisionType.tritanopia: 'Tritanopia',
+        ColorVisionType.achromatopsia: 'Achromatopsia',
+      },
+      appModeLoupeLabel: 'Loupe window',
+      alwaysOnTopLabel: 'Always on top',
+      clickThroughLabel: 'Click-through',
+    );
+
+    TrayService buildTray() => TrayService(
+          filterService: FilterService(),
+          visionFilterState: VisionFilterState(),
+          loupeWindow: LoupeWindowController(),
+          iconPath: 'assets/tray/tray_icon.png',
+          labels: _labels,
+          tooltip: 'ユニバーサル・エクスペリエンス',
+          onShowLoupe: () async {},
+          onHideLoupe: () async {},
+          onOpenSettings: () async {},
+          onQuit: () async {},
+        );
+
+    test('未初期化でも文言を保持し、メニュー仕様が新しい言語のラベルになる', () async {
+      final tray = buildTray();
+      expect(tray.labels.quit, '終了');
+
+      await tray.updateLocalization(
+          labels: enLabels, tooltip: 'Universal Experience');
+
+      expect(tray.labels, same(enLabels));
+      expect(tray.tooltip, 'Universal Experience');
+      final spec = buildTrayMenuSpec(
+        loupeVisible: true,
+        labels: tray.labels,
+        appMode: AppMode.settings,
+        alwaysOnTop: false,
+        clickThrough: false,
+      );
+      final labels = spec.map((e) => e.label).whereType<String>().toList();
+      expect(labels, contains('Hide loupe window'));
+      expect(labels, contains('Protanopia'));
+      expect(labels, contains('Quit'));
+      expect(labels, isNot(contains('終了')));
+    });
+
+    test('初期化済みならツールチップとコンテキストメニューをネイティブへ送り直す', () async {
+      // tray_manager の MethodChannel を記録用に差し替える（init を成功させる）。
+      final calls = <MethodCall>[];
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(const MethodChannel('tray_manager'),
+          (call) async {
+        calls.add(call);
+        return null;
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(
+          const MethodChannel('tray_manager'), null));
+
+      final tray = buildTray();
+      await tray.init();
+      expect(tray.isAvailable, isTrue, reason: 'モックしたチャネルで init が成功する');
+      addTearDown(tray.dispose);
+      expect(calls.where((c) => c.method == 'setToolTip').single.arguments,
+          containsPair('toolTip', 'ユニバーサル・エクスペリエンス'));
+      expect(calls.last.method, 'setContextMenu');
+      expect(calls.last.arguments.toString(), contains('終了'));
+
+      calls.clear();
+      await tray.updateLocalization(
+          labels: enLabels, tooltip: 'Universal Experience');
+
+      expect(calls.map((c) => c.method), ['setToolTip', 'setContextMenu']);
+      expect(calls.first.arguments,
+          containsPair('toolTip', 'Universal Experience'));
+      final menu = calls.last.arguments.toString();
+      expect(menu, contains('Quit'));
+      expect(menu, contains('Protanopia'));
+      expect(menu, isNot(contains('終了')));
+      expect(menu, isNot(contains('1型2色覚（赤）')));
     });
   });
 }
