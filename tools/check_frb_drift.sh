@@ -8,8 +8,10 @@
 #   freezed 2.x が使う analyzer が噛み合わず、build_runner が例外後に応答しなく
 #   なるため（#88）。`*.freezed.dart` は生成物をコミットしてあるので、FRB の
 #   Dart 出力との食い違いは後続の `flutter analyze` / `flutter test` で落ちる。
-# - Dart のフォーマッタは SDK のバージョンで出力が変わる。比較前に、手元（コミット済み）
-#   側にも同じ SDK の `dart format` を掛けてからフォーマット差を消して比較する。
+# - Dart のフォーマッタは SDK のバージョンで出力が変わる（折り返し位置・末尾カンマ）。
+#   コミット済みの整形結果は新旧どちらの SDK でも不動点にならないため、Dart ファイルは
+#   空白と閉じ括弧直前の末尾カンマを除いた字句列で比較する。Rust 側（rustfmt）は
+#   そのまま比較する。
 # - 比較が終わったら（差分の有無に関わらず）作業ツリーを実行前の内容に戻す。
 #
 # 使い方: tools/check_frb_drift.sh  （差分があれば非 0 で終了）
@@ -19,32 +21,44 @@ cd "$(dirname "$0")/.."
 DART_DIR=lib/src/rust
 RUST_FILE=rust/src/frb_generated.rs
 
-work=$(mktemp -d)
-orig="$work/orig"
-norm="$work/norm"
-mkdir -p "$orig" "$norm"
+orig=$(mktemp -d)
 cp -R "$DART_DIR" "$orig/dart"
 cp "$RUST_FILE" "$orig/frb_generated.rs"
+
 restore() {
   rm -rf "$DART_DIR"
   cp -R "$orig/dart" "$DART_DIR"
   cp "$orig/frb_generated.rs" "$RUST_FILE"
-  rm -rf "$work"
+  rm -rf "$orig"
 }
 trap restore EXIT
 
-# 手元側のフォーマットを実行中の SDK に揃える（FRB 自身の設定と同じ行長 80）。
-# 言語バージョン（pubspec の sdk 制約由来）でフォーマット様式が変わるため、
-# プロジェクト内のパスに対してその場で掛け、結果を比較の基準として退避する。
-dart format --line-length 80 "$DART_DIR" >/dev/null
-cp -R "$DART_DIR" "$norm/dart"
-cp "$RUST_FILE" "$norm/frb_generated.rs"
-
 flutter_rust_bridge_codegen generate --no-build-runner </dev/null
 
+# 空白を全て除き、閉じ括弧の直前の `,` を除く。
+normalize() {
+  tr -d ' \t\r\n' <"$1" | sed -E 's/,([])}])/\1/g'
+}
+
 status=0
-diff -ru "$norm/dart" "$DART_DIR" || status=1
-diff -u "$norm/frb_generated.rs" "$RUST_FILE" || status=1
+
+# ファイル集合の差（生成物の増減）。
+if ! diff <(cd "$orig/dart" && find . -type f | sort) <(cd "$DART_DIR" && find . -type f | sort); then
+  status=1
+fi
+
+while IFS= read -r rel; do
+  [ -f "$DART_DIR/$rel" ] || continue
+  if ! cmp -s <(normalize "$orig/dart/$rel") <(normalize "$DART_DIR/$rel"); then
+    echo "DRIFT: $DART_DIR/$rel"
+    diff -u "$orig/dart/$rel" "$DART_DIR/$rel" | head -200 || true
+    status=1
+  fi
+done < <(cd "$orig/dart" && find . -type f | sort)
+
+if ! diff -u "$orig/frb_generated.rs" "$RUST_FILE"; then
+  status=1
+fi
 
 if [ "$status" -ne 0 ]; then
   echo "::error::FRB codegen のドリフトを検出: \`flutter_rust_bridge_codegen generate\` を実行して差分をコミットしてください。"
