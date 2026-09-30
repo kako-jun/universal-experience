@@ -68,7 +68,7 @@
 > `surfaceContainerHighest`）で塗った専用ブロックに表示し、emergency は
 > earlyConsultation より大きい文字サイズにする。escalation は emergency/
 > earlyConsultation で見出しを分ける（vision フィルタは全て earlyConsultation
-> だが、`HearingFilter` の聴力低下系は emergency も持つため、聴覚側 UI #80 に
+> だが、`HearingFilter` の聴力低下系は emergency も持つため、聴覚側 UI（#20 で聴覚モードを足すか判断、FRB 公開は #10）に
 > 備える）。末尾には「医学的な診断ではない・医療監修を受けたものではない」旨と
 > sensus の Medical notes への参照を必ず添える（レビュー M2）。喚起文からは
 > 診療科名を外した（レビュー S4。めまい系フィルタは眼科の話ではないため）。

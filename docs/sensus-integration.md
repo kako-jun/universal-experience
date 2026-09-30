@@ -627,7 +627,7 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
 - **#76 レビュー N4 / 再レビュー S-a: escalation を emergency/earlyConsultation
   で見出しを分ける**。現状 vision フィルタの escalation は全て
   earlyConsultation だが、`HearingFilter` の聴力低下系は emergency 段も持つ
-  （§10 冒頭参照）。聴覚側の UI（#80）が同じグルーピングを再利用できるよう、
+  （§10 冒頭参照）。聴覚側の UI（聴覚モードを足すかは #20 で判断）が同じグルーピングを再利用できるよう、
   UI（`ConsultNoticeBlock`）だけでなく PNG（`ExportCaption.escalationGroups`）
   でも両方の見出しを最初から用意した。
 - **#76 再レビュー nit: 体験プリセットの免責文はセクション単位で 1 回**。
@@ -690,11 +690,11 @@ sensus 消費側の API 契約注記（#51）を、UI・テストへどう反映
 
 | 注記 | 内容 | ue での扱い |
 |---|---|---|
-| 1 | tunnel-vision は strength=1.0 でほぼ全黒（末期＝完全喪失の設計） | 推奨強度 0.5 から始める（#77）ことに加え、強度スライダの 80% の位置に印、下に注記、80% 以上で警告へ切り替える（#66）。対象・閾値は `lib/models/vision_filter_contract_notes.dart`、表示は `lib/ui/widgets/strength_caution.dart`、文言は ARB（`strengthCautionMarkerNote` / `strengthCautionNearLimit`）。sensus-core 0.6.1 のメタデータ API に「上限付近の注意」の項目は無いので ue が持つ。警告は受診喚起と混同しないようコンテナ色を使わない。`test/strength_caution_test.dart` |
+| 1 | tunnel-vision は strength=1.0 でほぼ全黒（視野のほぼすべてを失った最も進行した段階を再現する設計） | 推奨強度 0.5 から始める（#77）ことに加え、強度スライダの 80% の位置に印、下に注記、80% 以上で警告へ切り替える（#66）。対象・閾値は `lib/models/vision_filter_contract_notes.dart`、表示は `lib/ui/widgets/strength_caution.dart`、文言は ARB（`strengthCautionMarkerNote` / `strengthCautionNearLimit`）。sensus-core 0.6.1 のメタデータ API に「上限付近の注意」の項目は無いので ue が持つ。警告は受診喚起と混同しないようコンテナ色を使わない。`test/strength_caution_test.dart` |
 | 2 | DetailLoss が strength を無視 | sensus#167/#175 で解消済み（§7）。共通の強度スライダに直結 |
 | 3 | starbursts は広い高輝度面で白塊化する | 推奨サンプルは夜景（`night_scene`）。白画素（RGB すべて 240 以上）が 1% 未満であることを実画素で検証（`test/strength_caution_test.dart`） |
-| 4 | hearing 増幅系は hard clamp で歪む | 聴覚 UI は #80 のスコープ。音量正規化を後段に足さない方針のまま（現時点で UI・コードとも該当なし） |
-| 5 | sudden-hearing-loss の既定 freq は noise-induced と同一出力 | 同上（#80 でプリセットを並べるときに freq を変える） |
+| 4 | hearing 増幅系は hard clamp で歪む | 聴覚 UI は #20（聴覚モードを足すかの設計判断）、HearingFilter の FRB 公開は #10 に引き継ぎ済み。音量正規化を後段に足さない方針のまま（現時点で UI・コードとも該当なし） |
+| 5 | sudden-hearing-loss の既定 freq は noise-induced と同一出力 | 同上（#20 で聴覚モードを足し、プリセットを並べるときに freq を変える） |
 | 6 | 色覚の中間 severity の出力変更 | sensus 0.6.0 取り込み済み（§7・§8） |
 | 7 | 視線・アニメーション系は GUI 層の担当 | ライブ経路（#1-#5）のスコープ |
 
