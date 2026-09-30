@@ -1108,6 +1108,64 @@ void main() {
         }
       });
 
+      testWidgets('描画中に親が土台の層を差し替えても、書き出しのキャプション・ファイル名は画像に写っている土台の層のまま',
+          (tester) async {
+        final pending = Completer<void>();
+        // 1 回目の土台は即完了、2 回目（差し替え後）は止めておく。
+        final fakes = await installBaseFakes(
+          tester,
+          gateBase: (n) => n >= 2 ? pending.future : null,
+        );
+        final captions = <ExportCaption>[];
+        final filenames = <String>[];
+        exportImageComposer = (base, caption) async {
+          captions.add(caption);
+          return composeExportImage(base, caption);
+        };
+        pngSaver = (bytes, filename) async {
+          filenames.add(filename);
+          return '/fake/Downloads/$filename';
+        };
+
+        await tester
+            .pumpWidget(localized(viewOf(inputOf(['myopia', 'protanopia']))));
+        await settleCells(tester, fakes.cellCalls, 4);
+
+        // 描き直し中（土台の 2 回目が止まっている）に、土台の層を差し替える
+        // （層を足し、myopia の強さも変える）。
+        await tester.pumpWidget(localized(viewOf(inputOf(
+            ['myopia', 'vertigo', 'protanopia'],
+            strengths: {'myopia': 0.5}))));
+        await tester.pump();
+        await waitFor(tester, () => fakes.baseCalls.length == 2);
+
+        final en = lookupAppLocalizations(enLocale);
+        await tester.tap(find.byTooltip(en.exportButtonTooltip));
+        await waitFor(tester, () => filenames.isNotEmpty);
+
+        expect(captions, hasLength(4));
+        for (var i = 0; i < 4; i++) {
+          final c = captions[i];
+          expect([
+            for (final r in c.layers) r.name
+          ], [
+            en.filterMyopia,
+            visionFilterName(en, kColorVisionCompareEntries[i].id),
+          ], reason: '画像の土台は myopia だけ（vertigo は写っていない）');
+          expect(c.layers.first.strengthLabel, en.strengthLabel(100),
+              reason: '画像の土台の強さ（差し替え後の 50% ではない）');
+        }
+        expect(
+          filenames.single,
+          matches(RegExp(
+              r'^ue-color-vision-compare-myopia-\d{4}-\d{2}-\d{2}_\d{6}\.png$')),
+          reason: 'ファイル名も画像の土台（vertigo は入らない）',
+        );
+
+        pending.complete();
+        await settleCells(tester, fakes.cellCalls, 8);
+      });
+
       testWidgets('色覚の強度 0% でも、画像と同じく色覚の行は「0%」で残す（単独の 2×2 と揃える）',
           (tester) async {
         final captions = <ExportCaption>[];
@@ -1121,7 +1179,11 @@ void main() {
         final en = lookupAppLocalizations(enLocale);
         expect([for (final r in captions.first.layers) r.strengthLabel],
             [en.strengthLabel(100), en.strengthLabel(0)]);
-        expect(filenames.single, contains('color-vision-compare-myopia-'));
+        expect(
+          filenames.single,
+          matches(RegExp(
+              r'^ue-color-vision-compare-myopia-\d{4}-\d{2}-\d{2}_\d{6}\.png$')),
+        );
       });
 
       testWidgets('土台が無ければ従来どおり（1 型ずつのキャプション・強度 % 付きのファイル名）', (tester) async {
@@ -1169,7 +1231,9 @@ void main() {
             .group(1)!;
         expect(id.length, lessThanOrEqualTo(kMaxExportSymptomIdLength),
             reason: name);
-        expect(id, startsWith('color-vision-compare'));
+        // 比較の印 + 土台 4 層（適用順: vertigo → myopia → cataract → astigmatism）。
+        // 48 文字に収まる先頭 3 つだけ残し、落とした 2 層は `-plus2`。
+        expect(id, 'color-vision-compare-vertigo-myopia-plus2');
         expect(captions.first.layers.length, 5, reason: 'キャプションの行は上限で落とさない');
       });
     });
