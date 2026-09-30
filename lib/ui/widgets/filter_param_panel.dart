@@ -259,15 +259,12 @@ class FilterParamPanel extends StatelessWidget {
         // 画面上の文言は短く「パターンを変える」だが、ボタンが複数並ぶ
         // フィルタでどのパターンかを読み上げで区別できるよう、パラメータ名を
         // 含むラベルを読ませる。
-        Semantics(
-          button: true,
-          label: l10n.changePatternFor(label),
-          excludeSemantics: true,
-          onTap: () => state.randomizeSeed(param.name),
-          child: OutlinedButton.icon(
-            onPressed: () => state.randomizeSeed(param.name),
-            icon: const Icon(Icons.shuffle, size: 16),
-            label: Text(l10n.changePattern),
+        OutlinedButton.icon(
+          onPressed: () => state.randomizeSeed(param.name),
+          icon: const Icon(Icons.shuffle, size: 16),
+          label: Text(
+            l10n.changePattern,
+            semanticsLabel: l10n.changePatternFor(label),
           ),
         ),
       ],
