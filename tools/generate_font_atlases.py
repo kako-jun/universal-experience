@@ -15,8 +15,9 @@
   3. ``tools/generate_samples.dart`` が ``package:image`` の ``BitmapFont.fromFnt``
      でそれを読み、文字を描く。``package:image`` 同梱の Arial ビットマップは使わない。
 
-出力は Pillow / FreeType の版に依存するため、Pillow は上の版に固定している。
-同じ入力・同じ版なら同じバイト列になる（グリフ順・パッキングは決定的）。
+出力は Pillow（同梱の FreeType）の版に依存するため、Pillow は上の版に固定している。
+グリフ順・パッキングは決定的で、同一環境（同じ Pillow / FreeType）で 2 回実行して
+全 PNG の SHA-256 が一致することを確認している。別の版・別の環境での一致までは保証しない。
 
 生成物（``tools/fonts/*.fnt`` / ``*.png``）は Noto Sans / Noto Sans JP の派生物として
 SIL OFL 1.1 の下にある。著作権表示とライセンス全文は ``tools/fonts/OFL-*.txt`` と
@@ -65,27 +66,37 @@ _SOURCES = {
 }
 
 # ── 収録する文字 ─────────────────────────────────────────────────────
-# サンプル画像で実際に描く文字だけ。generate_samples.dart は、ここに無い
-# 文字を描こうとすると例外で止まる（黙って欠落させない）。
-_ASCII = "".join(chr(c) for c in range(0x20, 0x7F))
-_HIRAGANA = "".join(chr(c) for c in range(0x3041, 0x3097))
-_KATAKANA = "".join(chr(c) for c in range(0x30A1, 0x30FB)) + "ー"
-_JP_PUNCT = "、。・「」（）～：　"
-# 案内板（出口・駅・営業中・のりば案内）に使う漢字。
-_KANJI = "出入口駅営業中案内番線行方面央川沿北旧市街港場前東丘緑地公園普通環状足元注意乗改札時刻表"
-_JP_CHARS = _ASCII + _HIRAGANA + _KATAKANA + _JP_PUNCT + _KANJI
-# 見出し（48px）と大きな案内表示（96px）は使う文字だけに絞り、アトラスを小さく保つ。
-_JP_HEADING_CHARS = _ASCII + "のりば案内出入口駅営業中"
-_JP_SIGN_CHARS = "出入口駅営業中"
+# サンプル画像で実際に描く文字列だけから導出する（tools/generate_samples.dart の
+# 文字列と対応させること）。generate_samples.dart は、ここに無い文字を描こうとすると
+# 例外で止まる（黙って欠落させない）ので、食い違えば再生成時に必ず気づく。
+_LATIN_BODY = "".join(
+    [
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ",  # 駅ラベル（A〜Z）・路線コード・凡例・案内板の地名
+        "0123456789",  # 駅ラベルの数字・案内板の時刻と番号
+        ": -",  # 時刻の区切り・空白・ハイフン（"VIA LOOP LINE - MIND THE GAP" など）
+    ]
+)
+_LATIN_SMALL = "OPEN"  # 夜景の照明看板
+_LATIN_HEADING = "INFORMATION!P"  # 案内板の見出し・警告標識の「!」・案内標識の「P」
+_JP_BODY = "".join(
+    [
+        "0123456789:",
+        "1番線2番線3番線4番線5番線6番線",
+        "中央行き川沿い行き北口行き旧市街行き港行き市場前行き",
+        "普通・環状線まわり・足もとにご注意ください",
+    ]
+)
+_JP_HEADING = "のりば案内"
+_JP_SIGN = "出口駅営業中"
 
 # 出力名 → (フォントファイル, サイズ px, 収録文字)
 _FONTS = {
-    "noto_sans_regular_18": ("NotoSans-Regular.ttf", 18, _ASCII),
-    "noto_sans_regular_24": ("NotoSans-Regular.ttf", 24, _ASCII),
-    "noto_sans_bold_48": ("NotoSans-Bold.ttf", 48, _ASCII),
-    "noto_sans_jp_regular_24": ("NotoSansJP-Regular.otf", 24, _JP_CHARS),
-    "noto_sans_jp_bold_48": ("NotoSansJP-Bold.otf", 48, _JP_HEADING_CHARS),
-    "noto_sans_jp_bold_96": ("NotoSansJP-Bold.otf", 96, _JP_SIGN_CHARS),
+    "noto_sans_regular_18": ("NotoSans-Regular.ttf", 18, _LATIN_SMALL),
+    "noto_sans_regular_24": ("NotoSans-Regular.ttf", 24, _LATIN_BODY),
+    "noto_sans_bold_48": ("NotoSans-Bold.ttf", 48, _LATIN_HEADING),
+    "noto_sans_jp_regular_24": ("NotoSansJP-Regular.otf", 24, _JP_BODY),
+    "noto_sans_jp_bold_48": ("NotoSansJP-Bold.otf", 48, _JP_HEADING),
+    "noto_sans_jp_bold_96": ("NotoSansJP-Bold.otf", 96, _JP_SIGN),
 }
 
 # 以前の Arial ビットマップ（package:image）と行の上端が揃うよう、ベースラインを
@@ -100,7 +111,7 @@ def _fetch(workdir: Path) -> None:
     for name, (url, sha) in _SOURCES.items():
         dest = workdir / name
         print(f"fetch {name}")
-        with urllib.request.urlopen(url) as res:  # noqa: S310 (固定 URL)
+        with urllib.request.urlopen(url, timeout=60) as res:  # noqa: S310 (固定 URL)
             data = res.read()
         digest = hashlib.sha256(data).hexdigest()
         if digest != sha:
@@ -153,7 +164,7 @@ def _render_font(name: str, font_path: Path, size: int, chars: str) -> None:
 
     bold = 1 if "Bold" in font_path.name else 0
     lines = [
-        f'info face="{font_path.stem}" size={size} bold={bold} italic=0 charset="" '
+        f'info face="{font_path.stem}-BitmapSubset" size={size} bold={bold} italic=0 charset="" '
         "unicode=1 stretchH=100 smooth=1 aa=1 padding=0,0,0,0 spacing=1,1",
         f"common lineHeight={line_height} base={ascent} scaleW={_ATLAS_WIDTH} "
         f"scaleH={atlas_h} pages=1 packed=0",

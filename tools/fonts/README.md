@@ -19,7 +19,9 @@
   （ライセンス全文は <https://github.com/google/fonts> の `ofl/notosans/OFL.txt`・`ofl/notosansjp/OFL.txt`、
   版 `24ecb0bbdc3a52d6fddef160b769c61463f455d9` と同一）。
 - Noto Sans JP の予約フォント名（Reserved Font Name）は `Source` です。この派生物の名前は
-  `noto_sans_jp_*` で、`Source` を含みません。
+  `noto_sans_jp_*` で、`Source` を含みません。各 `.fnt` の `info face` も元のフォント名
+  ではなく派生名（`NotoSansJP-Bold-BitmapSubset` のように `-BitmapSubset` を付けたもの）に
+  しています。
 - フォントのソフトウェア本体（TTF/OTF）はこのリポに入れていません。入っているのは、
   サンプルに使う文字だけを含むビットマップのアトラスです。
 - サンプル画像（PNG）に描かれた文字は、フォントのグリフを画素として描いた出力であり、
@@ -29,15 +31,20 @@
 
 | ファイル | サイズ | 収録 |
 |---|---|---|
-| `noto_sans_regular_18` | 18px | ASCII（0x20–0x7E） |
-| `noto_sans_regular_24` | 24px | ASCII |
-| `noto_sans_bold_48` | 48px | ASCII |
-| `noto_sans_jp_regular_24` | 24px | ASCII・ひらがな・カタカナ・案内板に使う漢字と約物 |
-| `noto_sans_jp_bold_48` | 48px | ASCII と「のりば案内出入口駅営業中」 |
-| `noto_sans_jp_bold_96` | 96px | 「出入口駅営業中」 |
+| `noto_sans_regular_18` | 18px | 夜景の看板「OPEN」の文字 |
+| `noto_sans_regular_24` | 24px | 英大文字・数字・`:`・空白・`-`（駅ラベル、案内板の時刻・地名・補足行） |
+| `noto_sans_bold_48` | 48px | 「INFORMATION」「!」「P」の文字 |
+| `noto_sans_jp_regular_24` | 24px | 数字・`:`、日本語の案内板の表（「1番線」〜「6番線」・行き先・補足行）に出る文字 |
+| `noto_sans_jp_bold_48` | 48px | 「のりば案内」 |
+| `noto_sans_jp_bold_96` | 96px | 「出口」「駅」「営業中」 |
 
-`tools/generate_samples.dart` は、収録外の文字を描こうとすると例外で止まります。
-文字を増やすときは `tools/generate_font_atlases.py` の文字集合に足して再生成します。
+収録文字は、サンプル画像で実際に描く文字列だけから導いています
+（`tools/generate_font_atlases.py` の文字集合。`tools/generate_samples.dart` の
+文字列と対応させます）。
+
+`tools/generate_samples.dart` は、収録外の文字を描こうとすると例外で止まります
+（黙って欠落させません）。文字を増やすときは `tools/generate_font_atlases.py` の
+文字集合に足して再生成します。
 
 ## 再生成
 
@@ -47,5 +54,6 @@ dart run tools/generate_samples.dart
 ```
 
 前者は固定した版のフォントを公式配布元から取得し（SHA-256 を検証、作業ディレクトリは
-実行後に削除）、ここへアトラスを書き出します。Pillow の版を固定しているので、同じ入力なら
-同じバイト列になります。
+実行後に削除）、ここへアトラスを書き出します。Pillow の版を固定し、グリフ順・パッキングも決定的です。
+同一環境（同じ Pillow / FreeType）で 2 回実行して全 `*.fnt` / `*.png` のバイト列が
+一致することを確認しています（別の版・別の環境での一致までは保証しません）。
