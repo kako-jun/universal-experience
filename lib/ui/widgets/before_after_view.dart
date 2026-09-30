@@ -972,7 +972,7 @@ typedef ExportPlan = ({
 /// - 2 層以上: [buildLayeredExportCaption]（層ごとの行 + 合成した受診喚起）。ファイル名は
 ///   層の id を適用順につないだもの（[exportSymptomId]）で、強度の % は付けない。
 /// - 1 層: その層だけを、単一層の書き出し（[buildExportCaption]）と同じ見た目・同じ名前にする。
-/// - 0 層（単一層、原画比較中、全層が強度 0 で画像が原画のまま）: 引数の
+/// - 0 層（単一層、原画比較中、表示強度（整数パーセント）が 0 の層しかない）: 引数の
 ///   [filterId]/[colorVisionType]/[filter]/[strength]（フォーカス中の層の値）で、従来どおりの
 ///   単一層の書き出し。
 ExportPlan planExport(
