@@ -1,4 +1,4 @@
-// main() の実起動経路を踏む integration test。
+// main() の実起動経路を踏む integration test (#55)。
 //
 // integration_test/experience_presets_smoke_test.dart は自身の setUpAll で
 // initNativeBridge() を呼んでから統合フィルタ一覧を自前の MaterialApp に

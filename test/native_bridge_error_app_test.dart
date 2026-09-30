@@ -1,7 +1,7 @@
 // NativeBridgeErrorApp（lib/main.dart、#55）の widget テスト。
 //
 // Rust ブリッジ初期化失敗時 (initNativeBridge() が false) に main() が表示する
-// エラー画面。`locale` を注入できるようにしたので、実際に
+// エラー画面。`locale` を注入できるようにした (#55) ので、実際に
 // システムロケールに依存せず ja/en それぞれの文言が出ることと、未対応ロケール
 // でのフォールバックを widget test レベルで検証する。
 //

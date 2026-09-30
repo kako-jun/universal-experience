@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/rendering/shader_filter.dart';
 
-/// [SingleFlightCache] の単体テスト。
+/// [SingleFlightCache] の単体テスト（#58）。
 ///
 /// `ShaderFilter._loadProgram` は元々 `Map<String, Future<ui.FragmentProgram>>
 /// ??=` という素朴なキャッシュを使っていたため、一度失敗した Future を

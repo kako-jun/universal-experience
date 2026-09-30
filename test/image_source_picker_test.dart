@@ -53,7 +53,7 @@ Future<Uint8List> _validPngBytes() async {
   }
 }
 
-/// `length` を偽装した [XFile]。実ファイル I/O には
+/// `length` を偽装した [XFile]（#78）。実ファイル I/O には
 /// 一切触れない — `readAsBytes` が呼ばれたら [onReadAsBytes] を記録するので、
 /// 「サイズ超過はファイル本体を読む前に弾く」ことを検証できる。
 class _FakeSizedFile extends XFile {
@@ -74,8 +74,8 @@ class _FakeSizedFile extends XFile {
   }
 }
 
-/// `length()` 自体が例外を投げる [XFile]
-/// （取得ステップの失敗もデコード失敗と同じ経路でハンドルされることを見る）。
+/// `length()` 自体が例外を投げる [XFile]（#78 の対象:
+/// 取得ステップの失敗もデコード失敗と同じ経路でハンドルされることを見る）。
 class _ThrowingLengthFile extends XFile {
   _ThrowingLengthFile() : super('');
 
@@ -158,7 +158,9 @@ void main() {
       expect(find.text(en.imageSourcePickFailed), findsOneWidget);
     });
 
-    testWidgets('50MB を超えるファイルは本体を読まずに失敗として扱う', (tester) async {
+    testWidgets(
+        '50MB を超えるファイルは本体を読まずに失敗として扱う',
+        (tester) async {
       _suppressFlutterErrorReporting();
       final imageSourceState = ImageSourceState();
       await tester.pumpWidget(localized(
@@ -188,7 +190,8 @@ void main() {
       expect(find.text(en.imageSourcePickFailed), findsNothing);
     });
 
-    testWidgets('50MB ちょうどまでは許可される境界', (tester) async {
+    testWidgets(
+        '50MB ちょうどまでは許可される境界', (tester) async {
       final imageSourceState = ImageSourceState();
       await tester.pumpWidget(localized(
         const SizedBox(),
@@ -210,7 +213,9 @@ void main() {
       expect(imageSourceState.hasUserImage, isTrue);
     });
 
-    testWidgets('ファイル取得（length）自体が失敗しても SnackBar で報告する', (tester) async {
+    testWidgets(
+        'ファイル取得（length）自体が失敗しても SnackBar で報告する',
+        (tester) async {
       _suppressFlutterErrorReporting();
       final imageSourceState = ImageSourceState();
       await tester.pumpWidget(localized(
@@ -338,7 +343,9 @@ void main() {
       expect(chip.selected, isTrue);
     });
 
-    testWidgets('「画像を閉じる」ボタンでユーザー画像を破棄しサンプル表示に戻る', (tester) async {
+    testWidgets(
+        '「画像を閉じる」ボタンでユーザー画像を破棄しサンプル表示に戻る',
+        (tester) async {
       final imageSourceState = ImageSourceState(initialSampleId: 'chart');
       await tester.pumpWidget(localized(
         const ImageSourcePicker(child: SizedBox()),

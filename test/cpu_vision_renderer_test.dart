@@ -14,7 +14,7 @@ import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 /// 本ファイルはブリッジを挟まない往復変換部分（`imageToRgba8`/
 /// `premultiplyStraightRgba8`/`rgba8ToImage`）のみを検証する。
 ///
-/// ## alpha の扱い
+/// ## alpha の扱い（#85、訂正）
 ///
 /// Flutter の `ui.Image` は premultiplied alpha で GPU テクスチャを保持する
 /// （`ImageByteFormat.rawRgba` で読む生バイト列、`PixelFormat.rgba8888` で
@@ -79,7 +79,9 @@ void main() {
       expect(rgba8.length, image.width * image.height * 4);
     });
 
-    test('透過ピクセル（alpha=128 の既知の色）を含む往復で straight alpha が保たれる', () async {
+    test(
+        '透過ピクセル（alpha=128 の既知の色）を含む往復で straight alpha が保たれる',
+        () async {
       // 1x1 の半透明ピクセル。straight alpha 前提で描画する: Canvas に
       // Paint(color) で塗ると Skia は不透明色×アルファのブレンドで
       // 内部的に premultiply して合成するため、ここでは
@@ -111,23 +113,12 @@ void main() {
 
   group('premultiplyStraightRgba8', () {
     test('alpha==255 は恒等変換（かつ新しいバッファを確保しない fast path）', () {
-      final straight = Uint8List.fromList([
-        255,
-        255,
-        255,
-        255,
-        10,
-        20,
-        30,
-        255,
-      ]);
+      final straight =
+          Uint8List.fromList([255, 255, 255, 255, 10, 20, 30, 255]);
       final out = CpuVisionRenderer.premultiplyStraightRgba8(straight);
       expect(out, equals(straight));
-      expect(
-        identical(out, straight),
-        isTrue,
-        reason: '全ピクセル不透明なら straight をそのまま返す fast path が働いているはず',
-      );
+      expect(identical(out, straight), isTrue,
+          reason: '全ピクセル不透明なら straight をそのまま返す fast path が働いているはず');
     });
 
     test(

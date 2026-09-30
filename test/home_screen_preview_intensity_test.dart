@@ -1,6 +1,6 @@
 // HomeScreen のプレビュー（_buildPreviewSection の Consumer2<VisionFilterState,
 // FilterService> → BeforeAfterView）が、FilterService.setIntensity に追従する
-// ことの回帰テスト。
+// ことの回帰テスト（#57）。
 //
 // #57 修正の要点は「intensity の通知経路を FilterService 自身に閉じ込め、
 // SettingsService（延いては MaterialApp）には伝播させない」こと

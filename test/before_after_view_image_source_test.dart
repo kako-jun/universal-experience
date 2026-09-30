@@ -179,9 +179,10 @@ void main() {
       expect(stub.debugDisposed, isFalse);
     });
 
-    testWidgets('source を読み込み中に imageSource が A→B に切り替わっても、最終的に B が'
+    testWidgets(
+        'source を読み込み中に imageSource が A→B に切り替わっても、最終的に B が'
         '読み込まれる', (tester) async {
-      // 回帰テスト: 旧実装は _rebuild の最後で
+      // #78 の回帰テスト: 旧実装は _rebuild の最後で
       // `_currentImageSource = widget.imageSource`（呼び出し時点の最新値）を
       // 読んでいた。A の読み込みが in-flight のまま widget.imageSource が B に
       // 進むと、A の画像を読み込んだのに `_currentImageSource` には B が

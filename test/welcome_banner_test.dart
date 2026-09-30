@@ -5,7 +5,7 @@
 // 「自分の画像で試す」アクション（pickAndLoadUserImage 経由）
 // の decode 経路自体は test/image_source_picker_test.dart が検証済みなので、
 // ここではピッカーの結果（成功/キャンセル）に応じて dismiss するかどうかの
-// 分岐だけを確認する（pickImageFile をフェイクに差し替え、
+// 分岐（#78）だけを確認する（pickImageFile をフェイクに差し替え、
 // 実デコードは避ける）。
 
 import 'dart:typed_data';
@@ -119,10 +119,12 @@ void main() {
     expect(reloaded.welcomeBannerDismissed, isTrue);
   });
 
-  testWidgets('「ほかの見え方を選ぶ」は onChooseOtherView を呼んでから dismiss する。'
+  testWidgets(
+      '「ほかの見え方を選ぶ」は onChooseOtherView を呼んでから dismiss する。'
       '実際に検索欄へフォーカスを移す側の契約は '
       'test/filter_browser_test.dart（FilterBrowserController.focusSearch）と '
-      'test/home_screen_layout_test.dart のバナー経由の確認が担う（#72）', (tester) async {
+      'test/home_screen_layout_test.dart のバナー経由の確認が担う（#72）',
+      (tester) async {
     SharedPreferences.setMockInitialValues({});
     final settings = SettingsService();
     await settings.load();
@@ -160,7 +162,9 @@ void main() {
     expect(find.text(en.welcomeBannerTitle), findsNothing);
   });
 
-  testWidgets('「自分の画像で試す」はピッカーがキャンセルされたら dismiss しない', (tester) async {
+  testWidgets(
+      '「自分の画像で試す」はピッカーがキャンセルされたら dismiss しない',
+      (tester) async {
     SharedPreferences.setMockInitialValues({});
     final settings = SettingsService();
     await settings.load();
@@ -178,7 +182,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(pickerCalled, isTrue);
-    expect(settings.welcomeBannerDismissed, isFalse, reason: 'キャンセルではバナーを閉じない');
+    expect(settings.welcomeBannerDismissed, isFalse,
+        reason: 'キャンセルではバナーを閉じない');
     expect(find.text(en.welcomeBannerTitle), findsOneWidget);
   });
 
