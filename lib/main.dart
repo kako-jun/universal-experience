@@ -14,6 +14,7 @@ import 'l10n/locale_resolution.dart';
 import 'models/disability_type.dart';
 import 'models/sample_catalog.dart';
 import 'services/color_vision_selection.dart';
+import 'services/experience_source.dart' show isValidExperiencePreset;
 import 'services/filter_service.dart';
 import 'services/image_source_state.dart';
 import 'services/vision_filter_state.dart';
@@ -27,7 +28,6 @@ import 'services/settings_service.dart';
 import 'services/vision_filter_store.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/theme/app_theme.dart';
-import 'ui/widgets/experience_presets.dart' show isValidExperiencePreset;
 import 'ui/widgets/loupe_hud.dart';
 
 /// ルーペ窓の挙動 (#14) を集約したコントローラ。
