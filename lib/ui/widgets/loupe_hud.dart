@@ -49,7 +49,7 @@ const Duration kLoupeHudHideDelay = Duration(milliseconds: 700);
 /// - 受診喚起アイコン（[resolveConsultNotice] が非 null を返すときだけ表示。
 ///   押すと [ConsultNoticeBlock] で全文をダイアログ表示する）。複数層のときは、
 ///   喚起のある層があれば出し、ダイアログは層ごとに名前つきで並べる（各層単体の入力。
-///   複数層の合成は #121）
+///   複数層を合成した喚起は、1 枚の画像として共有される PNG 書き出しだけが焼き込む、#121）
 /// - 原画比較ボタン（押している間だけ [VisionFilterState.bypassed] を true に
 ///   し、離す/キャンセルで必ず false に戻す。スクリーンリーダー等、押し続ける
 ///   操作ができない場合のトグル代替も持つ、#79）

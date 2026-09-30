@@ -231,7 +231,9 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 - 2×2 比較のセルは正方形の画像 2 列で、狭幅では 1 セルが小さくなる（縦積みの中央カラムの幅が 2 分割される）。
   型名は 1 行で省略（`ellipsis`）し、全文は Semantics ラベルで読み上げる。
 - `export_service.dart` の PNG 書き出し用 `TextStyle(fontSize:)`（画面外の描画、`BuildContext` を持たない）は
-  `textTheme` の対象外として残している。
+  `textTheme` の対象外として残している。複数層の書き出し（#121）は、層ごとの「症状名 + 強度」の行を
+  同じスタイルで縦に並べ（症状名は太字、強度は通常の太さ）、1 層のときは従来と同じ 2 行のまま。
+  帯の高さは行数と折り返しから測って決めるので、5 層でも切れ・重なりは出ない。
 
 ### 6.2 目標
 
@@ -350,6 +352,9 @@ UE_SCREENSHOTS=1 UE_SCREENSHOT_DIR=/path/to/out \
   `narrow-xs` は幅 600）、`...-multi-limit.png`（上限 5 層。未選択の行が理由つきで無効）、
   `...-multi-limit-rows.png`（一覧を無効の行までスクロールして撮ったもの）、狭幅の `...-multi*-full.png`（縦積みの全体像。#120）。
   多層の after は、層の列を輝度ブレンドで重ねるレイアウト確認専用のフェイク。
+  書き出し PNG（#121）は別ファイル `test/ui_screenshots/export_screenshots_test.dart` が、
+  `composeExportImage` の出力そのものを `export-{1|3|5}-layers-{ja|en}-{1024|480}.png` に書く
+  （同じく `UE_SCREENSHOTS=1`。土台はダミーのグラデーションで、受診喚起は文章量が最大になる入力）。
 - フォールバック: macOS のシステムフォント（ヒラギノ角ゴシック / Apple Symbols）と Flutter SDK 同梱の
   Roboto・Material Icons を `FontLoader` で読む。**フォントファイルはリポに入れない。** 見つからない環境では
   警告を出して既定フォント（四角）のまま進む。

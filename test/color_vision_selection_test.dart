@@ -124,6 +124,19 @@ void main() {
       expect(visionState.selectedId, isNull);
       expect(visionState.isColorQuickSelection, isFalse);
     });
+
+    test('重ねている全層を外す（ホットキー「フィルタ解除」・トレイの解除、#121）', () {
+      toggleColorVision(filterService, visionState, ColorVisionType.protanopia);
+      visionState
+        ..toggle('myopia')
+        ..toggle('glaucoma');
+      expect(visionState.layers.length, 3);
+
+      deactivateColorVision(filterService, visionState);
+
+      expect(visionState.layers, isEmpty);
+      expect(filterService.currentFilter, ColorVisionType.none);
+    });
   });
 
   group('toggleColorVision（多選択、#120）', () {

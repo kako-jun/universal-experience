@@ -1,8 +1,9 @@
 // 複数層の受診喚起の入力の合成（#119）。
 //
 // `mergeConsultInputs` は resolveConsultNotice に渡す (urgency, escalation) を作る純粋関数。
-// UI・書き出しへの適用は #121 なので、ここは「緊急度は最大」「escalation は段ごとに併合して
-// 重複行を除く」という規則と、最終的な resolveConsultNotice の表示（見出し・行）までを確認する。
+// 書き出しへの適用（`buildLayeredExportCaption`）は export_multi_layer_test.dart が確認する。
+// ここは「緊急度は最大」「escalation は段ごとに併合して重複行を除く」という規則と、最終的な
+// resolveConsultNotice の表示（見出し・行）までを確認する。
 
 import 'package:flutter/widgets.dart' show Locale;
 import 'package:flutter_test/flutter_test.dart';

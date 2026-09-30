@@ -1,8 +1,8 @@
-// 複数層のときの比較ビューの見出しと、暫定の書き出し無効（#120）。
+// 複数層のときの比較ビューの見出し（#120）と、書き出しへ渡す全層の値（#121）。
 //
 // after の見出しは、層が 1 つなら従来どおりそのフィルタ名、複数なら「名前 + 名前 …（+N）」
 // の要約（適用順。2 つまでは全部、3 つ目以降は「…（+N）」）。原画ペインの見出しは変わらない。
-// PNG 書き出しは複数層の間（#121 で解除するまで）無効で、理由を画面に出す。
+// PNG 書き出しは複数層でも有効で、全層の値（適用順）を [BeforeAfterView] へ渡す。
 
 import 'dart:ui' as ui;
 
@@ -60,7 +60,7 @@ void main() {
       final h =
           await pumpHomeScreen(tester, size: wide, locale: const Locale('en'));
       h.visionState.toggle('myopia');
-      final l10n = await pumpEn(tester, h);
+      await pumpEn(tester, h);
 
       expect(
           tester
@@ -69,7 +69,6 @@ void main() {
           isNull);
       expect(find.text('Myopia'), findsWidgets);
       expect(find.textContaining(' + '), findsNothing);
-      expect(find.text(l10n.exportDisabledMultiLayer), findsNothing);
     });
 
     testWidgets('2 層: 「名前 + 名前」を適用順に出す', (tester) async {
@@ -121,40 +120,45 @@ void main() {
     });
   });
 
-  group('PNG 書き出し（#121 で解除するまでの暫定）', () {
-    testWidgets('複数層: ボタンは無効で、理由を画面に出す', (tester) async {
+  group('PNG 書き出し（#121）', () {
+    Finder exportButton() => find.ancestor(
+          of: find.byIcon(Icons.download_outlined),
+          matching: find.byType(IconButton),
+        );
+
+    testWidgets('複数層: ボタンは有効で、全層の値（適用順）を書き出しへ渡す', (tester) async {
       await installFakes(tester);
       final h =
           await pumpHomeScreen(tester, size: wide, locale: const Locale('en'));
       h.visionState.toggle('protanopia');
       h.visionState.toggle('myopia');
-      final l10n = await pumpEn(tester, h);
+      await pumpEn(tester, h);
 
-      expect(find.text(l10n.exportDisabledMultiLayer), findsOneWidget);
-      final button = find.ancestor(
-        of: find.byIcon(Icons.download_outlined),
-        matching: find.byType(IconButton),
-      );
-      expect(button, findsOneWidget);
-      expect(tester.widget<IconButton>(button).onPressed, isNull);
+      expect(exportButton(), findsOneWidget);
+      expect(tester.widget<IconButton>(exportButton()).onPressed, isNotNull);
+      final layers = tester
+          .widget<BeforeAfterView>(find.byType(BeforeAfterView))
+          .exportLayers!;
+      // 選ぶ順は段順の逆。渡す値は段順（光学 → 色覚）。
+      expect([for (final l in layers) l.layer.id], ['myopia', 'protanopia']);
     });
 
-    testWidgets('1 層に戻すと有効に戻り、理由も消える', (tester) async {
+    testWidgets('1 層: 書き出しへ渡す全層の値は無く、従来どおり有効', (tester) async {
       await installFakes(tester);
       final h =
           await pumpHomeScreen(tester, size: wide, locale: const Locale('en'));
       h.visionState.toggle('protanopia');
       h.visionState.toggle('myopia');
-      final l10n = await pumpEn(tester, h);
+      await pumpEn(tester, h);
       h.visionState.remove('myopia');
       await settle(tester);
 
-      expect(find.text(l10n.exportDisabledMultiLayer), findsNothing);
-      final button = find.ancestor(
-        of: find.byIcon(Icons.download_outlined),
-        matching: find.byType(IconButton),
-      );
-      expect(tester.widget<IconButton>(button).onPressed, isNotNull);
+      expect(
+          tester
+              .widget<BeforeAfterView>(find.byType(BeforeAfterView))
+              .exportLayers,
+          isNull);
+      expect(tester.widget<IconButton>(exportButton()).onPressed, isNotNull);
     });
   });
 

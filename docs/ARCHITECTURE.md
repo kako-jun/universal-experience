@@ -261,24 +261,29 @@ main.dart が `windowManager.show()` / `hide()` を `onShowLoupe` / `onHideLoupe
 6. (区切り線)
 7. **即切替フィルタ** (`quickColorVisionFilters()`) — よく使う色覚シミュレーションを
    直接適用: Protanopia / Deuteranopia / Tritanopia / Achromatopsia。
-   `selectColorVision`（`FilterService.applyFilter()` と `VisionFilterState` を
-   同時に更新する色覚クイック選択の入口）を通り、選択中のものにチェックが付く。
-   チェックは項番 8 と同じ選択行から決めるため、色覚の base 型（Protanopia 等）を
-   「高度なフィルタ」側から選んでも同名のトップレベル項目に点灯する（統合一覧と同じ）。
+   チェック式（#121）。クリックはメイン画面の色覚の行と同じ入口 `toggleColorVision`
+   （`color_vision_selection.dart`。足し引きで、色覚は他の層を残したまま置き換わる。
+   `FilterService` の色覚型は `syncFilterServiceWithLayers` が層の集合へ合わせる）を通る。
+   4 項目は排他（別の型を選ぶと置き換わる）。チェックは項番 8 と同じ層の集合から決めるため
+   （`origin` は見ない）、色覚の base 型（Protanopia 等）を「高度なフィルタ」側から選んでも
+   同名のトップレベル項目に点灯する（統合一覧と同じ）。上限 5 層で未選択の項目は灰色にする
+   （色覚の置き換えは有効）。
    トップレベルは短く保つため代表のみで、全フィルタは次項の「高度なフィルタ」
    サブメニューから選べる (#65)。
 8. **高度なフィルタ** (#65) — カテゴリ別の入れ子サブメニュー（7 カテゴリ）。統合
    フィルタ一覧 `kFilterListEntries`（色覚 7 型 + advanced 30 = 33 行、#72）の行を
-   すべて並べ、選ぶとウィンドウ内一覧と同じ入口 `applyFilterListEntry`
-   （色覚の行は `selectColorVision`、それ以外は `VisionFilterState.select`）を通る。
-   チェックは `selectedFilterListEntry(visionFilterState)` で決めるため、
-   ウィンドウ内 UI で選んだものもトレイに反映される（体験プリセット選択中は
-   トレイに何もチェックを付けない。トレイにプリセットは出さず、ウィンドウ内一覧も
-   一覧の行を点灯させないため）。ラベルは `TrayMenuLabels` の
+   すべて並べ、チェック式で足し引きする（#121）。クリックはウィンドウ内一覧と同じ入口
+   `toggleFilterListEntry`（色覚の行は `toggleColorVision`、それ以外は
+   `VisionFilterState.toggle`）を通る。チェックは層の集合から、メイン画面の一覧と同じ判定
+   `layerForFilterListEntry` で決めるため、ウィンドウ内 UI で選んだものもトレイに反映される
+   （体験プリセット選択中は、プリセットの層に対応する行にチェックが付く。
+   トレイにプリセットは出さない）。灰色は `filterListEntryBlockReason`（上限 5 層で未選択の行。
+   色覚の置き換えは対象外）。ラベルは `TrayMenuLabels` の
    `advancedFilters` / `categoryLabels` / `catalogNames` / `filterLabels` で、
    ARB（ja/en）から解決し `updateLocalization` で言語変更に追従する
-9. **フィルタを解除** — `deactivateColorVision`（色覚・advanced・プリセットを
-   まとめて未選択へ戻す）。何も選ばれていないときにチェックが付く
+9. **フィルタを解除** — `deactivateColorVision`（重ねている全層・プリセットを
+   まとめて未選択へ戻す）。何も選ばれていないときにチェックが付く。ホットキー（フィルタ解除）も
+   同じく全層を外す（`test/hotkey_actions_test.dart`。新しいホットキーは足していない）
 10. (区切り線)
 11. **設定を開く…** — フィルタ選択 UI はメインウィンドウ内にあるため
    `windowManager.show()` + `focus()` でウィンドウを表示する
@@ -289,7 +294,8 @@ main.dart が `windowManager.show()` / `hide()` を `onShowLoupe` / `onHideLoupe
 
 `TrayService._rebuildMenu` は、組み立てたメニュー構造が直前にネイティブへ送った
 ものと等しければ送り直さない（スライダーのドラッグ中に `VisionFilterState` が
-連続通知されても、33 行 + カテゴリのメニューを作り直し続けないため）。ただし
+連続通知されても、33 行 + カテゴリのメニューを作り直し続けないため。チェック・灰色も
+構造データに含まれるので、層の集合が変わったときだけ送り直す）。ただし
 メニュー項目のクリック後は、ネイティブ側が先にチェック表示を反転させる環境でも
 見た目が食い違わないよう、必ず送り直す。フィルタ切替のクリックは
 `LoupeWindowController`（クリックスルー・最前面・モード、#63）に一切触れない。
@@ -452,8 +458,9 @@ Linux debug ビルド成功で代替している:
 > 色覚型（`_currentFilter` / `settings.filterType`）と色覚の強度スライダーは更新されない
 > （`selectColorVision` 経由でだけ同期する）。プレビューは `VisionFilterState` だけを見るので描画は
 > 正しいが、`FilterService` 側とはずれる。`toggle` を呼ぶ production の経路は #120 まで無く、
-> 同期の持たせ方はそこで決める。`HomeScreen` の 2×2 比較の出し分け（`canCompare`）と書き出しの
-> キャプションは、複数層でもフォーカス層だけを見る暫定（#121/#122）。
+> 同期の持たせ方はそこで決める（#120 で `syncFilterServiceWithLayers` に決まった）。2×2 比較の出し分け
+> （`canCompare`）は複数層で出さない暫定（#122 で解除）。書き出しのキャプションは #121 で層ごとの行に
+> なった（下の `ExportService`）。
 > `FilterService` は色覚クイック選択の型を持ち、強度は `VisionFilterState` の記憶へ委譲する薄い窓に
 > なった（`ColorVisionType` / `FilterService` の削除は最終段 #124）。下の「現状は状態が 2 系統」
 > 以降は設計時点の記述。
@@ -977,8 +984,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   `BeforeAfterView.steps` へ渡し、`BeforeAfterView` は `renderAfterPipeline`
   （→ `CpuVisionRenderer.pipelineApplier`。テストはこちらを差し替える）で 1 回の合成として適用する。
   空の列は描画器を呼ばず原画を返す。層が 0〜1 のときは従来の単一フィルタの経路のままで、
-  最新優先の `_generation` はどちらの経路でも同じ。見出し・書き出しは当面フォーカス層だけを表す
-  （複数層は #120/#121）
+  最新優先の `_generation` はどちらの経路でも同じ。見出しは複数層で名前の要約（#120）、書き出しは層ごとの行（#121）
 - `BeforeAfterView`（`lib/ui/widgets/before_after_view.dart`）: before/after
   プレビューペイン。#85 で、ペインの論理サイズ・
   `devicePixelRatio` に連動して都度サイズを変えていた旧 GPU 時代の auto-sizing
@@ -1025,6 +1031,22 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   あるが、その機能自体が未実装のため**現状 production コードから呼ばれることは
   ない**。GPU と CPU の等価性は `test/vision_filter_golden_test.dart` 等の
   GPU golden テストが（production の呼び出しとは独立に）担保する
+- 複数層の書き出し（#121）: `BeforeAfterView` は画像を描画した時点の層の列を `ExportLayer`
+  （`lib/services/export_layers.dart`。層・構築済みフィルタ・強度）として控え、書き出しはその控えから
+  `planExport` でキャプション（`ExportCaption.layered`）・症状 id・強度を作る（呼び出し時点の選択は
+  見ない）。画像に効いている層（強度 > 0 の `effectiveExportLayers`。判定はキャプションに出す整数パーセント
+  `strengthPercent` で、0.004 のように「0%」と出る強度も数えない）ごとに「症状名 + 強度」の行を
+  適用順に並べ、受診喚起は `consultInputForFilters` の併合（最大の緊急度・escalation は段ごとに重複除去）
+  を `resolveConsultNotice` へ渡した 1 つだけ、実験的の注記はどれか 1 層でも実験的なら 1 つ、
+  「シミュレーション（近似）」は常に焼き込む。強度 0 の層は画素に何も足さないため、症状行・喚起・注記・
+  ファイル名に数えない（画像だけが共有されたとき実際の見え方と食い違わないため。プレビューの
+  `pipelineSteps` は厳密に 0 の層だけを除くので、0.5% 未満の層はごくわずかに画素へ効くが、目に見える差ではなく
+  「0%」の行も出さない）。bypass 中は空（原画のまま）。例外として、表示強度（整数パーセント）が 0 の層しかないとき
+  （全層が強度 0・0.004 の層だけ・bypass 中）は、従来どおりフォーカス中の層の名前・強度・喚起でキャプションを作る
+  （#121 以前の単一層と同じ出力を保つ）。1 層（強度 > 0 が 1 つ）は従来の
+  `ExportCaption` と同一の画素。ファイル名の症状 id は `exportSymptomId`（適用順に `-` 連結・
+  `kMaxExportSymptomIdLength` = 48 文字で、収まる分だけ残して `-plusN`。複数層は強度の % を入れない）。
+  調整パネル・HUD の注意書きは ADR どおり層ごとのままで、併合した喚起は共有される 1 枚の画像にだけ使う。
 - `ExportService`: フィルタ適用後（after）画像のメタ焼き込み PNG エクスポート。
   書き出し先は Downloads。macOS のサンドボックスでは `getDownloadsDirectory()` が
   コンテナ内 `Data/Downloads`（実 `~/Downloads` へのシンボリックリンク）を返し、

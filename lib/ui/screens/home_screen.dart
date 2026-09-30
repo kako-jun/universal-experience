@@ -8,6 +8,7 @@ import '../../l10n/l10n_extensions.dart';
 import '../../models/sample_catalog.dart';
 import '../../services/app_shortcuts.dart';
 import '../../services/color_vision_compare.dart';
+import '../../services/export_layers.dart';
 import '../../services/filter_list_selection.dart';
 import '../../services/filter_service.dart';
 import '../../services/image_source_state.dart';
@@ -463,6 +464,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                   for (final layer in visionState.layers)
                                     layer.id,
                                 ]
+                              : null,
+                          // 書き出しは全層の値から作る（#121）。
+                          exportLayers: visionState.layers.length > 1
+                              ? exportLayersOf(visionState)
                               : null,
                           imageSource: imageSourceState.current,
                         ),

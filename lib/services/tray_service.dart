@@ -83,10 +83,10 @@ enum TrayMenuKind {
   /// クリックスルーの切替 (#63)。
   toggleClickThrough,
 
-  /// 特定の色覚フィルタを即適用する。
+  /// 特定の色覚フィルタを足し引きする（チェック式。色覚は排他で、別の型を選ぶと置き換わる、#121）。
   applyColorVisionFilter,
 
-  /// フィルタ解除。
+  /// フィルタ解除（重ねている全層を外す）。
   clearFilter,
 
   /// 「高度なフィルタ」サブメニュー（カテゴリ別、#65）。[TrayMenuEntry.children]
@@ -94,7 +94,7 @@ enum TrayMenuKind {
   /// 項目を持つ。自身はクリックできない。
   submenu,
 
-  /// 統合フィルタ一覧（#72）の 1 行を選ぶ（#65）。
+  /// 統合フィルタ一覧（#72）の 1 行を足し引きする（チェック式、#65/#121）。
   applyListEntry,
 
   /// メインウィンドウを表示して設定を開く。
@@ -121,6 +121,7 @@ class TrayMenuEntry {
     this.listEntryKey,
     this.children = const [],
     this.checked = false,
+    this.enabled = true,
   });
 
   /// 区切り線を作る便宜コンストラクタ。
@@ -131,7 +132,8 @@ class TrayMenuEntry {
         colorVisionType = null,
         listEntryKey = null,
         children = const [],
-        checked = false;
+        checked = false,
+        enabled = true;
 
   final TrayMenuKind kind;
 
@@ -155,6 +157,10 @@ class TrayMenuEntry {
   /// チェック表示するか (アクティブなフィルタ / ルーペ表示状態の目印)。
   final bool checked;
 
+  /// 選べるか。`false` は灰色（操作不可）で出す。重ねられる上限（5 層）に達していて、
+  /// 新しく足せない行が該当する（#121）。
+  final bool enabled;
+
   @override
   bool operator ==(Object other) =>
       other is TrayMenuEntry &&
@@ -164,16 +170,17 @@ class TrayMenuEntry {
       other.colorVisionType == colorVisionType &&
       other.listEntryKey == listEntryKey &&
       listEquals(other.children, children) &&
-      other.checked == checked;
+      other.checked == checked &&
+      other.enabled == enabled;
 
   @override
   int get hashCode => Object.hash(kind, key, label, colorVisionType,
-      listEntryKey, Object.hashAll(children), checked);
+      listEntryKey, Object.hashAll(children), checked, enabled);
 
   @override
   String toString() => 'TrayMenuEntry(kind: $kind, key: $key, label: $label, '
       'colorVisionType: $colorVisionType, listEntryKey: $listEntryKey, '
-      'children: $children, checked: $checked)';
+      'children: $children, checked: $checked, enabled: $enabled)';
 }
 
 /// 色覚フィルタ項目の安定キー (フィルタ id から導出)。
@@ -184,13 +191,19 @@ String categorySubmenuKey(VisionFilterCategory category) =>
     'category_${category.name}';
 String listEntryMenuKey(FilterListEntry entry) => 'list_${entry.key}';
 
+/// 色覚のクイック項目 [type] に対応する統合一覧の行のキー（[FilterListEntry.key]）。
+String colorVisionListEntryKey(ColorVisionType type) => 'cv:${type.id}';
+
 /// 「高度なフィルタ」サブメニュー（#65）を純粋データとして組み立てる。
 ///
 /// カテゴリごとのサブメニューに、統合フィルタ一覧（[kFilterListEntries]）の行を
-/// 並べる。[selected]（`selectedFilterListEntry` の結果）の行にチェックを付ける。
+/// 並べる。チェック式（#121）: [checkedListEntryKeys]（[FilterListEntry.key] の集合。
+/// 重ねている層に対応する行）の行にチェックを付け、[disabledListEntryKeys]（上限で
+/// 新しく足せない行）の行は灰色にする。
 TrayMenuEntry buildAdvancedFiltersSubmenu({
   required TrayMenuLabels labels,
-  FilterListEntry? selected,
+  Set<String> checkedListEntryKeys = const {},
+  Set<String> disabledListEntryKeys = const {},
 }) {
   return TrayMenuEntry(
     kind: TrayMenuKind.submenu,
@@ -213,7 +226,8 @@ TrayMenuEntry buildAdvancedFiltersSubmenu({
                     colorVisionType: e.colorVisionType,
                   ),
                   listEntryKey: e.key,
-                  checked: e == selected,
+                  checked: checkedListEntryKeys.contains(e.key),
+                  enabled: !disabledListEntryKeys.contains(e.key),
                 ),
           ],
         ),
@@ -233,23 +247,25 @@ const String kQuitKey = 'quit';
 
 /// トレイメニュー全体を純粋データとして組み立てる。
 ///
-/// [loupeVisible] がトグルのラベルを、[activeFilter] がアクティブな
-/// クイックフィルタへのチェック表示を制御する。[appMode]/[alwaysOnTop]/
+/// [loupeVisible] がトグルのラベルを制御する。[appMode]/[alwaysOnTop]/
 /// [clickThrough] は起動モード・最前面・クリックスルーのチェック表示を制御する
-/// （#63、UI とトレイの両方から切り替えられる受け入れ条件）。[selectedListEntry]
-/// は「高度なフィルタ」サブメニュー（#65）でチェックする一覧の行、
-/// [advancedSelected] は色覚クイック選択以外（advanced・プリセット）が選ばれて
-/// いるか（そのとき「フィルタを解除」はチェックしない）。表示文言は
-/// 呼び出し側が i18n 解決して [labels] で渡す（純粋層は文言を持たない: #18）。
+/// （#63、UI とトレイの両方から切り替えられる受け入れ条件）。
+///
+/// フィルタの項目は重ねている層の集合から決める（#121）。[checkedListEntryKeys] は
+/// 層に対応する一覧の行（[FilterListEntry.key]）で、色覚のクイック 4 項目と「高度な
+/// フィルタ」サブメニュー（#65）の両方のチェックに使う。[disabledListEntryKeys] は
+/// 上限で新しく足せない行（色覚の置き換えは含めない）。[hasLayers] が false のとき
+/// だけ「フィルタを解除」にチェックを付ける。表示文言は呼び出し側が i18n 解決して
+/// [labels] で渡す（純粋層は文言を持たない: #18）。
 List<TrayMenuEntry> buildTrayMenuSpec({
   required bool loupeVisible,
   required TrayMenuLabels labels,
   required AppMode appMode,
   required bool alwaysOnTop,
   required bool clickThrough,
-  ColorVisionType activeFilter = ColorVisionType.none,
-  FilterListEntry? selectedListEntry,
-  bool advancedSelected = false,
+  Set<String> checkedListEntryKeys = const {},
+  Set<String> disabledListEntryKeys = const {},
+  bool hasLayers = false,
 }) {
   return <TrayMenuEntry>[
     TrayMenuEntry(
@@ -284,14 +300,20 @@ List<TrayMenuEntry> buildTrayMenuSpec({
         key: colorVisionEntryKey(f),
         label: labels.filterLabel(f),
         colorVisionType: f,
-        checked: f == activeFilter,
+        listEntryKey: colorVisionListEntryKey(f),
+        checked: checkedListEntryKeys.contains(colorVisionListEntryKey(f)),
+        enabled: !disabledListEntryKeys.contains(colorVisionListEntryKey(f)),
       ),
-    buildAdvancedFiltersSubmenu(labels: labels, selected: selectedListEntry),
+    buildAdvancedFiltersSubmenu(
+      labels: labels,
+      checkedListEntryKeys: checkedListEntryKeys,
+      disabledListEntryKeys: disabledListEntryKeys,
+    ),
     TrayMenuEntry(
       kind: TrayMenuKind.clearFilter,
       key: kClearFilterKey,
       label: labels.clearFilter,
-      checked: activeFilter == ColorVisionType.none && !advancedSelected,
+      checked: !hasLayers,
     ),
     const TrayMenuEntry.separator(),
     TrayMenuEntry(
@@ -345,10 +367,9 @@ class TrayService with TrayListener {
   /// アクティブな色覚フィルタの選択状態 (#14)。
   final FilterService filterService;
 
-  /// プレビューの選択の唯一の正本（#60）。トレイの色覚クイック選択は
-  /// `lib/services/color_vision_selection.dart` の `selectColorVision` /
-  /// `deactivateColorVision` を経由してこれも更新する（#60。FilterBrowser
-  /// と同じ入口を通す）。
+  /// プレビューの選択の唯一の正本（#60）。トレイの項目は、メイン画面の一覧と同じ入口
+  /// （`toggleColorVision` / `toggleFilterListEntry` / `deactivateColorVision`、#121）
+  /// を経由してこれを更新する。チェックと灰色はこれの層の集合から決める。
   final VisionFilterState visionFilterState;
 
   /// ルーペ窓のモード/最前面/クリックスルー (#63)。トレイからもこれらを
@@ -409,8 +430,7 @@ class TrayService with TrayListener {
   /// ウィンドウ内 UI（[FilterBrowser]・advanced カタログ・体験プリセット・
   /// `WindowModePanel`）での選択・切替もトレイのチェックマークに反映される
   /// ようにする（#60/#63。トレイのチェックマークは [_rebuildMenu] が
-  /// `visionFilterState.isColorQuickSelection` や `loupeWindow.appMode` 等から
-  /// 決めるが、これまではトレイ自身の操作でしか再構築が起きなかった）。
+  /// `visionFilterState` の層の集合や `loupeWindow.appMode` 等から決める）。
   /// トレイ自体のネイティブ初期化が失敗しても listener は付けたままにする
   /// （`refresh()` 自身が `_initialised` を見て no-op になるため無害で、
   /// コードパスを単純に保てる）。listener は [dispose] で外す。
@@ -477,22 +497,31 @@ class TrayService with TrayListener {
   }
 
   Future<void> _rebuildMenu() async {
-    // チェックはすべて VisionFilterState から決める（ウィンドウ内 UI の選択が
-    // そのままトレイに出る、#65）。一覧の選択行は統合一覧（FilterBrowser）と同じ
-    // 判定なので、色覚 base 型（protanopia 等）を高度なフィルタ側から選んだ場合も、
-    // 一覧と同じくトップレベルの同名項目に点灯する。プリセット選択中は一覧の行が
-    // 無い（null）ので、何もチェックしない（トレイにプリセットは出さない）。
-    final selectedEntry = selectedFilterListEntry(visionFilterState);
+    // チェックと灰色は、すべて VisionFilterState の層の集合から決める（ウィンドウ内 UI の
+    // 選択がそのままトレイに出る、#65/#121）。一覧の行との対応はメイン画面の一覧と同じ
+    // 判定（[layerForFilterListEntry]。層の origin は問わない）なので、色覚 base 型を高度な
+    // フィルタ側から足した場合も、トップレベルの同名項目と一覧の行の両方に点灯する。
+    // 体験プリセットは、その層（例: 近視）の行に点灯する。
+    // 灰色は上限（5 層）で新しく足せない行。色覚は置き換えになるので対象外
+    // （[filterListEntryBlockReason]）。
+    final checked = <String>{};
+    final disabled = <String>{};
+    for (final e in kFilterListEntries) {
+      if (layerForFilterListEntry(visionFilterState, e) != null) {
+        checked.add(e.key);
+      } else if (filterListEntryBlockReason(visionFilterState, e) != null) {
+        disabled.add(e.key);
+      }
+    }
     final spec = buildTrayMenuSpec(
       loupeVisible: _loupeVisible,
       labels: _labels,
       appMode: loupeWindow.appMode,
       alwaysOnTop: loupeWindow.alwaysOnTop,
       clickThrough: loupeWindow.clickThrough,
-      activeFilter: selectedEntry?.colorVisionType ?? ColorVisionType.none,
-      selectedListEntry: selectedEntry,
-      advancedSelected: visionFilterState.selectedId != null &&
-          !visionFilterState.isColorQuickSelection,
+      checkedListEntryKeys: checked,
+      disabledListEntryKeys: disabled,
+      hasLayers: visionFilterState.layers.isNotEmpty,
     );
     // 変化が無いなら OS へ再送しない。スライダーのドラッグ中などに
     // visionFilterState が連続通知されても、ネイティブメニューを作り直し続けない。
@@ -532,12 +561,14 @@ class TrayService with TrayListener {
         key: entry.key,
         label: entry.label ?? '',
         checked: true,
+        disabled: !entry.enabled,
         onClick: (_) => _handleClick(entry),
       );
     }
     return MenuItem(
       key: entry.key,
       label: entry.label,
+      disabled: !entry.enabled,
       onClick: (_) => _handleClick(entry),
     );
   }
@@ -571,9 +602,10 @@ class TrayService with TrayListener {
         await refresh();
         break;
       case TrayMenuKind.applyColorVisionFilter:
+        // メイン画面の色覚の行と同じ入口（足し引き。色覚は他の層を残したまま置き換わる、#121）。
         final type = entry.colorVisionType;
         if (type != null) {
-          selectColorVision(filterService, visionFilterState, type);
+          toggleColorVision(filterService, visionFilterState, type);
           await refresh();
         }
         break;
@@ -582,11 +614,11 @@ class TrayService with TrayListener {
         await refresh();
         break;
       case TrayMenuKind.applyListEntry:
-        // ウィンドウ内の統合一覧と同じ入口（#72/#65）。フィルタの切替は
+        // ウィンドウ内の統合一覧と同じ入口（足し引き、#72/#65/#121）。フィルタの切替は
         // loupeWindow（クリックスルー等、#63）に一切触れない。
         final listEntry = _listEntryByKey(entry.listEntryKey);
         if (listEntry != null) {
-          applyFilterListEntry(filterService, visionFilterState, listEntry);
+          toggleFilterListEntry(filterService, visionFilterState, listEntry);
           await refresh();
         }
         break;

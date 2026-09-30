@@ -74,7 +74,7 @@ typedef ConsultInput = ({Urgency urgency, List<UrgencyEscalation> escalation});
 ///   段ごとの並べ替え・見出しは [resolveConsultNotice] が行うので、ここは入力順
 ///   （層の適用順）で最初に現れたものを残すだけ。
 ///
-/// 純粋関数。UI・書き出しへの適用は #121。
+/// 純粋関数。複数層の書き出し（PNG）の受診喚起はこれで作る（#121、`buildLayeredExportCaption`）。
 ConsultInput mergeConsultInputs(Iterable<ConsultInput> inputs) {
   var urgency = Urgency.none;
   final seen = <(Urgency, String)>{};
@@ -93,7 +93,8 @@ ConsultInput mergeConsultInputs(Iterable<ConsultInput> inputs) {
 ///
 /// 渡された [filters] はすべて数える。**強度 0 の層も含めるかどうかはこの関数では決めない**
 /// （呼び出し側が [VisionFilterState.buildAll] か `pipelineSteps().map((s) => s.filter)` のどちらを
-/// 渡すかで変わる。描画されない層の喚起を出すかの最終決定は #121）。
+/// 渡すかで変わる）。書き出しは強度 0 の層を渡さない方針（#121、`effectiveExportLayers`:
+/// 画像に写っていない症状の喚起を焼き込むと、画像だけが共有されたとき実際の見え方と食い違う）。
 ConsultInput consultInputForFilters(Iterable<VisionFilter> filters) =>
     mergeConsultInputs([
       for (final f in filters)

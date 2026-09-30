@@ -351,8 +351,8 @@ void main() async {
       // #60 の唯一の入口（selectColorVision/deactivateColorVision）を経由する。
       // filterService.deactivate() + visionFilterState.clear() と同じフィールド
       // をクリアする実装だが、規律に合わせて置き換える。
-      deactivateFilters: () =>
-          deactivateColorVision(filterService, visionFilterState),
+      deactivateFilters:
+          hotkeyDeactivateFilters(filterService, visionFilterState),
       setClickThrough: loupeWindow.setClickThrough,
       setAlwaysOnTop: loupeWindow.setAlwaysOnTop,
       getClickThrough: () => loupeWindow.clickThrough,

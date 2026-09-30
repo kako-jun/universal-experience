@@ -14,8 +14,10 @@ import '../../models/vision_filter_catalog.dart';
 import '../../models/vision_filter_contract_notes.dart' as contract_notes;
 import '../../rendering/cpu_vision_renderer.dart';
 import '../../rendering/image_fit.dart';
+import '../../services/export_layers.dart';
 import '../../services/export_service.dart';
 import '../../services/vision_filter_metadata.dart';
+import '../../services/vision_layer.dart' show quickColorVisionTypeOf;
 import '../../src/rust/api/sensus_bridge.dart';
 
 /// [_BeforeAfterViewState] が内部で使う「before 画像を [PreviewImageSource]
@@ -144,6 +146,7 @@ class BeforeAfterView extends StatefulWidget {
     this.steps,
     this.layerNames,
     this.layerIds,
+    this.exportLayers,
   }) : assert(
           (filter == null) == (filterId == null),
           'filter and filterId must both be null or both be set',
@@ -186,14 +189,22 @@ class BeforeAfterView extends StatefulWidget {
   /// （[BeforeAfterView.renderAfterPipeline] → [CpuVisionRenderer.pipelineApplier]。テストでは
   /// `pipelineApplier` を差し替える）、[filter] と
   /// [strength] は描画に使わない（見出し・書き出しが代表として参照する、フォーカス中の層の
-  /// 値。複数層の見出し・書き出しは #120/#121）。空なら原画をそのまま見せる。
+  /// 値。複数層の見出しは #120、書き出しは [exportLayers] で #121）。空なら原画をそのまま見せる。
   final List<VisionStep>? steps;
 
   /// 重ねている層の表示名（適用順、#120）。2 つ以上のときだけ複数層として扱う（それ以外は従来どおり
   /// [filterId]/[colorVisionType] の名前）。複数層のときは、after 側の見出しを
-  /// 「名前 + 名前 …（+N）」（[layerNamesSummary]）にし（切らずに折り返す）、PNG 書き出しは
-  /// 理由つきで無効にする（複数層の書き出しは #121）。
+  /// 「名前 + 名前 …（+N）」（[layerNamesSummary]）にする（切らずに折り返す）。PNG 書き出しの
+  /// キャプションは [exportLayers] から作る（#121）。
   final List<String>? layerNames;
+
+  /// PNG 書き出しが描画時点で控える、重ねている全層の値（適用順、強度 0 の層を含む、#121）。
+  /// 複数層のときだけ渡す（`null` なら従来どおり [filter]・[filterId]・[colorVisionType]・
+  /// [strength] の 1 層として書き出す）。キャプションには**強度が 0 より大きい層だけ**が
+  /// 載る（[effectiveExportLayers]）。それが 2 つ以上ならその全層の行・合成した受診喚起、
+  /// 1 つならその層だけ（1 層のときと同じ見た目）、0 なら [filter] 側の 1 層（フォーカス中の層。
+  /// 原画比較中や全層強度 0 で、画像が原画のままのとき）。
+  final List<ExportLayer>? exportLayers;
 
   /// 重ねている層のカタログ id（適用順、[layerNames] と同じ並び、#120）。複数層のとき、
   /// 時間依存のフィルタ（[VisionFilterEntry.isTimeDependent]）が 1 つでもあれば「静止フレーム」の
@@ -373,6 +384,10 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// slower re-render is still in flight.
   VisionFilter? _afterFilter;
 
+  /// [BeforeAfterView.exportLayers] のうち、現在の [_after] を描画した時点のもの（#121）。
+  /// [_afterFilter] などと同じ理由で、書き出しはこちらから作る。
+  List<ExportLayer>? _afterExportLayers;
+
   /// Monotonic request id. Bumped on every [_rebuild] call so a slow/late
   /// async result can tell it has been superseded by a newer request and
   /// discard (dispose) itself instead of overwriting `_before`/`_after` with
@@ -547,14 +562,25 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     final bool clonedInput = reuseBefore;
     final ui.Image rendererInput = clonedInput ? before.clone() : before;
 
+    // 描画器に渡す入力と、描画した画像に記録する値（書き出しのキャプション・強度・
+    // フィルタ）は、ここで一度だけ読んでローカルに固定する。描画器の await の間に親が
+    // 再 build して `widget.*` が新しい値になっても（[_scheduleRebuild] は実行中は世代を
+    // 上げず待避させるだけなので、この呼び出しが最新のまま完了し得る）、画像に写っている
+    // 層の集合・強度と、書き出しに焼く値がずれないようにする（#121）。
+    final steps = widget.steps;
+    final renderFilter = widget.filter;
+    final renderStrength = widget.strength;
+    final renderFilterId = widget.filterId;
+    final renderColorVisionType = widget.colorVisionType;
+    final renderExportLayers = widget.exportLayers;
+
     ui.Image? after;
     try {
-      final steps = widget.steps;
       after = steps == null
           ? await afterImageRenderer(
               rendererInput,
-              widget.filter,
-              widget.strength,
+              renderFilter,
+              renderStrength,
             )
           : await BeforeAfterView.renderAfterPipeline(rendererInput, steps);
     } catch (e, st) {
@@ -614,10 +640,11 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     setState(() {
       _before = before;
       _after = after;
-      _afterFilterId = widget.filterId; // #60
-      _afterColorVisionType = widget.colorVisionType; // #60
-      _afterStrength = widget.strength;
-      _afterFilter = widget.filter; // #76
+      _afterFilterId = renderFilterId; // #60
+      _afterColorVisionType = renderColorVisionType; // #60
+      _afterStrength = renderStrength;
+      _afterFilter = renderFilter; // #76
+      _afterExportLayers = renderExportLayers; // #121
       _currentSampleSize = sampleSize;
       _currentImageSource = source; // widget.imageSource ではなく、冒頭で固定した source
       _loading = false;
@@ -678,15 +705,16 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     final filterId = _afterFilterId;
     final colorVisionType = _afterColorVisionType;
     final afterFilter = _afterFilter;
+    final exportLayers = _afterExportLayers;
     setState(() => _exporting = true);
 
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final strengthPercent = contract_notes.strengthPercent(strength);
       final now = DateTime.now();
       final date = isoDate(now);
-      final caption = buildExportCaption(
+      final plan = planExport(
         l10n,
+        layers: exportLayers,
         filterId: filterId,
         colorVisionType: colorVisionType,
         filter: afterFilter,
@@ -694,14 +722,12 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         isoDate: date,
       );
 
-      final composed = await exportImageComposer(base, caption);
+      final composed = await exportImageComposer(base, plan.caption);
       final bytes = await encodePngAndDispose(composed);
 
       final filename = exportFilename(
-        // colorVisionType があればその id（-omaly を含む）を使う（#60）。
-        // filterId は -omaly を base の -opia と区別できないため。
-        symptomId: colorVisionType?.id ?? filterId ?? 'none',
-        strengthPercent: strengthPercent,
+        symptomId: plan.symptomId,
+        strengthPercent: plan.strengthPercent,
         isoDate: date,
         // #64: 同じ日に何度書き出しても別名になるよう時刻も入れる（それでも
         // 衝突したら savePng が連番にする）。焼き込むキャプションは日付のみ。
@@ -817,16 +843,13 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
           wrapLabel: multiLayer,
           // Export is only meaningful when a real "after" image exists.
           // The failed state (null _after) gets no button.
-          // 複数層の間は無効にし、理由を下に見せる（#120。複数層の書き出しは #121）。
+          // 複数層でも書き出せる（キャプションは層ごとの行、#121）。
           trailing: _after != null
               ? IconButton(
                   icon: const Icon(Icons.download_outlined),
                   iconSize: 20,
-                  tooltip: multiLayer
-                      ? l10n.exportDisabledMultiLayer
-                      : l10n.exportButtonTooltip,
-                  onPressed:
-                      _exporting || multiLayer ? null : () => _export(l10n),
+                  tooltip: l10n.exportButtonTooltip,
+                  onPressed: _exporting ? null : () => _export(l10n),
                 )
               : null,
           child: afterChild,
@@ -861,19 +884,6 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                 ],
               );
 
-        // 複数層の間の PNG 書き出しの無効の理由（#120。ボタンの tooltip だけに頼らず常に見せる）。
-        final Widget? exportReason = multiLayer && _after != null
-            ? Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  l10n.exportDisabledMultiLayer,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              )
-            : null;
-
         // #60: vertigo / bppv_rotation のような時間依存フィルタは、CPU
         // プレビュー（時刻を受け取らず常に同じ内部時刻で描画する、
         // `CpuVisionRenderer` の doc 参照）では静止フレームにしかならない。
@@ -883,7 +893,6 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               panes,
-              if (exportReason != null) exportReason,
               const SizedBox(height: 8),
               Text(
                 l10n.previewStaticFrameNote,
@@ -892,12 +901,6 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                 ),
               ),
             ],
-          );
-        }
-        if (exportReason != null) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [panes, exportReason],
           );
         }
         return panes;
@@ -942,6 +945,106 @@ ExportCaption buildExportCaption(
     simulationNotice: l10n.exportSimulationNotice,
     experimentalNotice:
         (kVisionFilterCatalogById[filterId]?.isExperimental ?? false)
+        ? l10n.exportExperimentalNotice
+        : null,
+    urgencyMessage: notice?.message,
+    escalationGroups: [
+      for (final g in notice?.escalationGroups ?? const [])
+        ExportEscalationGroup(header: g.header, lines: g.lines),
+    ],
+    disclaimer: notice?.disclaimerShort,
+  );
+}
+
+/// [planExport] の結果: 焼き込むキャプション・ファイル名の症状 id・強度（% の整数。複数層は null）。
+typedef ExportPlan = ({
+  ExportCaption caption,
+  String symptomId,
+  int? strengthPercent,
+});
+
+/// 書き出しの内容（キャプション・ファイル名の素）を、描画時点の値から決める（#121）。
+///
+/// [layers] は重ねている全層（[BeforeAfterView.exportLayers]、単一層なら null）。
+/// キャプションに数えるのは**強度が 0 より大きい層だけ**（[effectiveExportLayers]。強度 0 の層は
+/// 画素に効かないので、症状の行にも受診喚起にもファイル名にも入れない。表示が「0%」になる強度も同じ）。
+///
+/// - 2 層以上: [buildLayeredExportCaption]（層ごとの行 + 合成した受診喚起）。ファイル名は
+///   層の id を適用順につないだもの（[exportSymptomId]）で、強度の % は付けない。
+/// - 1 層: その層だけを、単一層の書き出し（[buildExportCaption]）と同じ見た目・同じ名前にする。
+/// - 0 層（単一層、原画比較中、表示強度（整数パーセント）が 0 の層しかない）: 引数の
+///   [filterId]/[colorVisionType]/[filter]/[strength]（フォーカス中の層の値）で、従来どおりの
+///   単一層の書き出し。
+ExportPlan planExport(
+  AppLocalizations l10n, {
+  required List<ExportLayer>? layers,
+  required String? filterId,
+  required ColorVisionType? colorVisionType,
+  required VisionFilter? filter,
+  required double strength,
+  required String isoDate,
+}) {
+  final effective = effectiveExportLayers(layers ?? const []);
+  if (effective.length >= 2) {
+    return (
+      caption: buildLayeredExportCaption(l10n,
+          layers: effective, isoDate: isoDate),
+      symptomId: exportSymptomId([for (final l in effective) l.layer.strengthKey]),
+      strengthPercent: null,
+    );
+  }
+  if (effective.length == 1) {
+    final only = effective.single;
+    filterId = only.layer.id;
+    colorVisionType = quickColorVisionTypeOf(only.layer);
+    filter = only.filter;
+    strength = only.strength;
+  }
+  return (
+    caption: buildExportCaption(
+      l10n,
+      filterId: filterId,
+      colorVisionType: colorVisionType,
+      filter: filter,
+      strength: strength,
+      isoDate: isoDate,
+    ),
+    // colorVisionType があればその id（-omaly を含む）を使う（#60）。
+    // filterId は -omaly を base の -opia と区別できないため。
+    symptomId: exportSymptomId([colorVisionType?.id ?? filterId ?? 'none']),
+    strengthPercent: contract_notes.strengthPercent(strength),
+  );
+}
+
+/// 複数の層（[layers]、適用順、2 つ以上。呼び出し側が強度 0 を除いたもの）を重ねた書き出しの
+/// [ExportCaption]（#121）。
+///
+/// - 症状の行: 層ごとに 1 行（名前 + その層の強度）。
+/// - 受診喚起: 各層の緊急度の**最大**と、escalation の**段ごとの併合（重複は 1 行）**を
+///   [consultInputForFilters]（[mergeConsultInputs]）で 1 つにして、単一層と同じ
+///   [resolveConsultNotice] の経路で解決する。
+/// - 実験的の注記: どれか 1 層でも [VisionFilterEntry.isExperimental] なら添える。
+/// - 「シミュレーション（近似）」は常に焼き込む。
+ExportCaption buildLayeredExportCaption(
+  AppLocalizations l10n, {
+  required List<ExportLayer> layers,
+  required String isoDate,
+}) {
+  final input = consultInputForFilters([for (final l in layers) l.filter]);
+  final notice = resolveConsultNotice(l10n, input.urgency, input.escalation);
+  return ExportCaption.layered(
+    layers: [
+      for (final l in layers)
+        ExportLayerRow(
+          name: visionLayerDisplayName(l10n, l.layer),
+          strengthLabel:
+              l10n.strengthLabel(contract_notes.strengthPercent(l.strength)),
+        ),
+    ],
+    isoDate: isoDate,
+    simulationNotice: l10n.exportSimulationNotice,
+    experimentalNotice: layers.any(
+            (l) => kVisionFilterCatalogById[l.layer.id]?.isExperimental ?? false)
         ? l10n.exportExperimentalNotice
         : null,
     urgencyMessage: notice?.message,

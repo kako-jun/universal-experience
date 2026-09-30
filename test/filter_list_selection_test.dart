@@ -103,20 +103,20 @@ void main() {
   });
 
   group('選択の書き込み', () {
-    test('色覚の行は selectColorVision 経由（色覚クイック選択になる）', () {
+    test('色覚の行は toggleColorVision 経由（色覚クイック選択になる）', () {
       final state = VisionFilterState();
       final filterService = FilterService(visionState: state);
-      applyFilterListEntry(
+      toggleFilterListEntry(
           filterService, state, entryByKey('cv:deuteranomaly'));
       expect(state.isColorQuickSelection, isTrue);
       expect(state.colorVisionType, ColorVisionType.deuteranomaly);
       expect(selectedFilterListEntry(state), entryByKey('cv:deuteranomaly'));
     });
 
-    test('advanced だけの行は VisionFilterState.select 経由', () {
+    test('advanced だけの行は VisionFilterState.toggle 経由', () {
       final state = VisionFilterState();
       final filterService = FilterService(visionState: state);
-      applyFilterListEntry(
+      toggleFilterListEntry(
           filterService, state, entryByKey('catalog:starbursts'));
       expect(state.selectedId, 'starbursts');
       expect(state.isColorQuickSelection, isFalse);
