@@ -421,7 +421,7 @@ Linux debug ビルド成功で代替している:
 ## 状態モデルの統一と多症状の同時適用 (#32 / #41、設計のみ・未実装)
 
 現状は状態が 2 系統ある（`VisionFilterState` = カタログ 30 フィルタ、`FilterService` =
-`ColorVisionType` 7 種）うえ、選択は常に 1 つだけ。両方を解く方針として、**選択の単位を
+`ColorVisionType` 8 値 = none + 7 型）うえ、選択は常に 1 つだけ。両方を解く方針として、**選択の単位を
 「カタログ id ごとに 1 つのレイヤー」の順序つき列に統一**し、単一選択を 1 要素の多選択として扱う。
 要点:
 
@@ -430,8 +430,11 @@ Linux debug ビルド成功で代替している:
   決め、選択した順には依存させない。結果は「層の集合」の関数になる。
 - プレビューは CPU `apply()`（1024px）のまま、sensus の `Pipeline` を bridge 経由で 1 回のジョブとして
   適用する（ue に合成ロジックを持たない）。ライブ（GPU）経路は同じ順序の N パス多段にする。
-- 永続 JSON は v2（`layers` 配列）に上げ、v1 は移行して読む。`ColorVisionType` / `FilterService` の削除は
-  最終段。
+- 強度の出どころは 1 つにする: 記憶の鍵を `variantId ?? id` にして `FilterService` の強度記憶
+  （`settings.intensityByType`）を第 1 段で `VisionFilterState` に統合し、`isColorQuickSelection` は
+  層ごとの属性に置き換える。
+- 永続 JSON は v2（`layers` 配列）に上げ、v1 は色覚クイック選択の強度の出どころを含めて移行して読む。
+  `ColorVisionType` / `FilterService` の削除は最終段。
 
 段階ごとの実装は Issue #117〜#125、判断・代替案・根拠は
 `docs/adr/2026-09-30-multi-select-filter-state-model.md`。実装が入るまでは、上の「フィルタ選択の永続化

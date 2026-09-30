@@ -234,7 +234,7 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 
 ### 状態モデルの統一と多症状の同時適用（設計のみ）
 
-状態が 2 系統（`FilterService` の `ColorVisionType` 7 種 / `VisionFilterState` の 30 フィルタ）並行し、
+状態が 2 系統（`FilterService` の `ColorVisionType` 8 値（none + 7 型）/ `VisionFilterState` の 30 フィルタ）並行し、
 選択も 1 つだけという現状を、「カタログ id ごとに 1 つのレイヤー」の順序つき列（最大 5、色覚は排他、
 適用順は段で固定）に統一し、sensus の `Pipeline` で合成する方針。実装は Issue #117〜#125 の段階移行で、
 `ColorVisionType` / `FilterService` の削除は最後。判断・代替案は

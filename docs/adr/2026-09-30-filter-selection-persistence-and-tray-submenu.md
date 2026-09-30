@@ -70,7 +70,9 @@
 ## 結果・トレードオフ
 
 - 保存 JSON の形を変えるときは `kVisionFilterSnapshotVersion` を上げる。古い版は丸ごと
-  捨てられ、既定値で起動する（移行は書かない）。
+  捨てられ、既定値で起動する（移行は書かない）。ただし v1 → v2 に限っては
+  `docs/adr/2026-09-30-multi-select-filter-state-model.md`（#32 / #41）が移行して読む方針で、この
+  「移行は書かない」を部分的に上書きする。
 - 復元中に sensus 呼び出しが例外を投げても起動は止まらない。`VisionFilterState.restore` が
   失敗時に呼び出し前の状態へ巻き戻し、store が握って色覚シードのまま起動する。
 - 選択の保存先が 2 か所になっている: `SettingsService.filterType` は初回起動の判定と旧版
