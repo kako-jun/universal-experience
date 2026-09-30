@@ -86,6 +86,18 @@ Future<ui.Image> decodeImageBytes(Uint8List bytes) async {
 /// headroom above the canonical size while still bounding memory use.
 const int kUserImageMaxDimension = 2048;
 
+/// ユーザー画像として受け付けるファイルの拡張子（小文字）。ファイル選択
+/// （`image_source_picker.dart`）とクリップボードのファイル判定
+/// （`clipboard_image_reader.dart`、#97）が共有する。
+const List<String> kUserImageFileExtensions = [
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'bmp',
+  'webp',
+];
+
 /// Decodes [bytes] into a [ui.Image] the same way [decodeImageBytes] does,
 /// but downscales **during** decode so neither dimension exceeds
 /// [kUserImageMaxDimension] (#78 レビュー S1), preserving aspect ratio.
@@ -109,7 +121,8 @@ Future<ui.Image> decodeUserImageBytes(Uint8List bytes) async {
     getTargetSize: (intrinsicWidth, intrinsicHeight) {
       final longEdge = math.max(intrinsicWidth, intrinsicHeight);
       if (longEdge <= kUserImageMaxDimension) {
-        return ui.TargetImageSize(width: intrinsicWidth, height: intrinsicHeight);
+        return ui.TargetImageSize(
+            width: intrinsicWidth, height: intrinsicHeight);
       }
       final scale = kUserImageMaxDimension / longEdge;
       return ui.TargetImageSize(
