@@ -4,8 +4,10 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_catalog.dart';
+import '../../models/vision_filter_stage.dart' show kMaxVisionLayers;
 import '../../services/filter_list_selection.dart';
 import '../../services/filter_service.dart';
+import '../../services/vision_layer.dart';
 import '../../services/vision_filter_state.dart';
 import 'experience_presets.dart';
 import '../../src/rust/api/sensus_bridge.dart' show Experience;
@@ -43,6 +45,46 @@ class FilterBrowserController extends ChangeNotifier {
     notifyListeners();
   }
 
+  final Map<String, FocusNode> _rowFocusNodes = {};
+
+  /// 一覧の行 [entry] のフォーカス（↑↓ の行移動の行き先、#120）。行ごとに 1 つ、画面の
+  /// 生存期間にわたって持つ。
+  FocusNode rowFocusNode(FilterListEntry entry) => _rowFocusNodes.putIfAbsent(
+        entry.key,
+        () => FocusNode(debugLabel: 'filterRow:${entry.key}'),
+      );
+
+  /// いまフォーカスが乗っている行（今見えている行のうち）。行にフォーカスが無ければ null。
+  FilterListEntry? get focusedRowEntry {
+    final primary = FocusManager.instance.primaryFocus;
+    if (primary == null) return null;
+    for (final e in visibleEntries) {
+      if (identical(_rowFocusNodes[e.key], primary)) return e;
+    }
+    return null;
+  }
+
+  /// 行にフォーカスが乗っているか（↑↓ を行移動として受けるかの判定に使う）。
+  bool get isRowFocused => focusedRowEntry != null;
+
+  /// ↑↓: 今見えている行の間でフォーカスを送る（#63, #120）。**選択は変えない**（足し引きは
+  /// Space/Enter）。行にフォーカスが無いときは、順送りは先頭・逆送りは末尾の行へ入る。
+  /// 選べない行（上限で無効）は飛ばす。末尾の次は先頭へ折り返す。
+  void moveRowFocus({required bool forward}) {
+    final visible = visibleEntries;
+    var current = focusedRowEntry;
+    for (var i = 0; i < visible.length; i++) {
+      final next = nextFilterListEntry(visible, current, forward: forward);
+      if (next == null) return;
+      final node = rowFocusNode(next);
+      if (node.canRequestFocus && node.context != null) {
+        node.requestFocus();
+        return;
+      }
+      current = next;
+    }
+  }
+
   /// 検索語が空か。
   bool get isSearching => !isBlankFilterQuery(search.text);
 
@@ -62,6 +104,9 @@ class FilterBrowserController extends ChangeNotifier {
     search.removeListener(notifyListeners);
     search.dispose();
     searchFocus.dispose();
+    for (final node in _rowFocusNodes.values) {
+      node.dispose();
+    }
     super.dispose();
   }
 }
@@ -73,9 +118,11 @@ Key filterListTileKey(FilterListEntry entry) =>
 /// 左カラム「選ぶ」（#72）: インクリメンタル検索・カテゴリ切替・統合フィルタ一覧。
 ///
 /// 色覚 7 型と advanced 30 フィルタを 1 つの一覧にまとめる（内部の状態は
-/// `VisionFilterState` が唯一の正本のまま）。書き込みの入口は既存のまま:
-/// 色覚の行は `selectColorVision`、それ以外は `VisionFilterState.select`
-/// （[applyFilterListEntry]）。体験プリセットは一覧の最上段に置く。
+/// `VisionFilterState` が唯一の正本のまま）。行は**チェック式**（#120）: 選ぶと層を足し、
+/// もう一度選ぶと外す（[toggleFilterListEntry]）。色覚カテゴリの行は同時に 1 つのラジオ式
+/// （見出しに「いずれか 1 つ」）で、選んでいる間は適用順の番号が出る。層が上限に達すると、未選択の
+/// 行は理由つきで選べなくなる（色覚の行は色覚層があれば置き換えなので選べる）。体験プリセットは
+/// 一覧の最上段に置き、選ぶと層を全部そのフィルタ 1 つに置き換える。
 ///
 /// - 検索は日本語名・英語名のどちらでも当たる。検索語があるあいだは
 ///   カテゴリを無視して全体から探す。
@@ -254,20 +301,38 @@ class _FilterList extends StatelessWidget {
         ),
       Consumer2<FilterService, VisionFilterState>(
         builder: (context, filterService, visionState, _) {
-          final selected = selectedFilterListEntry(visionState);
           final rows = <Widget>[];
           VisionFilterCategory? previous;
           for (final entry in entries) {
-            if (showGroupHeaders && entry.category != previous) {
-              rows.add(heading(visionCategoryName(l10n, entry.category)));
+            if (entry.category != previous) {
+              // カテゴリごとの小見出し。色覚は排他なので、カテゴリを 1 つに絞っているときも
+              // 「いずれか 1 つ」を出す。
+              final exclusive =
+                  entry.category == VisionFilterCategory.colorVision;
+              if (showGroupHeaders || (exclusive && !controller.isSearching)) {
+                final name = visionCategoryName(l10n, entry.category);
+                rows.add(heading(
+                  exclusive ? l10n.filterListExclusiveHeading(name) : name,
+                ));
+              }
             }
             previous = entry.category;
+            final order = filterListEntryOrder(visionState, entry);
+            final blocked = filterListEntryBlockReason(visionState, entry);
             rows.add(FilterListTile(
               key: filterListTileKey(entry),
               title: filterListEntryName(l10n, entry),
-              selected: entry == selected,
+              selected: order != null,
+              kind: isExclusiveFilterListEntry(entry)
+                  ? FilterListTileKind.radio
+                  : FilterListTileKind.check,
+              orderNumber: order,
+              disabledReason: blocked == VisionLayerBlockReason.layerLimit
+                  ? l10n.filterListLimitReached(kMaxVisionLayers)
+                  : null,
+              focusNode: controller.rowFocusNode(entry),
               onTap: () =>
-                  applyFilterListEntry(filterService, visionState, entry),
+                  toggleFilterListEntry(filterService, visionState, entry),
               onPointerActivated: onActivated,
               isExperimental:
                   kVisionFilterCatalogById[entry.catalogId]?.isExperimental ??

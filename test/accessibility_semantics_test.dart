@@ -217,7 +217,8 @@ void main() {
       await settle(tester);
 
       final checks = find.descendant(
-          of: find.byType(FilterListTile), matching: find.byIcon(Icons.check));
+          of: find.byType(FilterListTile),
+          matching: find.byIcon(Icons.check_box));
       expect(checks, findsOneWidget);
       handle.dispose();
     });

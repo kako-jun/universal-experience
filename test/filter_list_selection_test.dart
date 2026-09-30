@@ -9,6 +9,7 @@ import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/filter_list_selection.dart';
 import 'package:universal_experience/services/filter_service.dart';
+import 'package:universal_experience/services/vision_layer.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 
 import 'support/vision_filter_metadata_fixture.dart';
@@ -159,6 +160,69 @@ void main() {
 
     test('空の一覧は null', () {
       expect(nextFilterListEntry(const [], null, forward: true), isNull);
+    });
+  });
+
+  group('多選択の入口（#120）', () {
+    late VisionFilterState state;
+    late FilterService service;
+    setUp(() {
+      state = VisionFilterState();
+      service = FilterService(visionState: state);
+    });
+
+    test('toggleFilterListEntry は足し引きし、番号は段順', () {
+      toggleFilterListEntry(service, state, entryByKey('catalog:glaucoma'));
+      toggleFilterListEntry(service, state, entryByKey('catalog:myopia'));
+      expect(filterListEntryOrder(state, entryByKey('catalog:myopia')), 1);
+      expect(filterListEntryOrder(state, entryByKey('catalog:glaucoma')), 2);
+      expect(
+          filterListEntryOrder(state, entryByKey('catalog:floaters')), isNull);
+
+      final result =
+          toggleFilterListEntry(service, state, entryByKey('catalog:myopia'));
+      expect(result, VisionLayerResult.removed);
+      expect(filterListEntryOrder(state, entryByKey('catalog:glaucoma')), 1);
+    });
+
+    test('色覚の行は別名（-omaly）まで区別して対応づく', () {
+      final omaly = entryByKey('cv:protanomaly');
+      final full = entryByKey('cv:protanopia');
+      toggleFilterListEntry(service, state, omaly);
+      expect(layerForFilterListEntry(state, omaly), isNotNull);
+      expect(layerForFilterListEntry(state, full), isNull);
+      expect(filterListEntryForLayer(state.layers.single), omaly);
+      expect(service.currentFilter, ColorVisionType.protanomaly);
+    });
+
+    test('上限では未選択の行が layerLimit になるが、色覚の行は色覚層があれば選べる', () {
+      for (final k in [
+        'catalog:myopia',
+        'catalog:cataract',
+        'catalog:floaters',
+        'catalog:glaucoma',
+        'cv:protanopia',
+      ]) {
+        toggleFilterListEntry(service, state, entryByKey(k));
+      }
+      expect(
+        filterListEntryBlockReason(state, entryByKey('catalog:hyperopia')),
+        VisionLayerBlockReason.layerLimit,
+      );
+      expect(filterListEntryBlockReason(state, entryByKey('cv:tritanopia')),
+          isNull);
+      // チェック済みの行は外せるので理由なし。
+      expect(filterListEntryBlockReason(state, entryByKey('catalog:myopia')),
+          isNull);
+      final blocked = toggleFilterListEntry(
+          service, state, entryByKey('catalog:hyperopia'));
+      expect(blocked.change, VisionLayerChange.blocked);
+      expect(state.layers.length, 5);
+    });
+
+    test('isExclusiveFilterListEntry は色覚カテゴリだけ', () {
+      expect(isExclusiveFilterListEntry(entryByKey('cv:protanopia')), isTrue);
+      expect(isExclusiveFilterListEntry(entryByKey('catalog:myopia')), isFalse);
     });
   });
 }

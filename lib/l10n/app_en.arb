@@ -731,6 +731,35 @@
   "@filterListSelectedSemantics": {
     "description": "Semantics hint appended to the currently selected row of the filter list (#72)."
   },
+  "filterListExclusiveHeading": "{name} (pick one)",
+  "@filterListExclusiveHeading": {
+    "description": "Heading of the color-vision category in the filter list: the rows of this category are mutually exclusive (radio style), so the heading says only one can be picked (#120).",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "filterListLimitReached": "Limit of {max} reached. Uncheck one to pick this.",
+  "@filterListLimitReached": {
+    "description": "Reason shown on an unchecked, disabled row of the filter list when the maximum number of stacked filters is reached (#120).",
+    "placeholders": {
+      "max": { "type": "int" }
+    }
+  },
+  "filterListOrderSemantics": "Applied number {order}",
+  "@filterListOrderSemantics": {
+    "description": "Screen-reader label of the order badge on a checked row of the filter list: the position in the order the filters are stacked (#120).",
+    "placeholders": {
+      "order": { "type": "int" }
+    }
+  },
+  "layerSummaryMore": "{names} … (+{count})",
+  "@layerSummaryMore": {
+    "description": "Summary of several stacked filters where only the first ones are named: {names} is the first names joined with ' + ', {count} is how many more are not named. Used in the after-pane heading of the preview and in the loupe HUD (#120).",
+    "placeholders": {
+      "names": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
   "adjustHeading": "Adjust",
   "@adjustHeading": {
     "description": "Heading of the right column (adjustment) on the home screen (#72)."

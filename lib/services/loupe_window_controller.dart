@@ -1,7 +1,8 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' show HardwareKeyboard, KeyDownEvent, KeyEvent;
+import 'package:flutter/services.dart'
+    show HardwareKeyboard, KeyDownEvent, KeyEvent;
 import 'package:flutter/widgets.dart' show Color, Rect, Size;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
@@ -139,7 +140,8 @@ class LoupeWindowPolicy {
 /// Linux/macOS/Windows で挙動差・未対応がある。利用不能でも落ちないよう
 /// 全 I/O を try/catch + ログで握る。
 class LoupeWindowController extends ChangeNotifier with WindowListener {
-  LoupeWindowController({LoupeRectSource rectSource = const ManualLoupeRectSource()})
+  LoupeWindowController(
+      {LoupeRectSource rectSource = const ManualLoupeRectSource()})
       : _rectSource = rectSource;
 
   final LoupeRectSource _rectSource;
@@ -189,10 +191,10 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
         orElse: () => LoupeWindowPolicy.defaultAppMode,
       );
     }
-    _alwaysOnTop =
-        prefs.getBool(_prefsAlwaysOnTop) ?? LoupeWindowPolicy.defaultAlwaysOnTop;
-    final storedClickThrough =
-        prefs.getBool(_prefsClickThrough) ?? LoupeWindowPolicy.defaultClickThrough;
+    _alwaysOnTop = prefs.getBool(_prefsAlwaysOnTop) ??
+        LoupeWindowPolicy.defaultAlwaysOnTop;
+    final storedClickThrough = prefs.getBool(_prefsClickThrough) ??
+        LoupeWindowPolicy.defaultClickThrough;
     if (_appMode == AppMode.settings && storedClickThrough) {
       // 保存値が不変条件（設定窓モードはクリックスルー禁止）と矛盾していた
       // 場合は正しい値へ正規化し、書き直す (#63)。

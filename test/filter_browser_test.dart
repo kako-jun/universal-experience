@@ -217,7 +217,8 @@ void main() {
       expect(state.colorVisionType, ColorVisionType.protanopia);
       expect(
         find.descendant(
-            of: tileOf('cv:protanopia'), matching: find.byIcon(Icons.check)),
+            of: tileOf('cv:protanopia'),
+            matching: find.byIcon(Icons.radio_button_checked)),
         findsOneWidget,
       );
       expect(activated, 1);

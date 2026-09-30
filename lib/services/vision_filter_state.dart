@@ -311,12 +311,11 @@ class VisionFilterState extends ChangeNotifier {
   /// 足す層の [origin] は既定で advanced（色覚クイック選択の層を足すときは
   /// [VisionLayerOrigin.quick] と、-omaly なら [variantId] を渡す）。
   ///
-  /// **制約（#119 時点）**: origin を quick にして色覚を足しても、`FilterService` の
-  /// 色覚型（`_currentFilter` / `settings.filterType`）と色覚の強度スライダーは更新されない
-  /// （それらは `selectColorVision` 経由でだけ同期する）。プレビューの描画はこの state だけを
-  /// 見るので表示は正しいが、`FilterService` 側とはずれる。UI から [toggle] で色覚を足す
-  /// 経路は #120 で入るので、そこで同期の持たせ方を決める。#119 時点の production は
-  /// [toggle] を呼ばない。
+  /// **FilterService との同期**: origin を quick にして色覚を足しても、この state は
+  /// `FilterService` の色覚型（`_currentFilter` / `settings.filterType`）を知らない。UI は
+  /// 直接 [toggle] を呼ばず、`color_vision_selection.dart` の `toggleColorVision` /
+  /// `filter_list_selection.dart` の `toggleFilterListEntry` を通す（呼んだあとに
+  /// `FilterService` を層の集合へ合わせる、#120）。
   ///
   /// [id] が未知のカタログ id なら [ArgumentError]（[variantId] が [id] の別名として不正なときも）。
   ///
@@ -336,8 +335,7 @@ class VisionFilterState extends ChangeNotifier {
     if (blocked != null) return VisionLayerResult.blocked(blocked);
 
     final layer = _newLayer(id, variantId, origin);
-    final replacing =
-        isVisionColorGroupId(id) &&
+    final replacing = isVisionColorGroupId(id) &&
         _layers.any((l) => isVisionColorGroupId(l.id));
     _layers = normalizeVisionLayers([
       for (final l in _layers)
@@ -349,6 +347,15 @@ class VisionFilterState extends ChangeNotifier {
     _dropPresetIfLayersDiverged();
     notifyListeners();
     return replacing ? VisionLayerResult.replaced : VisionLayerResult.added;
+  }
+
+  /// [id] の層へフォーカスを移す（チップ・一覧の行・調整パネルの節の操作から）。強度・payload・
+  /// プリセット選択・原画比較には触れない。[id] の層が無い、またはすでにフォーカス中なら何もしない
+  /// （通知もしない）。
+  void focusLayer(String id) {
+    if (_focusedId == id || _layerById(id) == null) return;
+    _focusedId = id;
+    notifyListeners();
   }
 
   /// [id] の層を外す。選択されていなければ（未知の id でも）何もせず false。フォーカスの移り方は [toggle] の

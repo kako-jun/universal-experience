@@ -9,6 +9,7 @@ import '../models/vision_filter_catalog.dart';
 import 'color_vision_selection.dart';
 import 'filter_service.dart';
 import 'vision_filter_state.dart';
+import 'vision_layer.dart';
 
 /// 統合フィルタ一覧（#72）の 1 行。色覚 7 型と advanced 30 フィルタを**同じ
 /// 一覧**に並べるための純粋なデータ（Widget もサービスの状態も持たない）。
@@ -239,4 +240,83 @@ FilterListEntry? nextFilterListEntry(
   if (index == -1) return forward ? visible.first : visible.last;
   final next = forward ? index + 1 : index - 1;
   return visible[(next + visible.length) % visible.length];
+}
+
+// ── 多選択（#120）──
+//
+// 統合一覧の行は、単一選択の「今の 1 行」（[selectedFilterListEntry]、トレイが使う）ではなく
+// **層の集合**と対応づける。チェックされている行 = 層がある行、番号バッジ = 適用順。
+
+/// [entry] が色覚グループ（排他のラジオ式）の行か。
+bool isExclusiveFilterListEntry(FilterListEntry entry) =>
+    entry.category == VisionFilterCategory.colorVision;
+
+/// [entry] の層の別名（-omaly の別名 id）。別名でなければ null。
+String? filterListEntryVariantId(FilterListEntry entry) {
+  final type = entry.colorVisionType;
+  return type != null && kVisionVariantIds.contains(type.name)
+      ? type.name
+      : null;
+}
+
+/// [layer] が一覧の行 [entry] に当たるか（カタログ id と別名が同じ）。origin は問わない
+/// （体験プリセットや advanced で足した色覚の層も、同じ行にチェックが付く）。
+bool filterListEntryMatchesLayer(FilterListEntry entry, VisionLayer layer) =>
+    layer.id == entry.catalogId &&
+    layer.variantId == filterListEntryVariantId(entry);
+
+/// 一覧の行 [entry] にチェックが付いている層。無ければ null。
+VisionLayer? layerForFilterListEntry(
+  VisionFilterState visionState,
+  FilterListEntry entry,
+) {
+  for (final layer in visionState.layers) {
+    if (filterListEntryMatchesLayer(entry, layer)) return layer;
+  }
+  return null;
+}
+
+/// 層 [layer] に対応する一覧の行。対応する行が無ければ null。
+FilterListEntry? filterListEntryForLayer(VisionLayer layer) {
+  for (final e in kFilterListEntries) {
+    if (filterListEntryMatchesLayer(e, layer)) return e;
+  }
+  return null;
+}
+
+/// [entry] の適用順の番号（1 始まり）。チェックが付いていなければ null。層は段順に並んで
+/// いるので、番号 = [VisionFilterState.layers] の位置 + 1（チップ帯の並びと同じ）。
+int? filterListEntryOrder(
+    VisionFilterState visionState, FilterListEntry entry) {
+  final layers = visionState.layers;
+  for (var i = 0; i < layers.length; i++) {
+    if (filterListEntryMatchesLayer(entry, layers[i])) return i + 1;
+  }
+  return null;
+}
+
+/// 未チェックの行 [entry] をいま選べない理由。選べる・すでにチェック済みなら null。
+/// 色覚グループの行は、色覚の層があれば置き換えになるので上限でも選べる。
+VisionLayerBlockReason? filterListEntryBlockReason(
+  VisionFilterState visionState,
+  FilterListEntry entry,
+) {
+  if (layerForFilterListEntry(visionState, entry) != null) return null;
+  return visionState.blockReasonFor(entry.catalogId);
+}
+
+/// 一覧の行 [entry] を**足し引き**する（多選択の入口、#120）。チェック済みなら外し、未
+/// チェックなら足す（色覚は既存の色覚層と置き換え）。上限で足せなければ何もしない。
+/// どの行でも、呼んだあと `FilterService` を層の集合へ合わせる（tetrachromacy のような
+/// カタログ側の色覚グループの行が、クイック選択の色覚層を置き換えることがあるため）。
+VisionLayerResult toggleFilterListEntry(
+  FilterService filterService,
+  VisionFilterState visionState,
+  FilterListEntry entry,
+) {
+  final type = entry.colorVisionType;
+  if (type != null) return toggleColorVision(filterService, visionState, type);
+  final result = visionState.toggle(entry.catalogId);
+  syncFilterServiceWithLayers(filterService, visionState);
+  return result;
 }

@@ -289,7 +289,8 @@ void main() {
       expect(find.text('何も選択されていません'), findsNothing);
       // 選んだ行にはチェックが付く。
       expect(
-        find.descendant(of: tile, matching: find.byIcon(Icons.check)),
+        find.descendant(
+            of: tile, matching: find.byIcon(Icons.radio_button_checked)),
         findsOneWidget,
       );
     });

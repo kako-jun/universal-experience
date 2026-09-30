@@ -331,7 +331,9 @@ void main() {
     // 統合フィルタ一覧（#72）の protanopia の行。選択中は行にチェックが付く。
     Finder protanopiaRow() => find.byKey(filterListTileKey(protanopiaEntry));
     bool protanopiaRowSelected() => find
-        .descendant(of: protanopiaRow(), matching: find.byIcon(Icons.check))
+        .descendant(
+            of: protanopiaRow(),
+            matching: find.byIcon(Icons.radio_button_checked))
         .evaluate()
         .isNotEmpty;
 

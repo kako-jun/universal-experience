@@ -18,6 +18,7 @@ import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
+import 'package:universal_experience/services/vision_layer.dart';
 
 import 'support/vision_filter_metadata_fixture.dart';
 
@@ -122,6 +123,46 @@ void main() {
       expect(filterService.currentFilter, ColorVisionType.none);
       expect(visionState.selectedId, isNull);
       expect(visionState.isColorQuickSelection, isFalse);
+    });
+  });
+
+  group('toggleColorVision（多選択、#120）', () {
+    test('他の層を残したまま色覚の層を足し、FilterService を同期する', () {
+      visionState.toggle('glaucoma');
+      final r = toggleColorVision(
+          filterService, visionState, ColorVisionType.protanopia);
+      expect(r, VisionLayerResult.added);
+      expect([for (final l in visionState.layers) l.id],
+          ['glaucoma', 'protanopia']);
+      expect(filterService.currentFilter, ColorVisionType.protanopia);
+    });
+
+    test('別の色覚は置き換え、同じ色覚をもう一度は外す', () {
+      toggleColorVision(filterService, visionState, ColorVisionType.protanopia);
+      final replaced = toggleColorVision(
+          filterService, visionState, ColorVisionType.deuteranopia);
+      expect(replaced, VisionLayerResult.replaced);
+      expect(filterService.currentFilter, ColorVisionType.deuteranopia);
+
+      final removed = toggleColorVision(
+          filterService, visionState, ColorVisionType.deuteranopia);
+      expect(removed, VisionLayerResult.removed);
+      expect(visionState.layers, isEmpty);
+      expect(filterService.currentFilter, ColorVisionType.none);
+    });
+
+    test('none は色覚の層だけを外し、他の層は残す', () {
+      visionState.toggle('myopia');
+      toggleColorVision(filterService, visionState, ColorVisionType.tritanopia);
+      toggleColorVision(filterService, visionState, ColorVisionType.none);
+      expect([for (final l in visionState.layers) l.id], ['myopia']);
+      expect(filterService.currentFilter, ColorVisionType.none);
+    });
+
+    test('quick 以外（advanced 由来）の色覚層は FilterService の対象にしない', () {
+      visionState.toggle('protanopia'); // origin 既定 = advanced
+      syncFilterServiceWithLayers(filterService, visionState);
+      expect(filterService.currentFilter, ColorVisionType.none);
     });
   });
 }
