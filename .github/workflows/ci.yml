@@ -64,10 +64,11 @@ jobs:
       # 落とすが、freezed のバージョンだけ上げた stale は検出できない）。
       #
       # cargo-expand と flutter_rust_bridge_codegen はソースビルドに約 4.5 分
-      # かかる。Rust cache（Swatinem/rust-cache）は ~/.cargo/bin を保存しても、
-      # 完全ヒット時は保存し直さず、かつ `cargo install` のバイナリはそこに残らない
-      # ため毎回ビルドになる。そこで 2 つのバイナリを actions/cache で別途保存し、
-      # ヒット時は install をスキップする。キーは OS・アーキテクチャと両ツールの版。
+      # かかる。Rust cache（Swatinem/rust-cache）は完全ヒット時に保存し直さず、
+      # 実測で毎回ビルドになっていた。そこで 2 つのバイナリを actions/cache で
+      # 別途保存し、ヒット時は install をスキップする。キーは OS・アーキテクチャと
+      # 両ツールの版。保存は install 直後（restore と save を分けている）に行い、
+      # 後段のステップが落ちても次回以降に効くようにする。
       - name: Resolve FRB codegen tool versions
         id: frb
         run: |
@@ -77,9 +78,9 @@ jobs:
           test -n "$version"
           echo "codegen=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Cache FRB codegen tools
+      - name: Restore FRB codegen tools
         id: frb-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.cargo/bin/cargo-expand
@@ -92,6 +93,15 @@ jobs:
         run: |
           cargo install cargo-expand --version "$CARGO_EXPAND_VERSION" --locked
           cargo install flutter_rust_bridge_codegen --version "${{ steps.frb.outputs.codegen }}" --locked
+
+      - name: Save FRB codegen tools
+        if: steps.frb-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-expand
+            ~/.cargo/bin/flutter_rust_bridge_codegen
+          key: ${{ steps.frb-cache.outputs.cache-primary-key }}
 
       - name: Verify FRB codegen has no drift
         timeout-minutes: 15

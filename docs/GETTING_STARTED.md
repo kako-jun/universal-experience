@@ -175,8 +175,14 @@ CI の `check` job でも同じスクリプトを実行する（#88）。差分�
 tools/check_frb_drift.sh
 ```
 
-前提は `cargo install cargo-expand flutter_rust_bridge_codegen`（codegen の版は
-`rust/Cargo.toml` の `flutter_rust_bridge` と揃える）。
+前提は次の 2 つのインストール（版は CI と揃える。cargo-expand は
+`.github/workflows/ci.yml` の `CARGO_EXPAND_VERSION`、codegen は `rust/Cargo.toml` の
+`flutter_rust_bridge = "=X.Y.Z"` が正。下記は 2026-09 時点の値）。
+
+```bash
+cargo install cargo-expand --version 1.0.126 --locked
+cargo install flutter_rust_bridge_codegen --version 2.11.1 --locked
+```
 
 ### コードフォーマット
 
