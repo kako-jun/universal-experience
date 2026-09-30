@@ -30,7 +30,8 @@ lib/
 │   │                                 # （ライブ画面キャプチャ向けに残置、現状 production 未使用）
 │   └── image_fit.dart               # 任意画像を正準サイズの正方形へレターボックス（#78）
 ├── services/
-│   ├── app_shortcuts.dart           # アプリ内キー操作（/, ↑↓, ←→, Esc）の Intent 定義（#63/#72）
+│   ├── app_shortcuts.dart           # アプリ内キー操作（/, ↑↓, ←→, Esc, Cmd/Ctrl+V）の Intent 定義（#63/#72/#97）
+│   ├── clipboard_image_reader.dart  # クリップボード画像取得の seam（実体は pasteboard、#97）
 │   ├── color_vision_selection.dart  # 色覚クイック選択の唯一の入口（FilterService/
 │   │                                 # VisionFilterState を同時更新、#60）
 │   ├── export_service.dart          # PNG エクスポート（メタ焼き込み・Downloads へ非上書き保存・フォルダで表示、#43/#64）
@@ -72,7 +73,7 @@ lib/
     │                                 # language_dialog（AppBar の言語ピッカー。自動/日本語/English、#82）,
     │                                 # click_through_dialog_scope（ダイアログ共通のクリックスルー安全策、#63/#82）,
     │                                 # image_source_picker（サンプルチップ・ファイル選択・
-    │                                 # drag&drop、#78）, welcome_banner（初回案内、#78）
+    │                                 # drag&drop・クリップボード貼り付け、#78/#97）, welcome_banner（初回案内、#78）
     └── theme/app_theme.dart         # light/dark に加え highContrastTheme / highContrastDarkTheme
                                       # （contrastLevel 1.0。OS のハイコントラスト設定で MaterialApp が自動選択、#72）
 
@@ -103,6 +104,7 @@ test/
 ├── tap_target_size_test.dart       # macOS 指定で操作領域が 48dp 以上（padded + standard・言語ダイアログの選択肢、#72/#82）
 ├── filter_browser_test.dart        # 統合一覧の検索・カテゴリ切替・行の選択（#72）
 ├── filter_list_selection_test.dart # 統合一覧の純粋ロジック（#72）
+├── clipboard_paste_test.dart       # クリップボード画像の貼り付け経路・失敗 5 種・Cmd/Ctrl+V・ボタン（#97）
 ├── language_dialog_test.dart       # 言語ピッカー: 切替で追従・永続化・自称名の網羅と読み上げ言語・画面とトレイの言語一致（#82）
 ├── tray_locale_sync_test.dart      # 言語の選択/OS ロケール変更でトレイの文言が更新される（#82）
 ├── tray_advanced_filters_test.dart # トレイの「高度なフィルタ」サブメニュー: 構造・チェック・クリック→状態・UI との双方向同期・言語追従・click-through 不干渉（#65）
