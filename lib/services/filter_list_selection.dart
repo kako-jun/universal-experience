@@ -209,10 +209,11 @@ FilterListEntry? selectedFilterListEntry(VisionFilterState visionState) {
   return null;
 }
 
-/// 一覧の行を選ぶ。**書き込みの入口は既存のまま**: 色覚クイック選択の行は
-/// [selectColorVision]（`FilterService` と `VisionFilterState` の両方を更新）、
-/// それ以外は [VisionFilterState.replaceWith]（従来の単一選択と同じ置き換え。
-/// 複数選択の足し引きは #120 の UI が [VisionFilterState.toggle] で行う）。
+/// 一覧の行を**単一選択**として選ぶ（層の集合をその行 1 つへ置き換える）。統合一覧の行は
+/// 多選択の [toggleFilterListEntry] を使うので、これを呼ぶのは**トレイ**（`tray_service.dart`、
+/// チェック式への拡張は #121）だけ。色覚クイック選択の行は [selectColorVision]
+/// （`FilterService` と `VisionFilterState` の両方を更新）、それ以外は
+/// [VisionFilterState.replaceWith]（従来の単一選択と同じ置き換え）。
 void applyFilterListEntry(
   FilterService filterService,
   VisionFilterState visionState,

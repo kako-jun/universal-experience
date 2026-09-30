@@ -1,12 +1,9 @@
 // FilterParamPanel の widget test（#60 の strength スライダー表示/非表示 +
 // #76/#77 の受診喚起ブロック・推奨値リセット）。
 //
-// 色覚クイック選択由来の選択（`VisionFilterState.isColorQuickSelection`）
-// では、実際の強度は #57 のタイプ別記憶（FilterService）が決めるため、
-// FilterParamPanel の strength スライダーを動かしても反映されない。
-// advanced カタログ・体験プリセット由来の選択では、`VisionFilterState.
-// strength` がそのまま使われるのでスライダーを表示する（`preview_selection.
-// dart` の `showsAdvancedStrengthSlider`）。
+// 強度スライダーは、どの由来の選択（色覚クイック選択・advanced カタログ・体験プリセット）でも
+// 調整中の層の 1 本だけ出る（#120。かつて色覚クイック選択では出さず、別のスライダーが担って
+// いたのを 1 本に統合した）。動かす先は層ごとのキーの記憶（`VisionFilterState.strengthByKey`）。
 //
 // #76: 受診喚起は sensus ブリッジ（`visionFilterUrgencyProvider` /
 // `visionFilterUrgencyEscalationProvider`）を唯一の正本にする。実ブリッジは

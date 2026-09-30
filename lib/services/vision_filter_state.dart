@@ -350,7 +350,8 @@ class VisionFilterState extends ChangeNotifier {
     return replacing ? VisionLayerResult.replaced : VisionLayerResult.added;
   }
 
-  /// [id] の層へフォーカスを移す（チップ・一覧の行・調整パネルの節の操作から）。強度・payload・
+  /// [id] の層へフォーカスを移す（チップ・調整パネルの節の操作から。一覧の行は足し引きで、足した層に
+  /// フォーカスが移る）。強度・payload・
   /// プリセット選択・原画比較には触れない。[id] の層が無い、またはすでにフォーカス中なら何もしない
   /// （通知もしない）。
   void focusLayer(String id) {
