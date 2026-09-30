@@ -113,8 +113,8 @@ test/
 ├── filter_browser_test.dart        # 統合一覧の検索・カテゴリ切替・行の選択（#72）
 ├── filter_list_selection_test.dart # 統合一覧の純粋ロジック（#72）
 ├── color_vision_compare_test.dart  # 2×2 比較で並べる型の順・切替の条件・フィルタの対応表（#84）
-├── color_vision_compare_view_test.dart # 2×2 の描画・Semantics・直列最新優先・失敗・書き出し PNG の実画素（#84）
-├── home_screen_color_vision_compare_test.dart # 「2×2 で比較」の切替が色覚選択時だけ出て Before / After と入れ替わる（#84）
+├── color_vision_compare_view_test.dart # 2×2 の描画・Semantics（失敗文言・描画済みの強さ）・直列最新優先・失敗（控えがある間は出さない）・書き出し PNG の実画素（#84）
+├── home_screen_color_vision_compare_test.dart # 「2×2 で比較」の切替が色覚選択時だけ出て Before / After・見出しと入れ替わる／Tab で操作できる／行からの → は高さによらず受け口／bypass（#84）
 ├── clipboard_paste_test.dart       # クリップボード画像の貼り付け経路・失敗 5 種・Cmd/Ctrl+V・ボタン（#97）
 ├── language_dialog_test.dart       # 言語ピッカー: 切替で追従・永続化・自称名の網羅と読み上げ言語・画面とトレイの言語一致（#82）
 ├── tray_locale_sync_test.dart      # 言語の選択/OS ロケール変更でトレイの文言が更新される（#82）
