@@ -1,4 +1,4 @@
-// FilterParamPanel の widget test（#60 の strength スライダー表示/非表示 +
+// FilterParamPanel の widget test（強度スライダー（常に 1 本）+
 // #76/#77 の受診喚起ブロック・推奨値リセット）。
 //
 // 強度スライダーは、どの由来の選択（色覚クイック選択・advanced カタログ・体験プリセット）でも
