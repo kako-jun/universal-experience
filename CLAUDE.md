@@ -62,6 +62,7 @@ lib/
     │                                 # loupe_hud（ルーペ窓モード限定の HUD。症状名・強度・
     │                                 # 受診喚起・原画比較・設定を開く、#79）,
     │                                 # language_dialog（AppBar の言語ピッカー。自動/日本語/English、#82）,
+    │                                 # click_through_dialog_scope（ダイアログ共通のクリックスルー安全策、#63/#82）,
     │                                 # image_source_picker（サンプルチップ・ファイル選択・
     │                                 # drag&drop、#78）, welcome_banner（初回案内、#78）
     └── theme/app_theme.dart         # light/dark に加え highContrastTheme / highContrastDarkTheme
@@ -91,10 +92,10 @@ test/
 ├── no_hardcoded_colors_test.dart   # lib/ の色ハードコードを検出（例外は DESIGN.md の例外表と一致させる、#72）
 ├── app_theme_test.dart             # ハイコントラストテーマの生成と MaterialApp での切替（#72）
 ├── home_screen_layout_test.dart    # 3 カラム/縦積み・プレビューの初回ビューポート・空状態・キー操作（#72）
-├── tap_target_size_test.dart       # macOS 指定で操作領域が 48dp 以上（padded + standard、#72）
+├── tap_target_size_test.dart       # macOS 指定で操作領域が 48dp 以上（padded + standard・言語ダイアログの選択肢、#72/#82）
 ├── filter_browser_test.dart        # 統合一覧の検索・カテゴリ切替・行の選択（#72）
 ├── filter_list_selection_test.dart # 統合一覧の純粋ロジック（#72）
-├── language_dialog_test.dart       # 言語ピッカー: 切替でフィルタ名・説明が追従・永続化・自称名の網羅（#82）
+├── language_dialog_test.dart       # 言語ピッカー: 切替で追従・永続化・自称名の網羅と読み上げ言語・画面とトレイの言語一致（#82）
 ├── tray_locale_sync_test.dart      # 言語の選択/OS ロケール変更でトレイの文言が更新される（#82）
 ├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品
 ├── support/screenshot_harness.dart # スクリーンショット用フォント読込・PNG 書出し（フォントはコミットしない）
