@@ -7,6 +7,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
@@ -264,5 +265,63 @@ void main() {
             tester.getTopLeft(before).dy - 14);
       });
     }
+  });
+
+  group('読み上げの順序は「原画の見出し → after の見出し → after の画像」', () {
+    // 見出しの行と画像の行を別々に組んでいても（横並び）、原画の画像は装飾（見出しが説明を担う）で
+    // 読み上げ対象が無いため、ペイン単位で組んだ場合と順序は変わらない。
+    testWidgets('横並び（複数層）でこの順に読まれる', (tester) async {
+      final handle = tester.ensureSemantics();
+      final names = ['W' * 10, 'W' * 10, 'W' * 10];
+      await installFakes(tester);
+      tester.view.physicalSize = const Size(440, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: BeforeAfterView(
+                filter: const VisionFilter.myopia(),
+                filterId: 'myopia',
+                strength: 1.0,
+                imageSource: const SamplePreviewImageSource('test'),
+                sampleSize: 32,
+                layerNames: names,
+                layerIds: const ['myopia', 'glaucoma', 'protanopia'],
+                steps: const [],
+              ),
+            ),
+          ),
+        ),
+      );
+      await settle(tester);
+      final l10n =
+          AppLocalizations.of(tester.element(find.byType(BeforeAfterView)))!;
+
+      final labels = <String>[];
+      void walk(SemanticsNode node) {
+        if (node.label.isNotEmpty) labels.add(node.label);
+        node.visitChildren((child) {
+          walk(child);
+          return true;
+        });
+      }
+
+      walk(tester.binding.pipelineOwner.semanticsOwner!.rootSemanticsNode!);
+
+      int indexOf(String text) => labels.indexWhere((l) => l.contains(text));
+      final beforeHeading = indexOf(l10n.previewPaneOriginal);
+      final afterHeading = indexOf(layerNamesSummary(l10n, names));
+      final afterImage =
+          indexOf(l10n.previewImageFilteredSemantics(names.join(' + ')));
+      expect(beforeHeading, greaterThanOrEqualTo(0), reason: '$labels');
+      expect(afterHeading, greaterThan(beforeHeading), reason: '$labels');
+      expect(afterImage, greaterThan(afterHeading), reason: '$labels');
+      handle.dispose();
+    });
   });
 }
