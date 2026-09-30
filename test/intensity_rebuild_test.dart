@@ -57,8 +57,7 @@ void main() {
     // （揃えないと、最初の 1 回だけ HomeScreen._persistFilterState の
     // setFilterType が「none → protanopia」の実変更として notify してしまい、
     // これから見たい「intensity だけを動かしたとき」の挙動と混ざってしまう）。
-    selectColorVision(
-        filterService, visionFilterState, ColorVisionType.protanopia);
+    selectColorVision(filterService, visionFilterState, ColorVisionType.protanopia);
     await settings.setFilterType(ColorVisionType.protanopia);
 
     await tester.pumpWidget(UniversalExperienceApp(settings: settings));
