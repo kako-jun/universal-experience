@@ -286,6 +286,7 @@ void main() {
     expect(pipelineCalls.length, composedBeforeBypass,
         reason: 'バイパス中は土台を合成しない');
 
+    renderedStrengths.clear();
     h.visionState.releaseBypass(holder);
     await tester.pump();
     for (var i = 0; i < 20; i++) {
@@ -293,6 +294,8 @@ void main() {
     }
     expect(pipelineCalls.length, composedBeforeBypass,
         reason: '解除しても層が同じなら土台を再合成しない');
+    expect(renderedStrengths.length, 4, reason: '解除で 4 セルとも描き直す');
+    expect(renderedStrengths, everyElement(1.0), reason: '色覚層の強度（既定 100%）に戻る');
     expect(
       tester
           .widget<ColorVisionCompareView>(find.byType(ColorVisionCompareView))
@@ -388,6 +391,7 @@ void main() {
     for (var i = 0; i < 20; i++) {
       await tester.pump();
     }
+    expect(renderedStrengths.length, 4, reason: '解除で 4 セルとも描き直す');
     expect(renderedStrengths, everyElement(0.6));
     await tester.pump(const Duration(milliseconds: 400));
   });

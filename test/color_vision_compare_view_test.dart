@@ -725,6 +725,7 @@ void main() {
       WidgetTester tester, {
       Future<void>? Function(int baseCallNumber)? gateBase,
       Object? Function(int baseCallNumber)? failBase,
+      int Function(List<VisionStep> steps)? baseArgbFor,
     }) async {
       await installFakes(tester); // 読み込み（白の原画）だけ使う。
       late ui.Image baseMaster;
@@ -743,7 +744,9 @@ void main() {
         if (wait != null) await wait;
         final failure = failBase?.call(n);
         if (failure != null) throw failure;
-        final image = baseMaster.clone();
+        final image = baseArgbFor == null
+            ? baseMaster.clone()
+            : await _solid(_kSize, baseArgbFor(steps));
         baseReturned.add(image);
         return image;
       };
@@ -903,7 +906,13 @@ void main() {
     });
 
     testWidgets('土台が空の間に層が変わってから戻ると、再合成は 1 回だけ', (tester) async {
-      final fakes = await installBaseFakes(tester);
+      // 土台の色は myopia の強さで変える（新旧の土台が画素で区別できるように）。
+      const changedBaseArgb = 0xFF805020;
+      final fakes = await installBaseFakes(
+        tester,
+        baseArgbFor: (steps) =>
+            steps.single.strength == 0.5 ? changedBaseArgb : baseArgb,
+      );
       await tester
           .pumpWidget(localized(viewOf(inputOf(['myopia', 'protanopia']))));
       await settleCells(tester, fakes.cellCalls, 4);
@@ -920,6 +929,12 @@ void main() {
       expect(fakes.baseCalls.last.single.strength, 0.5);
       expect(fakes.baseReturned.first.debugDisposed, isTrue,
           reason: '置き換えられた古い土台は破棄される');
+      for (var i = 8; i < 12; i++) {
+        final id = kColorVisionCompareEntries[i - 8].id;
+        expect(await centerArgb(tester, fakes.cellReturned[i]),
+            tint(id, changedBaseArgb),
+            reason: '$id は新しい土台から作られる（古い土台ではない）');
+      }
     });
 
     testWidgets('ソースが変わると保持していた土台を破棄し、dispose でも破棄する', (tester) async {
@@ -1162,8 +1177,33 @@ void main() {
           reason: 'ファイル名も画像の土台（vertigo は入らない）',
         );
 
+        // 止めた描画を解放する。描画が完了したら控えが新しい土台に更新され、
+        // 次の書き出しは新しい土台の層（vertigo + myopia 50%）と一致する。
         pending.complete();
         await settleCells(tester, fakes.cellCalls, 8);
+        captions.clear();
+        await tester.tap(find.byTooltip(en.exportButtonTooltip));
+        await waitFor(tester, () => filenames.length == 2);
+
+        expect(captions, hasLength(4));
+        for (var i = 0; i < 4; i++) {
+          final c = captions[i];
+          expect([
+            for (final r in c.layers) r.name
+          ], [
+            en.filterVertigo,
+            en.filterMyopia,
+            visionFilterName(en, kColorVisionCompareEntries[i].id),
+          ], reason: '描画完了後は新しい土台の層');
+          expect(c.layers[1].strengthLabel, en.strengthLabel(50),
+              reason: '差し替え後の myopia の強さ');
+        }
+        expect(
+          filenames.last,
+          matches(RegExp(
+              r'^ue-color-vision-compare-vertigo-myopia-\d{4}-\d{2}-\d{2}_\d{6}\.png$')),
+          reason: '描画完了後のファイル名も新しい土台',
+        );
       });
 
       testWidgets('色覚の強度 0% でも、画像と同じく色覚の行は「0%」で残す（単独の 2×2 と揃える）',
