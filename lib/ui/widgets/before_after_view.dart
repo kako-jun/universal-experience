@@ -189,7 +189,7 @@ class BeforeAfterView extends StatefulWidget {
   /// （[BeforeAfterView.renderAfterPipeline] → [CpuVisionRenderer.pipelineApplier]。テストでは
   /// `pipelineApplier` を差し替える）、[filter] と
   /// [strength] は描画に使わない（見出し・書き出しが代表として参照する、フォーカス中の層の
-  /// 値。複数層の見出し・書き出しは #120/#121）。空なら原画をそのまま見せる。
+  /// 値。複数層の見出しは #120、書き出しは [exportLayers] で #121）。空なら原画をそのまま見せる。
   final List<VisionStep>? steps;
 
   /// 重ねている層の表示名（適用順、#120）。2 つ以上のときだけ複数層として扱う（それ以外は従来どおり
