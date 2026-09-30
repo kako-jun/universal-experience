@@ -50,15 +50,24 @@ jobs:
         run: flutter pub get
 
       # FRB codegen のドリフト検証（lib/src/rust/ と rust/src/frb_generated.rs が
-      # rust/src/api/ の Rust コードと同期していること）は #85 レビュー N4 で
-      # 一度追加したが、CI (macOS runner) の `flutter_rust_bridge_codegen
-      # generate` が原因未特定のまま毎回ハングする（cargo-expand の自動
-      # インストール成功後、MIR パーサのログ行まで到達した直後から応答が
-      # 完全に止まる。ローカルでは同じコマンドが2秒未満で完了し再現しない。
-      # `timeout-minutes: 10` を付けても短縮されるだけで解消しなかった）ため、
-      # ステップごと撤去した。詳細な調査結果・再挑戦の方針は #88 を参照。
-      # 現状 CI ではこのドリフトを検知しない（手動での
-      # `flutter_rust_bridge_codegen generate` 実行 + レビューに依存する）。
+      # rust/src/api/ の Rust コードと同期していること）。
+      #
+      # 以前は `flutter_rust_bridge_codegen generate` が CI でだけログ無しのまま
+      # ハングした（#88）。原因は codegen が内部で走らせる build_runner（freezed 用）:
+      # CI の新しい Dart SDK が書くコード（dot shorthand）を freezed 2.x が使う
+      # analyzer が解釈できず、例外のあと build_runner が終了しなくなる。そのため
+      # tools/check_frb_drift.sh は `--no-build-runner` で generate する
+      # （`*.freezed.dart` はコミット済みで、食い違えば後続の analyze/test が落ちる）。
+      # cargo-expand は codegen が無ければ自動インストールするが、ログが長く
+      # なるので独立ステップで入れておく（rust-cache が ~/.cargo/bin も保存する）。
+      - name: Install FRB codegen tools
+        run: |
+          cargo install cargo-expand --locked
+          cargo install flutter_rust_bridge_codegen --version 2.11.1 --locked
+
+      - name: Verify FRB codegen has no drift
+        timeout-minutes: 15
+        run: tools/check_frb_drift.sh
 
       # shaders/*.frag・pubspec.yaml の shaders: ブロックが tools/sensus_shaders.g.json
       # と同期していることを明示的に確認する（#56）。test/shader_codegen_test.dart

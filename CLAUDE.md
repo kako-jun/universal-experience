@@ -96,6 +96,7 @@ rust_builder/                 # cargokit 統合（#55）。flutter build/run 時
 
 tools/                       # シェーダ codegen（sensus の .frag → Impeller サブセットへ機械変換）
                               # + generate_samples.dart（サンプル画像集の生成、#78）
+                              # + check_frb_drift.sh（FRB 生成物のドリフト検証。CI の check job が実行、#88）
 shaders/                     # 変換済み .frag（ビルド時 impellerc がコンパイル）
 assets/samples/              # サンプル画像集（自作・手続き生成、#78）。出典は README.md
 
