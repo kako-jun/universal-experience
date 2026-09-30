@@ -229,5 +229,10 @@
   "selectionEmptyTitle": "何も選択されていません",
   "selectionEmptyBody": "一覧から見え方を選ぶと、ここに強さやパラメータが表示されます。",
   "clickThroughOnBannerTitle": "クリックスルーが ON です。解除するには:",
-  "windowModeCloseButton": "閉じる"
+  "windowModeCloseButton": "閉じる",
+  "languageSectionTitle": "言語",
+  "languageOptionSystem": "自動",
+  "languageOptionSystemSemantics": "自動（端末の言語）",
+  "languageDialogNote": "「自動」は端末の言語に合わせます（未対応の言語のときは英語）。トレイのメニューの言語も変わります。",
+  "languageCloseButton": "閉じる"
 }

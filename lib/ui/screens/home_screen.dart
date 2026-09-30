@@ -17,6 +17,7 @@ import '../widgets/adjust_panel.dart';
 import '../widgets/before_after_view.dart';
 import '../widgets/filter_browser.dart';
 import '../widgets/image_source_picker.dart';
+import '../widgets/language_dialog.dart';
 import '../widgets/welcome_banner.dart';
 import '../widgets/window_mode_panel.dart';
 
@@ -212,6 +213,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: const Icon(Icons.window_outlined),
                   onPressed: () => showWindowModeDialog(context),
                   tooltip: l10n.windowModeSectionTitle,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.language),
+                  onPressed: () => showLanguageDialog(context),
+                  tooltip: l10n.languageSectionTitle,
                 ),
                 const _ThemeModeButton(),
                 IconButton(

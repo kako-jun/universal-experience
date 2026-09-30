@@ -322,14 +322,16 @@ class TrayService with TrayListener {
     required this.visionFilterState,
     required this.loupeWindow,
     required this.iconPath,
-    required this.labels,
-    required this.tooltip,
+    required TrayMenuLabels labels,
+    required String tooltip,
     required this.onShowLoupe,
     required this.onHideLoupe,
     required this.onOpenSettings,
     required this.onQuit,
     bool loupeVisible = true,
-  }) : _loupeVisible = loupeVisible;
+  })  : _labels = labels,
+        _tooltip = tooltip,
+        _loupeVisible = loupeVisible;
 
   /// アクティブな色覚フィルタの選択状態 (#14)。
   final FilterService filterService;
@@ -350,11 +352,15 @@ class TrayService with TrayListener {
   /// トレイアイコンのアセットパス (PNG)。`assets/tray/` 参照。
   final String iconPath;
 
-  /// トレイメニューの i18n 解決済み文言 (#18)。起動時ロケールで解決して渡す。
-  final TrayMenuLabels labels;
+  /// トレイメニューの i18n 解決済み文言 (#18)。起動時ロケールで解決して渡し、
+  /// 言語が変わったら [updateLocalization] で差し替える (#82)。
+  TrayMenuLabels get labels => _labels;
+  TrayMenuLabels _labels;
 
   /// トレイアイコンのツールチップ（= アプリ名、i18n 解決済み）。
-  final String tooltip;
+  /// [labels] と同じく [updateLocalization] で差し替わる (#82)。
+  String get tooltip => _tooltip;
+  String _tooltip;
 
   /// ルーペ窓を表示する (main.dart が windowManager.show を呼ぶ)。
   final Future<void> Function() onShowLoupe;
@@ -409,7 +415,7 @@ class TrayService with TrayListener {
     try {
       trayManager.addListener(this);
       await trayManager.setIcon(iconPath);
-      await trayManager.setToolTip(tooltip);
+      await trayManager.setToolTip(_tooltip);
       await _rebuildMenu();
       _initialised = true;
     } catch (error, stack) {
@@ -434,6 +440,27 @@ class TrayService with TrayListener {
     unawaited(refresh());
   }
 
+  /// 言語が変わったとき、トレイのメニュー文言とツールチップを差し替える (#82)。
+  ///
+  /// トレイは `BuildContext` を持てず `MaterialApp.locale` の変更を受け取れない
+  /// ため、呼び出し側（`TrayLocaleSync`）が解決済みの [labels]/[tooltip] を渡す。
+  /// トレイ未初期化・非対応環境では文言を保持するだけで、ネイティブは触らない
+  /// （[init] が保持した文言で初期化する）。
+  Future<void> updateLocalization({
+    required TrayMenuLabels labels,
+    required String tooltip,
+  }) async {
+    _labels = labels;
+    _tooltip = tooltip;
+    if (!_initialised) return;
+    try {
+      await trayManager.setToolTip(tooltip);
+    } catch (error) {
+      debugPrint('TrayService.setToolTip failed: $error');
+    }
+    await _rebuildMenu();
+  }
+
   /// 現在の状態からネイティブメニューを再構築する。
   Future<void> refresh() async {
     if (!_initialised) return;
@@ -443,7 +470,7 @@ class TrayService with TrayListener {
   Future<void> _rebuildMenu() async {
     final spec = buildTrayMenuSpec(
       loupeVisible: _loupeVisible,
-      labels: labels,
+      labels: _labels,
       appMode: loupeWindow.appMode,
       alwaysOnTop: loupeWindow.alwaysOnTop,
       clickThrough: loupeWindow.clickThrough,

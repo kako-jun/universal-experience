@@ -28,6 +28,7 @@ import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 import 'package:universal_experience/ui/widgets/image_source_picker.dart';
 import 'package:universal_experience/ui/widgets/intensity_slider.dart';
 import 'package:universal_experience/ui/widgets/welcome_banner.dart';
+import 'package:universal_experience/ui/widgets/language_dialog.dart';
 import 'package:universal_experience/ui/widgets/window_mode_panel.dart';
 
 import 'support/home_screen_harness.dart';
@@ -669,6 +670,51 @@ void main() {
           reason: '起動モードのダイアログ自身は閉じる');
 
       await tester.runAsync(() => h.loupe.setClickThrough(false));
+      await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
+    });
+
+    testWidgets('言語ダイアログを開いたままクリックスルーが ON になると、自動で閉じる（#82）',
+        (tester) async {
+      final h = await pumpHomeScreen(tester, size: wide);
+      await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
+      await tester.tap(find.byTooltip('言語'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LanguageDialog), findsOneWidget);
+
+      await tester.runAsync(() => h.loupe.setClickThrough(true));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LanguageDialog), findsNothing,
+          reason: 'ON になるとクリックが素通りして閉じられないので自動で閉じる');
+      expect(find.text(banner), findsOneWidget);
+
+      await tester.runAsync(() => h.loupe.setClickThrough(false));
+      await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
+    });
+
+    testWidgets('ON のまま言語ダイアログを開くと、1 回目の Esc は解除・2 回目で閉じる（#82）',
+        (tester) async {
+      final h = await pumpHomeScreen(tester, size: wide);
+      await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
+      await tester.runAsync(() => h.loupe.setClickThrough(true));
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('言語'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LanguageDialog), findsOneWidget);
+
+      await tester.runAsync(() async {
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pumpAndSettle();
+      expect(h.loupe.clickThrough, isFalse);
+      expect(find.byType(LanguageDialog), findsOneWidget,
+          reason: '1 回目の Esc は解除に使い、ダイアログは閉じない');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byType(LanguageDialog), findsNothing);
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
     });
 

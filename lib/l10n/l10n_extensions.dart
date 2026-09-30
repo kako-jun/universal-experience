@@ -475,7 +475,7 @@ ConsultNotice? resolveConsultNotice(
   );
 }
 
-/// 起動時ロケールの [AppLocalizations] からトレイメニュー文言を組み立てる (#18)。
+/// ロケール解決済みの [AppLocalizations] からトレイメニュー文言を組み立てる (#18/#82)。
 ///
 /// トレイは BuildContext を持てないため、`AppLocalizations.of(context)` ではなく
 /// `lookupAppLocalizations(locale)` で得たインスタンスをここに渡す。color-vision
