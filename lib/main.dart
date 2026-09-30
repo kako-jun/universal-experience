@@ -238,15 +238,17 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
   // 体験プリセット / 色覚クイック選択のいずれで終了しても、その選択のまま起動
   // する）。保存が無い・壊れている・カタログと合わない部分は既定値に落ち、
   // 起動は止まらない。色覚クイック選択に戻した場合は、トレイとウィンドウ内 UI の
-  // 両方が見る filterService も同じ型に合わせる。
+  // 両方が見る filterService も、層の集合から導いた型に合わせる。
   final restored = await vfStore.restoreAndBind(
     visionFilterState,
     isValidPreset: isValidExperiencePreset,
     snapshot: migrated,
   );
-  final restoredColorType = visionFilterState.colorVisionType;
-  if (restored && restoredColorType != null) {
-    filterService.applyFilter(restoredColorType);
+  if (restored) {
+    // 復元した層の集合（色覚クイック選択の層があればその型、無ければ none）へ
+    // 合わせる。フォーカス層だけを見ると、色覚の層があってもフォーカスが別の層に
+    // あるとき、色覚シードの型が FilterService に残ってしまう（#120）。
+    syncFilterServiceWithLayers(filterService, visionFilterState);
   }
 
   // #78: seed the initial sample from the just-restored/seeded filter

@@ -50,21 +50,6 @@
   },
 
 
-  "intensityValue": "Intensity: {percent}%",
-  "@intensityValue": {
-    "description": "Current filter intensity as a percentage.",
-    "placeholders": {
-      "percent": { "type": "int" }
-    }
-  },
-  "intensityActive": "Active",
-  "@intensityActive": {
-    "description": "Status label when a filter is currently active."
-  },
-  "intensitySliderName": "Intensity",
-  "@intensitySliderName": {
-    "description": "Screen-reader name of the intensity slider of the color-vision rows. Same word as the on-screen 'Intensity: N%' text; the value is read separately by the slider (#45)."
-  },
   "strengthSliderName": "Strength",
   "@strengthSliderName": {
     "description": "Screen-reader name of the strength slider of an advanced filter / experience. Same word as the on-screen 'Strength: N%' text; the value is read separately by the slider (#45)."
@@ -730,6 +715,75 @@
   "filterListSelectedSemantics": "Selected",
   "@filterListSelectedSemantics": {
     "description": "Semantics hint appended to the currently selected row of the filter list (#72)."
+  },
+  "filterListExclusiveHeading": "{name} (pick one)",
+  "@filterListExclusiveHeading": {
+    "description": "Heading of the color-vision category in the filter list: the rows of this category are mutually exclusive (radio style), so the heading says only one can be picked (#120).",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "filterListLimitReached": "Limit of {max} reached. Uncheck one to pick this.",
+  "@filterListLimitReached": {
+    "description": "Reason shown on an unchecked, disabled row of the filter list when the maximum number of stacked filters is reached (#120).",
+    "placeholders": {
+      "max": { "type": "int" }
+    }
+  },
+  "filterListOrderSemantics": "Order {order}",
+  "@filterListOrderSemantics": {
+    "description": "Screen-reader label of the order badge on a checked row of the filter list: the position in the order the filters are stacked (#120).",
+    "placeholders": {
+      "order": { "type": "int" }
+    }
+  },
+  "layerSummaryMore": "{names} … (+{count})",
+  "@layerSummaryMore": {
+    "description": "Summary of several stacked filters where only the first ones are named: {names} is the first names joined with ' + ', {count} is how many more are not named. Used in the after-pane heading of the preview and in the loupe HUD (#120).",
+    "placeholders": {
+      "names": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "layerStripSemantics": "Applied filters, in order",
+  "@layerStripSemantics": {
+    "description": "Screen-reader name of the chip strip above the preview that lists the stacked filters in application order (#120)."
+  },
+  "layerStripClearAll": "Clear all",
+  "@layerStripClearAll": {
+    "description": "Button in the chip strip that removes every stacked filter at once (#120)."
+  },
+  "layerChipLabel": "Order {order}, {name}",
+  "@layerChipLabel": {
+    "description": "Screen-reader label of one chip in the strip: its application-order number and the filter name (#120).",
+    "placeholders": {
+      "order": { "type": "int" },
+      "name": { "type": "String" }
+    }
+  },
+  "layerChipFocusHint": "Press to adjust this filter",
+  "@layerChipFocusHint": {
+    "description": "Screen-reader hint of a chip in the strip: pressing it makes that filter the one being adjusted (#120)."
+  },
+  "layerChipRemove": "Remove {name}",
+  "@layerChipRemove": {
+    "description": "Tooltip and screen-reader label of the x button of a chip: removes that one filter (#120).",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "layerSectionSummary": "Order {order}, {name}, strength {percent}%",
+  "@layerSectionSummary": {
+    "description": "Screen-reader label of a collapsed layer section in the adjust panel (application order, name, strength). Pressing it makes that filter the one being adjusted (#120).",
+    "placeholders": {
+      "order": { "type": "int" },
+      "name": { "type": "String" },
+      "percent": { "type": "int" }
+    }
+  },
+  "exportDisabledMultiLayer": "Saving as PNG isn't available yet while several filters are combined.",
+  "@exportDisabledMultiLayer": {
+    "description": "Visible reason next to the disabled PNG export button while several filters are layered (the export caption for combined filters comes in a later step, #121)."
   },
   "adjustHeading": "Adjust",
   "@adjustHeading": {

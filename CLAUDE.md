@@ -31,7 +31,7 @@ lib/
 │   │                                 # （ライブ画面キャプチャ向けに残置、現状 production 未使用）
 │   └── image_fit.dart               # 任意画像を正準サイズの正方形へレターボックス（#78）
 ├── services/
-│   ├── app_shortcuts.dart           # アプリ内キー操作（/, ↑↓, ←→, Esc, Cmd/Ctrl+V）の Intent 定義（#63/#72/#97）
+│   ├── app_shortcuts.dart           # アプリ内キー操作（/, ↑↓, ←→, Esc, Cmd/Ctrl+V）の Intent 定義（#63/#72/#97/#120）
 │   ├── clipboard_image_reader.dart  # クリップボード画像取得の seam（実体は pasteboard、#97）
 │   ├── color_vision_compare.dart    # 色覚 4 型の 2×2 比較で並べる型（カタログ順・実験的を除く）と
 │   │                                 # 切替を出す条件・セルのフィルタ（#84）
@@ -76,8 +76,10 @@ lib/
 └── ui/
     ├── screens/home_screen.dart
     ├── widgets/                     # filter_browser（左カラム「選ぶ」: 検索・カテゴリ・統合一覧、#72）,
-    │                                 # filter_list_tile（一覧の 1 行）, adjust_panel（右カラム「調整」、#72）,
-    │                                 # intensity_slider, before_after_view,
+    │                                 # filter_list_tile（一覧の 1 行: チェック・適用順の番号バッジ、#120）,
+    │                                 # layer_chip_strip（プレビュー上の適用順チップ帯・✕・すべて解除、#120）,
+    │                                 # adjust_panel（右カラム「調整」: 2 層以上は層ごとの節、#72/#120）,
+    │                                 # before_after_view（複数層は名前の要約見出し・書き出し無効、#120）, loupe_hud,
     │                                 # color_vision_compare_view（色覚 4 型の 2×2 比較と書き出し、#84）,
     │                                 # experience_presets（体験プリセットの行 ExperiencePresetTile）, filter_param_panel,
     │                                 # consult_notice_block（受診喚起の共有表示ウィジェット、#76）,
@@ -127,12 +129,16 @@ test/
 ├── accessibility_guidelines_test.dart # Flutter 標準ガイドライン（タップ領域・ラベル・コントラスト）を主画面・選択別パネル・ダイアログ・HUD に 4 テーマ × ja/en で当てる（#45）
 ├── accessibility_semantics_test.dart  # スライダー/ドロップダウンの名前と値・見出し・選択状態・画像の代替テキスト・liveRegion・視差効果・Esc で閉じてフォーカスが戻る（#45）
 ├── tap_target_size_test.dart       # macOS 指定で操作領域が 48dp 以上（padded + standard・言語ダイアログの選択肢、#72/#82）
-├── intensity_slider_test.dart      # 色覚クイック選択の間だけ「適用中」を出しスライダーを操作可能にする（#67）
 ├── filter_browser_test.dart        # 統合一覧の検索・カテゴリ切替・行の選択（#72）
+├── filter_browser_multi_select_test.dart # 統合一覧のチェック式・番号バッジが段順・色覚の排他置き換え・上限で未選択の行が無効（色覚置き換え行とプリセットは有効）・プリセット置換と一致時だけ強調・行フォーカス移動（#120）
+├── layer_chip_strip_test.dart      # チップ帯: 2 層以上で出る・チップで調整中が移る・✕ で 1 層除去・すべて解除・状態が形で分かる（#120）
+├── adjust_panel_layers_test.dart   # 調整パネルの層ごとの節・調整中の層だけ展開・強度スライダー 1 本・1 層は従来の見た目（#120）
+├── home_screen_multi_layer_heading_test.dart # 複数層の見出し（名前の要約）・書き出し無効と理由・2×2 スイッチが色覚 1 層のときだけ（#120）
+├── home_screen_multi_select_keys_test.dart # ↑↓ は選択を変えず Space/Enter で足し引き・←→ は調整中の層の強度（#120）
 ├── filter_list_selection_test.dart # 統合一覧の純粋ロジック（#72）
 ├── color_vision_compare_test.dart  # 2×2 比較で並べる型の順・切替の条件・フィルタの対応表（#84）
 ├── color_vision_compare_view_test.dart # 2×2 の描画・Semantics（失敗文言・描画済みの強さ）・直列最新優先・失敗（控えがある間は出さない）・書き出し PNG の実画素（#84）
-├── home_screen_color_vision_compare_test.dart # 「2×2 で比較」の切替が色覚選択時だけ出て Before / After・見出しと入れ替わる／Tab で操作できる／行からの → は高さによらず受け口／bypass（#84）
+├── home_screen_color_vision_compare_test.dart # 「2×2 で比較」の切替が層の集合がちょうど色覚 1 層のときだけ出て Before / After・見出しと入れ替わる／Tab で操作できる／行からの → は高さによらず受け口／bypass（#84）
 ├── clipboard_paste_test.dart       # クリップボード画像の貼り付け経路・失敗 5 種・Cmd/Ctrl+V・ボタン（#97）
 ├── language_dialog_test.dart       # 言語ピッカー: 切替で追従・永続化・自称名の網羅と読み上げ言語・画面とトレイの言語一致（#82）
 ├── tray_locale_sync_test.dart      # 言語の選択/OS ロケール変更でトレイの文言が更新される（#82）
@@ -251,7 +257,7 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 再利用する（専用レンダラを持たない）。Before / After との関係と理由は
 `docs/adr/2026-09-30-color-vision-2x2-compare.md`。
 
-### 状態モデルの統一と多症状の同時適用（第 3 段 #119 まで実装）
+### 状態モデルの統一と多症状の同時適用（第 4 段 #120 まで実装）
 
 状態が 2 系統（`FilterService` の `ColorVisionType` 8 値（none + 7 型）/ `VisionFilterState` の 30 フィルタ。強度の記憶は #117 で後者に一本化済み）並行し、
 選択も 1 つだけという現状を、「カタログ id ごとに 1 つのレイヤー」の順序つき列（最大 5、色覚は排他、
@@ -272,9 +278,18 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 - 推奨サンプル（#78）は `focusedId` の層に追従する。フォーカスが外れたら適用順で最後の層へ移る。
 - 複数層の相談喚起の入力は `mergeConsultInputs`（urgency は最大・escalation は段ごとに重複除去）で作る
   （UI・書き出しへの適用は #121）。
-- 見出し・書き出し・2×2 比較（`canCompare`）・トレイは #120〜#122 まで単一（フォーカス層）の意味のまま。
-- 制約: `toggle(..., origin: quick)` で色覚を足しても `FilterService` の色覚型・`settings.filterType`・
-  色覚の強度スライダーは更新されない（`selectColorVision` 経由でだけ同期）。UI からの `toggle` は #120 で入るので同期はそこで決める。
+
+第 4 段（#120）で UI が多選択になった:
+
+- 統合一覧はチェック式（色覚行はラジオ式の見た目・見出し「いずれか 1 つ」）で、チェック済みの行に適用順の
+  番号バッジが付く。上限 5 に達すると未選択の行は無効になり理由を行内に出す（色覚の置き換えと体験プリセットは有効）。
+- プレビュー上のチップ帯（2 層以上のみ）で層の切替（調整中）・✕・「すべて解除」。調整パネルは 2 層以上で層ごとの
+  節（調整中の層だけ展開）、強度スライダーは 1 本。1 層のときの見た目・挙動は従来どおり。
+- キー: ↑↓ は行フォーカスの移動だけ、Space / Enter が足し引き、←→ は調整中の層（`focusedId`）の強度。
+- 複数層の見出し・HUD は「名前 + 名前 …（+N）」（強度は出さない）。暫定として、複数層の間は PNG 書き出しを無効にして
+  理由を出し（#121 で解除）、「2×2 で比較」は層の集合がちょうど色覚 1 層のときだけ出す（#122 で解除）。トレイは #121 まで単一の意味のまま。
+- `FilterService` の色覚型は、UI の足し引き・プリセット選択・起動時の復元のたびに `syncFilterServiceWithLayers` が層の集合へ合わせる
+  （色覚クイック選択の層があればその型、無ければ none）。
 
 ### iOS非対応
 

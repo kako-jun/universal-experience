@@ -1,12 +1,9 @@
-// FilterParamPanel の widget test（#60 の strength スライダー表示/非表示 +
+// FilterParamPanel の widget test（強度スライダー（常に 1 本）+
 // #76/#77 の受診喚起ブロック・推奨値リセット）。
 //
-// 色覚クイック選択由来の選択（`VisionFilterState.isColorQuickSelection`）
-// では、実際の強度は #57 のタイプ別記憶（FilterService）が決めるため、
-// FilterParamPanel の strength スライダーを動かしても反映されない。
-// advanced カタログ・体験プリセット由来の選択では、`VisionFilterState.
-// strength` がそのまま使われるのでスライダーを表示する（`preview_selection.
-// dart` の `showsAdvancedStrengthSlider`）。
+// 強度スライダーは、どの由来の選択（色覚クイック選択・advanced カタログ・体験プリセット）でも
+// 調整中の層の 1 本だけ出る（#120。かつて色覚クイック選択では出さず、別のスライダーが担って
+// いたのを 1 本に統合した）。動かす先は層ごとのキーの記憶（`VisionFilterState.strengthByKey`）。
 //
 // #76: 受診喚起は sensus ブリッジ（`visionFilterUrgencyProvider` /
 // `visionFilterUrgencyEscalationProvider`）を唯一の正本にする。実ブリッジは
@@ -76,16 +73,32 @@ void main() {
     expect(find.byType(Slider), findsOneWidget);
   });
 
-  testWidgets('色覚クイック選択由来の選択では strength スライダーを表示しない', (tester) async {
+  testWidgets('色覚クイック選択由来の選択でも strength スライダーは 1 本だけ表示する（#120）',
+      (tester) async {
     visionState.selectColorVisionType(ColorVisionType.protanopia, 'protanopia');
     expect(visionState.isColorQuickSelection, isTrue);
 
     await pumpPanel(tester);
 
-    expect(find.byType(Slider), findsNothing);
-    // 受診喚起ブロックなど、パネル自体は描画され続けている（strength だけが
-    // 隠れている）ことも確認する。
+    expect(find.byType(Slider), findsOneWidget);
     expect(find.byType(FilterParamPanel), findsOneWidget);
+  });
+
+  testWidgets('strength スライダーは調整中の層の強度の記憶を動かし、原画比較を解除する', (tester) async {
+    visionState.selectColorVisionType(ColorVisionType.protanopia, 'protanopia');
+    visionState.toggle('myopia');
+    visionState.focusLayer('protanopia');
+    visionState.acquireBypass(Object());
+    expect(visionState.bypassed, isTrue);
+    await pumpPanel(tester);
+
+    await tester.tap(find.byType(Slider)); // 中央 = 50%
+    await tester.pump();
+
+    final protan = visionState.layers.firstWhere((l) => l.id == 'protanopia');
+    expect(visionState.strengthOf(protan), closeTo(0.5, 0.06));
+    expect(visionState.bypassed, isFalse);
+    expect(visionState.focusedId, 'protanopia');
   });
 
   group('受診喚起ブロック（#76）', () {

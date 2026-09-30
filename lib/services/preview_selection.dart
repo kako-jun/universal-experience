@@ -38,17 +38,8 @@ List<VisionStep> previewPipelineSteps(VisionFilterState visionState) {
   return visionState.pipelineSteps();
 }
 
-/// advanced カタログの strength スライダー（`FilterParamPanel`）を表示すべきか
-/// （#60）。
-///
-/// 色覚クイック選択が起点の選択では、強度は色覚クイック選択の強度スライダー
-/// （`IntensitySlider`）で操作するので、`FilterParamPanel` の strength スライダーは
-/// 出さない（同じ記憶を動かす 2 本のスライダーが並ぶのを避ける。2 本の整理は #120）。
-bool showsAdvancedStrengthSlider(VisionFilterState visionState) =>
-    !visionState.isColorQuickSelection;
-
 /// ←→ (#63 アプリ内ショートカット) の 1 回あたりの強度変化量。
-/// IntensitySlider の divisions:20 と同じ 5% 刻み。
+/// 調整パネルの強度スライダー（divisions:20）と同じ 5% 刻み。
 const double kKeyboardStrengthStep = 0.05;
 
 /// ←→ で強度を動かす。色覚クイック選択でも advanced/プリセットでも、フォーカス中の

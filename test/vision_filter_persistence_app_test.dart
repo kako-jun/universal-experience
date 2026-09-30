@@ -117,6 +117,57 @@ void main() {
         reason: 'トレイもウィンドウ内 UI も同じ filterService を見る');
   });
 
+  testWidgets('復元した層の集合から FilterService の色覚型が導かれる（フォーカスが色覚以外でも、#120）',
+      (tester) async {
+    // 設定側の色覚シードは protanopia だが、前回終了時の層は
+    // [色覚クイック選択 deuteranomaly, myopia]・フォーカスは myopia。
+    SharedPreferences.setMockInitialValues({
+      SettingsService.keyFilterType: ColorVisionType.protanopia.name,
+    });
+    final first = await _launch();
+    toggleColorVision(
+        filterService, visionFilterState, ColorVisionType.deuteranomaly);
+    visionFilterState.toggle('myopia');
+    visionFilterState.focusLayer('myopia');
+    expect(visionFilterState.colorVisionType, isNull,
+        reason: 'フォーカス層は色覚ではない');
+    await first.store.flush();
+    await _quitAndResetSingletons(first.store);
+
+    final second = await _launch();
+    addTearDown(() => _quitAndResetSingletons(second.store));
+    await tester.pumpWidget(second.app);
+    await tester.pump();
+
+    expect(visionFilterState.layers.map((l) => l.id), contains('myopia'));
+    expect(visionFilterState.focusedId, 'myopia');
+    expect(filterService.currentFilter, ColorVisionType.deuteranomaly,
+        reason: '色覚シード（protanopia）でも、フォーカス層（色覚なし）でもなく、'
+            '層の集合の色覚クイック選択の型');
+  });
+
+  testWidgets('復元した層に色覚クイック選択が無ければ FilterService は none になる（#120）',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({
+      SettingsService.keyFilterType: ColorVisionType.protanopia.name,
+    });
+    final first = await _launch();
+    visionFilterState.select('myopia');
+    deactivateColorVision(filterService, visionFilterState);
+    visionFilterState.toggle('myopia');
+    await first.store.flush();
+    await _quitAndResetSingletons(first.store);
+
+    final second = await _launch();
+    addTearDown(() => _quitAndResetSingletons(second.store));
+    await tester.pumpWidget(second.app);
+    await tester.pump();
+
+    expect(visionFilterState.layers.map((l) => l.id), ['myopia']);
+    expect(filterService.currentFilter, ColorVisionType.none,
+        reason: '設定側の色覚シード（protanopia）が残ってはならない');
+  });
+
   testWidgets('選択を解除して終了したなら、設定側の色覚シードより「未選択」が優先される', (tester) async {
     // 設定（settings.filterType）には前回の色覚が残っているが、その後に解除して
     // 終了した、という状況（設定の書き込みは画面側のリスナ経由のため、ここでは

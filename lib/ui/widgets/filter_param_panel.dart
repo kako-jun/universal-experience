@@ -5,7 +5,6 @@ import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_catalog.dart';
 import '../../models/vision_filter_contract_notes.dart';
-import '../../services/preview_selection.dart';
 import '../../services/vision_filter_metadata.dart';
 import '../../services/vision_filter_state.dart';
 import '../../src/rust/api/sensus_bridge.dart';
@@ -25,11 +24,10 @@ import 'strength_caution.dart';
 /// `lib/services/vision_filter_metadata.dart`）を**唯一の正本**にする（#76）。
 /// ue 独自の段階名（旧 `VisionFilterUrgency`）は UI に一切出さない。
 ///
-/// strength スライダは、選択が色覚クイック選択（統合一覧の色覚の行/トレイ）
-/// 由来のときは出さない（`lib/services/preview_selection.dart` の
-/// `showsAdvancedStrengthSlider` を参照。その場合の強度は `IntensitySlider` が
-/// 同じキーごとの記憶（`VisionFilterState.strengthByKey`、#117）を動かすので、
-/// 2 本のスライダーが並ぶのを避けるため、#60）。
+/// 対象は調整中（`focusedId`）の層 1 つ。強度スライダーはどの由来の層（色覚クイック選択・
+/// advanced・体験プリセット）でも**この 1 本だけ**（かつての色覚用スライダーとの二本立ては
+/// #120 で 1 本に統合した）。動かす先は層ごとのキーの記憶（`VisionFilterState.strengthByKey`、
+/// #117）で、動かすと原画比較（bypass）は解除される。複数層の節の並びは `AdjustPanel` が持つ。
 /// 文言はすべて i18n で解決する（カタログは識別子/enum のみ持つ: #18）。
 class FilterParamPanel extends StatelessWidget {
   const FilterParamPanel({super.key, this.noticeOverride});
@@ -62,17 +60,12 @@ class FilterParamPanel extends StatelessWidget {
         // 表示は ConsultNoticeBlock（プリセットカード・export と共有）に委ねる。
         final notice =
             noticeOverride ?? resolveConsultNotice(l10n, urgency, escalation);
-        // 色覚クイック選択由来の選択では、強度は IntensitySlider が同じ
-        // キーごとの記憶（VisionFilterState.strengthByKey、#117）を動かす。
-        // 同じ記憶を動かす 2 本のスライダーを並べないよう、この strength
-        // スライダーは出さない（判定は showsAdvancedStrengthSlider に集約、#60）。
-        final showStrength = showsAdvancedStrengthSlider(state);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (showStrength) _buildStrength(context, l10n, state),
+            _buildStrength(context, l10n, state),
             if (notice != null) ...[
-              if (showStrength) const SizedBox(height: 16),
+              const SizedBox(height: 16),
               ConsultNoticeBlock(notice: notice, l10n: l10n),
             ],
             for (final param in entry.parameters) ...[
@@ -91,7 +84,8 @@ class FilterParamPanel extends StatelessWidget {
     VisionFilterState state,
   ) {
     final percent = strengthPercent(state.strength);
-    final caution = kStrengthCautionByFilterId[state.selectedId];
+    final layerId = state.focusedId!;
+    final caution = kStrengthCautionByFilterId[layerId];
     final slider = MergeSemantics(
       child: Semantics(
           label: l10n.strengthSliderName,
@@ -102,7 +96,7 @@ class FilterParamPanel extends StatelessWidget {
             divisions: 20,
             label: '$percent%',
             semanticFormatterCallback: (v) => '${strengthPercent(v)}%',
-            onChanged: (v) => state.setStrength(v),
+            onChanged: (v) => state.setLayerStrength(layerId, v),
           )),
     );
     return Column(

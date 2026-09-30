@@ -1,7 +1,9 @@
 import '../models/disability_type.dart';
 import '../models/vision_filter_catalog.dart';
+import '../models/vision_filter_stage.dart';
 import 'filter_service.dart';
 import 'vision_filter_state.dart';
+import 'vision_layer.dart';
 
 /// 色覚のクイック選択（`FilterBrowser`・トレイ・起動時の復元）が [FilterService]
 /// と [VisionFilterState] の両方を更新する、唯一の入口（#60）。
@@ -54,4 +56,80 @@ void deactivateColorVision(
   VisionFilterState visionState,
 ) {
   selectColorVision(filterService, visionState, ColorVisionType.none);
+}
+
+/// 色覚のクイック選択を**多選択の足し引き**（[VisionFilterState.toggle]）で行う入口（#120）。
+///
+/// 統合一覧の色覚の行（排他のラジオ式）が呼ぶ。[selectColorVision] が「層を全部その 1 つに
+/// 置き換える」のに対し、こちらは他のフィルタの層を残したまま、色覚の層だけを足す・外す・
+/// 別の色覚へ置き換える。呼んだあと [FilterService] を層の集合へ合わせる
+/// （[syncFilterServiceWithLayers]）ので、`settings.filterType` ・トレイ・色覚の強度の記憶の
+/// 読み口とずれない。[type] が [ColorVisionType.none] のときは色覚層を外す
+/// （外したなら [VisionLayerResult.removed]、色覚層が無ければ何もせず
+/// [VisionLayerResult.unchanged]）。
+VisionLayerResult toggleColorVision(
+  FilterService filterService,
+  VisionFilterState visionState,
+  ColorVisionType type,
+) {
+  if (type == ColorVisionType.none) {
+    final colorLayerIds = [
+      for (final layer in visionState.layers)
+        if (isVisionColorGroupId(layer.id)) layer.id,
+    ];
+    for (final id in colorLayerIds) {
+      visionState.remove(id);
+    }
+    syncFilterServiceWithLayers(filterService, visionState);
+    return colorLayerIds.isEmpty
+        ? VisionLayerResult.unchanged
+        : VisionLayerResult.removed;
+  }
+  final catalogId =
+      visionFilterCatalogId(visionFilterForColorVisionType(type)!);
+  if (catalogId == null) {
+    throw StateError('No catalog id for color vision type: $type');
+  }
+  final result = visionState.toggle(
+    catalogId,
+    variantId: kVisionVariantIds.contains(type.name) ? type.name : null,
+    origin: VisionLayerOrigin.quick,
+  );
+  syncFilterServiceWithLayers(filterService, visionState);
+  return result;
+}
+
+/// 体験プリセットを選ぶ入口（#120）。[VisionFilterState.selectPreset] は層の集合をそのプリセット
+/// 単体へ置き換えるので、色覚クイック選択の層は無くなる。呼んだあと [FilterService] を層の集合へ
+/// 合わせる（[syncFilterServiceWithLayers]）ので、`settings.filterType`・トレイに「いま無い色覚」が
+/// 残らない。
+void selectExperiencePreset(
+  FilterService filterService,
+  VisionFilterState visionState,
+  String presetId,
+  String catalogId,
+) {
+  visionState.selectPreset(presetId, catalogId);
+  syncFilterServiceWithLayers(filterService, visionState);
+}
+
+/// [FilterService] の色覚型（`currentFilter`）を、[visionState] の層の集合に合わせる（#120）。
+///
+/// 色覚クイック選択（origin が quick）の層があればその型、無ければ none。色覚グループは
+/// 同時に 1 層なので、対象は高々 1 つ。advanced・体験プリセット由来の色覚層は、従来どおり
+/// `FilterService` の対象にしない（そこは `origin` が分ける）。
+void syncFilterServiceWithLayers(
+  FilterService filterService,
+  VisionFilterState visionState,
+) {
+  var type = ColorVisionType.none;
+  for (final layer in visionState.layers) {
+    if (layer.origin != VisionLayerOrigin.quick) continue;
+    final t = colorVisionTypeByName(layer.strengthKey);
+    if (t != null) {
+      type = t;
+      break;
+    }
+  }
+  if (filterService.currentFilter != type) filterService.applyFilter(type);
 }

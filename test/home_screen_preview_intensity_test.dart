@@ -160,7 +160,7 @@ void main() {
     );
     await tester.pump();
 
-    // IntensitySlider（色覚クイック選択の強度スライダー、#60）が唯一の Slider。
+    // 調整パネルの強度スライダー（#120 で 1 本に統合）が唯一の Slider。
     final sliderFinder = find.byType(Slider);
     // 1200x4000 の 3 カラム（#72）では右カラム「調整」の先頭付近にあり、
     // スクロールせずに hit test できる。

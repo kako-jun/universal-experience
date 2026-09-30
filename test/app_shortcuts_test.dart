@@ -20,6 +20,8 @@ import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
+import 'package:universal_experience/ui/widgets/filter_browser.dart';
+import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 
 import 'support/vision_filter_metadata_fixture.dart';
 
@@ -79,28 +81,39 @@ void main() {
     );
   });
 
-  testWidgets('↓ で統合一覧の選択が一覧順に進む（先頭から）', (WidgetTester tester) async {
+  Key? focusedRowKey(WidgetTester tester) =>
+      tester.binding.focusManager.primaryFocus?.context
+          ?.findAncestorWidgetOfExactType<FilterListTile>()
+          ?.key;
+
+  testWidgets('↓ で統合一覧の行へ先頭から順にフォーカスが進み、選択は変わらない（#120）',
+      (WidgetTester tester) async {
     await pumpApp(tester);
     expect(visionFilterState.selectedId, isNull);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pump();
-    expect(selectedFilterListEntry(visionFilterState), kFilterListEntries[0]);
+    expect(focusedRowKey(tester), filterListTileKey(kFilterListEntries[0]));
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pump();
-    expect(selectedFilterListEntry(visionFilterState), kFilterListEntries[1]);
+    expect(focusedRowKey(tester), filterListTileKey(kFilterListEntries[1]));
+    expect(visionFilterState.layers, isEmpty);
   });
 
-  testWidgets('↑ で統合一覧の選択が一覧順に戻る', (WidgetTester tester) async {
+  testWidgets('↑ で統合一覧の行へのフォーカスが一覧順に戻る（選択は変わらない、#120）',
+      (WidgetTester tester) async {
     await pumpApp(tester);
-    applyFilterListEntry(
-        filterService, visionFilterState, kFilterListEntries[2]);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pump();
+    expect(focusedRowKey(tester), filterListTileKey(kFilterListEntries[2]));
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
     await tester.pump();
-    expect(selectedFilterListEntry(visionFilterState), kFilterListEntries[1]);
+    expect(focusedRowKey(tester), filterListTileKey(kFilterListEntries[1]));
+    expect(visionFilterState.layers, isEmpty);
   });
 
   testWidgets('← → で advanced 選択中は VisionFilterState.strength が ±5% 動く',

@@ -278,7 +278,7 @@ ue が二重に持っていた色覚ロジックを撤去し、アルゴリズ�
   -anomaly 系は sensus が severity を `strength` で表すため base の -opia へマップ
   （anomaly は強度 < 1 相当）。
 - **UI**: `filter_selector`（現 `filter_browser`、#72） / `intensity_slider` は `ColorVisionType` のまま動く
-  （FilterService の公開 API を維持）。home_screen は system-wide 適用前提の文言を
+  （FilterService の公開 API を維持。追記: `intensity_slider` は #120 で廃止し、強度は調整パネルの 1 本のスライダーに統合した）。home_screen は system-wide 適用前提の文言を
   外し、「ライブ画面への適用は画面キャプチャ経路（#1/#3/#4）実装後」と明記した。
 - **テスト**: `test/filter_service_test.dart` を追加（選択状態の遷移・clamp・
   マッピング。現在は `visionFilterForColorVisionType` を直接検証）。protanopia golden は維持。
@@ -598,7 +598,7 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   （sensus 由来）で「喚起なし」、advanced 側（ue 独自値）で「早めに受診」と
   矛盾していたが、正本が 1 つになったことで解消した（`bppv_urgency_matches_
   between_experience_and_filter`、rust 側テスト）。
-  UI（`FilterParamPanel._buildConsultBlock`）は段階名（「緊急度：高」）を一切
+  UI（`FilterParamPanel.build` が `ConsultNoticeBlock` を組む。複数層は層ごとの節、#120）は段階名（「緊急度：高」）を一切
   出さず、喚起文だけを本文サイズ以上の専用ブロックで表示する。色は
   `ColorScheme` のロールのみ（`tertiaryContainer`/`errorContainer`/
   `surfaceContainerHighest`）を使う。`urgency_escalation()` の条件文

@@ -1,6 +1,7 @@
 import '../models/disability_type.dart';
 import '../models/vision_filter_catalog.dart';
 import '../services/tray_menu_labels.dart';
+import '../services/vision_layer.dart';
 import '../src/rust/api/sensus_bridge.dart';
 import 'app_localizations.dart';
 
@@ -218,6 +219,28 @@ String visionFilterDisplayName(
   }
   if (filterId == null) return l10n.previewPaneOriginal;
   return visionFilterName(l10n, filterId);
+}
+
+/// 重ねている 1 層の表示名（#120）。別名（-omaly）の層は別名の名前、それ以外は
+/// カタログの名前。チップ・調整パネルの節・見出し・HUD が共有する。
+String visionLayerDisplayName(AppLocalizations l10n, VisionLayer layer) {
+  final variant = layer.variantId;
+  final variantType = variant == null ? null : colorVisionTypeByName(variant);
+  return variantType != null
+      ? colorVisionTypeName(l10n, variantType)
+      : visionFilterName(l10n, layer.id);
+}
+
+/// 表示名に入れる層の名前の数の上限。これを超えた分は「…（+N）」にまとめる。
+const int kLayerSummaryNamedCount = 2;
+
+/// 複数の層の名前 [names]（適用順）を 1 行にまとめる（#120）。先頭 [kLayerSummaryNamedCount]
+/// 個を「 + 」でつなぎ、残りがあれば「 …（+N）」を付ける。名前が 0 件なら空文字。
+/// プレビューの after 側の見出しとルーペ HUD が同じ形を使う。
+String layerNamesSummary(AppLocalizations l10n, List<String> names) {
+  final shown = names.take(kLayerSummaryNamedCount).join(' + ');
+  final rest = names.length - kLayerSummaryNamedCount;
+  return rest > 0 ? l10n.layerSummaryMore(shown, rest) : shown;
 }
 
 /// Advanced カタログの payload パラメータ labelKey → 表示名を解決する。

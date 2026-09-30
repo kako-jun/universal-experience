@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_catalog.dart';
+import '../../services/color_vision_selection.dart';
 import '../../services/experience_source.dart';
+import '../../services/filter_service.dart';
 import '../../services/vision_filter_metadata.dart';
 import '../../services/vision_filter_state.dart';
 import '../../src/rust/api/sensus_bridge.dart';
@@ -108,9 +110,12 @@ class ExperiencePresetTile extends StatelessWidget {
       // 視覚フィルタを持つ体験のみ適用可能（4 体験はすべて vision を持つ）。
       onTap: catalogId == null
           ? null
-          : () => context
-              .read<VisionFilterState>()
-              .selectPreset(experience.id, catalogId),
+          : () => selectExperiencePreset(
+                context.read<FilterService>(),
+                context.read<VisionFilterState>(),
+                experience.id,
+                catalogId,
+              ),
       onPointerActivated: onActivated,
     );
   }

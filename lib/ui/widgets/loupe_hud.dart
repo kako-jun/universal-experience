@@ -8,9 +8,9 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_contract_notes.dart' as contract_notes;
+import '../../services/layer_consult_notice.dart';
 import '../../services/loupe_window_controller.dart';
 import '../../services/preview_selection.dart';
-import '../../services/vision_filter_metadata.dart';
 import '../../services/vision_filter_state.dart';
 import '../../src/rust/api/sensus_bridge.dart';
 import 'consult_notice_block.dart';
@@ -43,9 +43,13 @@ const Duration kLoupeHudHideDelay = Duration(milliseconds: 700);
 /// - 症状名・強度（[VisionFilterState] の現在の選択。表示名の解決は
 ///   [visionFilterDisplayName]（#60 の元 `_displayName` を共有可能な形に
 ///   抽出したもの）を `before_after_view.dart` と共有する — 重複させない。
-///   強度は bypass に関わらない [selectedStrength] を使う、#79）
+///   強度は bypass に関わらない [selectedStrength] を使う、#79）。複数層のときは
+///   強度を出さず、名前を「名前 + 名前 …（+N）」（[layerNamesSummary]。プレビューの
+///   after 側の見出しと同じ形）にまとめる（#120）。原画比較は全層まとめて 1 つのトグル
 /// - 受診喚起アイコン（[resolveConsultNotice] が非 null を返すときだけ表示。
-///   押すと [ConsultNoticeBlock] で全文をダイアログ表示する）
+///   押すと [ConsultNoticeBlock] で全文をダイアログ表示する）。複数層のときは、
+///   喚起のある層があれば出し、ダイアログは層ごとに名前つきで並べる（各層単体の入力。
+///   複数層の合成は #121）
 /// - 原画比較ボタン（押している間だけ [VisionFilterState.bypassed] を true に
 ///   し、離す/キャンセルで必ず false に戻す。スクリーンリーダー等、押し続ける
 ///   操作ができない場合のトグル代替も持つ、#79）
@@ -179,28 +183,34 @@ class _LoupeHudBar extends StatelessWidget {
 
     return Consumer<VisionFilterState>(
       builder: (context, visionState, _) {
-        final filter = visionState.build();
-        final symptomLabel = visionFilterDisplayName(
-          l10n,
-          visionState.colorVisionType,
-          visionState.selectedId,
-        );
+        final layers = visionState.layers;
+        final multi = layers.length > 1;
+        final symptomLabel = multi
+            ? layerNamesSummary(l10n, [
+                for (final layer in layers) visionLayerDisplayName(l10n, layer),
+              ])
+            : visionFilterDisplayName(
+                l10n,
+                visionState.colorVisionType,
+                visionState.selectedId,
+              );
         // #79: bypass に関わらない素の強度を表示する（原画比較中も
         // 「今選んでいるフィルタは何%か」が見え続けるように）。原画表示中で
         // あること自体は原画比較ボタンのアイコンの色で示す
-        // （[_CompareOriginalButtonState] 参照）。
+        // （[_CompareOriginalButtonState] 参照）。複数層のときは強度を出さない（#120）。
         final strengthPercent = contract_notes.strengthPercent(
           selectedStrength(visionState),
         );
         // #76 と同じく、喚起の解決は resolveConsultNotice 1 箇所に集約する
-        // （FilterParamPanel・ExperiencePresetTile・export と同じ経路）。
-        final notice = filter == null
-            ? null
-            : resolveConsultNotice(
-                l10n,
-                visionFilterUrgencyProvider(filter),
-                visionFilterUrgencyEscalationProvider(filter),
-              );
+        // （FilterParamPanel・ExperiencePresetTile・export と同じ経路）。層ごとに
+        // （名前, 喚起）を集める。1 層のときは従来どおり 1 件（名前は出さない）。
+        final notices = <(String, ConsultNotice)>[
+          for (final layer in layers)
+            if (layerConsultNotice(l10n, visionState, layer) case final notice?)
+              (visionLayerDisplayName(l10n, layer), notice),
+        ];
+        final hasEmergency =
+            notices.any((n) => n.$2.urgency == Urgency.emergency);
 
         return Material(
           elevation: 4,
@@ -215,36 +225,44 @@ class _LoupeHudBar extends StatelessWidget {
               children: [
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        symptomLabel,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: scheme.onSurface,
-                          fontWeight: FontWeight.bold,
+                  // 名前が長い複数層でも切らずに折り返す（バーの横幅は上限つき）。
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 320),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          symptomLabel,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: scheme.onSurface,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      Text(
-                        l10n.strengthLabel(strengthPercent),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+                        if (!multi)
+                          Text(
+                            l10n.strengthLabel(strengthPercent),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-                if (notice != null)
+                if (notices.isNotEmpty)
                   _HudIconButton(
-                    icon: notice.urgency == Urgency.emergency
+                    icon: hasEmergency
                         ? Icons.warning_amber_rounded
                         : Icons.medical_information_outlined,
                     tooltip: l10n.hudConsultNoticeTooltip,
-                    color: notice.urgency == Urgency.emergency
-                        ? scheme.error
-                        : scheme.tertiary,
-                    onPressed: () => _showConsultDialog(context, l10n, notice),
+                    color: hasEmergency ? scheme.error : scheme.tertiary,
+                    onPressed: () => _showConsultDialog(
+                      context,
+                      l10n,
+                      notices,
+                      showNames: multi,
+                    ),
                   ),
                 const _CompareOriginalButton(),
                 _HudIconButton(
@@ -266,14 +284,35 @@ class _LoupeHudBar extends StatelessWidget {
   void _showConsultDialog(
     BuildContext context,
     AppLocalizations l10n,
-    ConsultNotice notice,
-  ) {
+    List<(String, ConsultNotice)> notices, {
+    required bool showNames,
+  }) {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(l10n.hudConsultDialogTitle),
         content: SingleChildScrollView(
-          child: ConsultNoticeBlock(notice: notice, l10n: l10n),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < notices.length; i++) ...[
+                if (i > 0) const SizedBox(height: 16),
+                // 複数層のときは、どの層の喚起かを名前で示す。
+                if (showNames) ...[
+                  Semantics(
+                    header: true,
+                    child: Text(
+                      notices[i].$1,
+                      style: Theme.of(dialogContext).textTheme.titleMedium,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                ConsultNoticeBlock(notice: notices[i].$2, l10n: l10n),
+              ],
+            ],
+          ),
         ),
         actions: [
           TextButton(

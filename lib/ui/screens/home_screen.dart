@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
+import '../../l10n/l10n_extensions.dart';
 import '../../models/sample_catalog.dart';
 import '../../services/app_shortcuts.dart';
 import '../../services/color_vision_compare.dart';
@@ -21,6 +22,7 @@ import '../widgets/filter_browser.dart';
 import '../widgets/filter_list_tile.dart';
 import '../widgets/image_source_picker.dart';
 import '../widgets/language_dialog.dart';
+import '../widgets/layer_chip_strip.dart';
 import '../widgets/welcome_banner.dart';
 import '../widgets/window_mode_panel.dart';
 
@@ -165,19 +167,19 @@ class _HomeScreenState extends State<HomeScreen> {
               return null;
             },
           ),
-          CycleFilterIntent:
-              InteractiveFocusAwareCallbackAction<CycleFilterIntent>(
+          // ↑↓: 一覧の行の間でフォーカスだけを動かす（選択は変えない。足し引きは行の
+          // Space/Enter、#120）。行にフォーカスがある間も受ける（ListTile の標準の移動だと、
+          // 上限で無効の行や絞り込みの外へ出てしまうため）。ボタン・入力欄など行以外の
+          // 操作部品の上では奪わない。
+          CycleFilterIntent: _RowAwareCycleAction(
+            isRowFocused: () => _browser.isRowFocused,
             onInvoke: (intent) {
-              final filterService = context.read<FilterService>();
-              final visionState = context.read<VisionFilterState>();
-              final next = nextFilterListEntry(
-                _browser.visibleEntries,
-                selectedFilterListEntry(visionState),
+              // 行にフォーカスが無いときは、調整中の層の行から送る（先頭からではなく）。
+              final focused = context.read<VisionFilterState>().focusedLayer;
+              _browser.moveRowFocus(
                 forward: intent.forward,
+                from: focused == null ? null : filterListEntryForLayer(focused),
               );
-              if (next != null) {
-                applyFilterListEntry(filterService, visionState, next);
-              }
               return null;
             },
           ),
@@ -378,9 +380,11 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, visionState, imageSourceState, _) {
         final theme = Theme.of(context);
         final l10n = AppLocalizations.of(context)!;
-        // 暫定（#119）: 複数層でもフォーカス中の層だけで判定する。層集合が色覚 1 つのときだけ
-        // 出す方針への切り替えは #122（ADR の暫定挙動）。
-        final canCompare = isColorVisionFilterId(visionState.selectedId);
+        // 暫定（#120）: 「2×2 で比較」は、層の集合がちょうど色覚 1 層のときだけ出す。
+        // 他の層が重なっている間は、4 型の一覧が「重ねた結果」と食い違うため。複数層との
+        // 合成での 2×2 は #122 で解除する。
+        final canCompare = visionState.layers.length == 1 &&
+            isColorVisionFilterId(visionState.layers.single.id);
         final comparing = canCompare && _compareColorVision;
         final strength = previewStrength(visionState);
         return Card(
@@ -425,6 +429,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                   ],
                 ),
+                // 重ねている層のチップ帯（#120）。2 層以上のときだけ出る（1 層以下は高さ 0）。
+                if (visionState.layers.length > 1) ...[
+                  const SizedBox(height: 12),
+                  const LayerChipStrip(),
+                ],
                 const SizedBox(height: 12),
                 ImageSourcePicker(
                   child: comparing
@@ -441,6 +450,19 @@ class _HomeScreenState extends State<HomeScreen> {
                           // 単一フィルタ経路のまま。
                           steps: visionState.layers.length > 1
                               ? previewPipelineSteps(visionState)
+                              : null,
+                          // 複数層の見出し・HUD は名前の要約にする（#120）。
+                          layerNames: visionState.layers.length > 1
+                              ? [
+                                  for (final layer in visionState.layers)
+                                    visionLayerDisplayName(l10n, layer),
+                                ]
+                              : null,
+                          layerIds: visionState.layers.length > 1
+                              ? [
+                                  for (final layer in visionState.layers)
+                                    layer.id,
+                                ]
                               : null,
                           imageSource: imageSourceState.current,
                         ),
@@ -501,6 +523,19 @@ class _ThemeModeButton extends StatelessWidget {
         ThemeMode.light => ThemeMode.dark,
         ThemeMode.dark => ThemeMode.system,
       };
+}
+
+/// ↑↓ の行移動（[CycleFilterIntent]）。[isFocusOnInteractiveControl] が true の間は
+/// 無効（[InteractiveFocusAwareCallbackAction] と同じ）だが、フォーカスが一覧の行
+/// （[FilterBrowserController.isRowFocused]）にあるときは例外として有効にする。
+class _RowAwareCycleAction extends CallbackAction<CycleFilterIntent> {
+  _RowAwareCycleAction({required this.isRowFocused, required super.onInvoke});
+
+  final bool Function() isRowFocused;
+
+  @override
+  bool isEnabled(CycleFilterIntent intent) =>
+      isRowFocused() || !isFocusOnInteractiveControl();
 }
 
 /// 「選ぶ」カード（広幅は左カラム、狭幅は末尾）用のフォーカス走査。標準（読み順）と同じだが、**一覧の行にフォーカスが

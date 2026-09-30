@@ -69,6 +69,9 @@ enum VisionLayerChange {
 
   /// 上限のため何もしなかった（状態は変わらない。理由は [VisionLayerResult.blockedBy]）。
   blocked,
+
+  /// 外す対象が無く、何もしなかった（例: 色覚の層が無いときの「色覚を外す」）。
+  unchanged,
 }
 
 /// 未選択の層を足せない理由（UI が行を無効化するときの文言の出どころ）。
@@ -78,7 +81,8 @@ enum VisionLayerBlockReason {
 }
 
 /// [VisionFilterState.toggle] の結果。[change] が [VisionLayerChange.blocked] のとき
-/// だけ [blockedBy] が非 null で、その操作は状態を変えていない（no-op）。
+/// だけ [blockedBy] が非 null。blocked と [VisionLayerChange.unchanged] は、その操作が
+/// 状態を変えていない（no-op）。
 class VisionLayerResult {
   const VisionLayerResult._(this.change, this.blockedBy);
 
@@ -88,14 +92,18 @@ class VisionLayerResult {
   static const added = VisionLayerResult._(VisionLayerChange.added, null);
   static const removed = VisionLayerResult._(VisionLayerChange.removed, null);
   static const replaced = VisionLayerResult._(VisionLayerChange.replaced, null);
+  static const unchanged =
+      VisionLayerResult._(VisionLayerChange.unchanged, null);
 
   final VisionLayerChange change;
 
   /// [change] が blocked のときの理由。それ以外は null。
   final VisionLayerBlockReason? blockedBy;
 
-  /// 状態が変わったか（blocked でなければ true）。
-  bool get changed => change != VisionLayerChange.blocked;
+  /// 状態が変わったか（blocked でも unchanged でもなければ true）。
+  bool get changed =>
+      change != VisionLayerChange.blocked &&
+      change != VisionLayerChange.unchanged;
 
   @override
   bool operator ==(Object other) =>
