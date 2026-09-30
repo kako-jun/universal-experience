@@ -15,7 +15,8 @@
 ```
 lib/
 ├── main.dart
-├── l10n/                   # 多言語化（ARB: app_en.arb / app_ja.arb、ja/en。生成物は非コミット）
+├── l10n/                   # 多言語化（ARB: app_en.arb / app_ja.arb、ja/en。生成物は非コミット）。
+│                           # locale_resolution.dart が「選んだ言語 → OS → 英語」の解決の唯一の入口（#82）
 ├── models/
 │   ├── disability_type.dart
 │   ├── vision_filter_catalog.dart   # sensus カタログ（30種）の Dart 側定義
@@ -43,7 +44,8 @@ lib/
 │   ├── native_bridge_service.dart   # flutter_rust_bridge（sensus-core）の bootstrap 初期化
 │   ├── preview_selection.dart       # プレビュー強度の出どころを一本化する判定（#60/#63）
 │   ├── settings_service.dart        # isFirstRun/welcomeBannerDismissed も持つ（#78）
-│   ├── tray_service.dart            # タスクトレイ
+│   ├── tray_service.dart            # タスクトレイ（updateLocalization で文言を差し替える、#82）
+│   ├── tray_locale_sync.dart        # 言語の選択/OS ロケール変更をトレイの文言へ橋渡し（#82）
 │   ├── vision_filter_metadata.dart  # urgency/urgency_escalation/recommended_strength の
 │   │                                 # provider seam（sensus ブリッジが唯一の正本、#76/#77）
 │   └── vision_filter_state.dart     # フィルタ id ごとの強度・パラメータの記憶（#77）
@@ -59,6 +61,7 @@ lib/
     │                                 # ホットキー一覧を持つ。AppBar のダイアログで開く、#63/#72）,
     │                                 # loupe_hud（ルーペ窓モード限定の HUD。症状名・強度・
     │                                 # 受診喚起・原画比較・設定を開く、#79）,
+    │                                 # language_dialog（AppBar の言語ピッカー。自動/日本語/English、#82）,
     │                                 # image_source_picker（サンプルチップ・ファイル選択・
     │                                 # drag&drop、#78）, welcome_banner（初回案内、#78）
     └── theme/app_theme.dart         # light/dark に加え highContrastTheme / highContrastDarkTheme
@@ -91,12 +94,15 @@ test/
 ├── tap_target_size_test.dart       # macOS 指定で操作領域が 48dp 以上（padded + standard、#72）
 ├── filter_browser_test.dart        # 統合一覧の検索・カテゴリ切替・行の選択（#72）
 ├── filter_list_selection_test.dart # 統合一覧の純粋ロジック（#72）
+├── language_dialog_test.dart       # 言語ピッカー: 切替でフィルタ名・説明が追従・永続化・自称名の網羅（#82）
+├── tray_locale_sync_test.dart      # 言語の選択/OS ロケール変更でトレイの文言が更新される（#82）
 ├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品
 ├── support/screenshot_harness.dart # スクリーンショット用フォント読込・PNG 書出し（フォントはコミットしない）
 └── ui_screenshots/                 # HomeScreen の PNG 書出し。`UE_SCREENSHOTS=1` のときだけ実行（DESIGN.md §8）
 
 docs/
 ├── adr/                     # 設計判断の正本（Architecture Decision Records）
+├── ADDING_A_LANGUAGE.md     # 言語の追加手順と医学用語の訳の確認方針（#82）
 ├── ARCHITECTURE.md
 ├── COLOR_ALGORITHM.md
 ├── GETTING_STARTED.md

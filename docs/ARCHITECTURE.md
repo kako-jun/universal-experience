@@ -208,6 +208,22 @@
   `Menu` / `MenuItem` に変換し、クリックを `FilterService` (#14) と、main.dart
   から注入されるウィンドウ表示/非表示コールバックに橋渡しする。
 
+### 言語の切替とトレイの文言 (#82)
+
+AppBar の言語ダイアログ (`lib/ui/widgets/language_dialog.dart`) が
+`SettingsService.setLocale` を呼ぶ。使う言語は `lib/l10n/locale_resolution.dart` の
+`resolveSupportedLocale`（選んだ言語 → OS の言語 → 英語）が唯一の入口で、
+`MaterialApp.locale`・起動時のエラー画面・トレイが同じ関数で解決する。
+
+トレイは `BuildContext` を持たないため、`TrayService` はコンストラクタで文言
+(`TrayMenuLabels` とツールチップ) を受け取り、`updateLocalization()` で差し替える
+(初期化済みならツールチップとメニューを作り直す)。`lib/services/tray_locale_sync.dart` の
+`TrayLocaleSync` が `SettingsService` の変更と `WidgetsBindingObserver.didChangeLocales`
+（「システムに合わせる」のときの OS 言語変更）を見て、**解決後の言語が変わったときだけ**
+`main()` から渡された `apply` を呼ぶ。`test/tray_locale_sync_test.dart` と
+`test/tray_service_test.dart` の `updateLocalization` がこれを検証する。言語の追加手順は
+`docs/ADDING_A_LANGUAGE.md`。
+
 メインウィンドウ自体がルーペ窓 (#14)。`LoupeWindowController` は枠/モード/透過の
 責務を持つが show/hide は持たないため、トレイの「ルーペ窓を表示/隠す」は
 main.dart が `windowManager.show()` / `hide()` を `onShowLoupe` / `onHideLoupe`
