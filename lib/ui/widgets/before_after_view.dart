@@ -967,7 +967,7 @@ typedef ExportPlan = ({
 ///
 /// [layers] は重ねている全層（[BeforeAfterView.exportLayers]、単一層なら null）。
 /// キャプションに数えるのは**強度が 0 より大きい層だけ**（[effectiveExportLayers]。強度 0 の層は
-/// 画素に効かないので、症状の行にも受診喚起にもファイル名にも入れない）。
+/// 画素に効かないので、症状の行にも受診喚起にもファイル名にも入れない。表示が「0%」になる強度も同じ）。
 ///
 /// - 2 層以上: [buildLayeredExportCaption]（層ごとの行 + 合成した受診喚起）。ファイル名は
 ///   層の id を適用順につないだもの（[exportSymptomId]）で、強度の % は付けない。

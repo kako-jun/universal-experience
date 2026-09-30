@@ -317,6 +317,24 @@ void main() {
       expect(p.symptomId, 'vertigo-protanopia');
     });
 
+    test('表示が 0% になる強度（0.004）も数えない。1% になる強度（0.006）は数える', () {
+      final layers = layersOf(
+        ['protanopia', 'myopia', 'vertigo'],
+        strengths: {'myopia': 0.004, 'vertigo': 0.006},
+      );
+      expect([for (final l in effectiveExportLayers(layers)) l.layer.id],
+          ['vertigo', 'protanopia'],
+          reason: '整数パーセントに丸めて 0 になる層は、「0%」の行を出さず数えない');
+
+      final p = plan(en, layers);
+      expect([for (final l in p.caption.layers) l.name],
+          [en.filterVertigo, en.filterProtanopia]);
+      expect(p.caption.layers.first.strengthLabel, en.strengthLabel(1));
+      expect(p.caption.layers.any((l) => l.strengthLabel == en.strengthLabel(0)),
+          isFalse);
+      expect(p.symptomId, 'vertigo-protanopia');
+    });
+
     test('受診喚起から除く（強度 0 の層の緊急度・escalation は焼き込まない）', () {
       visionFilterUrgencyProvider = (f) => switch (f) {
             VisionFilter_Myopia() => Urgency.emergency,

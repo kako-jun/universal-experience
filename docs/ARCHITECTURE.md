@@ -1034,12 +1034,14 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
 - 複数層の書き出し（#121）: `BeforeAfterView` は画像を描画した時点の層の列を `ExportLayer`
   （`lib/services/export_layers.dart`。層・構築済みフィルタ・強度）として控え、書き出しはその控えから
   `planExport` でキャプション（`ExportCaption.layered`）・症状 id・強度を作る（呼び出し時点の選択は
-  見ない）。画像に効いている層（強度 > 0 の `effectiveExportLayers`）ごとに「症状名 + 強度」の行を
+  見ない）。画像に効いている層（強度 > 0 の `effectiveExportLayers`。判定はキャプションに出す整数パーセント
+  `strengthPercent` で、0.004 のように「0%」と出る強度も数えない）ごとに「症状名 + 強度」の行を
   適用順に並べ、受診喚起は `consultInputForFilters` の併合（最大の緊急度・escalation は段ごとに重複除去）
   を `resolveConsultNotice` へ渡した 1 つだけ、実験的の注記はどれか 1 層でも実験的なら 1 つ、
   「シミュレーション（近似）」は常に焼き込む。強度 0 の層は画素に何も足さないため、症状行・喚起・注記・
   ファイル名に数えない（画像だけが共有されたとき実際の見え方と食い違わないため。プレビューの
-  `pipelineSteps` が強度 0 を除くのと揃える）。bypass 中は空（原画のまま）。1 層（強度 > 0 が 1 つ）は従来の
+  `pipelineSteps` は厳密に 0 の層だけを除くので、0.5% 未満の層はごくわずかに画素へ効くが、目に見える差ではなく
+  「0%」の行も出さない）。bypass 中は空（原画のまま）。1 層（強度 > 0 が 1 つ）は従来の
   `ExportCaption` と同一の画素。ファイル名の症状 id は `exportSymptomId`（適用順に `-` 連結・
   `kMaxExportSymptomIdLength` = 48 文字で、収まる分だけ残して `-plusN`。複数層は強度の % を入れない）。
   調整パネル・HUD の注意書きは ADR どおり層ごとのままで、併合した喚起は共有される 1 枚の画像にだけ使う。

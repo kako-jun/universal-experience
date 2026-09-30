@@ -44,7 +44,7 @@ lib/
 │   │                                 # 検索・選択入口・↑↓ の順送りの純粋ロジック（#72）
 │   ├── filter_service.dart          # 色覚クイック選択の型と、sensus VisionFilter へのマッピング。
 │   │                                 # 強度は VisionFilterState の記憶へ委譲（#117）
-│   ├── export_layers.dart           # 書き出しが数える層 effectiveExportLayers（強度 > 0 のみ）・描画時点の控え ExportLayer / exportLayersOf（#121）
+│   ├── export_layers.dart           # 書き出しが数える層 effectiveExportLayers（強度 > 0 のみ。表示の整数パーセントが 0 になる強度も除く）・描画時点の控え ExportLayer / exportLayersOf（#121）
 │   ├── hotkey_actions.dart          # グローバルホットキー4アクションの実処理（#63。フィルタ解除は全層を外す、#121 でテスト固定）
 │   ├── hotkey_service.dart          # hotkey_manager 登録の副作用層（#63）
 │   ├── image_source_state.dart      # プレビュー原画（サンプル/ユーザー画像）の選択の唯一の正本（#78）
