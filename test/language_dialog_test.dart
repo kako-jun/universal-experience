@@ -48,7 +48,9 @@ void main() {
     addTearDown(tester.view.reset);
     // OS の優先言語リスト。複数言語を与えられるよう `locales` を正とし、
     // 単数の `locale` は先頭に揃える。
-    tester.platformDispatcher.localeTestValue = system.first;
+    // 一覧が空のときは単数の値に意味を持たせない（解決は一覧だけを見る）。
+    tester.platformDispatcher.localeTestValue =
+        system.isEmpty ? const Locale('xx') : system.first;
     tester.platformDispatcher.localesTestValue = system;
     addTearDown(tester.platformDispatcher.clearLocalesTestValue);
     addTearDown(tester.platformDispatcher.clearLocaleTestValue);
@@ -279,6 +281,13 @@ void main() {
       );
     });
 
+    testWidgets('OS の言語リストが空（自動）: 画面もトレイも en', (tester) async {
+      final settings = await pumpApp(tester, system: const []);
+      final r = await screenAndTray(tester, settings);
+      expect(r.screen, const Locale('en'));
+      expect(r.tray, r.screen);
+    });
+
     testWidgets('未対応の保存値 fr + OS が [fr, ja]: 画面もトレイも ja', (tester) async {
       final settings = await pumpApp(
         tester,
@@ -292,6 +301,33 @@ void main() {
   });
 
   group('言語名の読み上げ', () {
+    testWidgets('「自動」は、端末の言語に従うことが分かる名前で読み上げられる', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpApp(tester, persisted: const Locale('ja'));
+      await openDialog(tester, ja);
+      expect(
+        find.descendant(
+          of: find.byType(SegmentedButton<String>),
+          matching: find.bySemanticsLabel('自動（端末の言語）'),
+        ),
+        findsOneWidget,
+      );
+      // 画面に見えるのは短い「自動」のまま。
+      expect(find.text('自動'), findsOneWidget);
+
+      await tester.tap(find.text('English'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(
+        find.descendant(
+          of: find.byType(SegmentedButton<String>),
+          matching: find.bySemanticsLabel('Auto (device language)'),
+        ),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
     testWidgets('自称名は、その言語のラベルとして読み上げられる（LocaleStringAttribute）',
         (tester) async {
       final handle = tester.ensureSemantics();
