@@ -51,18 +51,6 @@ typedef AfterImageRenderer = Future<ui.Image?> Function(
 @visibleForTesting
 AfterImageRenderer afterImageRenderer = BeforeAfterView.renderAfter;
 
-/// 複数層のときの after 画像描画ステップの型（[AfterImageRenderer] の複数ステップ版、
-/// #119）。実体は [BeforeAfterView.renderAfterPipeline]。[steps] は適用順で、強度 0 の層は
-/// 既に除かれている。テストでフェイクに差し替えて「どのステップ列を渡したか」を検証する。
-typedef AfterPipelineRenderer =
-    Future<ui.Image?> Function(ui.Image source, List<VisionStep> steps);
-
-/// 複数層の after 画像描画の供給源（テストで差し替え可能）。既定は
-/// [BeforeAfterView.renderAfterPipeline]。
-@visibleForTesting
-AfterPipelineRenderer afterPipelineRenderer =
-    BeforeAfterView.renderAfterPipeline;
-
 /// [_BeforeAfterViewState._export] が使うキャプション合成ステップの型。
 ///
 /// 実体は [composeExportImage]。widget test が実ファイル I/O（[pngSaver]）に
@@ -193,7 +181,8 @@ class BeforeAfterView extends StatefulWidget {
   ///
   /// `null`（既定。層が 0〜1 のとき）なら従来どおり [filter] を [strength] で適用する
   /// （[afterImageRenderer]）。非 null のときは **この列を 1 回の合成で適用**し
-  /// （[afterPipelineRenderer] → [CpuVisionRenderer.pipelineApplier]）、[filter] と
+  /// （[BeforeAfterView.renderAfterPipeline] → [CpuVisionRenderer.pipelineApplier]。テストでは
+  /// `pipelineApplier` を差し替える）、[filter] と
   /// [strength] は描画に使わない（見出し・書き出しが代表として参照する、フォーカス中の層の
   /// 値。複数層の見出し・書き出しは #120/#121）。空なら原画をそのまま見せる。
   final List<VisionStep>? steps;
@@ -553,7 +542,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
               widget.filter,
               widget.strength,
             )
-          : await afterPipelineRenderer(rendererInput, steps);
+          : await BeforeAfterView.renderAfterPipeline(rendererInput, steps);
     } catch (e, st) {
       // こちらも同様に報告する。
       FlutterError.reportError(FlutterErrorDetails(
@@ -574,7 +563,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     // 無い」状態で、空の枠を成功として出してしまう。例外と同じ失敗として扱う（#45）。
     if (after == null) {
       FlutterError.reportError(FlutterErrorDetails(
-        exception: StateError('afterImageRenderer returned null'),
+        exception: StateError('after renderer returned null'),
         library: 'before_after_view',
       ));
       if (clonedInput) {
