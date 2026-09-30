@@ -174,9 +174,30 @@ VisionFilterState.focusedId : String?                      // 調整パネルが
     無ければ `intensityByType` だけで初期化する。**色覚シードはこの記憶ができた後に走る**ので、シードされた層
     （初回起動の deuteranomaly や `settings.filterType`）の強度も `intensityByType` の値になる（層に
     強度を持たせないので、シード層も記憶を読むだけで済む）。
-  - **書き込みの順序**: 折り畳んだ記憶を `settings.visionFilter`（v2）に書き、書けたことを確認して
+  - **置き場所**: 折り畳みは、現在 `main.dart` が `filterService.load()`（211 行付近）を呼んでいる
+    位置（設定の読み込みの後、色覚シード（229 行付近）の前）に、`load()` の代わりとして置く。`load()` は
+    `intensityByType` を読んで `FilterService` の内部 map に入れているが、#117 以降の `FilterService` は
+    記憶を持たない薄い委譲なので、`load()` も `_persist` / `flush`（`filter_service.dart` の 163〜252 行付近）
+    も `intensityByType` を**読み書きしない**ようにする（書き続けると、起動のたびに (b) の分岐になる）。
+    折り畳みだけが生の `SharedPreferences` から `intensityByType` を読む。
+  - **v1 JSON が無いときの v2 の `layers`**: 起動順は `filterService.load()` → 色覚シード →
+    `restoreAndBind`（`main.dart` の 211 → 229 → 241 行付近）で、`VisionFilterSnapshot.isEmpty` は
+    `selectedId == null && strengthById.isEmpty && paramsById.isEmpty`（`vision_filter_snapshot.dart` 136 行付近）
+    と強度も見るため、`strengthByKey` だけが入った v2 は「空でない」と判定されて `restore` が走る。
+    `restore` は `selectedId == null` だと選択を全部外す（`vision_filter_state.dart` 353〜362 行付近）ので、
+    `layers` が空の v2 を色覚シード前に書くと、**シードした色覚層が起動のたびに消える**。そこで、v1 JSON が
+    無いときの v2 は、色覚シードと同じ選択を `layers` に書く: シードと同じ型（`settings.isFirstRun` なら
+    deuteranomaly、そうでなければ `settings.filterType`）が none でなければ、その型に対応する
+    `{id: catalogId(t), variantId: -omaly なら t、そうでなければ null, origin: クイック}` の 1 層（強度は
+    `strengthByKey` に `intensityByType` から入れた値）。none なら `layers` は空で、`strengthByKey` だけを
+    持つ v2 になる（`isEmpty` は false なので復元は走るが、選択は元々無いので何も変わらない）。v1 JSON が
+    あるときは従来どおり v1 の選択（`selectedId` / `colorVisionType`）を v2 の層に写す。
+  - **書き込みの順序**: 折り畳んだ記憶と層を `settings.visionFilter`（v2）に書き、書けたことを確認して
     から `settings.intensityByType` を消す（書けなければ消さず、次回の起動で再び (a) になる。折り畳みは
-    冪等）。v1 JSON は v2 で上書きされる。
+    冪等）。v1 JSON は v2 で上書きされる。2 回目の起動は (c) になり、`restoreAndBind` が v2 の層
+    （deuteranomaly / `filterType`）を復元して、1 回目と同じ選択で起動する。
+  - **旧バージョンへ戻す場合**: 戻すことは非対応（本機能は未リリース）。戻した場合、旧版は v2 を捨てて
+    推奨強度で起動し、旧版で動かした `intensityByType` は新版の再起動時に (b) の分岐で残骸として消える。
   1. v1 に `colorVisionType = t`（≠ none）があれば、それは色覚クイック選択だった。層は
      `{id: catalogId(t), variantId: t が -omaly なら t、そうでなければ null, origin: クイック}`。
      強度は per-key 記憶の `t`（= `intensityByType[t]`、無ければ記憶に書かず推奨強度で導く）。
