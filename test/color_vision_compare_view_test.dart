@@ -8,8 +8,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/preview_image_source.dart';
+import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
 import 'package:universal_experience/services/color_vision_compare.dart';
 import 'package:universal_experience/services/export_service.dart';
+import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/color_vision_compare_view.dart';
@@ -103,6 +105,7 @@ void main() {
     exportImageComposer = composeExportImage;
     pngSaver = savePng;
     folderRevealer = revealInFolder;
+    CpuVisionRenderer.pipelineApplier = CpuVisionRenderer.applyPipeline;
     resetVisionFilterMetadataProviders();
   });
 
@@ -661,6 +664,443 @@ void main() {
       await tester.tap(find.text(en.exportRevealAction));
       await tester.pump();
       expect(revealed, [savedPath]);
+    });
+  });
+  // 他の層を重ねたとき（#122）: 4 セルは「色覚以外の層を 1 回だけ適用した土台」の上に
+  // 色覚 4 型を 1 つずつ適用したもの。
+  group('土台（他の層を重ねたとき、#122）', () {
+    /// 土台（myopia 適用済みの代役）の色。
+    const baseArgb = 0xFF205080;
+
+    /// 型ごとのチャンネル操作（フェイクの色覚適用）。**入力画素から**出力を決めるので、
+    /// セルが土台から始まったか原画から始まったかが画素に現れる。
+    int tint(String id, int argb) {
+      final r = (argb >> 16) & 0xFF, g = (argb >> 8) & 0xFF, b = argb & 0xFF;
+      final (nr, ng, nb) = switch (id) {
+        'protanopia' => (g, g, b),
+        'deuteranopia' => (r, r, b),
+        'tritanopia' => (r, g, g),
+        _ => (g, g, g),
+      };
+      return 0xFF000000 | (nr << 16) | (ng << 8) | nb;
+    }
+
+    ColorVisionCompareInput inputOf(
+      List<String> ids, {
+      Map<String, double> strengths = const {},
+    }) {
+      final state = VisionFilterState();
+      for (final id in ids) {
+        state.toggle(id);
+      }
+      strengths.forEach(state.setLayerStrength);
+      return colorVisionCompareInputOf(state)!;
+    }
+
+    Widget viewOf(ColorVisionCompareInput input) => ColorVisionCompareView(
+          strength: input.strength,
+          baseSteps: input.baseSteps,
+          baseLayers: input.baseLayers,
+          imageSource: const SamplePreviewImageSource('test'),
+          sampleSize: _kSize,
+        );
+
+    Future<int> centerArgb(WidgetTester tester, ui.Image image) async {
+      final data = await tester
+          .runAsync(() => image.toByteData(format: ui.ImageByteFormat.rawRgba));
+      final o = ((image.height ~/ 2) * image.width + image.width ~/ 2) * 4;
+      final b = data!.buffer.asUint8List();
+      return (b[o + 3] << 24) | (b[o] << 16) | (b[o + 1] << 8) | b[o + 2];
+    }
+
+    /// 読み込み・土台（pipelineApplier）・色覚適用（afterImageRenderer）のフェイク。
+    /// 色覚適用は入力画素を読んで型ごとに変換した単色を返す。
+    Future<
+        ({
+          List<List<VisionStep>> baseCalls,
+          List<ui.Image> baseReturned,
+          List<({String id, double strength})> cellCalls,
+          List<ui.Image> cellReturned,
+        })> installBaseFakes(
+      WidgetTester tester, {
+      Future<void>? Function(int baseCallNumber)? gateBase,
+      Object? Function(int baseCallNumber)? failBase,
+    }) async {
+      await installFakes(tester); // 読み込み（白の原画）だけ使う。
+      late ui.Image baseMaster;
+      await tester
+          .runAsync(() async => baseMaster = await _solid(_kSize, baseArgb));
+      addTearDown(baseMaster.dispose);
+
+      final baseCalls = <List<VisionStep>>[];
+      final baseReturned = <ui.Image>[];
+      final cellCalls = <({String id, double strength})>[];
+      final cellReturned = <ui.Image>[];
+      CpuVisionRenderer.pipelineApplier = (source, steps) async {
+        final n = baseCalls.length + 1;
+        baseCalls.add(steps);
+        final wait = gateBase?.call(n);
+        if (wait != null) await wait;
+        final failure = failBase?.call(n);
+        if (failure != null) throw failure;
+        final image = baseMaster.clone();
+        baseReturned.add(image);
+        return image;
+      };
+      afterImageRenderer = (source, filter, strength) async {
+        final id = idOf(filter!);
+        cellCalls.add((id: id, strength: strength));
+        final data =
+            await source.toByteData(format: ui.ImageByteFormat.rawRgba);
+        final b = data!.buffer.asUint8List();
+        final o = ((source.height ~/ 2) * source.width + source.width ~/ 2) * 4;
+        final src =
+            (b[o + 3] << 24) | (b[o] << 16) | (b[o + 1] << 8) | b[o + 2];
+        final image = await _solid(source.width, tint(id, src));
+        cellReturned.add(image);
+        return image;
+      };
+      return (
+        baseCalls: baseCalls,
+        baseReturned: baseReturned,
+        cellCalls: cellCalls,
+        cellReturned: cellReturned,
+      );
+    }
+
+    Future<void> settleCells(
+        WidgetTester tester, List<Object?> cellCalls, int count) async {
+      await waitFor(tester, () => cellCalls.length >= count);
+      // 最後のセルの後の setState まで流す。
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    testWidgets('土台は 1 回だけ合成され、4 セルは「土台 + 各型」の画素になる（原画 + 各型ではない）',
+        (tester) async {
+      final fakes = await installBaseFakes(tester);
+      final input = inputOf(['myopia', 'protanopia']);
+      await tester.pumpWidget(localized(viewOf(input)));
+      await settleCells(tester, fakes.cellCalls, 4);
+
+      expect(fakes.baseCalls.length, 1, reason: '土台の合成は 4 セルで共有して 1 回');
+      expect(fakes.baseCalls.single, input.baseSteps);
+      expect(fakes.cellCalls.map((c) => c.id), [
+        for (final e in kColorVisionCompareEntries) e.id,
+      ]);
+      expect(fakes.cellCalls.map((c) => c.strength), everyElement(1.0));
+      expect(find.byType(PreviewImageView), findsNWidgets(4));
+
+      const white = 0xFFFFFFFF;
+      for (var i = 0; i < 4; i++) {
+        final id = kColorVisionCompareEntries[i].id;
+        final actual = await centerArgb(tester, fakes.cellReturned[i]);
+        expect(actual, tint(id, baseArgb), reason: '$id は土台から始まる');
+        expect(actual, isNot(tint(id, white)), reason: '$id は原画から始まっていない');
+      }
+    });
+
+    testWidgets('色覚の強さだけが動いたときは、土台を再合成しない（4 セルだけ描き直す）', (tester) async {
+      final fakes = await installBaseFakes(tester);
+      await tester
+          .pumpWidget(localized(viewOf(inputOf(['myopia', 'protanopia']))));
+      await settleCells(tester, fakes.cellCalls, 4);
+
+      final moved =
+          inputOf(['myopia', 'protanopia'], strengths: {'protanopia': 0.4});
+      await tester.pumpWidget(localized(viewOf(moved)));
+      await settleCells(tester, fakes.cellCalls, 8);
+
+      expect(fakes.baseCalls.length, 1, reason: '土台の入力は同じ');
+      expect(fakes.cellCalls.skip(4).map((c) => c.strength), everyElement(0.4));
+      // 再利用している土台は破棄されていない（4 セルとも有効な入力で描けた）。
+      expect(fakes.baseReturned.single.debugDisposed, isFalse);
+      for (var i = 4; i < 8; i++) {
+        final id = kColorVisionCompareEntries[i - 4].id;
+        expect(await centerArgb(tester, fakes.cellReturned[i]),
+            tint(id, baseArgb));
+      }
+    });
+
+    testWidgets('土台の層の強さが動いたら再合成する。同じ内容の別リストでは再合成しない', (tester) async {
+      final fakes = await installBaseFakes(tester);
+      await tester
+          .pumpWidget(localized(viewOf(inputOf(['myopia', 'protanopia']))));
+      await settleCells(tester, fakes.cellCalls, 4);
+
+      // 同じ内容（別インスタンスの steps）→ 再合成しない・描き直さない。
+      await tester
+          .pumpWidget(localized(viewOf(inputOf(['myopia', 'protanopia']))));
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 100)));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(fakes.baseCalls.length, 1);
+      expect(fakes.cellCalls.length, 4);
+
+      // myopia の強さが動く → 土台を作り直す。
+      await tester.pumpWidget(localized(viewOf(
+          inputOf(['myopia', 'protanopia'], strengths: {'myopia': 0.5}))));
+      await settleCells(tester, fakes.cellCalls, 8);
+      expect(fakes.baseCalls.length, 2);
+      expect(fakes.baseCalls.last.single.strength, 0.5);
+      expect(fakes.baseReturned.first.debugDisposed, isTrue,
+          reason: '置き換えられた古い土台は破棄される');
+    });
+
+    testWidgets('土台が空（他の層なし）なら合成は呼ばず、4 セルは原画から始まる', (tester) async {
+      final fakes = await installBaseFakes(tester);
+      await tester.pumpWidget(localized(viewOf(inputOf(['protanopia']))));
+      await settleCells(tester, fakes.cellCalls, 4);
+
+      expect(fakes.baseCalls, isEmpty);
+      for (var i = 0; i < 4; i++) {
+        final id = kColorVisionCompareEntries[i].id;
+        expect(await centerArgb(tester, fakes.cellReturned[i]),
+            tint(id, 0xFFFFFFFF));
+      }
+      final en = lookupAppLocalizations(enLocale);
+      expect(
+        find.textContaining(en.compareBaseNote('').split(':').first),
+        findsNothing,
+        reason: '土台が無ければ注記は出ない',
+      );
+    });
+
+    testWidgets('土台ありから土台なしへ戻ると、保持していた土台を破棄して原画から描く', (tester) async {
+      final fakes = await installBaseFakes(tester);
+      await tester
+          .pumpWidget(localized(viewOf(inputOf(['myopia', 'protanopia']))));
+      await settleCells(tester, fakes.cellCalls, 4);
+      expect(fakes.baseReturned.single.debugDisposed, isFalse);
+
+      await tester.pumpWidget(localized(viewOf(inputOf(['protanopia']))));
+      await settleCells(tester, fakes.cellCalls, 8);
+      expect(fakes.baseCalls.length, 1);
+      expect(fakes.baseReturned.single.debugDisposed, isTrue);
+      expect(await centerArgb(tester, fakes.cellReturned[4]),
+          tint('protanopia', 0xFFFFFFFF));
+    });
+
+    testWidgets('土台の注記が出る（en / ja）。土台の層の名前が適用順', (tester) async {
+      await installBaseFakes(tester);
+      final input = inputOf(['protanopia', 'myopia', 'vertigo']);
+      for (final locale in [enLocale, jaLocale]) {
+        await tester.pumpWidget(localized(viewOf(input), locale: locale));
+        await waitFor(
+            tester, () => find.byType(PreviewImageView).evaluate().length == 4);
+        final l10n = lookupAppLocalizations(locale);
+        expect(
+          find.text(l10n.compareBaseNote(
+              '${visionFilterName(l10n, 'vertigo')} + ${visionFilterName(l10n, 'myopia')}')),
+          findsOneWidget,
+          reason: locale.languageCode,
+        );
+      }
+    });
+
+    testWidgets('描画中に土台の入力が変わったら、古い土台の 4 セルは描かず最新の土台でやり直す', (tester) async {
+      final first = Completer<void>();
+      final fakes = await installBaseFakes(
+        tester,
+        gateBase: (n) => n == 1 ? first.future : null,
+      );
+      await tester
+          .pumpWidget(localized(viewOf(inputOf(['myopia', 'protanopia']))));
+      await tester.pump();
+      await waitFor(tester, () => fakes.baseCalls.length == 1);
+
+      await tester.pumpWidget(localized(viewOf(
+          inputOf(['myopia', 'protanopia'], strengths: {'myopia': 0.5}))));
+      await tester.pump();
+      first.complete();
+      await settleCells(tester, fakes.cellCalls, 4);
+
+      expect(fakes.baseCalls.length, 2);
+      expect(fakes.baseCalls.first.single.strength, 1.0);
+      expect(fakes.baseCalls.last.single.strength, 0.5);
+      expect(fakes.cellCalls.length, 4, reason: '古い土台の上では 1 セルも描かない');
+      expect(fakes.baseReturned.first.debugDisposed, isTrue);
+    });
+
+    testWidgets('土台の合成が失敗したら失敗表示になり、次の変更で復帰する', (tester) async {
+      _suppressFlutterErrorReporting();
+      final fakes = await installBaseFakes(
+        tester,
+        failBase: (n) => n == 1 ? StateError('boom') : null,
+      );
+      final en = lookupAppLocalizations(enLocale);
+      await tester
+          .pumpWidget(localized(viewOf(inputOf(['myopia', 'protanopia']))));
+      await waitFor(
+          tester, () => find.text(en.previewFailed).evaluate().length == 4);
+      expect(find.text(en.previewFailed), findsNWidgets(4));
+      expect(find.byTooltip(en.exportButtonTooltip), findsNothing);
+      expect(fakes.cellCalls, isEmpty);
+
+      await tester.pumpWidget(localized(viewOf(
+          inputOf(['myopia', 'protanopia'], strengths: {'myopia': 0.5}))));
+      await settleCells(tester, fakes.cellCalls, 4);
+      expect(find.text(en.previewFailed), findsNothing);
+      expect(find.byType(PreviewImageView), findsNWidgets(4));
+    });
+
+    group('書き出し', () {
+      Future<void> exportWith(
+        WidgetTester tester,
+        ColorVisionCompareInput input, {
+        required List<ExportCaption> captions,
+        required List<String> filenames,
+        List<Uint8List>? pngs,
+        List<ui.Size>? composedSizes,
+      }) async {
+        final fakes = await installBaseFakes(tester);
+        exportImageComposer = (base, caption) async {
+          captions.add(caption);
+          final composed = await composeExportImage(base, caption);
+          composedSizes?.add(
+              ui.Size(composed.width.toDouble(), composed.height.toDouble()));
+          return composed;
+        };
+        pngSaver = (bytes, filename) async {
+          filenames.add(filename);
+          pngs?.add(bytes);
+          return '/fake/Downloads/$filename';
+        };
+        await tester.pumpWidget(localized(viewOf(input)));
+        await settleCells(tester, fakes.cellCalls, 4);
+        final en = lookupAppLocalizations(enLocale);
+        await tester.tap(find.byTooltip(en.exportButtonTooltip));
+        await waitFor(tester, () => filenames.isNotEmpty);
+      }
+
+      testWidgets(
+          'キャプションは「土台の層の行 + そのセルの色覚の行」の複数層形式。'
+          'ファイル名は比較の印 + 土台の層 id（強度の % なし）', (tester) async {
+        final captions = <ExportCaption>[];
+        final filenames = <String>[];
+        final pngs = <Uint8List>[];
+        final composedSizes = <ui.Size>[];
+        await exportWith(
+          tester,
+          inputOf([
+            'protanopia',
+            'myopia',
+            'vertigo'
+          ], strengths: {
+            'myopia': 0.5,
+            'protanopia': 0.6,
+          }),
+          captions: captions,
+          filenames: filenames,
+          pngs: pngs,
+          composedSizes: composedSizes,
+        );
+
+        final en = lookupAppLocalizations(enLocale);
+        expect(captions, hasLength(4));
+        for (var i = 0; i < 4; i++) {
+          final rows = captions[i].layers;
+          expect([
+            for (final r in rows) r.name
+          ], [
+            en.filterVertigo,
+            en.filterMyopia,
+            visionFilterName(en, kColorVisionCompareEntries[i].id),
+          ], reason: '適用順（土台の層 → そのセルの色覚）');
+          expect([
+            for (final r in rows) r.strengthLabel
+          ], [
+            en.strengthLabel(100),
+            en.strengthLabel(50),
+            en.strengthLabel(60),
+          ]);
+          expect(captions[i].simulationNotice, en.exportSimulationNotice);
+        }
+        expect(
+          filenames.single,
+          matches(RegExp(
+              r'^ue-color-vision-compare-vertigo-myopia-\d{4}-\d{2}-\d{2}_\d{6}\.png$')),
+        );
+
+        // 保存された PNG の各セルの画像部分が「土台 + 各型」の画素。
+        final img = (await tester.runAsync(() => _decodePng(pngs.single)))!;
+        final layout = compareGridLayout(composedSizes);
+        expect(img.width, layout.size.width.toInt());
+        for (var i = 0; i < 4; i++) {
+          final id = kColorVisionCompareEntries[i].id;
+          final ox = layout.origins[i].dx.toInt();
+          final oy = layout.origins[i].dy.toInt();
+          expect(_argbAt(img, ox + _kSize ~/ 2, oy + _kSize ~/ 2),
+              tint(id, baseArgb),
+              reason: '書き出しのセル $id は土台から始まる');
+        }
+      });
+
+      testWidgets('色覚の強度 0% でも、画像と同じく色覚の行は「0%」で残す（単独の 2×2 と揃える）',
+          (tester) async {
+        final captions = <ExportCaption>[];
+        final filenames = <String>[];
+        await exportWith(
+          tester,
+          inputOf(['myopia', 'protanopia'], strengths: {'protanopia': 0}),
+          captions: captions,
+          filenames: filenames,
+        );
+        final en = lookupAppLocalizations(enLocale);
+        expect([for (final r in captions.first.layers) r.strengthLabel],
+            [en.strengthLabel(100), en.strengthLabel(0)]);
+        expect(filenames.single, contains('color-vision-compare-myopia-'));
+      });
+
+      testWidgets('土台が無ければ従来どおり（1 型ずつのキャプション・強度 % 付きのファイル名）', (tester) async {
+        final captions = <ExportCaption>[];
+        final filenames = <String>[];
+        await exportWith(
+          tester,
+          inputOf(['protanopia'], strengths: {'protanopia': 0.6}),
+          captions: captions,
+          filenames: filenames,
+        );
+        final en = lookupAppLocalizations(enLocale);
+        expect(captions.map((c) => c.layers), everyElement(isEmpty));
+        expect(captions.map((c) => c.symptomLabel), [
+          for (final e in kColorVisionCompareEntries)
+            visionFilterName(en, e.id),
+        ]);
+        expect(captions.map((c) => c.strengthLabel),
+            everyElement(en.strengthLabel(60)));
+        expect(
+          filenames.single,
+          matches(RegExp(
+              r'^ue-color-vision-compare-60pct-\d{4}-\d{2}-\d{2}_\d{6}\.png$')),
+        );
+      });
+
+      testWidgets('層が多くても、ファイル名の症状 id は上限内で、先頭の比較の印は残る', (tester) async {
+        final captions = <ExportCaption>[];
+        final filenames = <String>[];
+        await exportWith(
+          tester,
+          inputOf([
+            'protanopia',
+            'myopia',
+            'cataract',
+            'astigmatism',
+            'vertigo',
+          ]),
+          captions: captions,
+          filenames: filenames,
+        );
+        final name = filenames.single;
+        final id = RegExp(r'^ue-(.*)-\d{4}-\d{2}-\d{2}_\d{6}\.png$')
+            .firstMatch(name)!
+            .group(1)!;
+        expect(id.length, lessThanOrEqualTo(kMaxExportSymptomIdLength),
+            reason: name);
+        expect(id, startsWith('color-vision-compare'));
+        expect(captions.first.layers.length, 5, reason: 'キャプションの行は上限で落とさない');
+      });
     });
   });
 }

@@ -22,6 +22,11 @@
 //   {wide|narrow}-{light|dark}-{ja|en}-compare-{off|on}.png
 //                                                  — 色覚 4 型の 2×2 比較（#84）の切替前/後
 //   wide-{light|dark}-{ja|en}-compare-export.png   — 2×2 の書き出し PNG（保存されたバイトそのもの）
+//   {wide|narrow}-{light|dark}-{ja|en}-compare-layers-on.png
+//                                                  — 色覚 + 他の層（光学・運動）を重ねた 2×2 比較（#122）。
+//                                                    4 セルは色覚以外の層を先に適用した画像の上に 4 型
+//   wide-{light|dark}-{ja|en}-compare-layers-export.png
+//                                                  — 上の状態の 2×2 書き出し PNG
 //   {wide|narrow|narrow-xs}-{light|dark}-{ja|en}-multi.png
 //                                                  — 多層選択（3 層。チップ帯・層ごとの調整・見出しの要約、#120）
 //   {wide|narrow|narrow-xs}-{light|dark}-{ja|en}-multi-limit.png
@@ -238,6 +243,8 @@ void main() {
     // 実行し、保存された PNG を書き出して 4 セルの色が互いに異なることを確かめる。
     bool compare = false,
     bool compareExport = false,
+    // 書き出し PNG のファイル名に挟む印（他の層を重ねた 2×2 の書き出しを区別する、#122）。
+    String compareExportTag = '',
     // 指定すると、初回起動の色覚に続けてこれらの advanced フィルタを重ねる（多層選択、#120）。
     // [layerStrengths] は層 id → 強度。[focusId] は調整中にする層。
     List<String> extraLayers = const [],
@@ -409,7 +416,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
       expect(saved, isNotNull, reason: '書き出しが保存まで進む');
       final exportPath =
-          '${screenshotOutputDir().path}/$base-compare-export.png';
+          '${screenshotOutputDir().path}/$base-compare$compareExportTag-export.png';
       await tester.runAsync(() => File(exportPath).writeAsBytes(saved!));
       // ignore: avoid_print
       print('[ui_screenshots] wrote $exportPath');
@@ -679,6 +686,41 @@ void main() {
         suffix: '-compare-on',
         compare: true,
         compareExport: widthLabel == 'wide',
+      ),
+      skip: !screenshotsEnabled,
+    );
+  }
+
+  // 色覚 + 他の層を重ねた 2×2 比較（#122）。4 セルは myopia・vertigo（段順に 1 回だけ適用）の
+  // 上に色覚 4 型を 1 つずつ適用したもの。見出し下に「4 型の前に適用している層」の注記が出る。
+  // wide では書き出しも実行する。
+  for (final (widthLabel, dark, locale) in const <(String, bool, String)>[
+    ('wide', false, 'ja'),
+    ('wide', true, 'en'),
+    ('narrow', false, 'ja'),
+  ]) {
+    final size = sizes.firstWhere((s) => s.$1 == widthLabel);
+    final height = widthLabel == 'narrow' ? 2800.0 : 1100.0;
+    testWidgets(
+      'screenshot $widthLabel/${dark ? 'dark' : 'light'}/$locale compare-layers-on',
+      (tester) => shoot(
+        tester,
+        widthLabel: widthLabel,
+        width: size.$2,
+        height: height,
+        dark: dark,
+        locale: locale,
+        suffix: '-compare-layers-on',
+        compare: true,
+        compareExport: widthLabel == 'wide',
+        compareExportTag: '-layers',
+        extraLayers: const ['myopia', 'vertigo'],
+        // レイアウト確認用のフェイクは層を「輝度との混合」で表すので、4 型の差が潰れない弱さにする。
+        layerStrengths: const {
+          'myopia': 0.3,
+          'vertigo': 0.2,
+          'deuteranopia': 1.0,
+        },
       ),
       skip: !screenshotsEnabled,
     );
