@@ -280,17 +280,63 @@ void main() {
       expect(p.strengthPercent, 100);
     });
 
-    test('1 層の層の値でも、単一層の書き出しと見た目・名前が同一', () {
+    testWidgets('1 層（本番の経路 planExport）: キャプション・ファイル名・画素が、従来の書き出しの値と一致する',
+        (tester) async {
       final layers = layersOf(['protanopia'], strengths: {'protanopia': 0.6});
       final p = plan(en, layers, strength: 0.6);
-      final legacy = plan(en, null, strength: 0.6);
 
+      // 従来（#121 以前）の単一層の書き出しが作っていた値を、文言ごと直接書いたもの。
+      // 新しい構築関数を通さずに、本番の 1 層の結果と突き合わせる。
+      final legacy = ExportCaption(
+        symptomLabel: en.filterProtanopia,
+        strengthLabel: 'Strength: 60%',
+        isoDate: '2026-06-23',
+        simulationNotice: 'Simulation (approximation)',
+      );
       expect(p.caption.layers, isEmpty, reason: '1 層は層ごとの行にしない（従来どおりの 2 行）');
-      expect(p.caption.symptomLabel, legacy.caption.symptomLabel);
-      expect(p.caption.strengthLabel, legacy.caption.strengthLabel);
-      expect(p.symptomId, legacy.symptomId);
-      expect(p.strengthPercent, legacy.strengthPercent);
-      expect(p.strengthPercent, 60);
+      expect(p.caption.symptomLabel, legacy.symptomLabel);
+      expect(p.caption.strengthLabel, legacy.strengthLabel);
+      expect(p.caption.isoDate, legacy.isoDate);
+      expect(p.caption.simulationNotice, legacy.simulationNotice);
+      expect(p.caption.experimentalNotice, isNull);
+      expect(p.caption.urgencyMessage, isNull);
+      expect(p.caption.escalationGroups, isEmpty);
+      expect(p.caption.disclaimer, isNull);
+
+      // ファイル名（従来と同じ `ue-<id>-<強度>pct-<日付>`）。
+      expect(
+        exportFilename(
+          symptomId: p.symptomId,
+          strengthPercent: p.strengthPercent,
+          isoDate: '2026-06-23',
+        ),
+        'ue-protanopia-60pct-2026-06-23.png',
+      );
+
+      // 画素: 本番の 1 層のキャプションと、従来の値のキャプションで、合成した画像が同じ。
+      Future<List<int>> pixels(ExportCaption c) async {
+        final base = await generateSampleImage(64);
+        final composed = await composeExportImage(base, c);
+        final rgba =
+            await composed.toByteData(format: ui.ImageByteFormat.rawRgba);
+        final out = [
+          composed.width,
+          composed.height,
+          ...rgba!.buffer.asUint8List(),
+        ];
+        composed.dispose();
+        base.dispose();
+        return out;
+      }
+
+      late List<int> actual;
+      late List<int> expected;
+      await tester.runAsync(() async {
+        actual = await pixels(p.caption);
+        expected = await pixels(legacy);
+      });
+      expect(actual.length, greaterThan(64 * 64 * 4));
+      expect(actual, expected);
     });
   });
 
@@ -322,15 +368,19 @@ void main() {
         ['protanopia', 'myopia', 'vertigo'],
         strengths: {'myopia': 0.004, 'vertigo': 0.006},
       );
-      expect([for (final l in effectiveExportLayers(layers)) l.layer.id],
-          ['vertigo', 'protanopia'],
-          reason: '整数パーセントに丸めて 0 になる層は、「0%」の行を出さず数えない');
+      expect([
+        for (final l in effectiveExportLayers(layers)) l.layer.id
+      ], [
+        'vertigo',
+        'protanopia'
+      ], reason: '整数パーセントに丸めて 0 になる層は、「0%」の行を出さず数えない');
 
       final p = plan(en, layers);
       expect([for (final l in p.caption.layers) l.name],
           [en.filterVertigo, en.filterProtanopia]);
       expect(p.caption.layers.first.strengthLabel, en.strengthLabel(1));
-      expect(p.caption.layers.any((l) => l.strengthLabel == en.strengthLabel(0)),
+      expect(
+          p.caption.layers.any((l) => l.strengthLabel == en.strengthLabel(0)),
           isFalse);
       expect(p.symptomId, 'vertigo-protanopia');
     });
@@ -623,9 +673,12 @@ void main() {
       });
       await tester.pump();
 
-      expect([for (final l in captured!.layers) l.name],
-          [en.filterMyopia, en.filterProtanopia],
-          reason: '画像に写っている 2 層だけ。後から足された vertigo は焼かない');
+      expect([
+        for (final l in captured!.layers) l.name
+      ], [
+        en.filterMyopia,
+        en.filterProtanopia
+      ], reason: '画像に写っている 2 層だけ。後から足された vertigo は焼かない');
       expect(captured!.layers[0].strengthLabel, en.strengthLabel(50));
       expect(savedFilename, startsWith('ue-myopia-protanopia-'));
 

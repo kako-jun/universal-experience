@@ -955,7 +955,10 @@ void main() {
       expect(() => layeredCaption(0), throwsAssertionError);
     });
 
-    test('層が 1 つの layers は従来の書き出しと画素まで同じ（症状名 + 強度の 2 行）', () async {
+    // composer 単体の性質。本番の 1 層は planExport が layers を空にして渡す
+    // （その経路が従来の値と一致することは export_multi_layer_test.dart で確かめる）。
+    test('composer: 層の行が 1 つだけの layers は、空の layers（症状名 + 強度の 2 行）と画素まで同じ',
+        () async {
       final base = await makeBase(640, 40);
       addTearDown(base.dispose);
       const legacy = ExportCaption(
