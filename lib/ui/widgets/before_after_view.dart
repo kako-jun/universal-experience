@@ -86,6 +86,29 @@ typedef FolderRevealer = Future<bool> Function(String path);
 @visibleForTesting
 FolderRevealer folderRevealer = revealInFolder;
 
+/// 上の 3 つの差し替え口（[previewSourceImageLoader] / [afterImageRenderer] /
+/// [exportImageComposer]）を、テスト以外のコード（2×2 比較の
+/// `color_vision_compare_view.dart`、#84）から呼ぶための入口。差し替え口そのものは
+/// `@visibleForTesting` なので、本番コードはここを経由して同じ経路（と、テストでの
+/// 差し替え）を共有する。
+Future<ui.Image> loadPreviewImage(PreviewImageSource source, int size) =>
+    previewSourceImageLoader(source, size);
+
+/// [afterImageRenderer] の呼び出し口（[loadPreviewImage] 参照）。
+Future<ui.Image?> renderPreviewAfter(
+  ui.Image source,
+  VisionFilter? filter,
+  double strength,
+) =>
+    afterImageRenderer(source, filter, strength);
+
+/// [exportImageComposer] の呼び出し口（[loadPreviewImage] 参照）。
+Future<ui.Image> composeCaptionedExportImage(
+  ui.Image base,
+  ExportCaption caption,
+) =>
+    exportImageComposer(base, caption);
+
 /// Side-by-side "before / after" preview for the currently selected
 /// `VisionFilterState` selection (#60).
 ///
@@ -267,7 +290,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   bool _loading = true;
   bool _exporting = false;
 
-  /// Set when the most recently *applied* generation failed. Gates the "after" pane to a [_ErrorPlaceholder] instead of a
+  /// Set when the most recently *applied* generation failed. Gates the "after" pane to a [PreviewErrorPlaceholder] instead of a
   /// stale/possibly-inconsistent image. Cleared back to `false` on the next
   /// successful generation. The actual exception/stack trace isn't retained
   /// here — it's reported once via [FlutterError.reportError] at the catch
@@ -607,49 +630,17 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       final strengthPercent = contract_notes.strengthPercent(strength);
       final now = DateTime.now();
       final date = isoDate(now);
-      // プレビューの注記（FilterParamPanel・
-      // ExperiencePresetTile）と同じ正本・同じ解決経路（resolveConsultNotice）を
-      // export の焼き込みにも使う。色覚 7 型は urgency=none かつ escalation も
-      // 無いので notice は自然に null になる。
-      final notice = afterFilter == null
-          ? null
-          : resolveConsultNotice(
-              l10n,
-              visionFilterUrgencyProvider(afterFilter),
-              visionFilterUrgencyEscalationProvider(afterFilter),
-            );
-      final caption = ExportCaption(
-        symptomLabel: visionFilterDisplayName(l10n, colorVisionType, filterId),
-        strengthLabel: l10n.strengthLabel(strengthPercent),
+      final caption = buildExportCaption(
+        l10n,
+        filterId: filterId,
+        colorVisionType: colorVisionType,
+        filter: afterFilter,
+        strength: strength,
         isoDate: date,
-        simulationNotice: l10n.exportSimulationNotice,
-        // 実験的なフィルタ（四色覚）の PNG には、近似であることに加えて
-        // 「実験的」も焼き込む。対象は VisionFilterEntry.isExperimental が正本。
-        experimentalNotice:
-            (kVisionFilterCatalogById[filterId]?.isExperimental ?? false)
-                ? l10n.exportExperimentalNotice
-                : null,
-        urgencyMessage: notice?.message,
-        // PNG でも emergency/earlyConsultation の見出しを
-        // 分けて焼き込む。ConsultNotice.escalationGroups をそのまま詰め替える
-        // だけで、グルーピングのロジックはここに複製しない。
-        escalationGroups: [
-          for (final g in notice?.escalationGroups ?? const [])
-            ExportEscalationGroup(header: g.header, lines: g.lines),
-        ],
-        disclaimer: notice?.disclaimerShort,
       );
 
       final composed = await exportImageComposer(base, caption);
-      Uint8List? bytes;
-      try {
-        bytes = await encodeImagePng(composed);
-      } finally {
-        composed.dispose();
-      }
-      if (bytes == null) {
-        throw StateError('PNG encoding returned no bytes');
-      }
+      final bytes = await encodePngAndDispose(composed);
 
       final filename = exportFilename(
         // colorVisionType があればその id（-omaly を含む）を使う（#60）。
@@ -661,30 +652,10 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         // 衝突したら savePng が連番にする）。焼き込むキャプションは日付のみ。
         time: compactTime(now),
       );
-      final path = await pngSaver(bytes, filename);
-      await Clipboard.setData(ClipboardData(text: path));
+      final path = await savePngWithClipboard(bytes, filename);
 
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(
-        content: Text(l10n.exportSuccess(path)),
-        // #64: 保存先はユーザーが実際に辿れる場所（Downloads）。パスを読ませる
-        // だけでなく、その場でファイルマネージャを開けるようにする。アクション
-        // 付きの SnackBar は既定で消えないので、時間で閉じるよう明示する。
-        persist: false,
-        duration: const Duration(seconds: 10),
-        action: SnackBarAction(
-          label: l10n.exportRevealAction,
-          onPressed: () async {
-            final opened = await folderRevealer(path);
-            // messenger は export 開始時に取ってあり context を使わないので、
-            // ビューが外れた後でも失敗を必ず知らせる。
-            if (!opened) {
-              messenger.showSnackBar(
-                  SnackBar(content: Text(l10n.exportRevealFailure)));
-            }
-          },
-        ),
-      ));
+      showExportSuccess(messenger, l10n, path);
     } catch (_) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(content: Text(l10n.exportFailure)));
@@ -729,7 +700,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
 
         final beforePane = _Pane(
           label: l10n.previewPaneOriginal,
-          child: _ImageView(image: _before),
+          child: PreviewImageView(image: _before),
         );
         // 最新世代が失敗した場合は _failed が立ち、
         // _after は null にされている。stale/不整合な画像を出し続けるより
@@ -737,11 +708,11 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         // #60 で advanced カタログ・プリセットも結線）なので、失敗以外で
         // `_after` が null のまま安定することはない（一度も成功して
         // いなければこの分岐に来る前に上の `_loading` ガードで preparing 表示に
-        // なる）。それでも [_ImageView] 自身が null を安全に扱うため、二分岐で
+        // なる）。それでも [PreviewImageView] 自身が null を安全に扱うため、二分岐で
         // 十分（「描画は近日対応」プレースホルダは #86 で YAGNI と判断して撤去）。
         final Widget afterChild = _failed
-            ? _ErrorPlaceholder(theme: theme, label: l10n.previewFailed)
-            : _ImageView(image: _after);
+            ? PreviewErrorPlaceholder(theme: theme, label: l10n.previewFailed)
+            : PreviewImageView(image: _after);
         // #60: 時間依存の注記は widget.filterId（カタログ id）からカタログを
         // 引いて解決する。after ペインの見出しは widget.colorVisionType が
         // あればそちらを優先する（#60: -omaly の名前を正しく出すため、
@@ -803,6 +774,109 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   }
 }
 
+/// 書き出し PNG に焼き込む [ExportCaption] を、描画時の値から解決する（#43/#76/#80、
+/// 2×2 比較の各セル #84 と共有）。
+///
+/// i18n はここで解決し、pure な [exportImageComposer] へは解決済み文字列だけを渡す
+/// （規律2）。引数は **画像を描画した時点の値** を渡すこと（呼び出し時点の現在の
+/// widget props ではなく）。
+///
+/// - 受診喚起は プレビューの注記（`FilterParamPanel`・`ExperiencePresetTile`）と同じ
+///   正本・同じ解決経路（[resolveConsultNotice]）を使う。色覚 7 型は urgency=none
+///   かつ escalation も無いので notice は自然に null になる。
+/// - 実験的なフィルタ（四色覚）には、近似であることに加えて「実験的」も焼き込む。
+///   対象は [VisionFilterEntry.isExperimental] が正本。
+/// - escalation は `ConsultNotice.escalationGroups` を詰め替えるだけで、グルーピングの
+///   ロジックはここに複製しない。
+ExportCaption buildExportCaption(
+  AppLocalizations l10n, {
+  required String? filterId,
+  required ColorVisionType? colorVisionType,
+  required VisionFilter? filter,
+  required double strength,
+  required String isoDate,
+}) {
+  final notice = filter == null
+      ? null
+      : resolveConsultNotice(
+          l10n,
+          visionFilterUrgencyProvider(filter),
+          visionFilterUrgencyEscalationProvider(filter),
+        );
+  return ExportCaption(
+    symptomLabel: visionFilterDisplayName(l10n, colorVisionType, filterId),
+    strengthLabel: l10n.strengthLabel(contract_notes.strengthPercent(strength)),
+    isoDate: isoDate,
+    simulationNotice: l10n.exportSimulationNotice,
+    experimentalNotice:
+        (kVisionFilterCatalogById[filterId]?.isExperimental ?? false)
+        ? l10n.exportExperimentalNotice
+        : null,
+    urgencyMessage: notice?.message,
+    escalationGroups: [
+      for (final g in notice?.escalationGroups ?? const [])
+        ExportEscalationGroup(header: g.header, lines: g.lines),
+    ],
+    disclaimer: notice?.disclaimerShort,
+  );
+}
+
+/// [composed]（[exportImageComposer] などの戻り値）を PNG にエンコードし、
+/// **[composed] を破棄する**（エンコードの成否にかかわらず）。エンコード結果が
+/// 得られなければ [StateError]。
+Future<Uint8List> encodePngAndDispose(ui.Image composed) async {
+  Uint8List? bytes;
+  try {
+    bytes = await encodeImagePng(composed);
+  } finally {
+    composed.dispose();
+  }
+  if (bytes == null) {
+    throw StateError('PNG encoding returned no bytes');
+  }
+  return bytes;
+}
+
+/// [bytes] を [filename] で保存し（[pngSaver]）、保存先のフルパスを
+/// クリップボードへテキストとしてコピーして、そのパスを返す。画像そのものの
+/// クリップボード書き込みはプラグインを要し環境変更になるため非スコープ。
+Future<String> savePngWithClipboard(Uint8List bytes, String filename) async {
+  final path = await pngSaver(bytes, filename);
+  await Clipboard.setData(ClipboardData(text: path));
+  return path;
+}
+
+/// 書き出し成功の SnackBar（保存先の表示 + 「フォルダで表示」）。
+///
+/// #64: 保存先はユーザーが実際に辿れる場所（Downloads）。パスを読ませるだけでなく、
+/// その場でファイルマネージャを開けるようにする。アクション付きの SnackBar は既定で
+/// 消えないので、時間で閉じるよう明示する。[messenger] は書き出し開始時に取って
+/// あり context を使わないので、ビューが外れた後でも「開けなかった」を必ず知らせる。
+void showExportSuccess(
+  ScaffoldMessengerState messenger,
+  AppLocalizations l10n,
+  String path,
+) {
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text(l10n.exportSuccess(path)),
+      persist: false,
+      duration: const Duration(seconds: 10),
+      action: SnackBarAction(
+        label: l10n.exportRevealAction,
+        onPressed: () async {
+          final opened = await folderRevealer(path);
+          if (!opened) {
+            messenger.showSnackBar(
+              SnackBar(content: Text(l10n.exportRevealFailure)),
+            );
+          }
+        },
+      ),
+    ),
+  );
+}
+
 class _Pane extends StatelessWidget {
   const _Pane({required this.label, required this.child, this.trailing});
 
@@ -847,8 +921,10 @@ class _Pane extends StatelessWidget {
   }
 }
 
-class _ImageView extends StatelessWidget {
-  const _ImageView({required this.image});
+/// A ui.Image drawn to fill its box (also used by the 2x2 color-vision compare
+/// view, #84). Shows a neutral placeholder box while [image] is null.
+class PreviewImageView extends StatelessWidget {
+  const PreviewImageView({super.key, required this.image});
 
   final ui.Image? image;
 
@@ -898,8 +974,9 @@ class _UiImagePainter extends CustomPainter {
 /// Shown in the "after" pane when the latest generation/render attempt
 /// failed. Colours come only from `colorScheme` roles
 /// (#72 の方針): the `error`/`onErrorContainer` family, not a hardcoded value.
-class _ErrorPlaceholder extends StatelessWidget {
-  const _ErrorPlaceholder({required this.theme, required this.label});
+class PreviewErrorPlaceholder extends StatelessWidget {
+  const PreviewErrorPlaceholder(
+      {super.key, required this.theme, required this.label});
 
   final ThemeData theme;
   final String label;

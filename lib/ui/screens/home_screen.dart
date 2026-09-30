@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/sample_catalog.dart';
 import '../../services/app_shortcuts.dart';
+import '../../services/color_vision_compare.dart';
 import '../../services/filter_list_selection.dart';
 import '../../services/filter_service.dart';
 import '../../services/image_source_state.dart';
@@ -15,6 +16,7 @@ import '../../services/settings_service.dart';
 import '../../services/vision_filter_state.dart';
 import '../widgets/adjust_panel.dart';
 import '../widgets/before_after_view.dart';
+import '../widgets/color_vision_compare_view.dart';
 import '../widgets/filter_browser.dart';
 import '../widgets/image_source_picker.dart';
 import '../widgets/language_dialog.dart';
@@ -54,6 +56,11 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 一覧の行をタップしたあとにフォーカスをここへ戻し、行（`InkResponse`）に
   /// フォーカスが残って ↑↓ ←→ が効かなくなるのを防ぐ。
   final FocusNode _shortcutFocus = FocusNode(debugLabel: 'homeShortcuts');
+
+  /// 「2×2 で比較」（色覚 4 型の一覧比較、#84）を選んでいるか。切替は色覚カテゴリを
+  /// 選んでいる間だけ出る。色覚以外を選んでいる間は Before / After を出すが、
+  /// この値は保持する（色覚に戻ると、直前に選んだ表示に戻る）。
+  bool _compareColorVision = false;
 
   @override
   void didChangeDependencies() {
@@ -356,11 +363,19 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 集約した判定に従う。[VisionFilterState.colorVisionType] も渡し、色覚
   /// クイック選択のときは見出し・export の caption・ファイル名に -omaly の
   /// 名前を正しく出す。
+  ///
+  /// 色覚カテゴリを選んでいる間は「2×2 で比較」の切替を出し、ON の間は
+  /// Before / After の代わりに色覚 4 型の 2×2（[ColorVisionCompareView]、#84）を
+  /// 出す。強さは Before / After と同じ [previewStrength] を 4 セル共通で使うので、
+  /// 原画に戻すホットキー（bypass）も 2×2 にそのまま効く。
   Widget _previewCard() {
     return Consumer3<VisionFilterState, FilterService, ImageSourceState>(
       builder: (context, visionState, filterService, imageSourceState, _) {
         final theme = Theme.of(context);
         final l10n = AppLocalizations.of(context)!;
+        final canCompare = isColorVisionFilterId(visionState.selectedId);
+        final comparing = canCompare && _compareColorVision;
+        final strength = previewStrength(visionState, filterService);
         return Card(
           margin: EdgeInsets.zero,
           child: Padding(
@@ -390,17 +405,30 @@ class _HomeScreenState extends State<HomeScreen> {
                         visualDensity: VisualDensity.compact,
                       ),
                     ],
+                    if (canCompare)
+                      FilterChip(
+                        label: Text(l10n.compareToggleLabel),
+                        tooltip: l10n.compareToggleSemanticsHint,
+                        selected: _compareColorVision,
+                        onSelected: (value) =>
+                            setState(() => _compareColorVision = value),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 ImageSourcePicker(
-                  child: BeforeAfterView(
-                    filter: visionState.build(),
-                    filterId: visionState.selectedId,
-                    strength: previewStrength(visionState, filterService),
-                    colorVisionType: visionState.colorVisionType,
-                    imageSource: imageSourceState.current,
-                  ),
+                  child: comparing
+                      ? ColorVisionCompareView(
+                          strength: strength,
+                          imageSource: imageSourceState.current,
+                        )
+                      : BeforeAfterView(
+                          filter: visionState.build(),
+                          filterId: visionState.selectedId,
+                          strength: strength,
+                          colorVisionType: visionState.colorVisionType,
+                          imageSource: imageSourceState.current,
+                        ),
                 ),
               ],
             ),
