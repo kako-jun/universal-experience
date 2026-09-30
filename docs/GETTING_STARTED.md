@@ -184,6 +184,23 @@ cargo install cargo-expand --version 1.0.126 --locked
 cargo install flutter_rust_bridge_codegen --version 2.11.1 --locked
 ```
 
+### サンプル画像・フォントアトラスの同期検証
+
+`assets/samples/*.png` は `tools/generate_samples.dart` の生成物、`tools/fonts/` は
+`tools/generate_font_atlases.py` の生成物で、どちらもコミットしてある。スクリプトや
+アトラスを変えたら再生成して差分をコミットする（アトラスを変えたら PNG も）。
+
+```bash
+dart run tools/generate_samples.dart
+# フォントの文字集合を変えたときだけ（ネットワークが要る）:
+uv run --with pillow==12.3.0 python3 tools/generate_font_atlases.py
+```
+
+再生成し忘れは CI が落とす（#115）。`samples-sync` ワークフロー（`.github/workflows/samples-sync.yml`）は
+生成結果と `assets/samples` が一致しなければ失敗し、`font-atlas-sync`
+ワークフロー（`.github/workflows/font-atlas-sync.yml`）は `tools/fonts` について同じ検証をする。
+どちらも対象ファイルを変えた push/PR と手動実行（`workflow_dispatch`）でだけ起動する（通常の PR の CI 時間は増えない）。
+
 ### コードフォーマット
 
 ```bash

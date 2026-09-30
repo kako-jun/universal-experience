@@ -57,3 +57,11 @@ dart run tools/generate_samples.dart
 実行後に削除）、ここへアトラスを書き出します。Pillow の版を固定し、グリフ順・パッキングも決定的です。
 同一環境（同じ Pillow / FreeType）で 2 回実行して全 `*.fnt` / `*.png` のバイト列が
 一致することを確認しています（別の版・別の環境での一致までは保証しません）。
+
+この再生成結果とコミット済みの `*.fnt` / `*.png` が一致することは CI
+（`font-atlas-sync` ワークフロー、`.github/workflows/font-atlas-sync.yml`）が
+検証します。`tools/generate_font_atlases.py` や `tools/fonts/` を変えた push/PR と手動実行（`workflow_dispatch`）だけで
+起動します。落ちたら上のコマンドで再生成して差分をコミットし、アトラスが変わったときは
+`dart run tools/generate_samples.dart` で `assets/samples/*.png` も更新します
+（こちらは `samples-sync` ワークフローが検証します）。スクリプトが作らなくなった古い
+アトラスが差分（削除）に出た場合は、手元でも `git rm` します。
