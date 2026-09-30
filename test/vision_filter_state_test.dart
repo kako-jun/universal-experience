@@ -106,7 +106,7 @@ void main() {
       expect(state.paramValue(state.selectedEntry!.parameters.first), seed);
     });
 
-    // #76 レビュー N10: このテストの意図は「色覚クイック選択でもプレビュー
+    // このテストの意図は「色覚クイック選択でもプレビュー
     // 強度が #77 のフィルタ別記憶に従う」ことではない — production の
     // プレビュー強度は色覚クイック選択のとき常に FilterService のタイプ別
     // 記憶（#57）を使い、この state.strength は使われない

@@ -118,7 +118,7 @@ void main() {
       expect(above, protanopiaColorMatrixGrid[10]);
     });
 
-    test('±Infinity strength も 0.0..1.0 に clamp される（#86 レビュー nit）', () {
+    test('±Infinity strength も 0.0..1.0 に clamp される', () {
       final negInf = ShaderFilter.resolveSeverityMatrix(
         protanopiaColorMatrixGrid,
         double.negativeInfinity,

@@ -122,9 +122,8 @@ void main() {
     });
   });
 
-  group('decodeUserImageBytes（#78 レビュー S1）', () {
-    test('長辺が上限を超える画像は、縦横比を保ったままデコード時にダウンスケールされる',
-        () async {
+  group('decodeUserImageBytes', () {
+    test('長辺が上限を超える画像は、縦横比を保ったままデコード時にダウンスケールされる', () async {
       // 3000×1000（長辺 3000 > kUserImageMaxDimension=2048）。
       // scale = 2048/3000 = 0.68266...、高さ = round(1000 * scale) = 683。
       final source = await _solidImage(3000, 1000, const ui.Color(0xFFE53935));

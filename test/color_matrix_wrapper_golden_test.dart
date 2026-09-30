@@ -8,7 +8,7 @@ import 'package:universal_experience/rendering/color_matrices.g.dart';
 import 'package:universal_experience/rendering/shader_filter.dart';
 
 /// `ShaderFilter.applyDeuteranopiaGpu` / `applyTritanopiaGpu` /
-/// `applyAchromatopsiaGpu` の GPU golden テスト（#86 レビュー should-4）。
+/// `applyAchromatopsiaGpu` の GPU golden テスト。
 ///
 /// `test/vision_filter_golden_test.dart` は同じ参照 PNG を使うが、
 /// `ShaderFilter.applyColorFilterGpu` に JSON 由来の生の uniform を直接流し込む

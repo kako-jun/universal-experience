@@ -14,7 +14,7 @@
 //    selectedPresetId による比較で選んだ方だけが点灯する（#60）。
 // 6. escalation は Experience.vision（visionFilterUrgencyEscalationProvider）
 //    から取得し、ConsultNoticeBlock（FilterParamPanel・export と共有）で
-//    表示する（#76 レビュー S3）。
+//    表示する。
 // 7. 免責文・根拠 URL は喚起があるときだけ、右カラムの強度の下に 1 回出る。
 //
 // bridge の experiences() は native lib（FFI）を要求し flutter test では呼べないため、
@@ -291,9 +291,9 @@ void main() {
     expect(find.text(en.experienceBppvDesc), findsOneWidget);
   });
 
-  testWidgets(
-      'escalation は Experience.vision から取得し、ConsultNoticeBlock で表示する'
-      '（#76 レビュー S3）', (tester) async {
+  testWidgets('escalation は Experience.vision から取得し、ConsultNoticeBlock で表示する', (
+    tester,
+  ) async {
     // urgency=none の bppv でも、Experience.vision（bppvRotation）に対する
     // escalation フィクスチャがあれば ConsultNoticeBlock の escalation ブロックが
     // 出ることを確認する（喚起文そのものは urgency=none のため出ない）。
@@ -327,9 +327,7 @@ void main() {
     );
   });
 
-  testWidgets(
-      '免責文・根拠 URL は喚起があるときだけ、右カラムの強度の下に 1 回出る'
-      '（#76 再レビュー nit、#72）', (tester) async {
+  testWidgets('免責文・根拠 URL は喚起があるときだけ、右カラムの強度の下に 1 回出る（#72）', (tester) async {
     await pumpPresets(tester, const Locale('en'));
     final en = lookupAppLocalizations(const Locale('en'));
 
@@ -342,7 +340,7 @@ void main() {
     expect(find.text(en.consultEmergency), findsOneWidget);
   });
 
-  testWidgets('喚起が無い体験だけなら免責文も出ない（#76 再レビュー nit）', (tester) async {
+  testWidgets('喚起が無い体験だけなら免責文も出ない', (tester) async {
     experiencesProvider = () => const [
           Experience(
             id: 'bppv',

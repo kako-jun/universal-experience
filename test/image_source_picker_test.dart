@@ -3,9 +3,8 @@
 // - loadUserImageFile / pickAndLoadUserImage（ファイル選択・ドロップ共通の
 //   サイズ確認〜デコード〜ImageSourceState.setUserImage 経路）を、
 //   file_selector/desktop_drop の実プラットフォームチャネルなしで検証する。
-// - #78 レビュー S1（50MB 上限をボディを読む前に弾く・ダウンスケール
-//   デコード）・S2（取得からデコードまでを単一の try で囲む）・nit（画像を
-//   閉じるボタン）も検証する。
+// - 50MB 上限をボディを読む前に弾くこと・ダウンスケールデコード・取得から
+//   デコードまでを単一の try で囲むこと・画像を閉じるボタンも検証する。
 // - ウィジェット自体（サンプルチップ・「おすすめに戻す」・drop target への
 //   onDragDone 直接呼び出し）も検証する。
 //
@@ -54,7 +53,7 @@ Future<Uint8List> _validPngBytes() async {
   }
 }
 
-/// `length` を偽装した [XFile]（#78 レビュー S1）。実ファイル I/O には
+/// `length` を偽装した [XFile]。実ファイル I/O には
 /// 一切触れない — `readAsBytes` が呼ばれたら [onReadAsBytes] を記録するので、
 /// 「サイズ超過はファイル本体を読む前に弾く」ことを検証できる。
 class _FakeSizedFile extends XFile {
@@ -75,8 +74,8 @@ class _FakeSizedFile extends XFile {
   }
 }
 
-/// `length()` 自体が例外を投げる [XFile]（#78 レビュー S2 の対象:
-/// 取得ステップの失敗もデコード失敗と同じ経路でハンドルされることを見る）。
+/// `length()` 自体が例外を投げる [XFile]
+/// （取得ステップの失敗もデコード失敗と同じ経路でハンドルされることを見る）。
 class _ThrowingLengthFile extends XFile {
   _ThrowingLengthFile() : super('');
 
@@ -159,9 +158,7 @@ void main() {
       expect(find.text(en.imageSourcePickFailed), findsOneWidget);
     });
 
-    testWidgets(
-        '50MB を超えるファイルは本体を読まずに失敗として扱う（#78 レビュー S1）',
-        (tester) async {
+    testWidgets('50MB を超えるファイルは本体を読まずに失敗として扱う', (tester) async {
       _suppressFlutterErrorReporting();
       final imageSourceState = ImageSourceState();
       await tester.pumpWidget(localized(
@@ -185,14 +182,13 @@ void main() {
       expect(readBytesCalled, isFalse,
           reason: 'サイズ超過は length() だけで弾かれ、readAsBytes は呼ばれない');
       expect(imageSourceState.hasUserImage, isFalse);
-      // #78 レビュー nit: 上限超過は専用の文言（imageSourceFileTooLarge）を
+      // 上限超過は専用の文言（imageSourceFileTooLarge）を
       // 出す。汎用の imageSourcePickFailed とは区別する。
       expect(find.text(en.imageSourceFileTooLarge(50)), findsOneWidget);
       expect(find.text(en.imageSourcePickFailed), findsNothing);
     });
 
-    testWidgets(
-        '50MB ちょうどまでは許可される境界（#78 レビュー S1）', (tester) async {
+    testWidgets('50MB ちょうどまでは許可される境界', (tester) async {
       final imageSourceState = ImageSourceState();
       await tester.pumpWidget(localized(
         const SizedBox(),
@@ -214,9 +210,7 @@ void main() {
       expect(imageSourceState.hasUserImage, isTrue);
     });
 
-    testWidgets(
-        'ファイル取得（length）自体が失敗しても SnackBar で報告する（#78 レビュー S2）',
-        (tester) async {
+    testWidgets('ファイル取得（length）自体が失敗しても SnackBar で報告する', (tester) async {
       _suppressFlutterErrorReporting();
       final imageSourceState = ImageSourceState();
       await tester.pumpWidget(localized(
@@ -344,9 +338,7 @@ void main() {
       expect(chip.selected, isTrue);
     });
 
-    testWidgets(
-        '「画像を閉じる」ボタンでユーザー画像を破棄しサンプル表示に戻る（nit）',
-        (tester) async {
+    testWidgets('「画像を閉じる」ボタンでユーザー画像を破棄しサンプル表示に戻る', (tester) async {
       final imageSourceState = ImageSourceState(initialSampleId: 'chart');
       await tester.pumpWidget(localized(
         const ImageSourcePicker(child: SizedBox()),

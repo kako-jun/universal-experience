@@ -99,12 +99,12 @@ void main() {
       expect(recommendedSampleIdForFilter('starbursts'), 'night_scene');
     });
 
-    test('recommendedSampleIdForFilter: #78 レビュー S6 の割り当て', () {
+    test('recommendedSampleIdForFilter: 文字・グラフ素材の割り当て', () {
       expect(recommendedSampleIdForFilter('protanopia'), 'traffic_signs');
       expect(recommendedSampleIdForFilter('tritanopia'), 'fruit_stand');
       expect(recommendedSampleIdForFilter('astigmatism'), 'info_board');
       expect(recommendedSampleIdForFilter('photophobia'), 'depth_landscape');
-      // flickering_stars は変更なし（Q1: night_scene のまま）。
+      // flickering_stars は変更なし（night_scene のまま）。
       expect(recommendedSampleIdForFilter('flickering_stars'), 'night_scene');
     });
 

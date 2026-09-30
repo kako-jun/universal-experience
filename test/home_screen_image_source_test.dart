@@ -1,5 +1,5 @@
 // HomeScreen がフィルタ選択の変化に応じて ImageSourceState.selectedSampleId を
-// 自動追従させることの回帰テスト（#78 レビュー S7）。
+// 自動追従させることの回帰テスト。
 //
 // home_screen.dart の `_followRecommendedSample`（VisionFilterState への
 // リスナー、`_persistFilterState` と同じ subscribe-once パターン）が、
@@ -92,9 +92,9 @@ void main() {
     return imageSourceState;
   }
 
-  testWidgets(
-      '色覚クイック選択でフィルタを切り替えると selectedSampleId が推奨サンプルに追従する'
-      '（#78 レビュー S7）', (tester) async {
+  testWidgets('色覚クイック選択でフィルタを切り替えると selectedSampleId が推奨サンプルに追従する', (
+    tester,
+  ) async {
     final filterService = FilterService();
     final visionState = VisionFilterState();
     final imageSourceState = await pumpHome(
@@ -117,9 +117,9 @@ void main() {
         recommendedSampleIdForFilter('deuteranopia'));
   });
 
-  testWidgets(
-      'advanced カタログでフィルタを切り替えても selectedSampleId が追従する'
-      '（#78 レビュー S7）', (tester) async {
+  testWidgets('advanced カタログでフィルタを切り替えても selectedSampleId が追従する', (
+    tester,
+  ) async {
     final filterService = FilterService();
     final visionState = VisionFilterState();
     final imageSourceState = await pumpHome(

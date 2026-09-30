@@ -52,7 +52,7 @@ void main() {
         // フィルタ（starbursts 等）も strength=1.0 で効果が現れる。
         //
         // サイズは production と同じ [BeforeAfterView.canonicalSampleSize]
-        // （#85 レビュー S4）を使う。sensus の disk blur 系
+        // を使う。sensus の disk blur 系
         // （myopia/hyperopia/presbyopia/astigmatism）は半径を「画像サイズ ×
         // 固定比率」で決め、半径が 1px 未満だと楕円カーネルが中心 1 点のみに
         // 退化して strength=1.0 でも完全な no-op になる
@@ -87,7 +87,7 @@ void main() {
     }
   });
 
-  group('CpuVisionRenderer.apply(): protanopia の数値的な健全性 (#85 レビュー S7)', () {
+  group('CpuVisionRenderer.apply(): protanopia の数値的な健全性', () {
     testWidgets('strength=0.0 は原画とバイト単位で一致する', (tester) async {
       final src = await generateSampleImage(
         BeforeAfterView.canonicalSampleSize,
@@ -169,9 +169,7 @@ void main() {
               'protanopia が一部にしか効いていない疑い');
     });
 
-    testWidgets(
-        '非正方形（96×64）の画像でも出力サイズが一致し例外が出ない '
-        '(#85 レビュー §3-a)', (tester) async {
+    testWidgets('非正方形（96×64）の画像でも出力サイズが一致し例外が出ない', (tester) async {
       // canonicalSampleSize は常に正方形だが、CpuVisionRenderer.apply 自体は
       // 任意のアスペクト比を受け付ける契約（#60 の advanced カタログ結線で
       // 正方形以外の入力が来ないとは限らない）なので、非正方形でも壊れない
@@ -207,12 +205,11 @@ void main() {
       expect(out.height, height);
     });
 
-    testWidgets(
-        '純赤 2×1 を protanopia strength=1.0 で変換すると、Rust 側で1回だけ'
-        '実測した期待 RGBA とバイト一致する (#85 レビュー §3-b)', (tester) async {
+    testWidgets('純赤 2×1 を protanopia strength=1.0 で変換すると、Rust 側で1回だけ'
+        '実測した期待 RGBA とバイト一致する', (tester) async {
       // 期待値の由来: rust/ で `apply_vision_cpu_rgba8(VisionFilter::Protanopia,
       // vec![255,0,0,255, 255,0,0,255], 2, 1, 1.0)` を一時的な #[ignore] テスト
-      // （実行後に削除済み、PR #85 のレビュー対応時に1回だけ実行）で直接呼んで
+      // （実行後に削除済み、1回だけ実行）で直接呼んで
       // 得た実測値。golden PNG のようなファイル I/O を挟まないため、
       // integration_test の CWD 問題（§3 冒頭のコメント参照）に影響されない。
       const width = 2;
@@ -244,8 +241,7 @@ void main() {
     });
 
     // 「strength=1.0 の出力を既存 golden 参照（protanopia_ref.png）と比較する」
-    // （#85 レビュー S7-d、"可能なら" の依頼）は実装したが、CI で
-    // PathNotFoundException になり撤去した: デスクトップの integration_test は
+    // テストは実装したが、CI で PathNotFoundException になり撤去した: デスクトップの integration_test は
     // ビルド済みアプリとして起動するため、`File('test/golden/...')` のような
     // リポジトリルート相対パスは実行時カレントディレクトリと一致しない
     // （ローカルの `flutter test integration_test/... -d macos` では手元の
@@ -258,7 +254,7 @@ void main() {
     //     完全一致することを検証する。
     //   - test/cpu_vision_renderer_test.dart（plain `flutter test`、CWD が
     //     リポジトリルートと一致するため file I/O が安全に使える）が、golden
-    //     参照 PNG を CpuVisionRenderer の往復変換（straight⇄premultiplied、
-    //     #85 レビュー S1）にかけてもバイト完全一致することを検証する。
+    //     参照 PNG を CpuVisionRenderer の往復変換（straight⇄premultiplied）
+    //     にかけてもバイト完全一致することを検証する。
   });
 }

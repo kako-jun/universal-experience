@@ -232,9 +232,8 @@ void main() {
       expect(escalationConditionText(ja, unknown), unknown);
     });
 
-    test(
-        'consultDisclaimerShort（PNG 用の短い免責文）は診断ではない旨・医療監修なしの旨・'
-        '根拠の三つを含む（#76 再レビュー M1\'、最終レビュー nit）', () {
+    test('consultDisclaimerShort（PNG 用の短い免責文）は診断ではない旨・医療監修なしの旨・'
+        '根拠の三つを含む', () {
       final en = lookupAppLocalizations(const Locale('en'));
       final ja = lookupAppLocalizations(const Locale('ja'));
       expect(en.consultDisclaimerShort, contains('diagnos'));

@@ -13,7 +13,7 @@ import 'package:universal_experience/services/image_source_state.dart';
 
 import 'support/sample_image_generator.dart';
 
-/// [SchedulerBinding.addPostFrameCallback]（#78 レビュー S3 の遅延 dispose）を
+/// [SchedulerBinding.addPostFrameCallback]（遅延 dispose）を
 /// 実際に発火させる。プレーンな `ImageSourceState`（購読するウィジェットを
 /// 持たない）に対する `notifyListeners()` はどの Element も dirty にしない
 /// ため、`tester.pump()` 単体では `hasScheduledFrame` が false のままで
@@ -60,8 +60,7 @@ void main() {
       expect(notified, 1);
     });
 
-    test('既に手動選択済みの同じサンプルを再選択しても notify しない（#78 レビュー nit）',
-        () {
+    test('既に手動選択済みの同じサンプルを再選択しても notify しない', () {
       final state = ImageSourceState();
       state.selectSample('night_scene');
       var notified = 0;
@@ -156,7 +155,7 @@ void main() {
           (state.current as UserPreviewImageSource).generation;
 
       state.setUserImage(second);
-      // #78 レビュー S3: dispose は次フレームまで遅延する。
+      // dispose は次フレームまで遅延する。
       await pumpPostFrameCallbacks(tester);
 
       expect(first.debugDisposed, isTrue, reason: '差し替えられた旧ユーザー画像は dispose される');
@@ -166,9 +165,7 @@ void main() {
       expect(secondGeneration, greaterThan(firstGeneration));
     });
 
-    testWidgets(
-        'S3: 旧ユーザー画像の dispose は同期的には起きず、次フレームまで遅延する',
-        (tester) async {
+    testWidgets('旧ユーザー画像の dispose は同期的には起きず、次フレームまで遅延する', (tester) async {
       await tester.pumpWidget(const SizedBox());
       final state = ImageSourceState();
       final first = await generateSampleImage(4);
@@ -178,9 +175,12 @@ void main() {
       state.setUserImage(second);
       // pump する前は、BeforeAfterView._rebuild が fitImageToSquare で
       // first をまだ参照中かもしれないため、同期的にはまだ dispose されない
-      // （#78 レビュー S3 のレースを避けるための意図的な遅延）。
-      expect(first.debugDisposed, isFalse,
-          reason: 'pump 前はまだ dispose されていないべき');
+      // （レースを避けるための意図的な遅延）。
+      expect(
+        first.debugDisposed,
+        isFalse,
+        reason: 'pump 前はまだ dispose されていないべき',
+      );
 
       await pumpPostFrameCallbacks(tester);
 
@@ -250,7 +250,7 @@ void main() {
       await tester.pump();
 
       state.clearUserImage('info_board');
-      // #78 レビュー S3: こちらも次フレームまで遅延する。
+      // こちらも次フレームまで遅延する。
       await pumpPostFrameCallbacks(tester);
 
       expect(image.debugDisposed, isTrue);

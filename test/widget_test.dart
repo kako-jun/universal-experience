@@ -15,7 +15,7 @@
 //
 // `main()`/`buildRootApp()` の実起動経路（Rust ブリッジ初期化含む）自体は、
 // ここでは踏めない代わりに integration_test/app_bootstrap_test.dart が
-// 新しい別プロセスから検証する（#55 レビュー M1）。
+// 新しい別プロセスから検証する。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
