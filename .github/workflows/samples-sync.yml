@@ -48,6 +48,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Flutter/Dart SDK の更新で PNG のエンコード結果が変わると落ちうる。落ちたら SDK 差を
+      # 疑い、手元で再生成してコミットする。
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:

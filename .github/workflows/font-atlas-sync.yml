@@ -14,6 +14,10 @@ name: Font atlas sync
 # このジョブも macos-latest で走らせる。対象ファイルを変えたときだけ起動するので、macOS
 # ランナーの分は通常の PR には乗らない。
 # 環境差で落ちるようになったら、デコード後の画素一致での比較への切り替えを検討する。
+#
+# このワークフローの check は必須チェックにしない前提（`paths` で起動しない PR では
+# 報告されないため）。ブランチ保護で必須にする場合は、この paths フィルタを外して
+# ジョブ内で差分判定する形に作り直すこと。
 
 on:
   push:
@@ -44,8 +48,14 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
+      # フォント取得（raw.githubusercontent.com）はリトライなし。ネットワークの一時失敗で
+      # 赤になったら再実行する。
+      # 生成前に既存のアトラスを消す（README.md と OFL-*.txt は残す）。スクリプトがもう
+      # 書き出さない古いアトラスが残っていても、削除として差分に出て落ちる。
       - name: Regenerate font atlases
-        run: uv run --with pillow==12.3.0 python3 tools/generate_font_atlases.py
+        run: |
+          rm -f tools/fonts/*.fnt tools/fonts/*.png
+          uv run --with pillow==12.3.0 python3 tools/generate_font_atlases.py
 
       - name: Verify tools/fonts match the generator output
         run: |

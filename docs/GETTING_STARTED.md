@@ -199,7 +199,7 @@ uv run --with pillow==12.3.0 python3 tools/generate_font_atlases.py
 再生成し忘れは CI が落とす（#115）。`samples-sync` ワークフロー（`.github/workflows/samples-sync.yml`）は
 生成結果と `assets/samples` が一致しなければ失敗し、`font-atlas-sync`
 ワークフロー（`.github/workflows/font-atlas-sync.yml`）は `tools/fonts` について同じ検証をする。
-どちらも対象ファイルを変えた push/PR でだけ起動する（通常の PR の CI 時間は増えない）。
+どちらも対象ファイルを変えた push/PR と手動実行（`workflow_dispatch`）でだけ起動する（通常の PR の CI 時間は増えない）。
 
 ### コードフォーマット
 
