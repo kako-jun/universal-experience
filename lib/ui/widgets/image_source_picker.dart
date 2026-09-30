@@ -10,6 +10,8 @@ import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/sample_catalog.dart';
 import '../../rendering/image_fit.dart';
+import '../../services/app_shortcuts.dart';
+import '../../services/clipboard_image_reader.dart';
 import '../../services/image_source_state.dart';
 import '../../services/vision_filter_state.dart';
 
@@ -30,7 +32,7 @@ ImageFilePicker pickImageFile = _defaultPickImageFile;
 Future<XFile?> _defaultPickImageFile() {
   const typeGroup = XTypeGroup(
     label: 'images',
-    extensions: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'],
+    extensions: kUserImageFileExtensions,
   );
   return openFile(acceptedTypeGroups: [typeGroup]);
 }
@@ -95,18 +97,164 @@ Future<bool> loadUserImageFile(BuildContext context, XFile file) async {
     final bytes = await file.readAsBytes();
     decoded = await decodeUserImageBytes(bytes);
   } catch (e, st) {
-    FlutterError.reportError(FlutterErrorDetails(
-      exception: e,
-      stack: st,
-      library: 'image_source_picker',
-    ));
+    _reportUserImageError(e, st);
     if (!context.mounted) return false;
     final l10n = AppLocalizations.of(context)!;
-    final message = e is UserImageTooLargeException
-        ? l10n.imageSourceFileTooLarge(kMaxUserImageFileBytes ~/ (1024 * 1024))
-        : l10n.imageSourcePickFailed;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+    _showUserImageFailure(
+      context,
+      e is UserImageTooLargeException
+          ? l10n
+              .imageSourceFileTooLarge(kMaxUserImageFileBytes ~/ (1024 * 1024))
+          : l10n.imageSourcePickFailed,
+    );
+    return false;
+  }
+  imageSourceState.setUserImage(decoded);
+  return true;
+}
+
+/// Reports [error] via [FlutterError.reportError] (same convention as
+/// `before_after_view.dart`). Shared by every user-image entry point
+/// ([loadUserImageFile], [pasteUserImageFromClipboard]).
+void _reportUserImageError(Object error, StackTrace stack) {
+  FlutterError.reportError(FlutterErrorDetails(
+    exception: error,
+    stack: stack,
+    library: 'image_source_picker',
+  ));
+}
+
+/// Shows [message] in a SnackBar. The caller checks `context.mounted` first
+/// (after the async gap), so [context] is never used across it here.
+void _showUserImageFailure(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+}
+
+/// Thrown by [pasteUserImageFromClipboard] when the clipboard holds no image
+/// (#97) — the most common failure for a paste (text copied, or nothing),
+/// so it gets its own SnackBar (`imageSourcePasteNoImage`) telling the
+/// person to copy an image first.
+class ClipboardHasNoImageException implements Exception {
+  const ClipboardHasNoImageException();
+
+  @override
+  String toString() => 'ClipboardHasNoImageException';
+}
+
+/// Thrown by [pasteUserImageFromClipboard] when the clipboard image's bytes
+/// can't be decoded (#97) — an image format Flutter's codec doesn't read.
+class ClipboardImageUnsupportedException implements Exception {
+  const ClipboardImageUnsupportedException(this.cause);
+
+  final Object cause;
+
+  @override
+  String toString() => 'ClipboardImageUnsupportedException: $cause';
+}
+
+/// Thrown by [pasteUserImageFromClipboard] when the clipboard holds only files
+/// or folders with no readable image in them (#97, e.g. a HEIC or a folder
+/// copied in Finder) —
+/// "no image on the clipboard" would be untrue, so it gets its own SnackBar
+/// (`imageSourcePasteUnsupportedFile`).
+class ClipboardFileUnsupportedException implements Exception {
+  const ClipboardFileUnsupportedException();
+
+  @override
+  String toString() => 'ClipboardFileUnsupportedException';
+}
+
+/// How long [pasteUserImageFromClipboard] waits for [clipboardImageReader] (#97).
+/// A clipboard owner that never answers (a hung app on X11, say) would
+/// otherwise leave the in-flight guard set forever. 30s (not shorter) so a
+/// permission prompt that blocks the read synchronously isn't cut off. A timeout is reported like
+/// any read failure (`imageSourcePasteFailed`). Mutable only for tests.
+Duration clipboardReadTimeout = const Duration(seconds: 30);
+
+/// Pastes the clipboard's image as the preview's user image (#97, Cmd/Ctrl+V
+/// and the "Paste" button). Goes through the **same** decode + hand-over
+/// path as [loadUserImageFile] — [decodeUserImageBytes] (downscales during
+/// decode, so a 8K screenshot is bounded to [kUserImageMaxDimension]) →
+/// `ImageSourceState.setUserImage` — so the single source of truth is
+/// unchanged; only the byte source differs ([clipboardImageReader], a test
+/// seam). Nothing is written to disk or sent anywhere.
+///
+/// Failures never touch `ImageSourceState` and are reported via
+/// [FlutterError.reportError] + a SnackBar (only if [context] is still
+/// mounted): no image on the clipboard ([ClipboardHasNoImageException],
+/// `imageSourcePasteNoImage`), more than [kMaxUserImageFileBytes] of image
+/// data ([UserImageTooLargeException], `imageSourcePasteTooLarge` — checked
+/// before decoding), bytes the codec can't read
+/// ([ClipboardImageUnsupportedException], `imageSourcePasteUnsupported`), or
+/// the clipboard read itself failing or taking longer than
+/// [clipboardReadTimeout] (`imageSourcePasteFailed`), or only files/folders with no
+/// readable image being copied ([ClipboardFileUnsupportedException],
+/// `imageSourcePasteUnsupportedFile`).
+///
+/// If the clipboard holds an image **file** (copied in a file manager) the
+/// file goes through [loadUserImageFile] instead — the byte-level check above
+/// applies to image data only. A second call while one is still running is
+/// ignored (returns `false`), so key repeat and double clicks don't stack up.
+///
+/// Returns `true` on success, `false` on failure (or when ignored).
+Future<bool> pasteUserImageFromClipboard(BuildContext context) async {
+  // 実行中の再入は無視する（キーリピート・ボタンの二度押しで、読み取りと
+  // デコードが重なって走るのを防ぐ）。例外でも必ず解除する。
+  if (_pasteInFlight) return false;
+  _pasteInFlight = true;
+  try {
+    return await _pasteUserImageFromClipboard(context);
+  } finally {
+    _pasteInFlight = false;
+  }
+}
+
+bool _pasteInFlight = false;
+
+Future<bool> _pasteUserImageFromClipboard(BuildContext context) async {
+  final imageSourceState = context.read<ImageSourceState>();
+  ui.Image decoded;
+  try {
+    final content =
+        await clipboardImageReader.read().timeout(clipboardReadTimeout);
+    if (content is ClipboardImageFile) {
+      // ファイルをコピーした場合（#97）: 選択・ドロップと同じ経路（サイズの
+      // 事前判定・縮小デコード・失敗の SnackBar は loadUserImageFile が持つ）。
+      if (!context.mounted) return false;
+      return await loadUserImageFile(context, XFile(content.path));
+    }
+    if (content is ClipboardUnsupportedFiles) {
+      throw const ClipboardFileUnsupportedException();
+    }
+    if (content is! ClipboardImageData || content.bytes.isEmpty) {
+      throw const ClipboardHasNoImageException();
+    }
+    final bytes = content.bytes;
+    if (bytes.length > kMaxUserImageFileBytes) {
+      throw UserImageTooLargeException(bytes.length);
+    }
+    try {
+      decoded = await decodeUserImageBytes(bytes);
+    } catch (e) {
+      throw ClipboardImageUnsupportedException(e);
+    }
+  } catch (e, st) {
+    _reportUserImageError(e, st);
+    if (!context.mounted) return false;
+    final l10n = AppLocalizations.of(context)!;
+    _showUserImageFailure(
+      context,
+      switch (e) {
+        ClipboardHasNoImageException() => l10n.imageSourcePasteNoImage,
+        UserImageTooLargeException() => l10n.imageSourcePasteTooLarge(
+            kMaxUserImageFileBytes ~/ (1024 * 1024),
+          ),
+        ClipboardImageUnsupportedException() =>
+          l10n.imageSourcePasteUnsupported,
+        ClipboardFileUnsupportedException() =>
+          l10n.imageSourcePasteUnsupportedFile,
+        _ => l10n.imageSourcePasteFailed,
+      },
     );
     return false;
   }
@@ -125,7 +273,7 @@ Future<bool> pickAndLoadUserImage(BuildContext context) async {
 }
 
 /// Drag-and-drop target for [child] + sample-picker chips + "choose a photo"
-/// button (#78).
+/// and "paste" buttons (#78, #97).
 ///
 /// Wraps [child] (the `BeforeAfterView` preview) in a `desktop_drop`
 /// [DropTarget] so dropping an image file anywhere over the preview loads
@@ -230,14 +378,23 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
           IconButton(
             icon: const Icon(Icons.close, size: 18),
             tooltip: l10n.imageSourceClosePhotoTooltip,
-            onPressed: () =>
-                imageSourceState.clearUserImage(recommendedId),
+            onPressed: () => imageSourceState.clearUserImage(recommendedId),
           ),
         ],
         OutlinedButton.icon(
           onPressed: () => pickAndLoadUserImage(context),
           icon: const Icon(Icons.photo_outlined, size: 18),
           label: Text(l10n.imageSourcePickButton),
+        ),
+        // #97: クリップボードの画像を貼り付ける。Cmd/Ctrl+V（home_screen.dart）
+        // と同じ経路（pasteUserImageFromClipboard）を通る。
+        Tooltip(
+          message: l10n.imageSourcePasteTooltip(pasteShortcutLabel()),
+          child: OutlinedButton.icon(
+            onPressed: () => pasteUserImageFromClipboard(context),
+            icon: const Icon(Icons.content_paste, size: 18),
+            label: Text(l10n.imageSourcePasteButton),
+          ),
         ),
         Text(
           l10n.imageSourceDropHint,
@@ -246,8 +403,7 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
         ),
         if (!imageSourceState.isFollowingRecommended)
           TextButton(
-            onPressed: () =>
-                imageSourceState.resetToRecommended(recommendedId),
+            onPressed: () => imageSourceState.resetToRecommended(recommendedId),
             child: Text(l10n.imageSourceResetToRecommended),
           ),
       ],
