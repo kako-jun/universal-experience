@@ -143,6 +143,7 @@ class BeforeAfterView extends StatefulWidget {
     this.sampleSize,
     this.steps,
     this.layerNames,
+    this.layerIds,
   }) : assert(
           (filter == null) == (filterId == null),
           'filter and filterId must both be null or both be set',
@@ -193,6 +194,12 @@ class BeforeAfterView extends StatefulWidget {
   /// 「名前 + 名前 …（+N）」（[layerNamesSummary]）にし（切らずに折り返す）、PNG 書き出しは
   /// 理由つきで無効にする（複数層の書き出しは #121）。
   final List<String>? layerNames;
+
+  /// 重ねている層のカタログ id（適用順、[layerNames] と同じ並び、#120）。複数層のとき、
+  /// 時間依存のフィルタ（[VisionFilterEntry.isTimeDependent]）が 1 つでもあれば「静止フレーム」の
+  /// 注記を出すために使う（[filterId] はフォーカス中の層 1 つしか指さない）。`null` なら
+  /// 従来どおり [filterId] だけで判定する。
+  final List<String>? layerIds;
 
   /// Explicit width/height (in pixels) for the generated square sample
   /// image. When `null` (the default, used by real callers), the resolution
@@ -793,9 +800,16 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         // 引いて解決する。after ペインの見出しは widget.colorVisionType が
         // あればそちらを優先する（#60: -omaly の名前を正しく出すため、
         // [visionFilterDisplayName] 参照）。
-        final entry = widget.filterId == null
-            ? null
-            : kVisionFilterCatalogById[widget.filterId];
+        // 複数層のときは、どれか 1 層でも時間依存なら出す（フォーカス中の層だけでは判らない）。
+        final layerIds = widget.layerIds;
+        final showsStaticFrameNote = multiLayer && layerIds != null
+            ? layerIds.any(
+                (id) => kVisionFilterCatalogById[id]?.isTimeDependent ?? false)
+            : (widget.filterId == null
+                    ? null
+                    : kVisionFilterCatalogById[widget.filterId])
+                ?.isTimeDependent ??
+                false;
         final afterPane = _Pane(
           label: afterName,
           // 複数層の見出しは切らずに折り返す。左右の見出し行の高さを揃えるため、
@@ -848,7 +862,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         // プレビュー（時刻を受け取らず常に同じ内部時刻で描画する、
         // `CpuVisionRenderer` の doc 参照）では静止フレームにしかならない。
         // その旨を短く注記する。
-        if (entry?.isTimeDependent ?? false) {
+        if (showsStaticFrameNote) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

@@ -153,4 +153,46 @@ void main() {
       expect(tester.widget<IconButton>(button).onPressed, isNotNull);
     });
   });
+
+  group('静止フレームの注記（時間依存の層が 1 つでもあるとき）', () {
+    testWidgets('3 層（時間依存の vertigo を含む）で、調整中が myopia でも注記は出る',
+        (tester) async {
+      await installFakes(tester);
+      final h =
+          await pumpHomeScreen(tester, size: wide, locale: const Locale('en'));
+      h.visionState.toggle('protanopia');
+      h.visionState.toggle('vertigo');
+      h.visionState.toggle('myopia');
+      h.visionState.focusLayer('myopia');
+      final l10n = await pumpEn(tester, h);
+
+      expect(h.visionState.focusedId, 'myopia');
+      expect(find.text(l10n.previewStaticFrameNote), findsOneWidget);
+    });
+
+    testWidgets('時間依存の層が無ければ、複数層でも注記は出ない', (tester) async {
+      await installFakes(tester);
+      final h =
+          await pumpHomeScreen(tester, size: wide, locale: const Locale('en'));
+      h.visionState.toggle('protanopia');
+      h.visionState.toggle('myopia');
+      final l10n = await pumpEn(tester, h);
+
+      expect(find.text(l10n.previewStaticFrameNote), findsNothing);
+    });
+
+    testWidgets('時間依存の層を外すと注記も消える', (tester) async {
+      await installFakes(tester);
+      final h =
+          await pumpHomeScreen(tester, size: wide, locale: const Locale('en'));
+      h.visionState.toggle('vertigo');
+      h.visionState.toggle('myopia');
+      final l10n = await pumpEn(tester, h);
+      expect(find.text(l10n.previewStaticFrameNote), findsOneWidget);
+
+      h.visionState.remove('vertigo');
+      await settle(tester);
+      expect(find.text(l10n.previewStaticFrameNote), findsNothing);
+    });
+  });
 }

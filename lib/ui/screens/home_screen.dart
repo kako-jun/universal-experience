@@ -452,6 +452,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                     visionLayerDisplayName(l10n, layer),
                                 ]
                               : null,
+                          layerIds: visionState.layers.length > 1
+                              ? [
+                                  for (final layer in visionState.layers)
+                                    layer.id,
+                                ]
+                              : null,
                           imageSource: imageSourceState.current,
                         ),
                 ),
