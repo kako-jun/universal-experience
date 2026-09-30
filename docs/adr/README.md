@@ -36,6 +36,7 @@ Universal Experience（ue）の主要な設計判断を記録する正本ディ�
 
 | ファイル | タイトル | 決定日 | ステータス |
 |---|---|---|---|
+| [2026-09-30-filter-selection-persistence-and-tray-submenu.md](2026-09-30-filter-selection-persistence-and-tray-submenu.md) | フィルタ選択は版つき JSON で永続化し、トレイは統合一覧をカテゴリ別サブメニューで出す | 2026-09-30 | Accepted |
 | [2026-09-30-language-picker-endonyms-and-single-resolution.md](2026-09-30-language-picker-endonyms-and-single-resolution.md) | 言語ピッカーは自称名で並べ、言語の解決を 1 つの関数に一本化する | 2026-09-30 | Accepted |
 | [2026-09-30-export-png-to-downloads.md](2026-09-30-export-png-to-downloads.md) | PNG エクスポートは保存ダイアログを使わず Downloads へ直接保存する | 2026-09-30 | Accepted |
 | [2026-09-30-home-screen-unified-list-and-three-columns.md](2026-09-30-home-screen-unified-list-and-three-columns.md) | 主画面を「統合一覧 + 3 カラム（広幅）/ 縦積み（狭幅）」にする | 2026-09-30 | Accepted |
