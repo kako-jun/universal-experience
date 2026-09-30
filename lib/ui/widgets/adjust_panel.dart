@@ -249,9 +249,8 @@ class _FocusedSection extends StatelessWidget {
         state.focusedVariantId,
         state.selectedId,
       );
-      categoryLabel = entry == null
-          ? null
-          : visionCategoryName(l10n, entry.category);
+      categoryLabel =
+          entry == null ? null : visionCategoryName(l10n, entry.category);
     }
 
     // 説明文: 色覚と体験プリセットだけが持つ（advanced の各フィルタには

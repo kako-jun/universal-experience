@@ -93,6 +93,6 @@ class TrayMenuLabels {
   /// （-omaly を区別）、それ以外は [catalogNames]（未登録なら id）。
   String listEntryLabel({required String catalogId, String? variantId}) =>
       isColorVisionQuickKey(variantId ?? catalogId)
-      ? filterLabel(variantId ?? catalogId)
-      : (catalogNames[catalogId] ?? catalogId);
+          ? filterLabel(variantId ?? catalogId)
+          : (catalogNames[catalogId] ?? catalogId);
 }

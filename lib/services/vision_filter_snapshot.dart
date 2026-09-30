@@ -156,27 +156,27 @@ class VisionFilterSnapshot {
       !legacyHadContent;
 
   Map<String, Object?> toJson() => {
-    'version': kVisionFilterSnapshotVersion,
-    'layers': [
-      for (final l in layers)
-        {
-          'id': l.id,
-          'params': {
-            for (final e in l.params.entries) e.key: _paramToJson(e.value),
-          },
-          if (l.variantId != null) 'variantId': l.variantId,
+        'version': kVisionFilterSnapshotVersion,
+        'layers': [
+          for (final l in layers)
+            {
+              'id': l.id,
+              'params': {
+                for (final e in l.params.entries) e.key: _paramToJson(e.value),
+              },
+              if (l.variantId != null) 'variantId': l.variantId,
+            },
+        ],
+        'focusedId': focusedId,
+        'presetId': presetId,
+        'strengthByKey': Map<String, double>.of(strengthByKey),
+        'paramsById': {
+          for (final e in paramsById.entries)
+            e.key: {
+              for (final p in e.value.entries) p.key: _paramToJson(p.value),
+            },
         },
-    ],
-    'focusedId': focusedId,
-    'presetId': presetId,
-    'strengthByKey': Map<String, double>.of(strengthByKey),
-    'paramsById': {
-      for (final e in paramsById.entries)
-        e.key: {
-          for (final p in e.value.entries) p.key: _paramToJson(p.value),
-        },
-    },
-  };
+      };
 
   static Object _paramToJson(Object value) =>
       value is BigInt ? value.toString() : value;
@@ -234,14 +234,14 @@ class VisionFilterSnapshot {
         final variant = raw['variantId'];
         final variantId =
             variant is String && isValidVariantFor(entry.id, variant)
-            ? variant
-            : null;
+                ? variant
+                : null;
         // 層の params が無い・壊れているときは、id ごとの記憶 → 既定値の順で補う。
         final params = entry.parameters.isEmpty
             ? const <String, Object>{}
             : raw.containsKey('params')
-            ? sanitizeVisionParams(entry, raw['params'])
-            : (paramsById[entry.id] ?? defaultVisionParams(entry));
+                ? sanitizeVisionParams(entry, raw['params'])
+                : (paramsById[entry.id] ?? defaultVisionParams(entry));
         parsed.add(
           VisionLayer(id: entry.id, params: params, variantId: variantId),
         );

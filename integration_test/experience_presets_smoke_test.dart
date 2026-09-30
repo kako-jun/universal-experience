@@ -208,8 +208,7 @@ void main() {
       expect(find.byType(ExperiencePresetTile), findsNWidgets(4));
     });
 
-    testWidgets(
-        '行をタップすると層がそのプリセット 1 つに置き換わり、色覚クイック選択の層は無くなる（#120）',
+    testWidgets('行をタップすると層がそのプリセット 1 つに置き換わり、色覚クイック選択の層は無くなる（#120）',
         (tester) async {
       await tester.pumpWidget(_presetsApp());
       await tester.pumpAndSettle();

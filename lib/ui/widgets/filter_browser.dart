@@ -336,7 +336,7 @@ class _FilterList extends StatelessWidget {
                 onPointerActivated: onActivated,
                 isExperimental:
                     kVisionFilterCatalogById[entry.catalogId]?.isExperimental ??
-                    false,
+                        false,
               ),
             );
           }

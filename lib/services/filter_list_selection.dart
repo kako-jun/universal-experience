@@ -130,11 +130,11 @@ bool matchesFilterQuery(Iterable<String> texts, String query) {
 
 /// [entry] を検索する対象の文字列（ja 名・en 名・catalog id / 型 id）。
 List<String> filterListEntrySearchTexts(FilterListEntry entry) => [
-  filterListEntryName(_ja, entry),
-  filterListEntryName(_en, entry),
-  entry.catalogId,
-  if (entry.variantId != null) entry.variantId!,
-];
+      filterListEntryName(_ja, entry),
+      filterListEntryName(_en, entry),
+      entry.catalogId,
+      if (entry.variantId != null) entry.variantId!,
+    ];
 
 /// 体験プリセット [experienceId] が検索語 [query] に当たるか（ja・en 名と id）。
 /// 空の検索語は常に true。
@@ -254,4 +254,5 @@ VisionLayerBlockReason? filterListEntryBlockReason(
 VisionLayerResult toggleFilterListEntry(
   VisionFilterState visionState,
   FilterListEntry entry,
-) => visionState.toggle(entry.catalogId, variantId: entry.variantId);
+) =>
+    visionState.toggle(entry.catalogId, variantId: entry.variantId);

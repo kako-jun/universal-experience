@@ -812,11 +812,11 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                 // ここで画像が無いことはない。）
                 semanticLabel:
                     widget.filterId == null && widget.variantId == null
-                    ? null
-                    // 複数層の代替テキストは、まとめずに全部の名前を読ませる。
-                    : l10n.previewImageFilteredSemantics(
-                        multiLayer ? layerNames.join(' + ') : afterName,
-                      ),
+                        ? null
+                        // 複数層の代替テキストは、まとめずに全部の名前を読ませる。
+                        : l10n.previewImageFilteredSemantics(
+                            multiLayer ? layerNames.join(' + ') : afterName,
+                          ),
               );
         // #60: 時間依存の注記は widget.filterId（カタログ id）からカタログを
         // 引いて解決する。after ペインの見出しは widget.variantId が

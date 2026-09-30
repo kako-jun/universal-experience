@@ -123,14 +123,14 @@ class TrayMenuEntry {
 
   /// 区切り線を作る便宜コンストラクタ。
   const TrayMenuEntry.separator()
-    : kind = TrayMenuKind.separator,
-      key = null,
-      label = null,
-      colorVisionKey = null,
-      listEntryKey = null,
-      children = const [],
-      checked = false,
-      enabled = true;
+      : kind = TrayMenuKind.separator,
+        key = null,
+        label = null,
+        colorVisionKey = null,
+        listEntryKey = null,
+        children = const [],
+        checked = false,
+        enabled = true;
 
   final TrayMenuKind kind;
 
@@ -172,19 +172,18 @@ class TrayMenuEntry {
 
   @override
   int get hashCode => Object.hash(
-    kind,
-    key,
-    label,
-    colorVisionKey,
-    listEntryKey,
-    Object.hashAll(children),
-    checked,
-    enabled,
-  );
+        kind,
+        key,
+        label,
+        colorVisionKey,
+        listEntryKey,
+        Object.hashAll(children),
+        checked,
+        enabled,
+      );
 
   @override
-  String toString() =>
-      'TrayMenuEntry(kind: $kind, key: $key, label: $label, '
+  String toString() => 'TrayMenuEntry(kind: $kind, key: $key, label: $label, '
       'colorVisionKey: $colorVisionKey, listEntryKey: $listEntryKey, '
       'children: $children, checked: $checked, enabled: $enabled)';
 }

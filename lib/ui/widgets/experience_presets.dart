@@ -108,9 +108,9 @@ class ExperiencePresetTile extends StatelessWidget {
       onTap: catalogId == null
           ? null
           : () => context.read<VisionFilterState>().selectPreset(
-              experience.id,
-              catalogId,
-            ),
+                experience.id,
+                catalogId,
+              ),
       onPointerActivated: onActivated,
     );
   }
