@@ -384,6 +384,28 @@ void main() {
       await h.filterService.flush();
       handle.dispose();
     });
+
+    testWidgets('描画器が null を返したら失敗として扱い、空の枠を「画像」として読まない', (tester) async {
+      final handle = tester.ensureSemantics();
+      await installFakes(tester);
+      // 何も選んでいないとき（filter == null）は成功し、フィルタを選ぶと null を返す。
+      final succeed = afterImageRenderer;
+      afterImageRenderer = (source, filter, strength) async =>
+          filter == null ? succeed(source, filter, strength) : null;
+      final h = await pumpHomeScreen(tester, size: wide);
+      await settle(tester);
+      selectColorVision(
+          h.filterService, h.visionState, ColorVisionType.protanopia);
+      await settle(tester);
+
+      expect(tester.takeException(), isNotNull);
+      final data = dataOf(tester, find.text('プレビューの描画に失敗しました'));
+      expect(data.flagsCollection.isLiveRegion, isTrue);
+      expect(readoutCount(tester, 'を適用した画像'), 0,
+          reason: '空の枠を「〇〇を適用した画像」と読まない');
+      await h.filterService.flush();
+      handle.dispose();
+    });
   });
 
   group('視差効果を減らす設定（disableAnimations）', () {
