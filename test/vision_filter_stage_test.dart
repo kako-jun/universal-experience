@@ -31,29 +31,55 @@ void main() {
     ]);
   });
 
-  test('段内の順は sensus の宣言順（ue のカタログの表示順とは別）', () {
-    expect(kVisionFilterStageOrder[VisionFilterStage.optics], [
-      'myopia',
-      'hyperopia',
-      'astigmatism',
-      'presbyopia',
-      'cataract',
-      'photophobia',
-      'diplopia',
-      'starbursts',
-      'eye_strain',
-      'dry_eye',
-    ]);
-    expect(kVisionFilterStageOrder[VisionFilterStage.colorVision], [
-      'protanopia',
-      'deuteranopia',
-      'tritanopia',
-      'achromatopsia',
-      'tetrachromacy',
-    ]);
+  test('全 7 段の段内の順は sensus-core 0.6.1 の `enum Filter` の宣言順（リテラルで固定）', () {
+    // 期待値は sensus-core-0.6.1 `src/lib.rs` の `enum Filter` から転記したもの。
+    // ue のカタログの表示順（myopia, hyperopia, presbyopia, astigmatism ...）とは別。
+    // 表の導出ロジックではなく、この並びそのものを固定する。
+    expect(kVisionFilterStageOrder, {
+      VisionFilterStage.motion: [
+        'vertigo',
+        'bppv_rotation',
+        'vestibular_neuritis',
+        'nystagmus',
+      ],
+      VisionFilterStage.optics: [
+        'myopia',
+        'hyperopia',
+        'astigmatism',
+        'presbyopia',
+        'cataract',
+        'photophobia',
+        'diplopia',
+        'starbursts',
+        'eye_strain',
+        'dry_eye',
+      ],
+      VisionFilterStage.media: ['floaters'],
+      VisionFilterStage.retina: [
+        'macular_degeneration',
+        'night_blindness',
+        'metamorphopsia',
+        'contrast_sensitivity',
+        'detail_loss',
+      ],
+      VisionFilterStage.visualField: [
+        'glaucoma',
+        'hemianopia',
+        'tunnel_vision',
+      ],
+      VisionFilterStage.perception: ['teichopsia', 'flickering_stars'],
+      VisionFilterStage.colorVision: [
+        'protanopia',
+        'deuteranopia',
+        'tritanopia',
+        'achromatopsia',
+        'tetrachromacy',
+      ],
+    });
   });
 
-  test('visionFilterApplyOrder は 0..29 の一意な通し番号で、段をまたいで単調', () {
+  // 補助: 通し番号が表の並びから正しく振られていること（並びそのものは上のテストが固定）。
+  test('visionFilterApplyOrder は表の並びどおりの 0..29 の通し番号', () {
     final orders = <int>[];
     for (final stage in VisionFilterStage.values) {
       for (final id in kVisionFilterStageOrder[stage]!) {
