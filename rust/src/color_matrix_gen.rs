@@ -175,7 +175,7 @@ mod tests {
     /// のと同じ不変条件を行列レベルでも確認する（回帰があれば golden よりこちらが先に
     /// 落ちる）。
     ///
-    /// **#86 レビュー nit**: [`protanopia_grid`] 等は内部で
+    /// **#86**: [`protanopia_grid`] 等は内部で
     /// `shaders::protanopia_uniforms(1.0).matrix` を呼ぶだけなので、
     /// `protanopia_grid()[10]` を期待値にすると「同じ計算を自分自身と比べる」だけの
     /// 無意味な assert になっていた。sensus-core が独立に公開している定数

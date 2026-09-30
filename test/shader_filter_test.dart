@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/rendering/shader_filter.dart';
 
-/// [SingleFlightCache] の単体テスト（#58 レビュー S1）。
+/// [SingleFlightCache] の単体テスト（#58）。
 ///
 /// `ShaderFilter._loadProgram` は元々 `Map<String, Future<ui.FragmentProgram>>
 /// ??=` という素朴なキャッシュを使っていたため、一度失敗した Future を
@@ -13,7 +13,7 @@ import 'package:universal_experience/rendering/shader_filter.dart';
 /// 使っているのと同じキャッシュ実装）を `int`/`String` などの平易な型で直接
 /// 検証する。
 void main() {
-  group('SingleFlightCache (#58 レビュー S1)', () {
+  group('SingleFlightCache', () {
     test('成功した Future はキャッシュされ、create は1回しか呼ばれない', () async {
       final cache = SingleFlightCache<String, int>();
       var callCount = 0;

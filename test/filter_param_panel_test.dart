@@ -159,7 +159,7 @@ void main() {
     });
 
     testWidgets(
-        'escalation は emergency と earlyConsultation で見出しを分けて表示する（#76 レビュー N4）',
+        'escalation は emergency と earlyConsultation で見出しを分けて表示する',
         (tester) async {
       // 現状 vision フィルタの escalation は全て earlyConsultation だが、
       // ConsultNoticeBlock 自体は聴覚側（#80、emergency 段を持つ）にも備えて
@@ -193,7 +193,7 @@ void main() {
       );
     });
 
-    testWidgets('emergency の喚起文は本文（bodyMedium）より大きいスタイルで表示する（#76 レビュー N5）',
+    testWidgets('emergency の喚起文は本文（bodyMedium）より大きいスタイルで表示する',
         (tester) async {
       visionFilterUrgencyProvider = (_) => Urgency.emergency;
       visionFilterUrgencyEscalationProvider = (_) => const [];
@@ -212,7 +212,7 @@ void main() {
       expect(messageSize, greaterThan(bodySize));
     });
 
-    testWidgets('免責文の根拠 URL を選択可能なテキストで表示する（#76 レビュー M2）',
+    testWidgets('免責文の根拠 URL を選択可能なテキストで表示する',
         (tester) async {
       visionFilterUrgencyProvider = (_) => Urgency.earlyConsultation;
       visionFilterUrgencyEscalationProvider = (_) => const [];

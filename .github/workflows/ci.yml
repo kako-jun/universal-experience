@@ -237,7 +237,7 @@ jobs:
       - name: Flutter build linux
         run: flutter build linux --debug
 
-      # 完了条件（#55 レビュー指摘）: Rust ライブラリが実際に Linux バンドルの
+      # 完了条件（#55）: Rust ライブラリが実際に Linux バンドルの
       # lib/ に同梱されていることを確認する。ls -la でバンドル内容を可視化した上で、
       # 同じステップ内の test -f が対象ファイルの有無を判定し、無ければこの
       # ステップ自体が fail する。

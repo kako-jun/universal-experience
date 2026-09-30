@@ -208,7 +208,7 @@ void main() { fragColor = texture(uTexture, vTexCoord) * uStrength; }
     );
   });
 
-  group('M1: token boundaries + unknown array uniforms', () {
+  group('token boundaries + unknown array uniforms', () {
     // A vec2 payload uniform `uTexelSize` whose body ALSO references a longer
     // identifier `uTexelSizeScale` (a plain float). The rewrite must split the
     // bare `uTexelSize` but leave `uTexelSizeScale` byte-for-byte intact.
@@ -345,7 +345,7 @@ void main() {
     });
   });
 
-  group('S3/N2: header traceability', () {
+  group('header traceability', () {
     test('stamps sensus version and the input dump path into the header', () {
       final out = convertShaderToImpeller(
         _matrixGlsl,

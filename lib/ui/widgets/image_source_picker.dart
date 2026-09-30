@@ -23,7 +23,7 @@ import '../../services/vision_filter_state.dart';
 /// [_defaultPickImageFile], which calls the real `file_selector` plugin
 /// (platform channel — not available in plain `flutter test`). Returns the
 /// [XFile] itself (not its bytes) so [loadUserImageFile] can check
-/// [XFile.length] **before** reading the file body (#78 レビュー S1).
+/// [XFile.length] **before** reading the file body (#78).
 typedef ImageFilePicker = Future<XFile?> Function();
 
 @visibleForTesting
@@ -37,13 +37,13 @@ Future<XFile?> _defaultPickImageFile() {
   return openFile(acceptedTypeGroups: [typeGroup]);
 }
 
-/// Maximum accepted user image file size (#78 レビュー S1), checked via
+/// Maximum accepted user image file size (#78), checked via
 /// [XFile.length] **before** [loadUserImageFile] reads the file body — an
 /// oversized file is rejected without ever loading its bytes into memory.
 const int kMaxUserImageFileBytes = 50 * 1024 * 1024; // 50MB
 
 /// Thrown by [loadUserImageFile] when a file's reported length exceeds
-/// [kMaxUserImageFileBytes] (#78 レビュー nit). A distinct type (rather than
+/// [kMaxUserImageFileBytes] (#78). A distinct type (rather than
 /// a plain [StateError]) so the catch block can show a size-specific
 /// SnackBar (`imageSourceFileTooLarge`) instead of the generic
 /// `imageSourcePickFailed` one — a 200MB RAW file and a corrupt PNG are
@@ -67,25 +67,25 @@ class UserImageTooLargeException implements Exception {
 /// (`lib/ui/widgets/welcome_banner.dart`) — every entry point that ends with
 /// an [XFile] goes through this one function.
 ///
-/// #78 レビュー S1: rejects (without reading the file body) anything larger
+/// Rejects (without reading the file body) anything larger
 /// than [kMaxUserImageFileBytes], and decodes via [decodeUserImageBytes]
 /// (downscales during decode so no dimension exceeds
 /// [kUserImageMaxDimension]).
 ///
-/// #78 レビュー S2: the size check, the read, and the decode all run inside
+/// The size check, the read, and the decode all run inside
 /// **one** try/catch — any failure along the way (oversized file, unreadable
 /// file, corrupt/unsupported image data) is reported via
 /// [FlutterError.reportError] (same convention as `before_after_view.dart`'s
 /// generator/renderer errors) and, only if [context] is still mounted,
 /// surfaced with a SnackBar — [UserImageTooLargeException] gets the
-/// size-specific `imageSourceFileTooLarge` message (#78 レビュー nit), any
+/// size-specific `imageSourceFileTooLarge` message, any
 /// other failure gets the generic `imageSourcePickFailed`. `ImageSourceState`
 /// is left untouched on any failure.
 ///
 /// Returns `true` on success, `false` on failure — the welcome banner
 /// (`lib/ui/widgets/welcome_banner.dart`) uses this to decide whether its
-/// "try it with your photo" action should dismiss itself (#78 レビュー Q3:
-/// only on an actual successful load, never on cancel/failure).
+/// "try it with your photo" action should dismiss itself
+/// (only on an actual successful load, never on cancel/failure).
 Future<bool> loadUserImageFile(BuildContext context, XFile file) async {
   final imageSourceState = context.read<ImageSourceState>();
   ui.Image decoded;
@@ -327,7 +327,7 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 120),
                 decoration: BoxDecoration(
-                  // #78 レビュー nit: Colors.transparent ではなく colorScheme
+                  // Colors.transparent ではなく colorScheme
                   // のロール（primary、alpha=0）を使う。見た目は同じ透明だが、
                   // Colors.* を直接参照しない規約に従う。
                   border: Border.all(
@@ -374,7 +374,7 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
             selected: imageSourceState.isUsingUserImage,
             onSelected: (_) => imageSourceState.useLoadedUserImage(),
           ),
-          // #78 レビュー nit: 読み込んだユーザー画像を閉じる UI。
+          // 読み込んだユーザー画像を閉じる UI。
           IconButton(
             icon: const Icon(Icons.close, size: 18),
             tooltip: l10n.imageSourceClosePhotoTooltip,

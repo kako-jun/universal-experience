@@ -1,4 +1,4 @@
-// テスト専用のダミー正方形画像ファクトリ（#78 レビュー S4）。
+// テスト専用のダミー正方形画像ファクトリ（#78）。
 //
 // 元は `BeforeAfterView.generateSampleImage`（production の before ペインが
 // 使っていた、意味を持たない色相グラデーション）。production 側は #78 で

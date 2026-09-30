@@ -122,7 +122,7 @@ void main() {
     });
   });
 
-  group('decodeUserImageBytes（#78 レビュー S1）', () {
+  group('decodeUserImageBytes', () {
     test('長辺が上限を超える画像は、縦横比を保ったままデコード時にダウンスケールされる',
         () async {
       // 3000×1000（長辺 3000 > kUserImageMaxDimension=2048）。

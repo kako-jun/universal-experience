@@ -69,7 +69,7 @@ img.Image _canvas(img.Color background) {
   return image;
 }
 
-/// Draws a solid thick line as a filled quadrilateral (#78 レビュー S5).
+/// Draws a solid thick line as a filled quadrilateral (#78).
 ///
 /// `package:image`'s `drawLine(thickness: ...)` builds a thick line out of
 /// short perpendicular strokes, which leaves a visible "hatched"/striped
@@ -146,7 +146,7 @@ img.Image _generateRouteMap() {
     final color = img.ColorRgb8(r, g, b);
     final px = points.map((p) => (p[0] * kSize, p[1] * kSize)).toList();
     for (var i = 0; i < px.length - 1; i++) {
-      // #78 レビュー S5: drawLine(thickness:) の斜め区間の縞模様を避けるため
+      // #78: drawLine(thickness:) の斜め区間の縞模様を避けるため
       // 太線は塗りつぶしクアッドで描く（_fillThickLine 参照）。butt cap で
       // 継ぎ目に隙間が出るが、各頂点に駅マーカー（白丸+リング）を重ねて描く
       // ため隠れる。
@@ -187,8 +187,8 @@ img.Image _generateRouteMap() {
         color: color,
         antialias: true,
       );
-      // #78 レビュー nit: 駅ラベルは arial14 では小さすぎるため arial24 にする
-      // （案内板と同じ最小文字サイズの方針、#78 レビュー S5 参照）。
+      // 駅ラベルは arial14 では小さすぎるため arial24 にする
+      // （案内板と同じ最小文字サイズの方針）。
       img.drawString(
         image,
         '${String.fromCharCode(65 + stationIndex % 26)}${stationIndex ~/ 26 + 1}',
@@ -324,7 +324,7 @@ img.Image _generateTrafficSigns() {
   ];
   img.fillPolygon(image,
       vertices: triPoints, color: img.ColorRgb8(0xFD, 0xD8, 0x35));
-  // #78 レビュー S5: fillPolygon にアンチエイリアスが無いため、塗りの縁が
+  // #78: fillPolygon にアンチエイリアスが無いため、塗りの縁が
   // ジャギーになる。_fillThickLine（塗りつぶしクアッド）で境界を十分太く
   // 覆って隠す（旧版の drawLine(thickness:10) は縁を覆いきれていなかった）。
   final triBorderColor = img.ColorRgb8(0x21, 0x21, 0x21);
@@ -342,7 +342,7 @@ img.Image _generateTrafficSigns() {
       triBorderColor,
     );
   }
-  // #78 レビュー nit: 各辺を独立した矩形として描くと、頂点（特に鋭角な頂点
+  // 各辺を独立した矩形として描くと、頂点（特に鋭角な頂点
   // トップ）で継ぎ目がマイターされず、スパイク状の突起として飛び出て見える。
   // 各頂点に太さと同じ直径の円を重ねて継ぎ目を丸め、突起を隠す。
   for (final p in triPoints) {
@@ -362,7 +362,7 @@ img.Image _generateTrafficSigns() {
       color: img.ColorRgb8(0x21, 0x21, 0x21));
 
   // Prohibition circle: a thick ring drawn as the *difference of two filled
-  // circles* (#78 レビュー S5) — a big filled red disc, then a smaller
+  // circles* — a big filled red disc, then a smaller
   // filled white disc on top, leaving a clean red ring with no stroke
   // artifacts (the old version stroked two thin drawCircle outlines, which
   // read as a thin double ring rather than one thick one).
@@ -374,7 +374,7 @@ img.Image _generateTrafficSigns() {
   img.fillCircle(image,
       x: proCx, y: proCy, radius: proR - proRingThickness,
       color: img.ColorRgb8(0xFF, 0xFF, 0xFF), antialias: true);
-  // #78 レビュー nit: drawLine(thickness:) は端に projecting cap が付き、
+  // drawLine(thickness:) は端に projecting cap が付き、
   // 対角線の端点（中心から約141px）+ cap 分（約10px）でリングの外径
   // （150px）をわずかに超えてしまっていた。_fillThickLine（端がちょうど
   // 指定座標で切れる塗りつぶしクアッド）に替えて、リングの内側に収める。
@@ -413,7 +413,7 @@ img.Image _generateInfoBoard() {
   img.drawLine(image,
       x1: 60, y1: 140, x2: kSize - 60, y2: 140, color: ruleColor, thickness: 4);
 
-  // #78 レビュー S5: 本文は最小でも arial24（旧版は補足行だけ arial14 だった）。
+  // 本文は最小でも arial24（旧版は補足行だけ arial14 だった）。
   // 行数はそのぶん高さが要るため 10→8 行に減らし、1024px に収める。
   const rows = <(String, String, String)>[
     ('A1', '08:05', 'CENTRAL'),
@@ -431,7 +431,7 @@ img.Image _generateInfoBoard() {
     img.drawString(image, code, font: img.arial24, x: 60, y: y, color: textColor);
     img.drawString(image, time, font: img.arial24, x: 200, y: y, color: textColor);
     img.drawString(image, place, font: img.arial24, x: 380, y: y, color: textColor);
-    // A line of small print under each row (still arial24 — #78 レビュー S5:
+    // A line of small print under each row (still arial24 —
     // no body text below that size — fine detail for blur filters instead
     // comes from the sheer amount of text, not from a smaller font).
     img.drawString(
@@ -557,7 +557,7 @@ img.Image _generateNightScene() {
         color: img.ColorRgb8(0x02, 0x02, 0x06));
   }
 
-  // #78 レビュー S5: 低輝度の窓の格子を各ビルに足す（明るい白ではなく暗い
+  // 低輝度の窓の格子を各ビルに足す（明るい白ではなく暗い
   // 暖色 — ベタ白は置かない #51 note 3 の方針のまま）。市松状に間引いて
   // 「消灯した部屋」も混ぜる。
   final windowColor = img.ColorRgb8(0x3A, 0x32, 0x18);
@@ -571,7 +571,7 @@ img.Image _generateNightScene() {
     }
   }
 
-  // #78 レビュー S5: 街路灯（ポール + 小さな暖色の灯り。広い面ではなく点）。
+  // 街路灯（ポール + 小さな暖色の灯り。広い面ではなく点）。
   const lampXs = [60, 340, 620, 900];
   for (final lx in lampXs) {
     img.fillRect(image,
@@ -581,7 +581,7 @@ img.Image _generateNightScene() {
         x: lx, y: 855, radius: 9, color: img.ColorRgb8(0xFF, 0xE3, 0x9E));
   }
 
-  // #78 レビュー S5: ビルの 1 棟に小さな看板（照明看板、暗い赤地に淡い文字）。
+  // ビルの 1 棟に小さな看板（照明看板、暗い赤地に淡い文字）。
   img.fillRect(image,
       x1: 165, y1: 560, x2: 245, y2: 604,
       color: img.ColorRgb8(0x6E, 0x22, 0x22));
@@ -644,7 +644,7 @@ img.Image _generateDepthLandscape() {
     img.Point(0.0, 640.0),
   ], color: img.ColorRgb8(0xA9, 0xB8, 0xC4));
 
-  // #78 レビュー M2: 中景の地面（山並みの裾 y=640 〜 近景の柵 y=760 の間）。
+  // 中景の地面（山並みの裾 y=640 〜 近景の柵 y=760 の間）。
   // 旧版はここが未描画のまま（Image の既定の黒）で残っていた。中間の緑で塗る。
   img.fillRect(image,
       x1: 0, y1: 640, x2: kSize, y2: 760, color: img.ColorRgb8(0x5B, 0x8A, 0x52));
@@ -694,7 +694,7 @@ img.Image _generateDepthLandscapeDepthMap() {
     img.Point(0.0, 640.0),
   ], color: img.ColorRgb8(70, 70, 70));
 
-  // #78 レビュー M2: 中景の地面（y=640〜760）。奥（山並み側、100）から手前
+  // 中景の地面（y=640〜760）。奥（山並み側、100）から手前
   // （近景の柵側、140）へのグラデーションで、色版の中間の緑と対になる深度を
   // 持たせる。
   for (var y = 640; y < 760; y++) {

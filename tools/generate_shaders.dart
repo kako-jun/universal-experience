@@ -79,7 +79,7 @@ void main(List<String> args) {
   final sensusVersion = dump['sensus_core_version'] as String;
   final entries = dump['shaders'] as List<dynamic>;
 
-  // S1: surface the included/excluded split so the gap is never silent.
+  // Surface the included/excluded split so the gap is never silent.
   stderr.writeln(
     'sensus-core v$sensusVersion: ${entries.length} filters in scope, '
     '${_excludedFilters.length} excluded:',
@@ -199,7 +199,7 @@ Map<String, dynamic> _parseDump(String contents) {
   return decoded;
 }
 
-/// S2: validates a single shader entry has the expected `name`/`glsl`/`layout`
+/// Validates a single shader entry has the expected `name`/`glsl`/`layout`
 /// shape, throwing [FormatException] with the offending index on any gap.
 Map<String, dynamic> _validatedEntry(dynamic raw, int index) {
   if (raw is! Map<String, dynamic>) {

@@ -12,16 +12,16 @@ import 'image_source_picker.dart' show pickAndLoadUserImage;
 /// and it never reappears (`SettingsService.welcomeBannerDismissed`).
 ///
 /// - "Choose another way of seeing" moves focus to the search field of the
-///   unified filter list ([onChooseOtherView], #78 レビュー S8, #72) and
+///   unified filter list ([onChooseOtherView], #78, #72) and
 ///   dismisses — the list is already visible on the same screen, so no
 ///   navigation is needed, just a focus handoff. `home_screen.dart` wires this
 ///   to `FilterBrowserController.focusSearch`, which moves focus to a real
 ///   text field (visibly, with Material's focus ring) — not just to an inert
-///   container `FocusNode` (#78 レビュー nit: the handoff must be visible, not
+///   container `FocusNode` (#78: the handoff must be visible, not
 ///   just logically correct).
 /// - "Try it with your photo" opens the file picker ([pickAndLoadUserImage],
 ///   the exact same path `ImageSourcePicker`'s own button uses) and
-///   dismisses **only if a photo was actually loaded** (#78 レビュー Q3):
+///   dismisses **only if a photo was actually loaded** (#78):
 ///   cancelling the picker, or a decode failure, leaves the banner up so the
 ///   person can try again.
 ///
@@ -30,7 +30,7 @@ import 'image_source_picker.dart' show pickAndLoadUserImage;
 class WelcomeBanner extends StatelessWidget {
   const WelcomeBanner({super.key, this.onChooseOtherView});
 
-  /// Called for "choose another way of seeing" (#78 レビュー S8/nit, #72), before
+  /// Called for "choose another way of seeing" (#72), before
   /// dismissing. `null` (e.g. in isolated widget tests) just skips the
   /// handoff — the banner still dismisses.
   final VoidCallback? onChooseOtherView;

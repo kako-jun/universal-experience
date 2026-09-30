@@ -127,7 +127,7 @@ class FilterService extends ChangeNotifier {
         _debounceDuration = debounce;
 
   /// 旧 `SettingsService.keyIntensity`（#17、#57 で撤去）と同じキー文字列。
-  /// [load] はこの値を読まない（移行しない、M1）。ディスクに残っていれば
+  /// [load] はこの値を読まない（移行しない）。ディスクに残っていれば
   /// [load] が削除するだけの、掃除専用のキー名。
   static const String legacyIntensityKey = 'settings.intensity';
 
@@ -181,7 +181,7 @@ class FilterService extends ChangeNotifier {
   /// アプリ起動時に一度、`SettingsService.load()` の後・`applyFilter` で起動時の
   /// フィルタ種別をシードする前に呼ぶ（`main.dart` 参照）。
   ///
-  /// 旧単一キー [legacyIntensityKey] は読まない（M1: 移行はしない。アプリは
+  /// 旧単一キー [legacyIntensityKey] は読まない（移行はしない。アプリは
   /// #57 時点で未リリースのため既存ユーザーはいない）。ディスクに残っていれば
   /// 値を見ずに削除するだけで、以降のタイプ選択は素直に [recommendedStrength]
   /// から始まる。

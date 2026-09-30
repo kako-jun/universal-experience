@@ -290,7 +290,8 @@ void main() {
 
     test(
         '旧単一 intensity キーが 1.0 で残っていても読まれない。load 後は protanomaly が '
-        'recommendedStrength になり、旧キーも消えている（#57 レビュー M1: 移行は行わない）', () async {
+        'recommendedStrength になり、旧キーも消えている（移行は行わない）',
+        () async {
       SharedPreferences.setMockInitialValues({
         FilterService.legacyIntensityKey: 1.0,
       });
@@ -376,7 +377,7 @@ void main() {
       expect(json, contains('"protanopia":0.42'));
     });
 
-    test('保留中の書き込みが無い状態で flush しても例外にならず、何も書き込まない（nit-2）', () async {
+    test('保留中の書き込みが無い状態で flush しても例外にならず、何も書き込まない', () async {
       SharedPreferences.setMockInitialValues({});
       final service = FilterService();
       await service.load();

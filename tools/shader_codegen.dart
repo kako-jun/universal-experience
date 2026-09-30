@@ -123,7 +123,7 @@ String convertShaderToImpeller(
     );
   }
 
-  // Post-condition (should-1a): no array-style uniform access may survive the
+  // Post-condition: no array-style uniform access may survive the
   // rewrite. A leftover `<identifier>[<digits>]` means the source used an array
   // uniform it never declared, which would emit an `impellerc`-incompatible
   // array reference (or silently mis-bind). Fail loudly instead. Dynamic
@@ -144,7 +144,7 @@ String convertShaderToImpeller(
   // to `\b`) so a payload uniform like `uTexelSize` cannot partially match (and
   // corrupt) a longer identifier such as `uTexelSizeScale`.
   //
-  // PRECONDITION (should-2): each vec2 uniform name must be globally unique in
+  // PRECONDITION: each vec2 uniform name must be globally unique in
   // the body — there must be no local `float NAME`/`vec2 NAME` declaration that
   // shadows it. The boundary-anchored replacement is whole-identifier but not
   // scope-aware, so a same-named local would be wrongly rewritten. We detect
@@ -178,7 +178,7 @@ String convertShaderToImpeller(
         '(FlutterFragCoord().xy / vec2(${kResolutionBase}_x, ${kResolutionBase}_y))',
   );
 
-  // Cosmetic (nit-2): collapse runs of 2+ blank lines (left behind by dropped
+  // Cosmetic: collapse runs of 2+ blank lines (left behind by dropped
   // `precision`/`#version`/uniform lines, and by source formatting) down to a
   // single blank line, so the generated body reads cleanly. This only touches
   // whitespace, never comments or code.

@@ -85,8 +85,8 @@ class ImageSourceState extends ChangeNotifier {
   /// Switches away from a user image if one was active, and stops
   /// auto-follow until [resetToRecommended] is called.
   ///
-  /// No-op if [sampleId] is already the manually-pinned selection (#78 レビュー
-  /// nit: re-tapping the already-selected recommended chip shouldn't do
+  /// No-op if [sampleId] is already the manually-pinned selection (#78:
+  /// re-tapping the already-selected recommended chip shouldn't do
   /// anything) — but *not* a no-op while auto-follow is still active or a
   /// user image is showing, since picking the same id in either of those
   /// cases is still a real state change (pins the sample / switches off the
@@ -159,7 +159,7 @@ class ImageSourceState extends ChangeNotifier {
     _disposeAfterFrame(previous);
   }
 
-  /// Disposes [image] after the current frame finishes (#78 レビュー S3),
+  /// Disposes [image] after the current frame finishes (#78),
   /// instead of synchronously at the point it's replaced/cleared.
   ///
   /// `BeforeAfterView`'s `_rebuild` can be mid-`fitImageToSquare` for this

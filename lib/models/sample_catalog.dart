@@ -96,15 +96,15 @@ const Map<String, String> kRecommendedSampleByFilterId = {
   // 禁止標識の赤リングが色だけに頼らず伝わるかを見せる）。tritanopia は
   // 青黄の混同が起きやすい青系/紫系の果物で確認する。achromatopsia/
   // tetrachromacy は色だけに頼る素材（路線図・グラフ）で効果が最も
-  // 分かりやすい（#78 レビュー S6）──
+  // 分かりやすい（#78）──
   'protanopia': 'traffic_signs',
   'deuteranopia': 'fruit_stand',
   'tritanopia': 'fruit_stand',
   'achromatopsia': 'route_map',
   'tetrachromacy': 'chart',
 
-  // ── 屈折: 近見/老視系は文字。乱視も同じ理由で文字素材にする（#78 レビュー
-  // S6: 軸依存のぼけの再現自体は depth_aware_blur 配線後の課題、#98）──
+  // ── 屈折: 近見/老視系は文字。乱視も同じ理由で文字素材にする（#78）。
+  // 軸依存のぼけの再現自体は depth_aware_blur 配線後の課題（#98）──
   'myopia': 'info_board',
   'hyperopia': 'info_board',
   'presbyopia': 'info_board',
@@ -119,7 +119,7 @@ const Map<String, String> kRecommendedSampleByFilterId = {
 
   // ── 光・透明度: 夜盲・starbursts は Issue の指定通り夜景。畏光
   // （photophobia）は奥行きのある風景の明るい空で眩しさが分かりやすい
-  // （#78 レビュー S6/Q1）。白内障・飛蚊症は文字の上でコントラスト低下・
+  // （#78）。白内障・飛蚊症は文字の上でコントラスト低下・
   // 浮遊物が見やすい ──
   'cataract': 'info_board',
   'floaters': 'info_board',

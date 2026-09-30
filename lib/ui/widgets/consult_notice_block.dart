@@ -4,7 +4,7 @@ import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../src/rust/api/sensus_bridge.dart';
 
-/// [ConsultNotice] の表示ウィジェット（#76 レビュー M1）。
+/// [ConsultNotice] の表示ウィジェット（#76）。
 ///
 /// 右カラム「調整」（`FilterParamPanel`、#72）が、advanced カタログ・体験
 /// プリセットのどちらを選んでいても使う、受診喚起の唯一の表示ウィジェット。
@@ -13,18 +13,18 @@ import '../../src/rust/api/sensus_bridge.dart';
 ///
 /// - 段階名（旧「緊急度：高」のような表示）は一切出さない。喚起文
 ///   （[ConsultNotice.message]）だけを、本文サイズ以上で表示する。emergency は
-///   [TextTheme.bodyLarge]（w600）で目立たせる（#76 レビュー N5、再レビュー
-///   S-b: プリセットカードのタイトル titleMedium とサイズがぶつからないよう
+///   [TextTheme.bodyLarge]（w600）で目立たせる（#76。
+///   プリセットカードのタイトル titleMedium とサイズがぶつからないよう
 ///   bodyLarge にした）。
 /// - 色は [ColorScheme] のロールのみ使う（urgency に応じて
 ///   [ColorScheme.tertiaryContainer] / [ColorScheme.errorContainer]。
 ///   [Urgency.none] だが escalation が非空のフィルタは中立の
 ///   [ColorScheme.surfaceContainerHighest]）。
 /// - escalation は emergency → earlyConsultation の順で見出しを分けて表示する
-///   （#76 レビュー N4。現状 vision フィルタの escalation は全て
+///   （#76。現状 vision フィルタの escalation は全て
 ///   earlyConsultation だが、聴覚側（#80）は emergency も持つため備えておく。
 ///   段ごとの構成は [ConsultNotice.escalationGroups]（[resolveConsultNotice]）
-///   が組み立て済みで、PNG export もこれをそのまま使う、再レビュー S-a）。
+///   が組み立て済みで、PNG export もこれをそのまま使う）。
 /// - 免責文（医療監修を受けていない旨・sensus の Medical notes への参照）は
 ///   既定で表示する。[showDisclaimer] を false にすると省略できる
 ///   （免責文だけを別の場所に出したいとき用。[ConsultDisclaimerFooter]）。
@@ -39,7 +39,7 @@ class ConsultNoticeBlock extends StatelessWidget {
   final ConsultNotice notice;
   final AppLocalizations l10n;
 
-  /// false のとき、免責文・根拠 URL を表示しない（#76 再レビュー nit）。
+  /// false のとき、免責文・根拠 URL を表示しない。
   final bool showDisclaimer;
 
   @override
@@ -63,10 +63,9 @@ class ConsultNoticeBlock extends StatelessWidget {
         break;
     }
     final bodyStyle = theme.textTheme.bodyMedium?.copyWith(color: foreground);
-    // #76 レビュー N5・再レビュー S-b: emergency は本文（bodyMedium, 14px）
-    // より大きい bodyLarge（16px）で目立たせる。titleMedium（16px、プリセット
-    // カードのタイトルと同じスタイル）は使わない — カードの中で喚起文が
-    // タイトルと同格に見えてしまうため。
+    // emergency は本文（bodyMedium, 14px）より大きい bodyLarge（16px）で
+    // 目立たせる。titleMedium（16px、プリセットカードのタイトルと同じスタイル）
+    // は使わない — カードの中で喚起文がタイトルと同格に見えてしまうため。
     final messageStyle =
         (notice.urgency == Urgency.emergency ? theme.textTheme.bodyLarge : theme.textTheme.bodyMedium)
             ?.copyWith(color: foreground, fontWeight: FontWeight.w600);
@@ -119,7 +118,7 @@ class ConsultNoticeBlock extends StatelessWidget {
   }
 }
 
-/// 免責文 + 根拠 URL だけの独立したフッタ（#76 再レビュー nit）。
+/// 免責文 + 根拠 URL だけの独立したフッタ。
 ///
 /// 免責文だけを、urgency に紐づく着色コンテナの外に出したいときに使う。
 /// [ConsultNoticeBlock]（`showDisclaimer: true` のとき）も同じ見た目を使う。
