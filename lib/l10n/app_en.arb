@@ -575,6 +575,10 @@
   "@sampleInfoBoard": {
     "description": "Name of the built-in sample scene: a text-heavy signage board (#78)."
   },
+  "sampleInfoBoardJa": "Info board (Japanese)",
+  "@sampleInfoBoardJa": {
+    "description": "Name of the built-in sample scene: a signage board written in Japanese (exit / station / open signs and a small-print timetable) (#99)."
+  },
   "sampleFruitStand": "Fruit stand",
   "@sampleFruitStand": {
     "description": "Name of the built-in sample scene: rows of fruit for colour discrimination (#78)."

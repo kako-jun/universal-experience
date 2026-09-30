@@ -115,6 +115,8 @@ String sampleImageName(AppLocalizations l10n, String id) {
       return l10n.sampleTrafficSigns;
     case 'info_board':
       return l10n.sampleInfoBoard;
+    case 'info_board_ja':
+      return l10n.sampleInfoBoardJa;
     case 'fruit_stand':
       return l10n.sampleFruitStand;
     case 'night_scene':

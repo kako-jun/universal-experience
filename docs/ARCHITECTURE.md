@@ -952,7 +952,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   `FilterBrowser` の最上段に並ぶ（#72）
 - `ImageSourceState`（`lib/services/image_source_state.dart`）: プレビューの
   **原画**（before ペインの元画像）の選択状態を持つ、唯一の正本（#78）。
-  `VisionFilterState`（フィルタの選択）とは独立した軸で、内蔵サンプル 7 種
+  `VisionFilterState`（フィルタの選択）とは独立した軸で、内蔵サンプル 8 種
   （`lib/models/sample_catalog.dart`）か、ユーザーが読み込んだ画像
   （`ui.Image`、ファイル選択/ドラッグ＆ドロップ/クリップボード貼り付け）のどちらかを指す
   `PreviewImageSource`（`lib/models/preview_image_source.dart`。サンプルは
@@ -1119,6 +1119,11 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
 - **タスクトレイ常駐**（#15、完了）: 実機でのトレイ表示・メニュー操作は環境制約
   （Wayland + grim、GNOME のトレイ拡張要件）のため未検証。純粋ロジックの単体テストと
   ビルド成功で代替している（上記「実機目視について」）
+- **サンプル画像の文字の出典（#99）**: サンプル生成は OFL の Noto Sans / Noto Sans JP 由来の
+  ビットマップフォント（`tools/fonts/`、生成は `tools/generate_font_atlases.py`）で文字を描く。
+  `sample_fonts_provenance_test.dart` が Arial 依存の再混入・OFL 全文と出典の同梱・
+  フォント本体（TTF/OTF）を入れていないことを固定し、`sample_catalog_test.dart` が
+  日本語案内板 `info_board_ja` の看板色と文字の描画を実画素で検証する。
 - **プレビュー原画（#78）**: `sample_catalog_test.dart`（カタログ完全性・
   `assets/samples/*.png` が `rootBundle` 経由でデコードでき正準サイズと一致
   すること・`kRecommendedSampleByFilterId` が全 30 catalog id を過不足なく

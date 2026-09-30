@@ -3,17 +3,19 @@
 /// Usage:
 ///   dart run tools/generate_samples.dart
 ///
-/// Output: `assets/samples/*.png` — 7 scenes (see `assets/samples/README.md`
+/// Output: `assets/samples/*.png` — 8 scenes (see `assets/samples/README.md`
 /// for the full list + rationale) plus one grayscale depth-map companion for
 /// the "depth_landscape" scene.
 ///
 /// Everything here is procedurally generated with `package:image` (a pure-Dart
 /// rasterizer, no Flutter engine / `dart:ui` needed — this runs as a plain
 /// `dart run`, unlike `BeforeAfterView.generateSampleImage`, which needs a
-/// live Flutter binding). No external assets are downloaded or embedded: text
-/// uses `package:image`'s built-in bitmap fonts (Arial 14/24/48, vendored
-/// inside the package itself), and every shape is drawn with basic primitives
-/// (rects/circles/lines/polygons). No human faces appear anywhere (#78).
+/// live Flutter binding). No external assets are downloaded at run time: text
+/// uses the OFL bitmap fonts in `tools/fonts/` (Noto Sans / Noto Sans JP,
+/// rasterized by `tools/generate_font_atlases.py`; provenance and licence in
+/// `tools/fonts/README.md`, #99), and every shape is drawn with basic
+/// primitives (rects/circles/lines/polygons). No human faces appear anywhere
+/// (#78).
 ///
 /// Re-run this whenever a scene needs to change — the PNGs are committed
 /// (small, optimized at `level: 9`), not generated at build/runtime, so the
@@ -41,6 +43,7 @@ void main() {
     'chart': _generateChart,
     'traffic_signs': _generateTrafficSigns,
     'info_board': _generateInfoBoard,
+    'info_board_ja': _generateInfoBoardJa,
     'fruit_stand': _generateFruitStand,
     'night_scene': _generateNightScene,
     'depth_landscape': _generateDepthLandscape,
@@ -61,6 +64,68 @@ void _write(String filename, img.Image image) {
   final path = '$_outDir/$filename';
   File(path).writeAsBytesSync(bytes);
   stdout.writeln('  $path (${(bytes.length / 1024).toStringAsFixed(1)} KiB)');
+}
+
+// ── フォント（OFL の Noto Sans / Noto Sans JP、#99）──────────────────────
+
+const String _fontDir = 'tools/fonts';
+
+final Map<String, img.BitmapFont> _fontCache = {};
+
+/// `tools/fonts/<name>.fnt` + `<name>.png`（`tools/generate_font_atlases.py`
+/// の出力。BMFont 形式）を読む。`BitmapFont.fromFnt` は別引数でページ画像を
+/// 受け取るので、標準の `.fnt` にある `page` 行は取り除いてから渡す。
+img.BitmapFont _loadFont(String name) => _fontCache.putIfAbsent(name, () {
+      final fnt = File('$_fontDir/$name.fnt')
+          .readAsLinesSync()
+          .where((l) => !l.startsWith('page '))
+          .join('\n');
+      final page = img.decodePng(File('$_fontDir/$name.png').readAsBytesSync());
+      if (page == null) {
+        throw StateError('cannot decode $_fontDir/$name.png');
+      }
+      return img.BitmapFont.fromFnt(fnt, page);
+    });
+
+img.BitmapFont get _fontLatin18 => _loadFont('noto_sans_regular_18');
+img.BitmapFont get _fontLatin24 => _loadFont('noto_sans_regular_24');
+img.BitmapFont get _fontLatinBold48 => _loadFont('noto_sans_bold_48');
+img.BitmapFont get _fontJp24 => _loadFont('noto_sans_jp_regular_24');
+img.BitmapFont get _fontJpBold48 => _loadFont('noto_sans_jp_bold_48');
+img.BitmapFont get _fontJpBold96 => _loadFont('noto_sans_jp_bold_96');
+
+/// Draws [text] with a bitmap font. Unlike `img.drawString`, a character the
+/// font does not contain is an error rather than a silently skipped glyph
+/// (the atlases only hold the characters the samples use).
+void _drawText(
+  img.Image image,
+  String text, {
+  required img.BitmapFont font,
+  required int x,
+  required int y,
+  required img.Color color,
+}) {
+  _checkGlyphs(font, text);
+  img.drawString(image, text, font: font, x: x, y: y, color: color);
+}
+
+/// Advance width of [text] in [font] (for centring inside a sign).
+int _textWidth(img.BitmapFont font, String text) {
+  _checkGlyphs(font, text);
+  return text.codeUnits
+      .fold<int>(0, (w, c) => w + font.characters[c]!.xAdvance);
+}
+
+void _checkGlyphs(img.BitmapFont font, String text) {
+  for (final c in text.codeUnits) {
+    if (!font.characters.containsKey(c)) {
+      throw StateError(
+        'glyph U+${c.toRadixString(16).toUpperCase().padLeft(4, '0')} '
+        '(${String.fromCharCode(c)}) is not in ${font.face} ${font.size}px — '
+        'add it to tools/generate_font_atlases.py and regenerate',
+      );
+    }
+  }
 }
 
 img.Image _canvas(img.Color background) {
@@ -91,12 +156,14 @@ void _fillThickLine(
   if (len == 0) return;
   final nx = -dy / len * thickness / 2;
   final ny = dx / len * thickness / 2;
-  img.fillPolygon(image, vertices: [
-    img.Point(x1 + nx, y1 + ny),
-    img.Point(x2 + nx, y2 + ny),
-    img.Point(x2 - nx, y2 - ny),
-    img.Point(x1 - nx, y1 - ny),
-  ], color: color);
+  img.fillPolygon(image,
+      vertices: [
+        img.Point(x1 + nx, y1 + ny),
+        img.Point(x2 + nx, y2 + ny),
+        img.Point(x2 - nx, y2 - ny),
+        img.Point(x1 - nx, y1 - ny),
+      ],
+      color: color);
 }
 
 // ── 1. 路線図（色で区別する複数路線、駅名の文字）──────────────────────────
@@ -109,36 +176,66 @@ img.Image _generateRouteMap() {
   final image = _canvas(img.ColorRgb8(0xF3, 0xF1, 0xEA));
 
   const routes = <(String, int, int, int, List<List<double>>)>[
-    ('R', 0xE5, 0x39, 0x35, [
-      [0.08, 0.15],
-      [0.35, 0.15],
-      [0.55, 0.40],
-      [0.92, 0.40],
-    ]),
-    ('G', 0x2E, 0x7D, 0x32, [
-      [0.08, 0.55],
-      [0.40, 0.55],
-      [0.40, 0.20],
-      [0.75, 0.20],
-      [0.75, 0.88],
-    ]),
-    ('B', 0x1E, 0x88, 0xE5, [
-      [0.15, 0.92],
-      [0.15, 0.30],
-      [0.60, 0.30],
-      [0.60, 0.08],
-    ]),
-    ('O', 0xFB, 0x8C, 0x00, [
-      [0.90, 0.10],
-      [0.90, 0.65],
-      [0.20, 0.65],
-      [0.20, 0.95],
-    ]),
-    ('P', 0x8E, 0x24, 0xAA, [
-      [0.50, 0.05],
-      [0.50, 0.50],
-      [0.85, 0.80],
-    ]),
+    (
+      'R',
+      0xE5,
+      0x39,
+      0x35,
+      [
+        [0.08, 0.15],
+        [0.35, 0.15],
+        [0.55, 0.40],
+        [0.92, 0.40],
+      ]
+    ),
+    (
+      'G',
+      0x2E,
+      0x7D,
+      0x32,
+      [
+        [0.08, 0.55],
+        [0.40, 0.55],
+        [0.40, 0.20],
+        [0.75, 0.20],
+        [0.75, 0.88],
+      ]
+    ),
+    (
+      'B',
+      0x1E,
+      0x88,
+      0xE5,
+      [
+        [0.15, 0.92],
+        [0.15, 0.30],
+        [0.60, 0.30],
+        [0.60, 0.08],
+      ]
+    ),
+    (
+      'O',
+      0xFB,
+      0x8C,
+      0x00,
+      [
+        [0.90, 0.10],
+        [0.90, 0.65],
+        [0.20, 0.65],
+        [0.20, 0.95],
+      ]
+    ),
+    (
+      'P',
+      0x8E,
+      0x24,
+      0xAA,
+      [
+        [0.50, 0.05],
+        [0.50, 0.50],
+        [0.85, 0.80],
+      ]
+    ),
   ];
 
   var stationIndex = 0;
@@ -161,10 +258,10 @@ img.Image _generateRouteMap() {
       );
     }
     // Route code label near the first point, in the route's own colour.
-    img.drawString(
+    _drawText(
       image,
       code,
-      font: img.arial24,
+      font: _fontLatin24,
       x: px.first.$1.round() + 14,
       y: px.first.$2.round() - 30,
       color: color,
@@ -187,12 +284,12 @@ img.Image _generateRouteMap() {
         color: color,
         antialias: true,
       );
-      // 駅ラベルは arial14 では小さすぎるため arial24 にする
+      // 駅ラベルは小さすぎないよう 24px にする
       // （案内板と同じ最小文字サイズの方針）。
-      img.drawString(
+      _drawText(
         image,
         '${String.fromCharCode(65 + stationIndex % 26)}${stationIndex ~/ 26 + 1}',
-        font: img.arial24,
+        font: _fontLatin24,
         x: x.round() + 20,
         y: y.round() - 4,
         color: img.ColorRgb8(0x21, 0x21, 0x21),
@@ -217,11 +314,19 @@ img.Image _generateChart() {
   const rightX = kSize - 60;
 
   img.drawLine(image,
-      x1: originX, y1: topY, x2: originX, y2: originY,
-      color: axisColor, thickness: 3);
+      x1: originX,
+      y1: topY,
+      x2: originX,
+      y2: originY,
+      color: axisColor,
+      thickness: 3);
   img.drawLine(image,
-      x1: originX, y1: originY, x2: rightX, y2: originY,
-      color: axisColor, thickness: 3);
+      x1: originX,
+      y1: originY,
+      x2: rightX,
+      y2: originY,
+      color: axisColor,
+      thickness: 3);
 
   const series = <(String, int, int, int)>[
     ('A', 0xE5, 0x39, 0x35), // red
@@ -275,10 +380,13 @@ img.Image _generateChart() {
     final (code, r, g, b) = series[s];
     final y = legendY + s * 40;
     img.fillRect(image,
-        x1: legendX, y1: y, x2: legendX + 28, y2: y + 28,
+        x1: legendX,
+        y1: y,
+        x2: legendX + 28,
+        y2: y + 28,
         color: img.ColorRgb8(r, g, b));
-    img.drawString(image, code,
-        font: img.arial24, x: legendX + 44, y: y + 2, color: axisColor);
+    _drawText(image, code,
+        font: _fontLatin24, x: legendX + 44, y: y + 2, color: axisColor);
   }
   return image;
 }
@@ -355,9 +463,9 @@ img.Image _generateTrafficSigns() {
       antialias: true,
     );
   }
-  img.drawString(image, '!',
-      font: img.arial48,
-      x: triCx.round() - 8,
+  _drawText(image, '!',
+      font: _fontLatinBold48,
+      x: triCx.round() - _textWidth(_fontLatinBold48, '!') ~/ 2,
       y: triCy.round() - 10,
       color: img.ColorRgb8(0x21, 0x21, 0x21));
 
@@ -369,11 +477,17 @@ img.Image _generateTrafficSigns() {
   const proCx = 640, proCy = 620, proR = 150;
   const proRingThickness = 24;
   img.fillCircle(image,
-      x: proCx, y: proCy, radius: proR,
-      color: img.ColorRgb8(0xE5, 0x39, 0x35), antialias: true);
+      x: proCx,
+      y: proCy,
+      radius: proR,
+      color: img.ColorRgb8(0xE5, 0x39, 0x35),
+      antialias: true);
   img.fillCircle(image,
-      x: proCx, y: proCy, radius: proR - proRingThickness,
-      color: img.ColorRgb8(0xFF, 0xFF, 0xFF), antialias: true);
+      x: proCx,
+      y: proCy,
+      radius: proR - proRingThickness,
+      color: img.ColorRgb8(0xFF, 0xFF, 0xFF),
+      antialias: true);
   // drawLine(thickness:) は端に projecting cap が付き、
   // 対角線の端点（中心から約141px）+ cap 分（約10px）でリングの外径
   // （150px）をわずかに超えてしまっていた。_fillThickLine（端がちょうど
@@ -390,10 +504,17 @@ img.Image _generateTrafficSigns() {
 
   // Information rectangle (blue, rounded, white "P").
   img.fillRect(image,
-      x1: 880, y1: 460, x2: 1010, y2: 590,
-      color: img.ColorRgb8(0x1E, 0x88, 0xE5), radius: 16);
-  img.drawString(image, 'P',
-      font: img.arial48, x: 925, y: 495, color: img.ColorRgb8(0xFF, 0xFF, 0xFF));
+      x1: 880,
+      y1: 460,
+      x2: 1010,
+      y2: 590,
+      color: img.ColorRgb8(0x1E, 0x88, 0xE5),
+      radius: 16);
+  _drawText(image, 'P',
+      font: _fontLatinBold48,
+      x: 945 - _textWidth(_fontLatinBold48, 'P') ~/ 2,
+      y: 495,
+      color: img.ColorRgb8(0xFF, 0xFF, 0xFF));
 
   return image;
 }
@@ -408,12 +529,12 @@ img.Image _generateInfoBoard() {
   final textColor = img.ColorRgb8(0x1A, 0x23, 0x3D);
   final ruleColor = img.ColorRgb8(0xB8, 0xB0, 0x98);
 
-  img.drawString(image, 'INFORMATION',
-      font: img.arial48, x: 60, y: 50, color: textColor);
+  _drawText(image, 'INFORMATION',
+      font: _fontLatinBold48, x: 60, y: 50, color: textColor);
   img.drawLine(image,
       x1: 60, y1: 140, x2: kSize - 60, y2: 140, color: ruleColor, thickness: 4);
 
-  // 本文は最小でも arial24（旧版は補足行だけ arial14 だった）。
+  // 本文は最小でも 24px（旧版は補足行だけ 14px だった）。
   // 行数はそのぶん高さが要るため 10→8 行に減らし、1024px に収める。
   const rows = <(String, String, String)>[
     ('A1', '08:05', 'CENTRAL'),
@@ -428,16 +549,107 @@ img.Image _generateInfoBoard() {
   var y = 180;
   const rowHeight = 96;
   for (final (code, time, place) in rows) {
-    img.drawString(image, code, font: img.arial24, x: 60, y: y, color: textColor);
-    img.drawString(image, time, font: img.arial24, x: 200, y: y, color: textColor);
-    img.drawString(image, place, font: img.arial24, x: 380, y: y, color: textColor);
-    // A line of small print under each row (still arial24 —
+    _drawText(image, code, font: _fontLatin24, x: 60, y: y, color: textColor);
+    _drawText(image, time, font: _fontLatin24, x: 200, y: y, color: textColor);
+    _drawText(image, place, font: _fontLatin24, x: 380, y: y, color: textColor);
+    // A line of small print under each row (still 24px —
     // no body text below that size — fine detail for blur filters instead
     // comes from the sheer amount of text, not from a smaller font).
-    img.drawString(
+    _drawText(
       image,
-      'PLATFORM ${1 + rows.indexOf((code, time, place)) % 4} - VIA LOOP LINE - MIND THE GAP',
-      font: img.arial24,
+      'PLATFORM ${1 + rows.indexOf((
+                code,
+                time,
+                place
+              )) % 4} - VIA LOOP LINE - MIND THE GAP',
+      font: _fontLatin24,
+      x: 60,
+      y: y + 40,
+      color: img.ColorRgb8(0x5A, 0x54, 0x46),
+    );
+    img.drawLine(image,
+        x1: 60,
+        y1: y + rowHeight - 8,
+        x2: kSize - 60,
+        y2: y + rowHeight - 8,
+        color: ruleColor,
+        thickness: 2);
+    y += rowHeight;
+  }
+  return image;
+}
+
+// ── 4b. 日本語の案内板（出口・駅・営業中 + のりば案内）─────────────────────
+
+/// A Japanese signage board (#99): three large wayfinding signs (出口 /
+/// 駅 / 営業中 — short, everyday words, white on green/blue/red) above a
+/// small-print timetable ("のりば案内"). Same role as [_generateInfoBoard]
+/// for Japanese text: kanji strokes are dense, so blur / detail-loss filters
+/// change legibility differently than for Latin text. Only generic words —
+/// no real place names, brands or trademarks.
+img.Image _generateInfoBoardJa() {
+  final image = _canvas(img.ColorRgb8(0xF1, 0xED, 0xE1));
+  final textColor = img.ColorRgb8(0x1A, 0x23, 0x3D);
+  final ruleColor = img.ColorRgb8(0xB8, 0xB0, 0x98);
+  final white = img.ColorRgb8(0xFF, 0xFF, 0xFF);
+
+  // 3 枚の大きな看板（x1, x2, 地色, 文字）。文字は 96px を看板の中央に置く。
+  const signTop = 40, signBottom = 280;
+  final signs = <(int, int, img.Color, String)>[
+    (40, 320, img.ColorRgb8(0x1B, 0x7F, 0x4B), '出口'),
+    (340, 540, img.ColorRgb8(0x1E, 0x5A, 0xA8), '駅'),
+    (560, 984, img.ColorRgb8(0xC6, 0x28, 0x28), '営業中'),
+  ];
+  for (final (x1, x2, background, label) in signs) {
+    img.fillRect(image,
+        x1: x1,
+        y1: signTop,
+        x2: x2,
+        y2: signBottom,
+        color: background,
+        radius: 20);
+    final cx = (x1 + x2) ~/ 2;
+    _drawText(image, label,
+        font: _fontJpBold96,
+        x: cx - _textWidth(_fontJpBold96, label) ~/ 2,
+        // 矢印のある「出口」は文字を上に寄せ、他は看板の中央に置く。
+        y: signTop + (label == '出口' ? 40 : 68),
+        color: white);
+  }
+  // 「出口」の下に右向きの矢印（軸 + 三角形）。
+  img.fillRect(image, x1: 100, y1: 224, x2: 232, y2: 236, color: white);
+  img.fillPolygon(image,
+      vertices: [
+        img.Point(224, 206),
+        img.Point(262, 230),
+        img.Point(224, 254),
+      ],
+      color: white);
+
+  _drawText(image, 'のりば案内',
+      font: _fontJpBold48, x: 60, y: 316, color: textColor);
+  img.drawLine(image,
+      x1: 60, y1: 390, x2: kSize - 60, y2: 390, color: ruleColor, thickness: 4);
+
+  const rows = <(String, String, String)>[
+    ('1番線', '8:05', '中央行き'),
+    ('2番線', '8:20', '川沿い行き'),
+    ('3番線', '8:32', '北口行き'),
+    ('4番線', '8:47', '旧市街行き'),
+    ('5番線', '9:03', '港行き'),
+    ('6番線', '9:15', '市場前行き'),
+  ];
+  var y = 420;
+  const rowHeight = 96;
+  for (final (track, time, dest) in rows) {
+    _drawText(image, track, font: _fontJp24, x: 60, y: y, color: textColor);
+    _drawText(image, time, font: _fontJp24, x: 200, y: y, color: textColor);
+    _drawText(image, dest, font: _fontJp24, x: 380, y: y, color: textColor);
+    // 各行の下に小さな補足（これも 24px。細部はぼけ方の差ではなく量で出す）。
+    _drawText(
+      image,
+      '普通・環状線まわり・足もとにご注意ください',
+      font: _fontJp24,
       x: 60,
       y: y + 40,
       color: img.ColorRgb8(0x5A, 0x54, 0x46),
@@ -469,21 +681,29 @@ img.Image _generateFruitStand() {
       final (r, g, b) = colors[i];
       final cx = (spacing * i + spacing / 2).round();
       if (banana) {
-        img.fillPolygon(image, vertices: [
-          img.Point(cx - 70.0, y + 40.0),
-          img.Point(cx - 30.0, y - 60.0),
-          img.Point(cx + 40.0, y - 50.0),
-          img.Point(cx + 70.0, y + 50.0),
-        ], color: img.ColorRgb8(r, g, b));
+        img.fillPolygon(image,
+            vertices: [
+              img.Point(cx - 70.0, y + 40.0),
+              img.Point(cx - 30.0, y - 60.0),
+              img.Point(cx + 40.0, y - 50.0),
+              img.Point(cx + 70.0, y + 50.0),
+            ],
+            color: img.ColorRgb8(r, g, b));
       } else {
-        img.fillCircle(image, x: cx, y: y, radius: 90, color: img.ColorRgb8(r, g, b));
+        img.fillCircle(image,
+            x: cx, y: y, radius: 90, color: img.ColorRgb8(r, g, b));
         // Small stem, always the same dark colour (shape/position cue, not hue).
         img.fillRect(image,
-            x1: cx - 6, y1: y - 100, x2: cx + 6, y2: y - 75,
+            x1: cx - 6,
+            y1: y - 100,
+            x2: cx + 6,
+            y2: y - 75,
             color: img.ColorRgb8(0x3E, 0x27, 0x14));
         // Soft highlight for a touch of roundness.
         img.fillCircle(image,
-            x: cx - 30, y: y - 30, radius: 20,
+            x: cx - 30,
+            y: y - 30,
+            radius: 20,
             color: img.ColorRgb8(
               (r + 255) ~/ 2,
               (g + 255) ~/ 2,
@@ -507,11 +727,14 @@ img.Image _generateFruitStand() {
     (0xFB, 0x8C, 0x00),
     (0xFB, 0x8C, 0x00),
   ]);
-  fruitRow(520, [
-    (0xFD, 0xD8, 0x35),
-    (0xFD, 0xD8, 0x35),
-    (0xFD, 0xD8, 0x35),
-  ], banana: false);
+  fruitRow(
+      520,
+      [
+        (0xFD, 0xD8, 0x35),
+        (0xFD, 0xD8, 0x35),
+        (0xFD, 0xD8, 0x35),
+      ],
+      banana: false);
   // Row 3: grapes purple + plum blue (tritan-relevant blue/purple pair).
   fruitRow(800, [
     (0x6A, 0x1B, 0x9A),
@@ -536,7 +759,8 @@ img.Image _generateNightScene() {
     final r = (0x05 + (0x12 - 0x05) * t).round();
     final g = (0x05 + (0x12 - 0x05) * t).round();
     final b = (0x10 + (0x2A - 0x10) * t).round();
-    img.drawLine(image, x1: 0, y1: y, x2: kSize - 1, y2: y, color: img.ColorRgb8(r, g, b));
+    img.drawLine(image,
+        x1: 0, y1: y, x2: kSize - 1, y2: y, color: img.ColorRgb8(r, g, b));
   }
 
   // Skyline silhouette along the bottom — a depth/shape cue independent of
@@ -553,7 +777,10 @@ img.Image _generateNightScene() {
   ];
   for (final r in buildings) {
     img.fillRect(image,
-        x1: r[0], y1: r[1], x2: r[2], y2: r[3],
+        x1: r[0],
+        y1: r[1],
+        x2: r[2],
+        y2: r[3],
         color: img.ColorRgb8(0x02, 0x02, 0x06));
   }
 
@@ -575,7 +802,10 @@ img.Image _generateNightScene() {
   const lampXs = [60, 340, 620, 900];
   for (final lx in lampXs) {
     img.fillRect(image,
-        x1: lx - 3, y1: 860, x2: lx + 3, y2: kSize,
+        x1: lx - 3,
+        y1: 860,
+        x2: lx + 3,
+        y2: kSize,
         color: img.ColorRgb8(0x08, 0x08, 0x0C));
     img.fillCircle(image,
         x: lx, y: 855, radius: 9, color: img.ColorRgb8(0xFF, 0xE3, 0x9E));
@@ -583,10 +813,16 @@ img.Image _generateNightScene() {
 
   // ビルの 1 棟に小さな看板（照明看板、暗い赤地に淡い文字）。
   img.fillRect(image,
-      x1: 165, y1: 560, x2: 245, y2: 604,
+      x1: 165,
+      y1: 560,
+      x2: 245,
+      y2: 604,
       color: img.ColorRgb8(0x6E, 0x22, 0x22));
-  img.drawString(image, 'OPEN',
-      font: img.arial14, x: 176, y: 572, color: img.ColorRgb8(0xFF, 0xD8, 0xB0));
+  _drawText(image, 'OPEN',
+      font: _fontLatin18,
+      x: 176,
+      y: 572,
+      color: img.ColorRgb8(0xFF, 0xD8, 0xB0));
 
   // Deterministic point-lights (small LCG so re-running reproduces the same
   // image byte-for-byte).
@@ -609,7 +845,8 @@ img.Image _generateNightScene() {
     final y = next((kSize * 0.72).round());
     final radius = 2 + next(5);
     final (r, g, b) = palette[next(palette.length)];
-    img.fillCircle(image, x: x, y: y, radius: radius, color: img.ColorRgb8(r, g, b));
+    img.fillCircle(image,
+        x: x, y: y, radius: radius, color: img.ColorRgb8(r, g, b));
   }
   return image;
 }
@@ -629,25 +866,32 @@ img.Image _generateDepthLandscape() {
     final r = (0xCF + (0x7E - 0xCF) * t).round();
     final g = (0xE3 + (0xA6 - 0xE3) * t).round();
     final b = (0xF0 + (0xD8 - 0xF0) * t).round();
-    img.drawLine(image, x1: 0, y1: y, x2: kSize - 1, y2: y, color: img.ColorRgb8(r, g, b));
+    img.drawLine(image,
+        x1: 0, y1: y, x2: kSize - 1, y2: y, color: img.ColorRgb8(r, g, b));
   }
 
   // Background: far, pale, low-contrast mountain ridge.
-  img.fillPolygon(image, vertices: [
-    img.Point(0.0, 560.0),
-    img.Point(220.0, 380.0),
-    img.Point(430.0, 500.0),
-    img.Point(620.0, 340.0),
-    img.Point(860.0, 480.0),
-    img.Point(1024.0, 420.0),
-    img.Point(1024.0, 640.0),
-    img.Point(0.0, 640.0),
-  ], color: img.ColorRgb8(0xA9, 0xB8, 0xC4));
+  img.fillPolygon(image,
+      vertices: [
+        img.Point(0.0, 560.0),
+        img.Point(220.0, 380.0),
+        img.Point(430.0, 500.0),
+        img.Point(620.0, 340.0),
+        img.Point(860.0, 480.0),
+        img.Point(1024.0, 420.0),
+        img.Point(1024.0, 640.0),
+        img.Point(0.0, 640.0),
+      ],
+      color: img.ColorRgb8(0xA9, 0xB8, 0xC4));
 
   // 中景の地面（山並みの裾 y=640 〜 近景の柵 y=760 の間）。
   // 旧版はここが未描画のまま（Image の既定の黒）で残っていた。中間の緑で塗る。
   img.fillRect(image,
-      x1: 0, y1: 640, x2: kSize, y2: 760, color: img.ColorRgb8(0x5B, 0x8A, 0x52));
+      x1: 0,
+      y1: 640,
+      x2: kSize,
+      y2: 760,
+      color: img.ColorRgb8(0x5B, 0x8A, 0x52));
 
   // Midground: a cluster of trees/houses — mid saturation, mid size.
   final midColor = img.ColorRgb8(0x4E, 0x7D, 0x4A);
@@ -655,13 +899,18 @@ img.Image _generateDepthLandscape() {
     img.fillCircle(image, x: cx, y: 660, radius: 70, color: midColor);
   }
   img.fillRect(image,
-      x1: 470, y1: 600, x2: 620, y2: 700,
+      x1: 470,
+      y1: 600,
+      x2: 620,
+      y2: 700,
       color: img.ColorRgb8(0xB0, 0x7A, 0x4E));
-  img.fillPolygon(image, vertices: [
-    img.Point(465.0, 600.0),
-    img.Point(545.0, 530.0),
-    img.Point(625.0, 600.0),
-  ], color: img.ColorRgb8(0x8C, 0x3B, 0x2E));
+  img.fillPolygon(image,
+      vertices: [
+        img.Point(465.0, 600.0),
+        img.Point(545.0, 530.0),
+        img.Point(625.0, 600.0),
+      ],
+      color: img.ColorRgb8(0x8C, 0x3B, 0x2E));
 
   // Foreground: large, sharp, dark silhouette (a fence + a bush) close to
   // the camera, occupying the bottom of the frame.
@@ -683,16 +932,18 @@ img.Image _generateDepthLandscapeDepthMap() {
   final image = img.Image(width: kSize, height: kSize, numChannels: 1);
   // Sky/background mountains: far → dark.
   img.fill(image, color: img.ColorRgb8(40, 40, 40));
-  img.fillPolygon(image, vertices: [
-    img.Point(0.0, 560.0),
-    img.Point(220.0, 380.0),
-    img.Point(430.0, 500.0),
-    img.Point(620.0, 340.0),
-    img.Point(860.0, 480.0),
-    img.Point(1024.0, 420.0),
-    img.Point(1024.0, 640.0),
-    img.Point(0.0, 640.0),
-  ], color: img.ColorRgb8(70, 70, 70));
+  img.fillPolygon(image,
+      vertices: [
+        img.Point(0.0, 560.0),
+        img.Point(220.0, 380.0),
+        img.Point(430.0, 500.0),
+        img.Point(620.0, 340.0),
+        img.Point(860.0, 480.0),
+        img.Point(1024.0, 420.0),
+        img.Point(1024.0, 640.0),
+        img.Point(0.0, 640.0),
+      ],
+      color: img.ColorRgb8(70, 70, 70));
 
   // 中景の地面（y=640〜760）。奥（山並み側、100）から手前
   // （近景の柵側、140）へのグラデーションで、色版の中間の緑と対になる深度を
@@ -700,7 +951,8 @@ img.Image _generateDepthLandscapeDepthMap() {
   for (var y = 640; y < 760; y++) {
     final t = (y - 640) / (760 - 640);
     final v = (100 + (140 - 100) * t).round();
-    img.drawLine(image, x1: 0, y1: y, x2: kSize - 1, y2: y, color: img.ColorRgb8(v, v, v));
+    img.drawLine(image,
+        x1: 0, y1: y, x2: kSize - 1, y2: y, color: img.ColorRgb8(v, v, v));
   }
 
   // Midground: mid gray.
@@ -709,11 +961,13 @@ img.Image _generateDepthLandscapeDepthMap() {
     img.fillCircle(image, x: cx, y: 660, radius: 70, color: midGray);
   }
   img.fillRect(image, x1: 470, y1: 600, x2: 620, y2: 700, color: midGray);
-  img.fillPolygon(image, vertices: [
-    img.Point(465.0, 600.0),
-    img.Point(545.0, 530.0),
-    img.Point(625.0, 600.0),
-  ], color: midGray);
+  img.fillPolygon(image,
+      vertices: [
+        img.Point(465.0, 600.0),
+        img.Point(545.0, 530.0),
+        img.Point(625.0, 600.0),
+      ],
+      color: midGray);
 
   // Foreground: near → bright.
   final fgGray = img.ColorRgb8(230, 230, 230);
