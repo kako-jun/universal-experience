@@ -34,7 +34,7 @@ lib/
 │   ├── clipboard_image_reader.dart  # クリップボード画像取得の seam（実体は pasteboard、#97）
 │   ├── color_vision_selection.dart  # 色覚クイック選択の唯一の入口（FilterService/
 │   │                                 # VisionFilterState を同時更新、#60）
-│   ├── export_service.dart          # PNG エクスポート（メタ焼き込み・Downloads へ非上書き保存・フォルダで表示、#43/#64）
+│   ├── export_service.dart          # PNG エクスポート（メタ焼き込み・「シミュレーション（近似）」と実験的フィルタの注記の焼き込み #80・Downloads へ非上書き保存・フォルダで表示、#43/#64）
 │   ├── experience_source.dart       # 体験プリセットの供給源 seam・availableExperiences・
 │   │                                 # isValidExperiencePreset（永続化した選択の検証、#65）
 │   ├── filter_list_selection.dart   # 統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行）の
@@ -57,7 +57,8 @@ lib/
 │   ├── vision_filter_store.dart     # VisionFilterState の SharedPreferences 永続化・起動時復元・
 │   │                                 # 300ms デバウンス・flush（#65）
 │   ├── vision_filter_metadata.dart  # urgency/urgency_escalation/recommended_strength の
-│   │                                 # provider seam（sensus ブリッジが唯一の正本、#76/#77）
+│   │                                 # provider seam（sensus ブリッジが唯一の正本、#76/#77）。
+│   │                                 # citation/limitations も同じ seam（#80）
 │   └── vision_filter_state.dart     # フィルタ id ごとの強度・パラメータの記憶（#77）
 ├── src/rust/                        # flutter_rust_bridge 生成コード（sensus-core 連携）
 └── ui/
@@ -68,6 +69,8 @@ lib/
     │                                 # experience_presets（体験プリセットの行 ExperiencePresetTile）, filter_param_panel,
     │                                 # consult_notice_block（受診喚起の共有表示ウィジェット、#76）,
     │                                 # strength_caution（強度スライダの上限付近の印・注記、#66）,
+    │                                 # filter_provenance（モデルと出典・表現できないこと、#80）,
+    │                                 # experimental_badge（「実験的」バッジ、#80）,
     │                                 # window_mode_panel（起動モード・最前面・クリックスルー・
     │                                 # ホットキー一覧を持つ。AppBar のダイアログで開く、#63/#72）,
     │                                 # loupe_hud（ルーペ窓モード限定の HUD。症状名・強度・

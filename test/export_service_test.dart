@@ -454,6 +454,7 @@ void main() {
         symptomLabel: 'Protanopia',
         strengthLabel: 'Strength: 100%',
         isoDate: '2026-06-23',
+        simulationNotice: 'Simulation (approximation)',
       );
       final composed = await composeExportImage(base, caption);
       addTearDown(() {
@@ -471,6 +472,7 @@ void main() {
         symptomLabel: 'Tritanopia',
         strengthLabel: 'Strength: 60%',
         isoDate: '2026-01-05',
+        simulationNotice: 'Simulation (approximation)',
       );
       final composed = await composeExportImage(base, caption);
       final png = await encodeImagePng(composed);
@@ -490,6 +492,7 @@ void main() {
         strengthLabel: 'Strength: 80%',
         urgencyMessage: 'Sudden changes in vision can need prompt care.',
         isoDate: '2026-06-23',
+        simulationNotice: 'Simulation (approximation)',
       );
       final composed = await composeExportImage(base, caption);
       final png = await encodeImagePng(composed);
@@ -504,19 +507,19 @@ void main() {
       expect(png!.isNotEmpty, isTrue);
     });
 
-    test(
-        'escalationGroups（段ごとの見出し + 条件文）ぶん、無しより高くなる '
-        '（#76 レビュー M1・再レビュー S-a）', () async {
+    test('escalationGroups（段ごとの見出し + 条件文）ぶん、無しより高くなる', () async {
       final base = await makeBase(80, 60);
       const withoutGroups = ExportCaption(
         symptomLabel: 'BPPV Rotation',
         strengthLabel: 'Strength: 60%',
         isoDate: '2026-06-23',
+        simulationNotice: 'Simulation (approximation)',
       );
       const withGroups = ExportCaption(
         symptomLabel: 'BPPV Rotation',
         strengthLabel: 'Strength: 60%',
         isoDate: '2026-06-23',
+        simulationNotice: 'Simulation (approximation)',
         escalationGroups: [
           ExportEscalationGroup(
             header: 'See a doctor right away if:',
@@ -543,6 +546,214 @@ void main() {
       expect(composedWith.height, greaterThan(composedWithout.height));
       expect(pngWith, isNotNull);
       expect(pngWith!.isNotEmpty, isTrue);
+    });
+
+    /// [png] を実際にデコードして RGBA の生画素を返す（焼き込みの検証は
+    /// 描画命令ではなく、書き出される PNG の画素で行う）。
+    Future<({int width, int height, Uint8List rgba})> decodePng(
+        Uint8List png) async {
+      final codec = await ui.instantiateImageCodec(png);
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
+      final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      final result = (
+        width: image.width,
+        height: image.height,
+        rgba: data!.buffer.asUint8List()
+      );
+      image.dispose();
+      codec.dispose();
+      return result;
+    }
+
+    /// 帯の中で「注記の色（純白）」の画素が並ぶ行の塊（上から順）ごとの
+    /// 横方向の広がり（px）を返す。
+    List<int> whiteLineExtents(
+        ({int width, int height, Uint8List rgba}) img, int bandTop) {
+      final extents = <int>[];
+      var minX = -1;
+      var maxX = -1;
+      var inLine = false;
+      void flush() {
+        if (inLine) extents.add(maxX - minX + 1);
+        inLine = false;
+        minX = -1;
+        maxX = -1;
+      }
+
+      for (var y = bandTop; y < img.height; y++) {
+        var rowMin = -1;
+        var rowMax = -1;
+        for (var x = 0; x < img.width; x++) {
+          final o = (y * img.width + x) * 4;
+          if (img.rgba[o] == 0xFF &&
+              img.rgba[o + 1] == 0xFF &&
+              img.rgba[o + 2] == 0xFF) {
+            if (rowMin < 0) rowMin = x;
+            rowMax = x;
+          }
+        }
+        if (rowMin < 0) {
+          flush();
+        } else {
+          inLine = true;
+          minX = minX < 0 ? rowMin : (rowMin < minX ? rowMin : minX);
+          maxX = rowMax > maxX ? rowMax : maxX;
+        }
+      }
+      flush();
+      return extents;
+    }
+
+    test(
+        'simulationNotice は書き出した PNG の画素として焼き込まれ、'
+        '文言の長さに応じて広がる（#80）', () async {
+      final base = await makeBase(640, 40);
+      addTearDown(base.dispose);
+
+      Future<List<int>> extentsFor(String notice) async {
+        final composed = await composeExportImage(
+          base,
+          ExportCaption(
+            symptomLabel: 'Tritanopia',
+            strengthLabel: 'Strength: 60%',
+            isoDate: '2026-06-23',
+            simulationNotice: notice,
+          ),
+        );
+        final png = await encodeImagePng(composed);
+        composed.dispose();
+        return whiteLineExtents(await decodePng(png!), base.height);
+      }
+
+      final long = await extentsFor('Simulation (approximation)');
+      final short = await extentsFor('Sim');
+
+      // 純白の行の塊は 2 つ: 症状名（太字 18px）と、注記（14px）。
+      expect(long, hasLength(2));
+      expect(short, hasLength(2));
+      // 症状名は同じ、注記だけが文言に応じて変わる。
+      expect(long[0], short[0]);
+      expect(long[1], greaterThan(short[1] * 4));
+      expect(long[1], greaterThan(0));
+    });
+
+    test('simulationNotice は受診喚起の有無にかかわらず常に描かれる（#80）', () async {
+      final base = await makeBase(640, 40);
+      addTearDown(base.dispose);
+      final composed = await composeExportImage(
+        base,
+        const ExportCaption(
+          symptomLabel: 'Glaucoma',
+          strengthLabel: 'Strength: 80%',
+          isoDate: '2026-06-23',
+          simulationNotice: 'Simulation (approximation)',
+          urgencyMessage: 'Sudden changes in vision can need prompt care.',
+        ),
+      );
+      final png = await encodeImagePng(composed);
+      composed.dispose();
+      final extents = whiteLineExtents(await decodePng(png!), base.height);
+      expect(extents, hasLength(2));
+    });
+
+    /// 帯の中の純白（注記の色）の画素数。
+    int whitePixels(
+        ({int width, int height, Uint8List rgba}) img, int bandTop) {
+      var n = 0;
+      for (var y = bandTop; y < img.height; y++) {
+        for (var x = 0; x < img.width; x++) {
+          final o = (y * img.width + x) * 4;
+          if (img.rgba[o] == 0xFF &&
+              img.rgba[o + 1] == 0xFF &&
+              img.rgba[o + 2] == 0xFF) {
+            n++;
+          }
+        }
+      }
+      return n;
+    }
+
+    /// 幅 [width] の画像に焼き込まれた、simulationNotice だけの純白画素数。
+    /// 注記が空の同じ caption との差を取り、症状名などを除く。
+    Future<int> noticePixelsAtWidth(int width, {String? experimental}) async {
+      final base = await makeBase(width, 40);
+      addTearDown(base.dispose);
+      Future<int> count(String notice, String? exp) async {
+        final composed = await composeExportImage(
+          base,
+          ExportCaption(
+            symptomLabel: 'Tritanopia',
+            strengthLabel: 'Strength: 60%',
+            isoDate: '2026-06-23',
+            simulationNotice: notice,
+            experimentalNotice: exp,
+          ),
+        );
+        final png = await encodeImagePng(composed);
+        composed.dispose();
+        return whitePixels(await decodePng(png!), base.height);
+      }
+
+      return await count('Simulation (approximation)', experimental) -
+          await count('', null);
+    }
+
+    test(
+        'ごく狭い画像（64px・100px 幅）でも simulationNotice は省略されず全文が'
+        '描かれる（広い画像と同じ画素量。近似の注記が欠けない）（#80）', () async {
+      // 基準: 1 行に収まる幅 640px。テスト環境の文字（Ahem）は 1 文字が
+      // 塗りつぶしの正方形なので、全文が描かれていれば画素量は幅によらず
+      // ほぼ同じ（行送りの端数で縁がにじむぶんだけ差が出る）。
+      final wide = await noticePixelsAtWidth(640);
+      expect(wide, greaterThan(0));
+      for (final width in [64, 100]) {
+        final narrow = await noticePixelsAtWidth(width);
+        expect(narrow, greaterThan((wide * 0.8).round()),
+            reason: '$width px 幅で注記が欠けている（省略記号で切られている）');
+        expect(narrow, lessThan((wide * 1.2).round()), reason: '$width px 幅');
+      }
+    });
+
+    test('極小の画像（12px 幅）でも左余白で文字が画像の外に出ない（#80）', () async {
+      // 余白が 16px 固定だと、12px 幅では文字の開始位置が画像の外になり、
+      // 注記が 1 画素も残らない。
+      final narrow = await noticePixelsAtWidth(12);
+      expect(narrow, greaterThan(0));
+    });
+
+    test('experimentalNotice は全文が別の行として焼き込まれ、狭い画像でも省略されない（#80）', () async {
+      // 広い画像: 症状名・シミュレーション注記・実験的注記の 3 行（純白の塊）。
+      final base = await makeBase(640, 40);
+      addTearDown(base.dispose);
+      final composed = await composeExportImage(
+        base,
+        const ExportCaption(
+          symptomLabel: 'Tetrachromacy',
+          strengthLabel: 'Strength: 100%',
+          isoDate: '2026-06-23',
+          simulationNotice: 'Simulation (approximation)',
+          experimentalNotice: 'Experimental visualization',
+        ),
+      );
+      final png = await encodeImagePng(composed);
+      composed.dispose();
+      final extents = whiteLineExtents(await decodePng(png!), base.height);
+      expect(extents, hasLength(3));
+
+      // 狭い画像でも、実験的注記ぶんの画素が広い画像と同じ量だけ増える。
+      final wideOnly = await noticePixelsAtWidth(640);
+      final wideBoth = await noticePixelsAtWidth(640,
+          experimental: 'Experimental visualization');
+      final expWide = wideBoth - wideOnly;
+      expect(expWide, greaterThan(0));
+
+      final narrowOnly = await noticePixelsAtWidth(100);
+      final narrowBoth = await noticePixelsAtWidth(100,
+          experimental: 'Experimental visualization');
+      final expNarrow = narrowBoth - narrowOnly;
+      expect(expNarrow, greaterThan((expWide * 0.8).round()));
+      expect(expNarrow, lessThan((expWide * 1.2).round()));
     });
   });
 }

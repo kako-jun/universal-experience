@@ -216,7 +216,8 @@ class _FilterList extends StatelessWidget {
         : const <Experience>[];
     final entries = controller.visibleEntries;
     // 検索語もカテゴリ指定も無いときだけ、カテゴリごとの小見出しを挟む。
-    final showGroupHeaders = !controller.isSearching && controller.category == null;
+    final showGroupHeaders =
+        !controller.isSearching && controller.category == null;
 
     Widget heading(String text) => Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
@@ -264,6 +265,9 @@ class _FilterList extends StatelessWidget {
               onTap: () =>
                   applyFilterListEntry(filterService, visionState, entry),
               onPointerActivated: onActivated,
+              isExperimental:
+                  kVisionFilterCatalogById[entry.catalogId]?.isExperimental ??
+                      false,
             ));
           }
           return Column(

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderAbstractViewport;
-import 'package:flutter/services.dart' show HardwareKeyboard, LogicalKeyboardKey;
+import 'package:flutter/services.dart'
+    show HardwareKeyboard, LogicalKeyboardKey;
 
 import '../../l10n/app_localizations.dart';
+import 'experimental_badge.dart';
 
 /// 統合フィルタ一覧（`FilterBrowser`、#72）の 1 行。
 ///
@@ -26,6 +28,7 @@ class FilterListTile extends StatefulWidget {
     required this.onTap,
     this.onPointerActivated,
     this.leading,
+    this.isExperimental = false,
   });
 
   /// 行の表示名。
@@ -45,6 +48,10 @@ class FilterListTile extends StatefulWidget {
 
   /// 先頭のアイコン（体験プリセットの行だけが使う）。
   final Widget? leading;
+
+  /// 名前の横に「実験的」バッジを出すか（#80、
+  /// `VisionFilterEntry.isExperimental`）。
+  final bool isExperimental;
 
   @override
   State<FilterListTile> createState() => _FilterListTileState();
@@ -112,7 +119,14 @@ class _FilterListTileState extends State<FilterListTile> {
       selectedTileColor: scheme.secondaryContainer,
       selectedColor: scheme.onSecondaryContainer,
       leading: widget.leading,
-      title: Text(widget.title),
+      title: widget.isExperimental
+          ? Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [Text(widget.title), const ExperimentalBadge()],
+            )
+          : Text(widget.title),
       titleTextStyle: theme.textTheme.bodyLarge?.copyWith(
         fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w400,
       ),

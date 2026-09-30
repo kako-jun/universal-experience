@@ -44,6 +44,7 @@ import 'package:universal_experience/services/hotkey_service.dart';
 import 'package:universal_experience/services/image_source_state.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/settings_service.dart';
+import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart';
@@ -164,6 +165,10 @@ void main() {
     // [strength] にする（契約注記の警告表示の確認用、#66）。
     String? advancedFilterId,
     double? strength,
+    // true なら「モデルと出典」「表現できないこと」を両方開いて撮る（#80）。
+    bool expandProvenance = false,
+    // 指定すると体験プリセット（[id, 対応するカタログ id]）を選ぶ（#80）。
+    (String, String)? preset,
   }) async {
     tester.view.physicalSize = Size(width, height);
     tester.view.devicePixelRatio = 1.0;
@@ -185,6 +190,7 @@ void main() {
       visionState.select(advancedFilterId);
       if (strength != null) visionState.setStrength(strength);
     }
+    if (preset != null) visionState.selectPreset(preset.$1, preset.$2);
     imageSourceState.followRecommendedSample(
       recommendedSampleIdForFilter(visionState.selectedId),
     );
@@ -244,6 +250,17 @@ void main() {
     }
 
     final base = '$widthLabel-${dark ? 'dark' : 'light'}-$locale';
+    if (expandProvenance) {
+      for (final key in ['provenance-model', 'provenance-limitations']) {
+        final header = find.descendant(
+          of: find.byKey(Key(key)),
+          matching: find.byType(ListTile),
+        );
+        await tester.ensureVisible(header);
+        await tester.tap(header);
+        await tester.pumpAndSettle();
+      }
+    }
     if (languageDialog) {
       // AppBar の言語ボタンから開く言語ダイアログ（#82）。
       await tester.tap(find.byIcon(Icons.language));
@@ -302,16 +319,8 @@ void main() {
   // 強度スライダの上限付近の注意（#66、#51 注記1）。tunnel_vision を選び、
   // 中程度（印の説明）と上限（警告）を撮る。ファイル名は
   // wide-{light|dark}-{ja|en}-tunnel-{mid|max}.png（ハイコントラストは末尾 -hc）。
-  for (final (label, width, height, dark, locale, hc, s, tag) in const <(
-    String,
-    double,
-    double,
-    bool,
-    String,
-    bool,
-    double,
-    String
-  )>[
+  for (final (label, width, height, dark, locale, hc, s, tag)
+      in const <(String, double, double, bool, String, bool, double, String)>[
     ('wide', 1280, 800, false, 'ja', false, 0.5, 'mid'),
     ('wide', 1280, 800, false, 'ja', false, 1.0, 'max'),
     ('wide', 1280, 800, true, 'ja', false, 1.0, 'max'),
@@ -336,15 +345,81 @@ void main() {
     );
   }
 
+  // フィルタごとの説明（#80）。「モデルと出典」「表現できないこと」を開いた状態。
+  // ファイル名は {wide|narrow}-{light|dark}-{ja|en}-explain-{deutan|cataract|
+  // tetrachromacy|floaters}.png。sensus の実文言は native lib が要るため、
+  // 実際の長さに近い**レイアウト確認用**の文を差し込む（内容は実データではない）。
+  for (final (label, width, height, dark, locale, filterId, tag)
+      in const <(String, double, double, bool, String, String?, String)>[
+    ('wide', 1280, 1100, false, 'ja', null, 'deutan'),
+    ('wide', 1280, 1100, true, 'en', null, 'deutan'),
+    ('wide', 1280, 1100, false, 'ja', 'cataract', 'cataract'),
+    ('wide', 1280, 1100, true, 'en', 'floaters', 'floaters'),
+    ('wide', 1280, 1100, false, 'ja', 'tetrachromacy', 'tetrachromacy'),
+    ('wide', 1280, 1100, true, 'en', 'tetrachromacy', 'tetrachromacy'),
+    ('narrow', 800, 4200, false, 'ja', 'floaters', 'floaters'),
+    ('narrow', 800, 4200, true, 'en', 'tetrachromacy', 'tetrachromacy'),
+    ('narrow', 800, 4200, false, 'ja', null, 'deutan'),
+  ]) {
+    testWidgets(
+      'screenshot $label/${dark ? 'dark' : 'light'}/$locale explanation $tag',
+      (tester) {
+        visionFilterCitationProvider = (_) => filterId == 'tetrachromacy'
+            ? null
+            : 'Machado, Oliveira & Fernandes (2009). A Physiologically-based '
+                'Model for Simulation of Color Vision Deficiency. IEEE '
+                'Transactions on Visualization and Computer Graphics, 15(6), '
+                '1291-1298. doi:10.1109/TVCG.2009.113';
+        visionFilterLimitationsProvider = (_) =>
+            'A single global colour transform applied to every pixel. It does '
+            'not model individual variation between people, the effect of '
+            'lighting, or how the brain adapts to a deficiency over time. The '
+            'preview is not what a person with this condition actually sees.';
+        return shoot(
+          tester,
+          widthLabel: label,
+          width: width,
+          height: height,
+          dark: dark,
+          locale: locale,
+          suffix: '-explain-$tag',
+          advancedFilterId: filterId,
+          expandProvenance: true,
+        );
+      },
+      skip: !screenshotsEnabled,
+    );
+  }
+
+  // 体験プリセット（見出しは体験名）。どの視覚フィルタの情報かを添える行の確認（#80）。
+  for (final (locale, dark) in const [('ja', false), ('en', true)]) {
+    testWidgets(
+      'screenshot wide/${dark ? 'dark' : 'light'}/$locale explanation meniere',
+      (tester) {
+        visionFilterCitationProvider = (_) => null;
+        visionFilterLimitationsProvider = (_) =>
+            'Layout-only sample text about what the simulation cannot show.';
+        return shoot(
+          tester,
+          widthLabel: 'wide',
+          width: 1280,
+          height: 1100,
+          dark: dark,
+          locale: locale,
+          suffix: '-explain-meniere',
+          preset: ('meniere', 'vertigo'),
+          expandProvenance: true,
+        );
+      },
+      skip: !screenshotsEnabled,
+    );
+  }
+
   // クリックスルー ON の復帰バナー（#63, #72）。ダイアログのスイッチで ON にすると
   // ダイアログが自動で閉じ、主画面の案内が見える。低い広幅（1280x480）と既定
   // ウィンドウ（800x600）でも、一覧とプレビューが破綻しないことを確認する。
-  for (final (label, width, height, viaDialog) in const <(
-    String,
-    double,
-    double,
-    bool
-  )>[
+  for (final (label, width, height, viaDialog)
+      in const <(String, double, double, bool)>[
     ('wide', 1280, 800, true),
     ('wide-low', 1280, 480, false),
     ('default-window', 800, 600, false),

@@ -159,7 +159,12 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 - **中央「見る」**: `BeforeAfterView` と、それに隣接する `ImageSourcePicker`（サンプル画像の切替）。
   その下に `WelcomeBanner`（プレビューを最初のビューポートから押し出さない位置）。
 - **右「調整」**（`AdjustPanel`）: 選んだ症状の名前・カテゴリ・説明、`IntensitySlider` /
-  `FilterParamPanel`（強度の上限付近に注意が要るフィルタでは、スライダの印と注記がここに入る。#66）、その下に `ConsultNoticeBlock`（常時展開）。何も選んでいないときは
+  `FilterParamPanel`（強度の上限付近に注意が要るフィルタでは、スライダの印と注記がここに入る。#66）、その下に `ConsultNoticeBlock`（常時展開）、最下段に
+  `FilterProvenanceSection`（「モデルと出典」「表現できないこと」の折りたたみ 2 行、既定は閉じる。強度・パラメータ・受診喚起の位置を動かさない。#80）。
+  「医療監修を受けたものではありません」は折りたたみの外、最下段の区切り線の下に常時 1 行出す。
+  英語以外の UI では、出典・限界のどちらにも「原文（英語）をそのまま表示」と添える。体験プリセットの見出しは体験名なので、折りたたみの上に「以下は「○○」フィルタについての情報です」を添える。出典・限界が空のときは、出典側は「示していません」と書き、限界側は折りたたみごと出さない。
+  名前の横には、確立したモデルでない可視化（現状は四色覚）に `ExperimentalBadge`（「実験的」。枠・アイコン・文言で示し、色だけに頼らない）を付ける。対象は `VisionFilterEntry.isExperimental` が決め、一覧の行にも同じバッジが出る。
+  seed 型パラメータは数値を出さず「パターンを変える」ボタンだけにする（読み上げにはパラメータ名を含める）。何も選んでいないときは
   「何も選択されていません」だけを出す。
 - **起動モード**（`WindowModePanel`）は AppBar のボタンから開くダイアログ。クリックスルー ON の間は、
   復帰方法（フォーカス復帰・Esc・トレイ・ホットキー）を主画面最上部の `ClickThroughRecoveryBanner` に常時出す（#63）。
@@ -189,8 +194,10 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 - 狭幅の選択は `NavigationBar` + ボトムシートではなく、縦積みの最下段に固定高（560dp）の一覧を置く（上の暫定状態の項を参照）。
 - 狭幅（800x600 の既定ウィンドウ）でクリックスルーの案内（約 115dp）が出ている間は、`ImageSourcePicker` の
   選択欄が最初のビューポートに収まりきらず、画像（`BeforeAfterView`）と選択欄の先頭の行までが見える。
-- advanced の各フィルタには説明文の文字列が無いため、右カラムに出るのは名前とカテゴリだけ
-  （色覚 7 型と体験プリセットは説明あり）。
+- advanced の各フィルタには説明文の文字列と有病率が無い（sensus に無く、ue は数値を作らない）ため、右カラムの
+  説明・有病率は色覚 7 型と体験プリセットだけ。advanced は名前・カテゴリと、折りたたみの出典・限界（#80）が出る。
+- 「モデルと出典」「表現できないこと」は sensus の英文をそのまま出す（英語以外の UI では原文である旨を添え、
+  読み上げの言語も英語にする）。sensus は出典が 10 フィルタにしか無く、無いものは「出典を示していない」と書く。
 - ちょうど 1000dp の広幅では中央カラムが 420dp を下回り、Before / After は縦に積み替わる。
 - `export_service.dart` の PNG 書き出し用 `TextStyle(fontSize:)`（画面外の描画、`BuildContext` を持たない）は
   `textTheme` の対象外として残している。
@@ -294,7 +301,9 @@ UE_SCREENSHOTS=1 UE_SCREENSHOT_DIR=/path/to/out \
   `{wide|wide-low|default-window}-light-ja-clickthrough.png`（クリックスルー ON の案内。`wide-low` は 1280×480、
   `default-window` は 800×600）、`wide-light-ja-dialog.png`（起動モードのダイアログ）と
   `wide-{light|dark}-{ja|en}-languagedialog.png`（言語ダイアログ。light/ja と dark/en の 2 枚）、
-  `wide-light-ja-tunnel-mid.png` / `wide-light-ja-tunnel-max.png` / `wide-dark-ja-tunnel-max.png` / `wide-light-en-tunnel-max.png` / `wide-light-ja-tunnel-max-hc.png`（tunnel_vision の強度スライダの印と警告の 5 通り。#66）。
+  `wide-light-ja-tunnel-mid.png` / `wide-light-ja-tunnel-max.png` / `wide-dark-ja-tunnel-max.png` / `wide-light-en-tunnel-max.png` / `wide-light-ja-tunnel-max-hc.png`（tunnel_vision の強度スライダの印と警告の 5 通り。#66）、
+  `{wide|narrow}-{light|dark}-{ja|en}-explain-{deutan|cataract|floaters|tetrachromacy}.png`（出典・限界を両方開いた状態。
+  色覚・advanced・seed 型・四色覚の「実験的」バッジ。#80。文言はレイアウト確認用の差し込みで実データではない）。
 - フォールバック: macOS のシステムフォント（ヒラギノ角ゴシック / Apple Symbols）と Flutter SDK 同梱の
   Roboto・Material Icons を `FontLoader` で読む。**フォントファイルはリポに入れない。** 見つからない環境では
   警告を出して既定フォント（四角）のまま進む。

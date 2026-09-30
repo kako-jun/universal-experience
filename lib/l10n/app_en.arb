@@ -96,9 +96,59 @@
     "description": "Shown under the preview panes when the selected filter is time-dependent (e.g. vertigo, BPPV rotation) and the static preview can't show its motion (#60)."
   },
 
-  "randomize": "Randomize",
-  "@randomize": {
-    "description": "Button that regenerates a random seed for a seed parameter."
+  "changePattern": "Change pattern",
+  "@changePattern": {
+    "description": "Button that regenerates the random pattern of a seed parameter (the seed number itself is never shown, #80)."
+  },
+  "experimentalBadge": "Experimental",
+  "@experimentalBadge": {
+    "description": "Badge on filters that are visualizations rather than a validated model of a condition (currently tetrachromacy, #80). The set is defined by VisionFilterEntry.isExperimental."
+  },
+  "provenanceModelHeading": "Model and source",
+  "@provenanceModelHeading": {
+    "description": "Heading of the collapsible section showing the model and citation that sensus gives for the selected filter (#80)."
+  },
+  "provenanceLimitationsHeading": "What this can't show",
+  "@provenanceLimitationsHeading": {
+    "description": "Heading of the collapsible section showing sensus's description of what the simulation cannot represent (#80)."
+  },
+  "provenanceNoCitation": "sensus does not list a source for this filter.",
+  "@provenanceNoCitation": {
+    "description": "Shown in the model-and-source section when sensus's citation() is null. Null means sensus has no documented primary source (it never invents one); it does not claim the filter is wrong (#80)."
+  },
+  "provenanceSourceNote": "Metadata from the simulation library sensus. Not medically reviewed.",
+  "@provenanceSourceNote": {
+    "description": "Attribution line under the model/source and limitations text, which are sensus's own wording (#80). Must stay consistent with consultDisclaimer (no medical review)."
+  },
+  "provenanceEnglishOriginalNote": "Shown as provided by sensus, in English.",
+  "@provenanceEnglishOriginalNote": {
+    "description": "Shown only when the UI language is not English: sensus supplies the citation and limitations text in English only, and ue does not translate medical wording (#80)."
+  },
+  "provenanceAboutFilter": "The information below is about the \"{filter}\" filter.",
+  "@provenanceAboutFilter": {
+    "description": "Shown above the model/source and limitations rows when the heading is an experience preset, so it is clear which underlying filter the information is for (#80).",
+    "placeholders": {
+      "filter": {
+        "type": "String"
+      }
+    }
+  },
+  "changePatternFor": "Change pattern ({param})",
+  "@changePatternFor": {
+    "description": "Screen-reader label of the seed button (read instead of the on-screen text); names the parameter so that several buttons can be told apart (#80).",
+    "placeholders": {
+      "param": {
+        "type": "String"
+      }
+    }
+  },
+  "exportExperimentalNotice": "Experimental visualization",
+  "@exportExperimentalNotice": {
+    "description": "Second notice line burned into the exported PNG of an experimental filter (currently tetrachromacy), next to the simulation notice (#80). The set is VisionFilterEntry.isExperimental."
+  },
+  "exportSimulationNotice": "Simulation (approximation)",
+  "@exportSimulationNotice": {
+    "description": "One line burned into every exported PNG caption so that the image is never mistaken for a real photo or a measurement (#80)."
   },
 
   "prevalenceLabel": "Prevalence: {value}",
@@ -132,27 +182,27 @@
   },
   "consultEarly": "If these symptoms continue, consider talking to a healthcare professional.",
   "@consultEarly": {
-    "description": "Gentle prompt for early-consultation-urgency conditions. Deliberately names no medical department (many of these filters, e.g. vertigo, aren't an eye complaint) — #76 review S4. Must not alarm or over-promise."
+    "description": "Gentle prompt for early-consultation-urgency conditions. Deliberately names no medical department (many of these filters, e.g. vertigo, aren't an eye complaint) (#76). Must not alarm or over-promise."
   },
   "consultEmergency": "If these symptoms appear suddenly, seek medical care right away.",
   "@consultEmergency": {
-    "description": "Firmer prompt for emergency-urgency conditions. Deliberately names no medical department (#76 review S4). Must be accurate and not alarmist."
+    "description": "Firmer prompt for emergency-urgency conditions. Deliberately names no medical department (#76). Must be accurate and not alarmist."
   },
   "consultDisclaimer": "This is general guidance, not a medical diagnosis. It has not been reviewed by a medical professional. Source: sensus (a simulation library)'s public documentation, Medical notes.",
   "@consultDisclaimer": {
-    "description": "Full disclaimer shown in the UI (right-hand adjustment column, always shown with the consult note for both advanced filters and experience presets) alongside every consult note, stating this app does not diagnose and has not had medical review, with a citation to sensus's own Medical notes doc (#76 review M2, wording clarified in re-review nit: names sensus as a simulation library and its docs as the source). The actual URL is shown separately as selectable text (ConsultNoticeBlock / ConsultDisclaimerFooter), not embedded in this string."
+    "description": "Full disclaimer shown in the UI (right-hand adjustment column, always shown with the consult note for both advanced filters and experience presets) alongside every consult note, stating this app does not diagnose and has not had medical review, with a citation to sensus's own Medical notes doc (#76; names sensus as a simulation library and its docs as the source). The actual URL is shown separately as selectable text (ConsultNoticeBlock / ConsultDisclaimerFooter), not embedded in this string."
   },
   "consultDisclaimerShort": "Not a diagnosis; not medically reviewed. Source: sensus Medical notes",
   "@consultDisclaimerShort": {
-    "description": "Compact disclaimer burned into the exported PNG caption (#76 review M1/M2, re-review M1'). Must fit both the non-diagnosis disclaimer AND the citation in one short line — kept short so the caption band stays small. The UI uses the longer consultDisclaimer instead."
+    "description": "Compact disclaimer burned into the exported PNG caption (#76). Must fit both the non-diagnosis disclaimer AND the citation in one short line — kept short so the caption band stays small. The UI uses the longer consultDisclaimer instead."
   },
   "escalationHeaderEarly": "Consider seeing a doctor if:",
   "@escalationHeaderEarly": {
-    "description": "Header introducing the EarlyConsultation-tier escalation conditions (Filter::urgency_escalation() / HearingFilter::urgency_escalation(), #76 review N4)."
+    "description": "Header introducing the EarlyConsultation-tier escalation conditions (Filter::urgency_escalation() / HearingFilter::urgency_escalation(), #76)."
   },
   "escalationHeaderEmergency": "See a doctor right away if:",
   "@escalationHeaderEmergency": {
-    "description": "Header introducing the Emergency-tier escalation conditions (#76 review N4). Vision filters never escalate to Emergency today, but HearingFilter's hearing-loss family does — this header is ready for that UI (#80)."
+    "description": "Header introducing the Emergency-tier escalation conditions (#76). Vision filters never escalate to Emergency today, but HearingFilter's hearing-loss family does — this header is ready for that UI (#80)."
   },
   "escalationConditionPhotophobiaSevere": "sudden, severe light sensitivity with eye pain or a headache",
   "@escalationConditionPhotophobiaSevere": {
@@ -357,8 +407,8 @@
   "categoryEyeStrain": "Eye strain",
   "categoryOther": "Other",
 
-  "paramAstigmatismAxisDeg": "Axis (deg)",
-  "paramGlaucomaMode": "Scotoma mode",
+  "paramAstigmatismAxisDeg": "Sharp direction (deg)",
+  "paramGlaucomaMode": "Field-loss pattern",
   "paramGlaucomaModeVignette": "Vignette (peripheral)",
   "paramGlaucomaModeArcuateSuperior": "Arcuate (superior)",
   "paramGlaucomaModeArcuateInferior": "Arcuate (inferior)",
@@ -366,25 +416,25 @@
   "paramHemianopiaSide": "Lost field",
   "paramHemianopiaSideLeft": "Left field lost",
   "paramHemianopiaSideRight": "Right field lost",
-  "paramCataractSeed": "Glare seed",
-  "paramFloatersSeed": "Seed",
+  "paramCataractSeed": "Glare pattern",
+  "paramFloatersSeed": "Floater layout",
   "paramFloatersDensity": "Density",
   "paramFloatersSize": "Size",
-  "paramFloatersGazeX": "Gaze X",
-  "paramFloatersGazeY": "Gaze Y",
+  "paramFloatersGazeX": "Gaze position (horizontal)",
+  "paramFloatersGazeY": "Gaze position (vertical)",
   "paramStarburstsNumRays": "Ray count",
   "paramStarburstsRayLengthRatio": "Ray length",
-  "paramStarburstsThreshold": "Threshold",
-  "paramStarburstsDispersion": "Dispersion",
-  "paramNystagmusAmplitude": "Amplitude",
-  "paramNystagmusDirectionDeg": "Direction (deg)",
-  "paramDiplopiaOffsetX": "Ghost offset X",
-  "paramDiplopiaOffsetY": "Ghost offset Y",
-  "paramDiplopiaGhostStrength": "Ghost strength",
-  "paramMetamorphopsiaFreq": "Frequency",
-  "paramMetamorphopsiaSeed": "Distortion seed",
-  "paramDetailLossCellSize": "Cell size (px)",
-  "paramFlickeringStarsSeed": "Seed",
+  "paramStarburstsThreshold": "Brightness where rays start",
+  "paramStarburstsDispersion": "Rainbow tint",
+  "paramNystagmusAmplitude": "Shake size",
+  "paramNystagmusDirectionDeg": "Shake direction (deg)",
+  "paramDiplopiaOffsetX": "Double-image offset (horizontal)",
+  "paramDiplopiaOffsetY": "Double-image offset (vertical)",
+  "paramDiplopiaGhostStrength": "Double-image opacity",
+  "paramMetamorphopsiaFreq": "Distortion fineness",
+  "paramMetamorphopsiaSeed": "Distortion pattern",
+  "paramDetailLossCellSize": "Block size (px)",
+  "paramFlickeringStarsSeed": "Star layout",
 
   "windowModeSectionTitle": "Startup Mode",
   "@windowModeSectionTitle": {
@@ -538,7 +588,7 @@
   },
   "imageSourceFileTooLarge": "That image is too large (max {maxMegabytes} MB). Try a smaller file.",
   "@imageSourceFileTooLarge": {
-    "description": "SnackBar shown when a picked or dropped file exceeds kMaxUserImageFileBytes (#78 レビュー nit) — shown instead of the generic imageSourcePickFailed so the person knows it's a size problem, not a corrupt/unsupported file. The file's body is never read in this case (checked via XFile.length() first).",
+    "description": "SnackBar shown when a picked or dropped file exceeds kMaxUserImageFileBytes (#78) — shown instead of the generic imageSourcePickFailed so the person knows it's a size problem, not a corrupt/unsupported file. The file's body is never read in this case (checked via XFile.length() first).",
     "placeholders": {
       "maxMegabytes": { "type": "int" }
     }

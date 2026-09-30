@@ -164,6 +164,7 @@ class VisionFilterEntry {
     required this.category,
     this.parameters = const [],
     this.isTimeDependent = false,
+    this.isExperimental = false,
   });
 
   /// snake_case の安定 id（sensus shaders 名と一致。例: `bppv_rotation`）。
@@ -190,6 +191,15 @@ class VisionFilterEntry {
   /// `VisionFilter.bppvRotation` の doc コメント「時間依存」参照）は
   /// プレビューにその旨の注記を出す（`before_after_view.dart`）。
   final bool isTimeDependent;
+
+  /// 「実験的」バッジを付けるか（#80）。
+  ///
+  /// 障害ではなく、確立した生理学モデルでもない可視化（現状は tetrachromacy
+  /// だけ。sensus の限界の記述も「validated model が存在しない」としている）。
+  /// これは **ue 側の既定の扱い**で、sensus のメタデータではない。後から
+  /// 対象を変える・外すときはこのフラグだけを変える（一覧の行・右カラムの
+  /// 表示はすべてこのフラグを見る）。
+  final bool isExperimental;
 }
 
 /// 緑内障モードの選択肢（[VisionGlaucomaMode] のミラー）。
@@ -264,6 +274,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     displayName: 'Tetrachromacy',
     i18nKey: 'filter.tetrachromacy',
     category: VisionFilterCategory.colorVision,
+    isExperimental: true,
   ),
 
   // ── 屈折 ──────────────────────────────────────────────
@@ -295,7 +306,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         name: 'axisDeg',
         kind: VisionParamKind.float,
         labelKey: 'param.astigmatism.axis_deg',
-        displayName: 'Axis (deg)',
+        displayName: 'Sharp direction (deg)',
         min: 0.0,
         max: 180.0,
         defaultValue: 90.0,
@@ -314,7 +325,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         name: 'mode',
         kind: VisionParamKind.enumValue,
         labelKey: 'param.glaucoma.mode',
-        displayName: 'Scotoma mode',
+        displayName: 'Field-loss pattern',
         defaultValue: 'vignette',
         options: _glaucomaModeOptions,
       ),
@@ -374,7 +385,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         name: 'seed',
         kind: VisionParamKind.seed,
         labelKey: 'param.cataract.seed',
-        displayName: 'Glare seed',
+        displayName: 'Glare pattern',
         // seed は sensus u64。const カタログのため defaultValue は const-safe な
         // int 0 とし、VisionFilterState が seed kind を実行時に BigInt 化する。
         defaultValue: 0,
@@ -391,7 +402,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         name: 'seed',
         kind: VisionParamKind.seed,
         labelKey: 'param.floaters.seed',
-        displayName: 'Seed',
+        displayName: 'Floater layout',
         // seed は sensus u64。const カタログのため defaultValue は const-safe な
         // int 0 とし、VisionFilterState が seed kind を実行時に BigInt 化する。
         defaultValue: 0,
@@ -418,7 +429,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         name: 'gazeX',
         kind: VisionParamKind.float,
         labelKey: 'param.floaters.gaze_x',
-        displayName: 'Gaze X',
+        displayName: 'Gaze position (horizontal)',
         min: 0.0,
         max: 1.0,
         defaultValue: 0.5,
@@ -427,7 +438,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         name: 'gazeY',
         kind: VisionParamKind.float,
         labelKey: 'param.floaters.gaze_y',
-        displayName: 'Gaze Y',
+        displayName: 'Gaze position (vertical)',
         min: 0.0,
         max: 1.0,
         defaultValue: 0.5,
@@ -474,7 +485,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         name: 'threshold',
         kind: VisionParamKind.float,
         labelKey: 'param.starbursts.threshold',
-        displayName: 'Threshold',
+        displayName: 'Brightness where rays start',
         min: 0.0,
         max: 1.0,
         defaultValue: 0.8,
@@ -483,7 +494,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         name: 'dispersion',
         kind: VisionParamKind.float,
         labelKey: 'param.starbursts.dispersion',
-        displayName: 'Dispersion',
+        displayName: 'Rainbow tint',
         min: 0.0,
         max: 1.0,
         defaultValue: 0.2,
@@ -522,7 +533,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         name: 'amplitude',
         kind: VisionParamKind.float,
         labelKey: 'param.nystagmus.amplitude',
-        displayName: 'Amplitude',
+        displayName: 'Shake size',
         min: 0.0,
         max: 1.0,
         defaultValue: 0.1,
@@ -531,7 +542,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         name: 'directionDeg',
         kind: VisionParamKind.float,
         labelKey: 'param.nystagmus.direction_deg',
-        displayName: 'Direction (deg)',
+        displayName: 'Shake direction (deg)',
         min: 0.0,
         max: 360.0,
         defaultValue: 0.0,
@@ -570,7 +581,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         name: 'offsetX',
         kind: VisionParamKind.float,
         labelKey: 'param.diplopia.offset_x',
-        displayName: 'Ghost offset X',
+        displayName: 'Double-image offset (horizontal)',
         min: -1.0,
         max: 1.0,
         defaultValue: 0.05,
@@ -579,7 +590,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         name: 'offsetY',
         kind: VisionParamKind.float,
         labelKey: 'param.diplopia.offset_y',
-        displayName: 'Ghost offset Y',
+        displayName: 'Double-image offset (vertical)',
         min: -1.0,
         max: 1.0,
         defaultValue: 0.0,
@@ -588,7 +599,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         name: 'ghostStrength',
         kind: VisionParamKind.float,
         labelKey: 'param.diplopia.ghost_strength',
-        displayName: 'Ghost strength',
+        displayName: 'Double-image opacity',
         min: 0.0,
         max: 1.0,
         defaultValue: 0.5,
@@ -605,7 +616,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         name: 'freq',
         kind: VisionParamKind.float,
         labelKey: 'param.metamorphopsia.freq',
-        displayName: 'Frequency',
+        displayName: 'Distortion fineness',
         min: 0.0,
         max: 1.0,
         defaultValue: 0.5,
@@ -614,7 +625,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         name: 'seed',
         kind: VisionParamKind.seed,
         labelKey: 'param.metamorphopsia.seed',
-        displayName: 'Distortion seed',
+        displayName: 'Distortion pattern',
         // seed は sensus u64。const カタログのため defaultValue は const-safe な
         // int 0 とし、VisionFilterState が seed kind を実行時に BigInt 化する。
         defaultValue: 0,
@@ -631,7 +642,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         name: 'cellSize',
         kind: VisionParamKind.intValue,
         labelKey: 'param.detail_loss.cell_size',
-        displayName: 'Cell size (px)',
+        displayName: 'Block size (px)',
         min: 1.0,
         max: 64.0,
         defaultValue: 8,
@@ -654,7 +665,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
         name: 'seed',
         kind: VisionParamKind.seed,
         labelKey: 'param.flickering_stars.seed',
-        displayName: 'Seed',
+        displayName: 'Star layout',
         // seed は sensus u64。const カタログのため defaultValue は const-safe な
         // int 0 とし、VisionFilterState が seed kind を実行時に BigInt 化する。
         defaultValue: 0,
