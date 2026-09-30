@@ -4,11 +4,13 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_catalog.dart';
+import '../../models/vision_filter_contract_notes.dart';
 import '../../services/preview_selection.dart';
 import '../../services/vision_filter_metadata.dart';
 import '../../services/vision_filter_state.dart';
 import '../../src/rust/api/sensus_bridge.dart';
 import 'consult_notice_block.dart';
+import 'strength_caution.dart';
 
 /// 選択中フィルタの [VisionParam] 定義から動的にパラメータ UI を生成するパネル。
 ///
@@ -50,9 +52,8 @@ class FilterParamPanel extends StatelessWidget {
         // 参照）ため、現在の選択（payload 込み）から組み立てた実インスタンスを
         // そのまま渡せばよい（メタデータ専用の別インスタンスは不要）。
         final filter = state.build();
-        final urgency = filter == null
-            ? Urgency.none
-            : visionFilterUrgencyProvider(filter);
+        final urgency =
+            filter == null ? Urgency.none : visionFilterUrgencyProvider(filter);
         final escalation = filter == null
             ? const <UrgencyEscalation>[]
             : visionFilterUrgencyEscalationProvider(filter);
@@ -88,7 +89,16 @@ class FilterParamPanel extends StatelessWidget {
     AppLocalizations l10n,
     VisionFilterState state,
   ) {
-    final percent = (state.strength * 100).toInt();
+    final percent = strengthPercent(state.strength);
+    final caution = kStrengthCautionByFilterId[state.selectedId];
+    final slider = Slider(
+      value: state.strength,
+      min: 0.0,
+      max: 1.0,
+      divisions: 20,
+      label: '$percent%',
+      onChanged: (v) => state.setStrength(v),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -109,14 +119,23 @@ class FilterParamPanel extends StatelessWidget {
             ),
           ],
         ),
-        Slider(
-          value: state.strength,
-          min: 0.0,
-          max: 1.0,
-          divisions: 20,
-          label: '$percent%',
-          onChanged: (v) => state.setStrength(v),
-        ),
+        if (caution == null)
+          slider
+        else
+          // 上限付近の注意（#66）: 閾値の位置に印を描き、下に注記を出す。
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackShape: StrengthCautionTrackShape(
+                threshold: caution.threshold,
+                markColor: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            child: slider,
+          ),
+        if (caution != null) ...[
+          const SizedBox(height: 8),
+          StrengthCautionNote(caution: caution, strength: state.strength),
+        ],
       ],
     );
   }

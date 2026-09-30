@@ -136,6 +136,7 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 | ON/OFF の切り替えが状態として残るもの | `FilterChip` / `Switch` | |
 | 大分類の切り替え（フィルタのカテゴリ） | `ChoiceChip` の `Wrap`（広幅・狭幅とも。「すべて」+ 7 カテゴリ、選択中はチェックと色） | ボタンで独自に作る |
 | 強度・パラメータ | `Slider`（`divisions` で刻む、値を必ずラベル表示） | 値が見えないスライダー |
+| 強度の上限付近に注意が要るフィルタ（`tunnel_vision`）の強度 | `Slider` の閾値位置に縦線の印（`StrengthCautionTrackShape`、`onSurface`）+ 下に注記（`StrengthCautionNote`）。閾値未満はアイコン `info_outline`・文字 `onSurfaceVariant` の補足、閾値以上はアイコン `warning_amber_rounded`（`primary`）・文字 `onSurface`/`w600` の警告に切り替える | 警告にコンテナ色（`tertiaryContainer`/`errorContainer`）を使う（受診喚起と混同する）、色だけで切り替える |
 | 補足・免責 | `bodySmall` の `Text`（`onSurfaceVariant`） | 小さくして目立たなくする |
 
 - 操作領域は **48×48 dp 以上**（Material の最小タップ領域）。デスクトップの `visualDensity` で
@@ -158,7 +159,7 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 - **中央「見る」**: `BeforeAfterView` と、それに隣接する `ImageSourcePicker`（サンプル画像の切替）。
   その下に `WelcomeBanner`（プレビューを最初のビューポートから押し出さない位置）。
 - **右「調整」**（`AdjustPanel`）: 選んだ症状の名前・カテゴリ・説明、`IntensitySlider` /
-  `FilterParamPanel`、その下に `ConsultNoticeBlock`（常時展開）。何も選んでいないときは
+  `FilterParamPanel`（強度の上限付近に注意が要るフィルタでは、スライダの印と注記がここに入る。#66）、その下に `ConsultNoticeBlock`（常時展開）。何も選んでいないときは
   「何も選択されていません」だけを出す。
 - **起動モード**（`WindowModePanel`）は AppBar のボタンから開くダイアログ。クリックスルー ON の間は、
   復帰方法（フォーカス復帰・Esc・トレイ・ホットキー）を主画面最上部の `ClickThroughRecoveryBanner` に常時出す（#63）。
@@ -282,7 +283,8 @@ UE_SCREENSHOTS=1 UE_SCREENSHOT_DIR=/path/to/out \
   （狭幅 800×700。どちらもウィンドウ 1 枚ぶん）、狭幅だけ同名に `-full` を付けた縦長の全体像（縦積みの
   スクロール量の確認用）、`wide-{light|dark}-ja-hc.png`（ハイコントラスト）、
   `{wide|wide-low|default-window}-light-ja-clickthrough.png`（クリックスルー ON の案内。`wide-low` は 1280×480、
-  `default-window` は 800×600）と `wide-light-ja-dialog.png`（起動モードのダイアログ）。
+  `default-window` は 800×600）と `wide-light-ja-dialog.png`（起動モードのダイアログ）、
+  `wide-light-ja-tunnel-mid.png` / `wide-light-ja-tunnel-max.png` / `wide-dark-ja-tunnel-max.png` / `wide-light-en-tunnel-max.png` / `wide-light-ja-tunnel-max-hc.png`（tunnel_vision の強度スライダの印と警告の 5 通り。#66）。
 - フォールバック: macOS のシステムフォント（ヒラギノ角ゴシック / Apple Symbols）と Flutter SDK 同梱の
   Roboto・Material Icons を `FontLoader` で読む。**フォントファイルはリポに入れない。** 見つからない環境では
   警告を出して既定フォント（四角）のまま進む。
