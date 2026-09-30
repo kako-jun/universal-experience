@@ -118,7 +118,7 @@ DESIGN.md                    # UI 設計原則（カラートークン・タイ�
 test/
 ├── no_hardcoded_colors_test.dart   # lib/ の色ハードコードを検出（例外は DESIGN.md の例外表と一致させる、#72）
 ├── app_theme_test.dart             # ハイコントラストテーマの生成と MaterialApp での切替（#72）
-├── home_screen_layout_test.dart    # 3 カラム/縦積み・プレビューの初回ビューポート・空状態・キー操作（#72）
+├── home_screen_layout_test.dart    # 3 カラム/縦積み・プレビューの初回ビューポート（準備中状態で測定・読み込み済みは #130）・空状態・キー操作（#72）
 ├── accessibility_guidelines_test.dart # Flutter 標準ガイドライン（タップ領域・ラベル・コントラスト）を主画面・選択別パネル・ダイアログ・HUD に 4 テーマ × ja/en で当てる（#45）
 ├── accessibility_semantics_test.dart  # スライダー/ドロップダウンの名前と値・見出し・選択状態・画像の代替テキスト・liveRegion・視差効果・Esc で閉じてフォーカスが戻る（#45）
 ├── tap_target_size_test.dart       # macOS 指定で操作領域が 48dp 以上（padded + standard・言語ダイアログの選択肢、#72/#82）
@@ -137,7 +137,7 @@ test/
 ├── vision_filter_persistence_app_test.dart # 実アプリ（buildRootApp）を作り直して選択が復元される・旧強度の取り込み（#65/#117）
 ├── vision_filter_stage_test.dart   # 段の表（30 フィルタがちょうど 1 段・段内は sensus 宣言順）と適用順・色覚の排他グループ（#117）
 ├── vision_layer_test.dart          # 強度の記憶キー・別名の検証・層の列の正規化（上限・排他・重複・適用順）（#117）
-├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品
+├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品（プレビューの読み込み/適用は Rust 非依存のフェイクに固定）
 ├── support/screenshot_harness.dart # スクリーンショット用フォント読込・PNG 書出し（フォントはコミットしない）
 └── ui_screenshots/                 # HomeScreen の PNG 書出し。`UE_SCREENSHOTS=1` のときだけ実行（DESIGN.md §8）
 
