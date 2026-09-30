@@ -9,6 +9,10 @@ import 'vision_filter_metadata.dart';
 import 'vision_filter_snapshot.dart';
 import 'vision_layer.dart';
 
+/// 初回起動の層（[VisionFilterState.seedInitialLayers]）にする別名 id（またはカタログ id）。
+/// 初めて起動した利用者に、すぐ「色の見え方が変わる」体験を見せるための既定。
+const String kInitialVisionFilterKey = 'deuteranomaly';
+
 /// フィルタ選択状態を保持する ChangeNotifier。**プレビュー（before/after）の
 /// 描画対象の唯一の正本であり、選択状態モデルの唯一の系統**（#60, #124）。
 ///
@@ -44,10 +48,6 @@ import 'vision_layer.dart';
 ///
 /// アルゴリズムは持たず、層 + パラメータから sensus の [VisionFilter] インスタンスを
 /// 組み立てる [build] / [buildLayer] を提供する。
-/// 初回起動の層（[VisionFilterState.seedInitialLayers]）にする別名 id（またはカタログ id）。
-/// 初めて起動した利用者に、すぐ「色の見え方が変わる」体験を見せるための既定。
-const String kInitialVisionFilterKey = 'deuteranomaly';
-
 class VisionFilterState extends ChangeNotifier {
   List<VisionLayer> _layers = const [];
   String? _focusedId;
@@ -315,8 +315,7 @@ class VisionFilterState extends ChangeNotifier {
     if (blocked != null) return VisionLayerResult.blocked(blocked);
 
     final layer = _newLayer(id, variantId);
-    final replacing =
-        isVisionColorGroupId(id) &&
+    final replacing = isVisionColorGroupId(id) &&
         _layers.any((l) => isVisionColorGroupId(l.id));
     _layers = normalizeVisionLayers([
       for (final l in _layers)
@@ -435,22 +434,22 @@ class VisionFilterState extends ChangeNotifier {
   /// 再起動をまたいで残す部分（層・フォーカス・キーごとの強度/id ごとの payload の
   /// 記憶）の写し（#65, #117 で v2）。値は複製なので、以後の変更は写しに影響しない。
   VisionFilterSnapshot snapshot() => VisionFilterSnapshot(
-    layers: [
-      for (final l in _layers)
-        VisionLayer(
-          id: l.id,
-          params: Map<String, Object>.from(l.params),
-          variantId: l.variantId,
-        ),
-    ],
-    focusedId: _focusedId,
-    presetId: _selectedPresetId,
-    strengthByKey: Map<String, double>.from(_strengthByKey),
-    paramsById: {
-      for (final e in _paramsById.entries)
-        e.key: Map<String, Object>.from(e.value),
-    },
-  );
+        layers: [
+          for (final l in _layers)
+            VisionLayer(
+              id: l.id,
+              params: Map<String, Object>.from(l.params),
+              variantId: l.variantId,
+            ),
+        ],
+        focusedId: _focusedId,
+        presetId: _selectedPresetId,
+        strengthByKey: Map<String, double>.from(_strengthByKey),
+        paramsById: {
+          for (final e in _paramsById.entries)
+            e.key: Map<String, Object>.from(e.value),
+        },
+      );
 
   /// [snapshot] の内容でこの state を置き換える（#65。起動時の復元用）。
   ///

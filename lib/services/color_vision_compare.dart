@@ -91,8 +91,10 @@ ColorVisionCompareInput? colorVisionCompareInputOf(VisionFilterState state) {
 /// 色覚クイック選択と同じ対応表（カタログ id → 固定インスタンス、
 /// [visionFilterForCatalogId]）を引くので、1 型を単独で選んだときのプレビューと同じ
 /// フィルタになる。比較用の別フィルタ・別レンダラは持たない。
-/// 対応しない id は [StateError]（カタログを増やしたときに気付けるよう
-/// 黙って別物へ落とさない）。
+/// 固定インスタンスを持つカタログ id（色覚 4 種に限らない）はそのフィルタを返し、
+/// 持たない id（payload を持つフィルタなど）は [StateError]（カタログを増やしたときに
+/// 気付けるよう黙って別物へ落とさない）。呼び出しは [kColorVisionCompareEntries] の
+/// 行だけ。
 VisionFilter colorVisionCompareFilter(VisionFilterEntry entry) {
   final filter = visionFilterForCatalogId(entry.id);
   if (filter != null) return filter;
