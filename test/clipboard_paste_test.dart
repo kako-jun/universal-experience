@@ -9,11 +9,14 @@
 // 実クリップボード（pasteboard のプラットフォームチャネル）は素の flutter test
 // では読めないため、clipboardImageReader をフェイクに差し替える。
 
+import 'dart:async';
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:flutter/services.dart'
+    show LogicalKeyboardKey, MethodCall, SystemChannels;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -26,17 +29,30 @@ import 'package:universal_experience/ui/widgets/image_source_picker.dart';
 import 'support/home_screen_harness.dart';
 import 'support/sample_image_generator.dart';
 
+/// SnackBar 等で SizedBox が増えても context を一意に取るための目印。
+const _hostKey = Key('paste_host');
+
 /// 呼び出し回数を数え、返す中身をテストごとに差し替えられるフェイクのリーダ。
 class _FakeClipboardImageReader implements ClipboardImageReader {
-  _FakeClipboardImageReader(this.onRead);
+  /// 画像データ（`null` は「画像なし」）を返すフェイク。
+  _FakeClipboardImageReader(Future<Uint8List?> Function() onRead)
+      : _read = (() async {
+          final bytes = await onRead();
+          return bytes == null
+              ? const ClipboardNoImage()
+              : ClipboardImageData(bytes);
+        });
 
-  Future<Uint8List?> Function() onRead;
+  /// クリップボードの内容（ファイル等を含む）をそのまま返すフェイク。
+  _FakeClipboardImageReader.content(this._read);
+
+  final Future<ClipboardContent> Function() _read;
   int calls = 0;
 
   @override
-  Future<Uint8List?> readImageBytes() {
+  Future<ClipboardContent> read() {
     calls++;
-    return onRead();
+    return _read();
   }
 }
 
@@ -91,7 +107,7 @@ void main() {
             GlobalCupertinoLocalizations.delegate,
           ],
           supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(body: SizedBox()),
+          home: Scaffold(body: SizedBox(key: _hostKey)),
         ),
       );
     }
@@ -101,7 +117,7 @@ void main() {
       ImageSourceState imageSourceState,
     ) async {
       await tester.pumpWidget(localized(imageSourceState));
-      final context = tester.element(find.byType(SizedBox));
+      final context = tester.element(find.byKey(_hostKey));
       final ok =
           await tester.runAsync(() => pasteUserImageFromClipboard(context));
       await tester.pump();
@@ -213,6 +229,116 @@ void main() {
       expect(find.text(en.imageSourcePasteFailed), findsOneWidget);
     });
 
+    testWidgets('実行中の二重起動は無視され、読み取りは 1 回だけ', (tester) async {
+      final imageSourceState = ImageSourceState();
+      final bytes = await tester.runAsync(_validPngBytes);
+      // Completer は実イベントループ側（runAsync）で作る。テスト本体の
+      // FakeAsync ゾーンで作ると、完了のマイクロタスクが回らず固まる。
+      final gate =
+          (await tester.runAsync(() async => Completer<Uint8List?>()))!;
+      final reader = _FakeClipboardImageReader(() => gate.future);
+      clipboardImageReader = reader;
+      await tester.pumpWidget(localized(imageSourceState));
+      final context = tester.element(find.byKey(_hostKey));
+
+      final results = await tester.runAsync(() async {
+        final first = pasteUserImageFromClipboard(context);
+        // 1 回目がまだ読み取り中の間に、もう 2 回（キーリピート・二度押し相当）。
+        final second = pasteUserImageFromClipboard(context);
+        final third = pasteUserImageFromClipboard(context);
+        gate.complete(bytes);
+        return (first: await first, second: await second, third: await third);
+      });
+      await tester.pump();
+
+      expect(results!.first, isTrue);
+      expect(results.second, isFalse, reason: '実行中の呼び出しは無視');
+      expect(results.third, isFalse);
+      expect(reader.calls, 1);
+      expect(imageSourceState.hasUserImage, isTrue);
+    });
+
+    testWidgets('完了後は再び貼り付けられる', (tester) async {
+      final imageSourceState = ImageSourceState();
+      final bytes = await tester.runAsync(_validPngBytes);
+      final reader = _FakeClipboardImageReader(() async => bytes);
+      clipboardImageReader = reader;
+
+      expect(await paste(tester, imageSourceState), isTrue);
+      final context = tester.element(find.byKey(_hostKey));
+      final again =
+          await tester.runAsync(() => pasteUserImageFromClipboard(context));
+
+      expect(again, isTrue);
+      expect(reader.calls, 2, reason: 'ガードは完了で解除される');
+    });
+
+    testWidgets('読み取りが例外で終わってもガードは解除され、次は貼り付けられる', (tester) async {
+      _suppressFlutterErrorReporting();
+      final imageSourceState = ImageSourceState();
+      final bytes = await tester.runAsync(_validPngBytes);
+      var shouldThrow = true;
+      final reader = _FakeClipboardImageReader(() async {
+        if (shouldThrow) throw StateError('clipboard unavailable');
+        return bytes;
+      });
+      clipboardImageReader = reader;
+
+      expect(await paste(tester, imageSourceState), isFalse);
+      expect(find.text(en.imageSourcePasteFailed), findsOneWidget);
+
+      shouldThrow = false;
+      final context = tester.element(find.byKey(_hostKey));
+      final ok =
+          await tester.runAsync(() => pasteUserImageFromClipboard(context));
+
+      expect(ok, isTrue, reason: '例外のあとでも in-flight ガードが残らない');
+      expect(reader.calls, 2);
+      expect(imageSourceState.hasUserImage, isTrue);
+    });
+
+    group('ファイルをコピーした場合', () {
+      late Directory dir;
+
+      setUp(() {
+        dir = Directory.systemTemp.createTempSync('ue97_');
+      });
+      tearDown(() {
+        dir.deleteSync(recursive: true);
+      });
+
+      testWidgets('画像ファイルは loadUserImageFile の経路で読み込まれる', (tester) async {
+        final imageSourceState = ImageSourceState();
+        final bytes = await tester.runAsync(_validPngBytes);
+        final file = File('${dir.path}/copied.png')..writeAsBytesSync(bytes!);
+        clipboardImageReader = _FakeClipboardImageReader.content(
+          () async => ClipboardImageFile(file.path),
+        );
+
+        final ok = await paste(tester, imageSourceState);
+
+        expect(ok, isTrue);
+        expect(imageSourceState.hasUserImage, isTrue);
+        expect(imageSourceState.isUsingUserImage, isTrue);
+      });
+
+      testWidgets('読めないファイルは選択と同じ文言で失敗し、状態は変えない', (tester) async {
+        _suppressFlutterErrorReporting();
+        final imageSourceState = ImageSourceState();
+        final file = File('${dir.path}/broken.png')
+          ..writeAsBytesSync([1, 2, 3]);
+        clipboardImageReader = _FakeClipboardImageReader.content(
+          () async => ClipboardImageFile(file.path),
+        );
+
+        final ok = await paste(tester, imageSourceState);
+
+        expect(ok, isFalse);
+        expect(imageSourceState.hasUserImage, isFalse);
+        expect(find.text(en.imageSourcePickFailed), findsOneWidget);
+      });
+    });
+
     testWidgets('失敗しても、すでに読み込んだユーザー画像は保たれる', (tester) async {
       _suppressFlutterErrorReporting();
       final imageSourceState = ImageSourceState();
@@ -226,6 +352,94 @@ void main() {
 
       expect(imageSourceState.current, before,
           reason: '貼り付けに失敗しても generation は進まない');
+    });
+  });
+
+  group('resolveClipboardContent（ファイルを先に見る）', () {
+    final pngBytes = Uint8List.fromList([137, 80, 78, 71]);
+
+    Future<ClipboardContent> resolve({
+      List<String> files = const [],
+      Uint8List? image,
+      required List<String> log,
+    }) {
+      return resolveClipboardContent(
+        files: () async {
+          log.add('files');
+          return files;
+        },
+        imageBytes: () async {
+          log.add('image');
+          return image;
+        },
+      );
+    }
+
+    test('画像ファイルがあれば、画像データ（アイコン）は見に行かずファイルを返す', () async {
+      final log = <String>[];
+      final content = await resolve(
+        files: ['/tmp/a/photo.PNG'],
+        image: pngBytes,
+        log: log,
+      );
+
+      expect(content, isA<ClipboardImageFile>());
+      expect((content as ClipboardImageFile).path, '/tmp/a/photo.PNG');
+      expect(log, ['files'], reason: 'Finder がファイルと一緒に載せるアイコンを拾わない');
+    });
+
+    test('複数ファイルなら、画像でないものを飛ばして先頭の画像 1 枚', () async {
+      final content = await resolve(
+        files: ['/x/readme.txt', '/x/first.jpg', '/x/second.png'],
+        log: [],
+      );
+
+      expect((content as ClipboardImageFile).path, '/x/first.jpg');
+    });
+
+    test('画像でないファイルだけなら、画像データへ進まず「画像なし」', () async {
+      final log = <String>[];
+      final content = await resolve(
+        files: ['/x/readme.txt', '/x/archive.zip', '/x/noextension'],
+        image: pngBytes,
+        log: log,
+      );
+
+      expect(content, isA<ClipboardNoImage>());
+      expect(log, ['files'], reason: 'ファイルのアイコン画像を貼り付けない');
+    });
+
+    test('ファイルが無ければ画像データを返す', () async {
+      final log = <String>[];
+      final content = await resolve(image: pngBytes, log: log);
+
+      expect(content, isA<ClipboardImageData>());
+      expect((content as ClipboardImageData).bytes, pngBytes);
+      expect(log, ['files', 'image']);
+    });
+
+    test('ファイルも画像データも無い、または空なら「画像なし」', () async {
+      expect(await resolve(log: []), isA<ClipboardNoImage>());
+      expect(
+        await resolve(image: Uint8List(0), log: []),
+        isA<ClipboardNoImage>(),
+      );
+    });
+
+    test('isUserImagePath: 対応拡張子だけを大文字小文字を問わず受け付ける', () {
+      for (final ok in [
+        'a.png',
+        'a.JPG',
+        'a.jpeg',
+        'a.gif',
+        'a.bmp',
+        'a.WebP'
+      ]) {
+        expect(isUserImagePath(ok), isTrue, reason: ok);
+      }
+      for (final ng in ['a.txt', 'a.tiff', 'png', 'a.', 'a.png.txt', '']) {
+        expect(isUserImagePath(ng), isFalse, reason: ng);
+      }
     });
   });
 
@@ -266,7 +480,7 @@ void main() {
         final reader = _FakeClipboardImageReader(() async => bytes);
         clipboardImageReader = reader;
         final harness = await pumpHomeScreen(tester, size: wide);
-        expect(pasteShortcutLabel(), 'Cmd+V');
+        expect(pasteShortcutLabel(), '⌘V');
 
         await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft,
             platform: 'macos');
@@ -313,6 +527,63 @@ void main() {
       expect(find.byType(SnackBar), findsNothing);
     });
 
+    testWidgets('検索欄では Ctrl+V が実際に入力欄へのテキスト貼り付けとして働く', (tester) async {
+      await pumpHomeScreen(tester, size: wide);
+      final reader = _FakeClipboardImageReader(() async => null);
+      clipboardImageReader = reader;
+      // OS のクリップボード（テキスト）をモックする。入力欄の貼り付けは
+      // Clipboard.getData（プラットフォームチャネル）を読む。
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (MethodCall call) async {
+          if (call.method == 'Clipboard.getData') {
+            return <String, dynamic>{'text': 'protan'};
+          }
+          if (call.method == 'Clipboard.hasStrings') {
+            return <String, dynamic>{'value': true};
+          }
+          return null;
+        },
+      );
+      addTearDown(() => tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null));
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.slash);
+      await tester.pump();
+      expect(isFocusOnTextInput(), isTrue);
+      final searchField = find.byWidgetPredicate(
+          (w) => w is TextField && w.focusNode?.debugLabel == 'filterSearch');
+      expect(tester.widget<TextField>(searchField).controller!.text, isEmpty);
+
+      await pressPasteShortcut(tester);
+      await tester.pump();
+
+      expect(tester.widget<TextField>(searchField).controller!.text, 'protan',
+          reason: 'キーが画像貼り付けに取られず、入力欄のネイティブ貼り付けに届く');
+      expect(reader.calls, 0);
+    });
+
+    testWidgets('キーを押しっぱなしにしたリピートでは貼り付けを繰り返さない', (tester) async {
+      await pumpHomeScreen(tester, size: wide);
+      final reader = _FakeClipboardImageReader(() async => null);
+      clipboardImageReader = reader;
+      _suppressFlutterErrorReporting();
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.keyV);
+      await tester.pump();
+      expect(reader.calls, 1);
+      for (var i = 0; i < 3; i++) {
+        await tester.sendKeyRepeatEvent(LogicalKeyboardKey.keyV);
+        await tester.pump();
+      }
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.keyV);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
+
+      expect(reader.calls, 1, reason: 'リピートは includeRepeats: false で無視される');
+    });
+
     testWidgets('「貼り付け」ボタンで同じ経路を通り、押したあとも Ctrl+V が効く', (tester) async {
       _suppressFlutterErrorReporting();
       final harness = await pumpHomeScreen(tester, size: wide);
@@ -331,8 +602,34 @@ void main() {
       expect(find.text(ja.imageSourcePasteNoImage), findsOneWidget);
       expect(harness.imageSource.hasUserImage, isFalse);
 
-      // ボタンにフォーカスが残っていても（貼り付けのガードはテキスト入力のみ）
-      // キーボードの貼り付けが効く。
+      // フォーカスを「貼り付け」ボタンの中に確実に置く（タップでフォーカスが
+      // 移るかはプラットフォーム次第なので、明示的に要求する）。
+      final buttonElement = tester.element(button);
+      bool isInsideButton(BuildContext? context) {
+        if (context == null) return false;
+        var found = false;
+        context.visitAncestorElements((element) {
+          if (identical(element, buttonElement)) {
+            found = true;
+            return false;
+          }
+          return true;
+        });
+        return found;
+      }
+
+      FocusManager.instance.rootScope.descendants
+          .firstWhere((node) => isInsideButton(node.context))
+          .requestFocus();
+      await tester.pump();
+      expect(
+          isInsideButton(FocusManager.instance.primaryFocus?.context), isTrue,
+          reason: 'フォーカスは「貼り付け」ボタンの中にある');
+      expect(isFocusOnInteractiveControl(), isTrue,
+          reason: '/ ↑↓ ←→ ならガードされる状態');
+      expect(isFocusOnTextInput(), isFalse);
+
+      // その状態でも（貼り付けのガードはテキスト入力のみ）キーボードの貼り付けが効く。
       await pressPasteShortcut(tester);
       expect(reader.calls, 2);
     });
