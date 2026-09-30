@@ -164,6 +164,20 @@ flutter test
 flutter test test/filter_service_test.dart
 ```
 
+### FRB 生成物のドリフト検証
+
+`rust/src/api/` を変えたら `flutter_rust_bridge_codegen generate` を実行して `lib/src/rust/`
+と `rust/src/frb_generated.rs` の差分をコミットする。同期しているかは次で確認でき、
+CI の `check` job でも同じスクリプトを実行する（#88）。差分があれば非 0 で終了し、
+実行後に作業ツリーは元の内容へ戻る。
+
+```bash
+tools/check_frb_drift.sh
+```
+
+前提は `cargo install cargo-expand flutter_rust_bridge_codegen`（codegen の版は
+`rust/Cargo.toml` の `flutter_rust_bridge` と揃える）。
+
 ### コードフォーマット
 
 ```bash
