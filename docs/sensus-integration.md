@@ -675,7 +675,12 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   `integration_test/vision_filter_urgency_parity_test.dart` が検証する
   （sensus の escalation 条件文が変わっても、ja 訳が対応表に無ければこの
   integration test が検知する、#76 レビュー S1）。
-- **citation() / limitations()**: 公開のみ行い、UI 配線は #80 のスコープ。
+- **citation() / limitations()**: #80 で UI に配線した（右カラム最下段の
+  `FilterProvenanceSection`。provider seam は `visionFilterCitationProvider` /
+  `visionFilterLimitationsProvider`、実ブリッジとの一致は integration test）。sensus の英文を
+  そのまま出し、ue 側で医学的な文言を訳さない。**sensus に無いもの（ue は捏造しない）**:
+  有病率（出典付きの数値）、フィルタごとの短い説明（i18n キー）、limitations の
+  日本語版。`citation()` は 10 フィルタにしか無く、無いフィルタは「出典を示していない」と表示する。
 - **#65（永続化）向けの注意点（#76 レビュー N9）**: `VisionFilterState` の
   `_strengthById`/`_paramsById` はそのまま永続化できる構造にしてあるが、
   `_paramsById` の値は seed パラメータを [BigInt] で持つ（`kSeedMax` 参照）。
