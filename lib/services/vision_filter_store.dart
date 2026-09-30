@@ -72,11 +72,11 @@ class VisionFilterStore {
       try {
         state.restore(snapshot, isValidPreset: isValidPreset);
         restored = true;
-      } catch (error) {
+      } catch (error, stack) {
         // 復元中の例外（sensus 呼び出しの失敗など）は起動を止めない。
         // [VisionFilterState.restore] が呼び出し前の状態へ巻き戻すので、
         // 呼び出し側がシードした既定のまま起動し、以後の保存だけ始める。
-        debugPrint('VisionFilterStore: restore failed: $error');
+        debugPrint('VisionFilterStore: restore failed: $error\n$stack');
       }
     }
     bind(state);
