@@ -164,40 +164,52 @@ VisionFilterState.focusedId : String?                      // 調整パネルが
     色覚クイックのスライダーだけを動かすと `settings.visionFilter` は作られず `intensityByType` だけが
     書かれる。この状態は実在するので、「v1 JSON の初回読み込み」に結びつけると強度記憶が推奨値に戻り、
     「挙動不変」が崩れる。
-  - **きっかけと順序**: 起動時、色覚シードより**前**に、次の条件で 1 回だけ折り畳む。
-    (a) `settings.intensityByType` がある **かつ** v2 の `settings.visionFilter` が無い → 移行する。
-    (b) `settings.intensityByType` がある **かつ** v2 がすでにある → v2 が新しい（移行後の編集は v2 にだけ
-    書かれる）ので、`intensityByType` は古い残骸として**消すだけ**（移行の書き込み後、キー削除の前に
-    落ちた場合の救済）。(c) どちらも無い → 何もしない。
-  - **折り畳みの内容**（(a)）: per-key 記憶を、v1 JSON があればその `strengthById`（ただし下の規則 3 で
-    除く鍵を除く）で初期化し、そのうえに `intensityByType` の各エントリを**上書き**で入れる。v1 JSON が
-    無ければ `intensityByType` だけで初期化する。**色覚シードはこの記憶ができた後に走る**ので、シードされた層
-    （初回起動の deuteranomaly や `settings.filterType`）の強度も `intensityByType` の値になる（層に
-    強度を持たせないので、シード層も記憶を読むだけで済む）。
+  - **きっかけと順序**: 起動時、色覚シードより**前**に、次の条件で 1 回だけ折り畳む。以下、v2 が「ある」
+    とは**読める**（`VisionFilterStore.load()` が null でない。壊れた JSON・未知の版は null）ことを指し、
+    読めない v2 は「無い」として扱う。
+    (a) `settings.intensityByType` がある **かつ** 読める v2 が無い → 移行する。未知の版の v2 と
+    `intensityByType` が両方あるときも、v2 は読めないので (a) と同じ扱い。
+    (b) `settings.intensityByType` がある **かつ** 読める v2 がある → v2 が新しい（移行後の編集は v2 にだけ
+    書かれる）ので、`intensityByType` のうち **v2 の `strengthByKey` に無い鍵だけ**を取り込んでから消す
+    （移行の書き込みが失敗したまま状態が変わって v2 が書かれた場合の取りこぼしを防ぐ）。
+    (c) どちらも無い → 何もしない。
+  - **折り畳みの内容**（(a)）: per-key 記憶を、読める v1 JSON があればその `strengthById`（ただし下の
+    規則 3 で除く鍵を除く）で初期化し、そのうえに `intensityByType` の各エントリを**上書き**で入れる。
+    v1 JSON が無い・読めない・`isEmpty` なら `intensityByType` だけで初期化する。**色覚シードはこの記憶が
+    できた後に走る**ので、シードされた層（初回起動の deuteranomaly や `settings.filterType`）の強度も
+    `intensityByType` の値になる（層に強度を持たせないので、シード層も記憶を読むだけで済む）。
   - **置き場所**: 折り畳みは、現在 `main.dart` が `filterService.load()`（211 行付近）を呼んでいる
     位置（設定の読み込みの後、色覚シード（229 行付近）の前）に、`load()` の代わりとして置く。`load()` は
     `intensityByType` を読んで `FilterService` の内部 map に入れているが、#117 以降の `FilterService` は
-    記憶を持たない薄い委譲なので、`load()` も `_persist` / `flush`（`filter_service.dart` の 163〜252 行付近）
+    記憶を持たない薄い委譲なので、`load()` も `_persist` / `flush`（`filter_service.dart` の 163〜266 行付近）
     も `intensityByType` を**読み書きしない**ようにする（書き続けると、起動のたびに (b) の分岐になる）。
     折り畳みだけが生の `SharedPreferences` から `intensityByType` を読む。
-  - **v1 JSON が無いときの v2 の `layers`**: 起動順は `filterService.load()` → 色覚シード →
-    `restoreAndBind`（`main.dart` の 211 → 229 → 241 行付近）で、`VisionFilterSnapshot.isEmpty` は
+  - **v2 の `layers`（v1 の選択を写せないとき）**: 起動順は `filterService.load()` → 色覚シード →
+    `restoreAndBind`（`main.dart` の 211 → 229 → 240 行付近）で、`VisionFilterSnapshot.isEmpty` は
     `selectedId == null && strengthById.isEmpty && paramsById.isEmpty`（`vision_filter_snapshot.dart` 136 行付近）
     と強度も見るため、`strengthByKey` だけが入った v2 は「空でない」と判定されて `restore` が走る。
     `restore` は `selectedId == null` だと選択を全部外す（`vision_filter_state.dart` 353〜362 行付近）ので、
-    `layers` が空の v2 を色覚シード前に書くと、**シードした色覚層が起動のたびに消える**。そこで、v1 JSON が
-    無いときの v2 は、色覚シードと同じ選択を `layers` に書く: シードと同じ型（`settings.isFirstRun` なら
-    deuteranomaly、そうでなければ `settings.filterType`）が none でなければ、その型に対応する
+    `layers` が空の v2 を書くと、**シードした色覚層が起動のたびに消える**。現行（v1 まで）は、保存が無い・
+    壊れている・未知の版（`load()` が null）・中身が空（`isEmpty`）のとき `restoreAndBind`（`vision_filter_store.dart`
+    71 行付近）が復元を飛ばしてシード層が残る。これを保つため、**v1 JSON が無い・読めない・または
+    `isEmpty` のとき**の v2 は、色覚シードと同じ選択を `layers` に書く: シードと同じ型（`settings.isFirstRun`
+    なら deuteranomaly、そうでなければ `settings.filterType`）が none でなければ、その型に対応する
     `{id: catalogId(t), variantId: -omaly なら t、そうでなければ null, origin: クイック}` の 1 層（強度は
     `strengthByKey` に `intensityByType` から入れた値）。none なら `layers` は空で、`strengthByKey` だけを
-    持つ v2 になる（`isEmpty` は false なので復元は走るが、選択は元々無いので何も変わらない）。v1 JSON が
-    あるときは従来どおり v1 の選択（`selectedId` / `colorVisionType`）を v2 の層に写す。
-  - **書き込みの順序**: 折り畳んだ記憶と層を `settings.visionFilter`（v2）に書き、書けたことを確認して
-    から `settings.intensityByType` を消す（書けなければ消さず、次回の起動で再び (a) になる。折り畳みは
-    冪等）。v1 JSON は v2 で上書きされる。2 回目の起動は (c) になり、`restoreAndBind` が v2 の層
-    （deuteranomaly / `filterType`）を復元して、1 回目と同じ選択で起動する。
+    持つ v2 になる（復元は走るが、選択は元々無いので何も変わらない）。読めて空でない v1 JSON があるときは
+    従来どおり v1 の選択（`selectedId` / `colorVisionType`）を v2 の層に写す。
+  - **書き込みと冪等性**: **折り畳みの結果（per-key 記憶とシード層）は、書き込みの成否に関係なく
+    メモリ上の `VisionFilterState` に入れる**。v2 への書き込み（`settings.visionFilter`）はそのメモリ状態から
+    行い、書けたことを確認してから `settings.intensityByType` を消す。書けなかった場合は旧キーを消さず、
+    メモリ状態が正として起動を続けるので、次に状態が変わったときの `_persist` が v2 を正しく書く（その時点
+    から次回は (b) になり、(b) は v2 に無い鍵だけを取り込むので取りこぼさない）。状態が一度も変わらなければ
+    次回も (a) になるだけで、結果は同じ。つまり「書けなければ次回再び (a)」は**保証せず**、どちらの経路でも
+    強度記憶が失われないことを保証する。2 回目の起動は (c)（または上記の (b)）になり、`restoreAndBind` が
+    v2 の層（deuteranomaly / `filterType`）を復元して、1 回目と同じ選択で起動する。v1 JSON は v2 で
+    上書きされる。
   - **旧バージョンへ戻す場合**: 戻すことは非対応（本機能は未リリース）。戻した場合、旧版は v2 を捨てて
-    推奨強度で起動し、旧版で動かした `intensityByType` は新版の再起動時に (b) の分岐で残骸として消える。
+    推奨強度で起動し、旧版で動かした `intensityByType` は新版の再起動時に (b) の分岐で（v2 に無い鍵は
+    取り込まれたうえで）消える。
   1. v1 に `colorVisionType = t`（≠ none）があれば、それは色覚クイック選択だった。層は
      `{id: catalogId(t), variantId: t が -omaly なら t、そうでなければ null, origin: クイック}`。
      強度は per-key 記憶の `t`（= `intensityByType[t]`、無ければ記憶に書かず推奨強度で導く）。
