@@ -11,8 +11,13 @@
 // VisionFilterState を使う 1 本がある。
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/services/color_vision_selection.dart';
+import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/hotkey_actions.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
+
+import 'support/vision_filter_metadata_fixture.dart';
 
 void main() {
   group('HotkeyActions.toggleClickThrough', () {
@@ -261,6 +266,42 @@ void main() {
   });
 
   group('HotkeyActions.emergencyExit', () {
+    // #121: 「フィルタ解除」のホットキーは、重ねている全層を外す（新しいホットキーは足さない）。
+    // main.dart の配線（deactivateFilters → deactivateColorVision）と同じ組み立てで確かめる。
+    test('重ねている全層（色覚を含む）を外し、FilterService も none に戻す', () async {
+      installVisionFilterMetadataFixture();
+      addTearDown(resetVisionFilterMetadataProviders);
+      final visionState = VisionFilterState();
+      final filterService = FilterService(visionState: visionState);
+      toggleColorVision(filterService, visionState, ColorVisionType.protanopia);
+      visionState
+        ..toggle('myopia')
+        ..toggle('starbursts');
+      expect(visionState.layers.length, 3);
+      expect(filterService.currentFilter, ColorVisionType.protanopia);
+
+      final actions = HotkeyActions(
+        deactivateFilters: () =>
+            deactivateColorVision(filterService, visionState),
+        setClickThrough: (value) async {},
+        setAlwaysOnTop: (value) async {},
+        getClickThrough: () => false,
+        acquireBypass: () {},
+        releaseBypass: () {},
+        clearBypass: visionState.clearBypass,
+        isBypassHeldByHotkey: () => false,
+        showAndFocusLoupe: () async {},
+        toggleLoupeVisible: () async {},
+        setLoupeVisible: (value) async {},
+      );
+
+      await actions.emergencyExit();
+
+      expect(visionState.layers, isEmpty);
+      expect(visionState.selectedId, isNull);
+      expect(filterService.currentFilter, ColorVisionType.none);
+    });
+
     test(
         'フィルタ停止・クリックスルー解除・最前面解除・ルーペ表示・bypassed解除・'
         'トレイ表示状態同期がすべて呼ばれる', () async {
