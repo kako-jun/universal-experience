@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../l10n/locale_resolution.dart';
 import '../models/disability_type.dart';
 
 /// Persists and restores user preferences via [SharedPreferences].
@@ -61,9 +62,10 @@ class SettingsService extends ChangeNotifier {
 
   /// The chosen UI language, or null to follow the system locale (#18).
   ///
-  /// A language picker is out of scope for #18 (#16/#19 territory); this is the
-  /// persisted backing store + [setLocale] hook so tests and a future picker can
-  /// switch languages. Stored as the bare language code (e.g. `ja`).
+  /// Chosen in the app bar's language dialog (`LanguageDialog`, #82) and applied
+  /// through [setLocale]. Stored as the bare language code (e.g. `ja`); a stored
+  /// code the app does not support is discarded on [load], so the dialog's
+  /// "auto" state always matches what the app actually resolves.
   Locale? get locale => _locale;
 
   /// Loads persisted settings from disk into memory.
@@ -85,7 +87,9 @@ class SettingsService extends ChangeNotifier {
 
     final localeCode = prefs.getString(keyLocale);
     if (localeCode != null && localeCode.isNotEmpty) {
-      _locale = Locale(localeCode);
+      final saved = Locale(localeCode);
+      // 未対応の言語コード（対応言語が減った・手で書き換えた等）は捨てる。
+      if (isSupportedLanguage(saved)) _locale = saved;
     }
 
     _welcomeBannerDismissed =

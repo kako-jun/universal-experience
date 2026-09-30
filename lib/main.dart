@@ -501,7 +501,16 @@ class UniversalExperienceApp extends StatelessWidget {
             themeMode: settings.themeMode,
             // i18n (#18/#82). locale = null はシステム追従。AppBar の言語
             // ピッカー（`LanguageDialog`）が SettingsService.setLocale で切り替える。
-            locale: settings.locale,
+            //
+            // 選んだ言語は resolveSupportedLocale を通す。「自動」
+            // （null）のときは localeListResolutionCallback が OS の言語リストを
+            // 同じ関数で解決する。トレイ（TrayLocaleSync）も同じ関数なので
+            // 画面とトレイの言語はずれない。
+            locale: settings.locale == null
+                ? null
+                : resolveSupportedLocale(settings.locale),
+            localeListResolutionCallback: (locales, _) =>
+                resolveSupportedLocale(null, systemLocales: locales),
             localizationsDelegates: const [
               AppLocalizations.delegate,
               GlobalMaterialLocalizations.delegate,

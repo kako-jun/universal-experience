@@ -11,9 +11,9 @@ import 'settings_service.dart';
 /// 代わりに次の 2 つを購読し、**解決後の言語**（[resolveSupportedLocale]）が変わった
 /// ときだけ [apply] を呼ぶ:
 ///
-///  * [SettingsService]（言語ピッカーでの明示選択・「システムに合わせる」への切替）
+///  * [SettingsService]（言語ピッカーでの明示選択・「自動」への切替）
 ///  * OS のロケール変更（[WidgetsBindingObserver.didChangeLocales]。設定が
-///    「システムに合わせる」のときだけ実際の解決結果が変わる）
+///    「自動」のときだけ実際の解決結果が変わる）
 ///
 /// [SettingsService] はテーマ・フィルタの変更でも通知するので、解決結果が同じなら
 /// 何もしない（トレイのメニューを無駄に作り直さない）。

@@ -5,9 +5,8 @@
 // システムロケールに依存せず ja/en それぞれの文言が出ることと、未対応ロケール
 // でのフォールバックを widget test レベルで検証する。
 //
-// `_resolveStartupLocale` が `WidgetsBinding.instance.platformDispatcher.locale`
-// 経由で読むよう修正済み (#55 レビュー S2) なので、`tester.platformDispatcher`
-// への `localeTestValue` 差し替えが実際に効く。下の「サポート対象ロケールへの
+// `resolveSupportedLocale` が `WidgetsBinding.instance.platformDispatcher.locales`
+// 経由で読むので、`tester.platformDispatcher` への `localesTestValue` 差し替えが実際に効く。下の「サポート対象ロケールへの
 // 差し替えが効く」テストは、この配線が壊れて元の `PlatformDispatcher.instance`
 // を直接読むようになった場合に en (実フォールバック) が出て落ちる mutation-testing
 // 用の証拠テスト。
@@ -44,9 +43,11 @@ void main() {
   testWidgets('locale 未指定 + 未対応システムロケールは先頭のサポート対象言語にフォールバックする',
       (WidgetTester tester) async {
     // fr は AppLocalizations.supportedLocales に無いので、
-    // _resolveStartupLocale() は supportedLocales.first (en) にフォールバックする。
+    // resolveSupportedLocale は supportedLocales.first (en) にフォールバックする。
     tester.platformDispatcher.localeTestValue = const Locale('fr');
+    tester.platformDispatcher.localesTestValue = const [Locale('fr')];
     addTearDown(tester.platformDispatcher.clearLocaleTestValue);
+    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
 
     await tester.pumpWidget(const NativeBridgeErrorApp());
     await tester.pumpAndSettle();
@@ -64,11 +65,13 @@ void main() {
     // fr のテストはフォールバック先 (en) と実システムロケールが偶然一致しうるため、
     // それだけでは localeTestValue が本当に読まれているか証明できない。ここでは
     // フォールバックと衝突しないサポート対象ロケール ja を指定し、実際に ja の
-    // 文言が出ることを確認する。もし _resolveStartupLocale が
+    // 文言が出ることを確認する。もし resolveSupportedLocale が
     // WidgetsBinding.instance.platformDispatcher ではなく実 PlatformDispatcher.instance
     // を直接読むよう退行すれば、ここは ja ではなく実フォールバック (en) になり失敗する。
     tester.platformDispatcher.localeTestValue = const Locale('ja');
+    tester.platformDispatcher.localesTestValue = const [Locale('ja')];
     addTearDown(tester.platformDispatcher.clearLocaleTestValue);
+    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
 
     await tester.pumpWidget(const NativeBridgeErrorApp());
     await tester.pumpAndSettle();

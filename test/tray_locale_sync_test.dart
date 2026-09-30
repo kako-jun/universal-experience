@@ -20,10 +20,18 @@ void main() {
   late List<Locale> applied;
   late TrayLocaleSync sync;
 
-  Future<void> start(WidgetTester tester,
-      {Locale system = const Locale('en')}) async {
-    tester.platformDispatcher.localeTestValue = system;
+  // OS の優先言語リスト。MaterialApp は `locales`、旧来の単数 `locale` を読む
+  // コードも同じ先頭を見るよう、両方を揃えて差し替える。
+  void setSystem(WidgetTester tester, List<Locale> systems) {
+    tester.platformDispatcher.localeTestValue = systems.first;
+    tester.platformDispatcher.localesTestValue = systems;
     addTearDown(tester.platformDispatcher.clearLocaleTestValue);
+    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+  }
+
+  Future<void> start(WidgetTester tester,
+      {List<Locale> system = const [Locale('en')]}) async {
+    setSystem(tester, system);
     SharedPreferences.setMockInitialValues(<String, Object>{});
     settings = SettingsService();
     await settings.load();
@@ -37,18 +45,33 @@ void main() {
   }
 
   group('resolveSupportedLocale', () {
-    testWidgets('設定があればそれ、無ければシステム、非対応なら先頭（en）', (tester) async {
-      tester.platformDispatcher.localeTestValue = const Locale('ja', 'JP');
-      addTearDown(tester.platformDispatcher.clearLocaleTestValue);
+    testWidgets('設定があればそれ、無ければ OS、非対応なら先頭（en）', (tester) async {
+      setSystem(tester, const [Locale('ja', 'JP')]);
       expect(resolveSupportedLocale(null), const Locale('ja'));
       expect(resolveSupportedLocale(const Locale('en')), const Locale('en'));
 
-      tester.platformDispatcher.localeTestValue = const Locale('fr');
+      setSystem(tester, const [Locale('fr')]);
       expect(resolveSupportedLocale(null),
           AppLocalizations.supportedLocales.first);
       // 保存値が非対応言語なら（古い設定など）システム追従と同じ扱い。
       expect(resolveSupportedLocale(const Locale('de')),
           AppLocalizations.supportedLocales.first);
+    });
+
+    testWidgets('OS の優先言語が複数のとき、先頭から順に対応言語を探す（[fr, ja] → ja）',
+        (tester) async {
+      setSystem(tester, const [Locale('fr', 'FR'), Locale('ja', 'JP')]);
+      expect(resolveSupportedLocale(null), const Locale('ja'));
+      // 未対応の保存値も、OS の言語リストへ落ちる（先頭 1 件だけを見て en にしない）。
+      expect(resolveSupportedLocale(const Locale('fr')), const Locale('ja'));
+    });
+
+    testWidgets('systemLocales を渡すと platformDispatcher ではなくそれを見る', (tester) async {
+      setSystem(tester, const [Locale('en')]);
+      expect(
+        resolveSupportedLocale(null, systemLocales: const [Locale('ja', 'JP')]),
+        const Locale('ja'),
+      );
     });
   });
 
@@ -75,8 +98,8 @@ void main() {
       expect(applied, isEmpty);
     });
 
-    testWidgets('「システムに合わせる」(null) に戻すと、OS の言語で apply される', (tester) async {
-      await start(tester, system: const Locale('en'));
+    testWidgets('「自動」(null) に戻すと、OS の言語で apply される', (tester) async {
+      await start(tester, system: const [Locale('en')]);
       await settings.setLocale(const Locale('ja'));
       applied.clear();
 
@@ -86,7 +109,7 @@ void main() {
     });
 
     testWidgets('明示選択と解決結果が同じなら apply しない', (tester) async {
-      await start(tester, system: const Locale('ja'));
+      await start(tester, system: const [Locale('ja')]);
       // システムが ja なので、null → ja の明示選択は画面の言語が変わらない。
       await settings.setLocale(const Locale('ja'));
 
@@ -94,20 +117,20 @@ void main() {
     });
 
     testWidgets('システム追従のとき、OS のロケール変更で apply される', (tester) async {
-      await start(tester, system: const Locale('en'));
+      await start(tester, system: const [Locale('en')]);
 
-      tester.platformDispatcher.localeTestValue = const Locale('ja');
+      setSystem(tester, const [Locale('ja')]);
       await tester.pump();
 
       expect(applied, [const Locale('ja')]);
     });
 
     testWidgets('明示選択中は、OS のロケール変更で apply されない', (tester) async {
-      await start(tester, system: const Locale('en'));
+      await start(tester, system: const [Locale('en')]);
       await settings.setLocale(const Locale('en'));
       applied.clear();
 
-      tester.platformDispatcher.localeTestValue = const Locale('ja');
+      setSystem(tester, const [Locale('ja')]);
       await tester.pump();
 
       expect(applied, isEmpty);
