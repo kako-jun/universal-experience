@@ -19,7 +19,6 @@
 
   "intensityValue": "強さ：{percent}%",
   "intensityActive": "適用中",
-  "intensityInactive": "未適用",
 
   "clearFilter": "フィルタを解除",
   "clear": "クリア",

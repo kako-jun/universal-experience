@@ -43,7 +43,9 @@ ue は Flutter（Dart）アプリで、フィルタの選択状態・強度・�
 
 - `FilterService`（ChangeNotifier）が状態の単一の持ち場になり、UI は購読するだけの
   純粋な表示に保てる。#13 の sensus 一元化後も `FilterService` は選択状態モデル
-  （`currentFilter` / `intensity` / `isActive`）として Provider 経路のまま残っている。
+  （`currentFilter` / `intensity`）として Provider 経路のまま残っている
+  （当時あった `isActive` は、表示にしか使われず常に `currentFilter != none` と
+  一致していたため #67 で撤去した）。
 - **トレードオフ**: Provider はコンパイル時の依存解決保証が Riverpod ほど強くない。
   状態が複雑化したら Riverpod 移行を検討する（移行可能性を残す前提で採用している）。
 

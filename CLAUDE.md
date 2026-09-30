@@ -18,7 +18,7 @@ lib/
 ├── l10n/                   # 多言語化（ARB: app_en.arb / app_ja.arb、ja/en。生成物は非コミット）。
 │                           # locale_resolution.dart が「選んだ言語 → OS → 英語」の解決の唯一の入口（#82）
 ├── models/
-│   ├── disability_type.dart
+│   ├── disability_type.dart         # ColorVisionType（色覚 7 型 + none の安定識別子）。ファイル名は歴史的経緯
 │   ├── vision_filter_catalog.dart   # sensus カタログ（30種）の Dart 側定義
 │   ├── vision_filter_contract_notes.dart # sensus API 契約上の注意の定義（強度の上限付近の警告の対象・閾値、#66）
 │   ├── sample_catalog.dart          # サンプル画像集（7種）+ フィルタ id ごとの推奨サンプル（#78）
@@ -111,6 +111,7 @@ test/
 ├── app_theme_test.dart             # ハイコントラストテーマの生成と MaterialApp での切替（#72）
 ├── home_screen_layout_test.dart    # 3 カラム/縦積み・プレビューの初回ビューポート・空状態・キー操作（#72）
 ├── tap_target_size_test.dart       # macOS 指定で操作領域が 48dp 以上（padded + standard・言語ダイアログの選択肢、#72/#82）
+├── intensity_slider_test.dart      # 色覚クイック選択の間だけ「適用中」を出しスライダーを操作可能にする（#67）
 ├── filter_browser_test.dart        # 統合一覧の検索・カテゴリ切替・行の選択（#72）
 ├── filter_list_selection_test.dart # 統合一覧の純粋ロジック（#72）
 ├── color_vision_compare_test.dart  # 2×2 比較で並べる型の順・切替の条件・フィルタの対応表（#84）

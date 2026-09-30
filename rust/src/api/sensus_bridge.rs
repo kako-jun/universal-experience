@@ -20,7 +20,7 @@
 //! 詰める。FragmentProgram には float uniform しか積まないため、Dart 側で
 //! `setFloat(i, value)` した後、シェーダの `uint`/`int` uniform へは Flutter の
 //! sampler/float bridge 経由で渡らない点に注意（これらの整数 uniform を使う実描画は
-//! #11 の GPU パスで個別に詰める）。本ブリッジが保証するのは「値そのもの」と
+//! #61 の GPU パスで個別に詰める）。本ブリッジが保証するのは「値そのもの」と
 //! 「レイアウト（順序）」であり、float の bit 精度は u32 が 2^24 を超えると失われる。
 //! seed は基本 0..少数を想定するため実害はないが、層を超える際の前提として明記する。
 
@@ -1073,14 +1073,14 @@ pub fn vision_filter_recommended_strength(filter: VisionFilter) -> f32 {
 }
 
 /// モデル名と出典（DOI 等）。出典が無ければ `None`
-/// （[`sensus_core::Filter::citation`] 参照。#80 で使用予定、本 PR では公開のみ）。
+/// （[`sensus_core::Filter::citation`] 参照。#80 の出典・限界の表示が使う）。
 #[flutter_rust_bridge::frb(sync)]
 pub fn vision_filter_citation(filter: VisionFilter) -> Option<String> {
     filter.to_sensus().citation().map(|s| s.to_string())
 }
 
 /// このシミュレーションで表現できないことの簡潔な説明（英語）
-/// （[`sensus_core::Filter::limitations`] 参照。#80 で使用予定、本 PR では公開のみ）。
+/// （[`sensus_core::Filter::limitations`] 参照。#80 の出典・限界の表示が使う）。
 #[flutter_rust_bridge::frb(sync)]
 pub fn vision_filter_limitations(filter: VisionFilter) -> String {
     filter.to_sensus().limitations().to_string()

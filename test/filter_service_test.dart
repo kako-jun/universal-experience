@@ -23,11 +23,9 @@ void main() {
       final service = FilterService();
       expect(service.currentFilter, ColorVisionType.none);
       expect(service.intensity, 0.0);
-      expect(service.isActive, isFalse);
-      expect(service.sensusFilter, isNull);
     });
 
-    test('applyFilter で currentFilter / isActive が変わり notify される', () {
+    test('applyFilter で currentFilter が変わり notify される', () {
       final service = FilterService();
       var notified = 0;
       service.addListener(() => notified++);
@@ -35,19 +33,16 @@ void main() {
       service.applyFilter(ColorVisionType.deuteranopia);
 
       expect(service.currentFilter, ColorVisionType.deuteranopia);
-      expect(service.isActive, isTrue);
       expect(notified, 1);
     });
 
-    test('none を選ぶと isActive が false に戻る', () {
+    test('none を選ぶと currentFilter が none に戻る', () {
       final service = FilterService();
       service.applyFilter(ColorVisionType.protanopia);
-      expect(service.isActive, isTrue);
+      expect(service.currentFilter, ColorVisionType.protanopia);
 
       service.applyFilter(ColorVisionType.none);
       expect(service.currentFilter, ColorVisionType.none);
-      expect(service.isActive, isFalse);
-      expect(service.sensusFilter, isNull);
     });
 
     test('deactivate で none に戻る', () {
@@ -55,7 +50,6 @@ void main() {
       service.applyFilter(ColorVisionType.tritanopia);
       service.deactivate();
       expect(service.currentFilter, ColorVisionType.none);
-      expect(service.isActive, isFalse);
     });
 
     test('applyFilter の intensity は 0..1 に clamp される', () {
@@ -81,10 +75,9 @@ void main() {
     });
   });
 
-  group('sensusFilter マッピング', () {
+  group('visionFilterForColorVisionType マッピング', () {
     test('none は null', () {
-      final service = FilterService()..applyFilter(ColorVisionType.none);
-      expect(service.sensusFilter, isNull);
+      expect(visionFilterForColorVisionType(ColorVisionType.none), isNull);
     });
 
     test('-opia は対応する VisionFilter へマップ', () {
@@ -95,8 +88,7 @@ void main() {
         ColorVisionType.achromatopsia: const VisionFilter.achromatopsia(),
       };
       cases.forEach((type, expected) {
-        final service = FilterService()..applyFilter(type);
-        expect(service.sensusFilter, expected, reason: '$type');
+        expect(visionFilterForColorVisionType(type), expected, reason: '$type');
       });
     });
 
@@ -107,17 +99,8 @@ void main() {
         ColorVisionType.tritanomaly: const VisionFilter.tritanopia(),
       };
       cases.forEach((type, expected) {
-        final service = FilterService()..applyFilter(type);
-        expect(service.sensusFilter, expected, reason: '$type');
+        expect(visionFilterForColorVisionType(type), expected, reason: '$type');
       });
-    });
-
-    test('achromatopsia 適用で isActive=true / sensusFilter=achromatopsia', () {
-      final service = FilterService()
-        ..applyFilter(ColorVisionType.achromatopsia);
-      expect(service.isActive, isTrue);
-      expect(service.currentFilter, ColorVisionType.achromatopsia);
-      expect(service.sensusFilter, const VisionFilter.achromatopsia());
     });
 
     test('anomaly 型適用で intensity が渡した値のまま state に保持される', () {
@@ -126,12 +109,10 @@ void main() {
       expect(service.currentFilter, ColorVisionType.deuteranomaly);
       expect(service.intensity, 0.6);
       // anomaly は対応する -opia と同一 VisionFilter にマップされる契約
-      expect(service.sensusFilter, const VisionFilter.deuteranopia());
-    });
-
-    test('anomalyDefaultSeverity は旧 simulator の severity 0.6 を保持する', () {
-      final service = FilterService();
-      expect(service.anomalyDefaultSeverity, 0.6);
+      expect(
+        visionFilterForColorVisionType(service.currentFilter),
+        const VisionFilter.deuteranopia(),
+      );
     });
   });
 
@@ -164,32 +145,6 @@ void main() {
 
     test('none は 0.0 を返す', () {
       expect(recommendedStrength(ColorVisionType.none), 0.0);
-    });
-
-    test('recommendedStrengthForCurrent は選択中タイプに連動する', () {
-      final service = FilterService()..applyFilter(ColorVisionType.protanomaly);
-      expect(service.recommendedStrengthForCurrent, kAnomalyDefaultSeverity);
-      service.applyFilter(ColorVisionType.protanopia);
-      expect(service.recommendedStrengthForCurrent, 1.0);
-    });
-  });
-
-  group(
-      'visionFilterForColorVisionType（#85: sensusFilter と CPU プレビュー'
-      'レンダラが共有する単一の対応表）', () {
-    test('sensusFilter getter と同じ結果を返す（インスタンスを介さず直接引ける）', () {
-      for (final type in ColorVisionType.values) {
-        final service = FilterService()..applyFilter(type);
-        expect(
-          visionFilterForColorVisionType(type),
-          service.sensusFilter,
-          reason: '$type',
-        );
-      }
-    });
-
-    test('none は null', () {
-      expect(visionFilterForColorVisionType(ColorVisionType.none), isNull);
     });
   });
 

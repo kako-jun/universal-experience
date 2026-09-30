@@ -44,15 +44,13 @@ class IntensitySlider extends StatelessWidget {
                         : colorScheme.onSurface.withValues(alpha: 0.38),
                   ),
                 ),
+                // 有効なのは色覚を選んでいる間だけ（= 必ず適用中）。「未適用」の
+                // 状態は表示され得ないので、有効ならいつでも「適用中」を出す。
                 if (isEnabled)
                   Text(
-                    filterService.isActive
-                        ? l10n.intensityActive
-                        : l10n.intensityInactive,
+                    l10n.intensityActive,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: filterService.isActive
-                          ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant,
+                      color: colorScheme.primary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
