@@ -448,6 +448,12 @@ Linux debug ビルド成功で代替している:
 > `select` / `selectColorVisionType` / `selectPreset` は従来の「全部外して 1 つ足す」の薄い窓として
 > 残る（中身は `replaceWith`。`selectedId` はフォーカス層の id の別名）。UI はまだ単一選択の見た目で、
 > 複数選択の UI は #120。
+> **既知の制約（#119 時点）**: `toggle` で色覚を `origin: quick` として足しても、`FilterService` の
+> 色覚型（`_currentFilter` / `settings.filterType`）と色覚の強度スライダーは更新されない
+> （`selectColorVision` 経由でだけ同期する）。プレビューは `VisionFilterState` だけを見るので描画は
+> 正しいが、`FilterService` 側とはずれる。`toggle` を呼ぶ production の経路は #120 まで無く、
+> 同期の持たせ方はそこで決める。`HomeScreen` の 2×2 比較の出し分け（`canCompare`）と書き出しの
+> キャプションは、複数層でもフォーカス層だけを見る暫定（#121/#122）。
 > `FilterService` は色覚クイック選択の型を持ち、強度は `VisionFilterState` の記憶へ委譲する薄い窓に
 > なった（`ColorVisionType` / `FilterService` の削除は最終段 #124）。下の「現状は状態が 2 系統」
 > 以降は設計時点の記述。
@@ -959,8 +965,8 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   しない（適用順は呼び出し側が段順で決める）。空のステップ列は入力と同じ内容を返す。
   プレビュー配線は #119: `HomeScreen._previewCard` は層が 2 つ以上のとき
   `VisionFilterState.pipelineSteps()`（段順・強度 0 の層を除く。bypass 中は空）を
-  `BeforeAfterView.steps` へ渡し、`BeforeAfterView` は `afterPipelineRenderer`（既定は
-  `renderAfterPipeline` → `CpuVisionRenderer.pipelineApplier`）で 1 回の合成として適用する。
+  `BeforeAfterView.steps` へ渡し、`BeforeAfterView` は `renderAfterPipeline`
+  （→ `CpuVisionRenderer.pipelineApplier`。テストはこちらを差し替える）で 1 回の合成として適用する。
   空の列は描画器を呼ばず原画を返す。層が 0〜1 のときは従来の単一フィルタの経路のままで、
   最新優先の `_generation` はどちらの経路でも同じ。見出し・書き出しは当面フォーカス層だけを表す
   （複数層は #120/#121）

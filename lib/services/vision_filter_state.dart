@@ -18,7 +18,7 @@ import 'vision_layer.dart';
 /// `lib/services/color_vision_selection.dart` の `selectColorVision` を経由
 /// して [selectColorVisionType] を呼ぶ）・advanced カタログ全 30 種・体験
 /// プリセットのいずれで選んでも、最終的にここへ書き込まれる
-/// （[selectColorVisionType] / [select] / [selectPreset]）。プレビュー
+/// （[selectColorVisionType] / [select] / [selectPreset]。中身は [replaceWith]）。プレビュー
 /// （`before_after_view.dart`）は `FilterService` を直接見ず、常にこの state
 /// の [build] / [strength] / [selectedId] だけを描画対象にする。
 ///
@@ -33,7 +33,13 @@ import 'vision_layer.dart';
 ///
 /// 層の列は [normalizeVisionLayers] の不変条件（id 重複なし・色覚グループ排他・
 /// 上限 [kMaxVisionLayers]・適用順）を満たす。多選択の操作は [toggle] / [remove] /
-/// [setLayerStrength] / [setLayerParams] / [replaceWith] / [clear]（#119）。適用順は
+/// [setLayerStrength] / [setLayerParams] / [replaceWith] / [clear]（#119）。層・強度・
+/// payload の書き込み入口はこれらと、従来の単一選択 API（[select] / [selectColorVisionType] /
+/// [selectPreset] / [setStrength] / [setStrengthForKey] / [setParam] / [resetToRecommended] /
+/// [restore]）で、どれも層の列の不変条件を保つ。未知のカタログ id の扱いは入口で違う:
+/// 層を足す入口（[toggle] / [replaceWith] / [blockReasonFor] と、[select] 系）は
+/// [ArgumentError] を投げ、既存の層を操作する入口（[remove] / [setLayerStrength] /
+/// [setLayerParams]）は該当する層が無いものとして何もしない。適用順は
 /// 段（`vision_filter_stage.dart`）で決まり、選んだ順には依存しない。従来の単一選択
 /// API（[selectedId] / [strength] / [params] / [isColorQuickSelection] /
 /// [colorVisionType]）は **フォーカス中の層**（[focusedId]）を指す互換の読み口として
@@ -303,7 +309,16 @@ class VisionFilterState extends ChangeNotifier {
   ///    例外は [blockReasonFor] のとおり。
   ///
   /// 足す層の [origin] は既定で advanced（色覚クイック選択の層を足すときは
-  /// [VisionLayerOrigin.quick] と、-omaly なら [variantId] を渡す）。payload は id ごとの記憶
+  /// [VisionLayerOrigin.quick] と、-omaly なら [variantId] を渡す）。
+  ///
+  /// **制約（#119 時点）**: origin を quick にして色覚を足しても、`FilterService` の
+  /// 色覚型（`_currentFilter` / `settings.filterType`）と色覚の強度スライダーは更新されない
+  /// （それらは `selectColorVision` 経由でだけ同期する）。プレビューの描画はこの state だけを
+  /// 見るので表示は正しいが、`FilterService` 側とはずれる。UI から [toggle] で色覚を足す
+  /// 経路は #120 で入るので、そこで同期の持たせ方を決める。#119 時点の production は
+  /// [toggle] を呼ばない。
+  ///
+  /// [id] が未知のカタログ id なら [ArgumentError]（[variantId] が [id] の別名として不正なときも）。payload は id ごとの記憶
   /// から、強度はキーごとの記憶から導出する。体験プリセットの選択は、層の集合がそのフィルタ
   /// 1 つ以外になった時点で外れる（戻さない）。原画比較（bypass）は解除する。
   VisionLayerResult toggle(
@@ -335,7 +350,7 @@ class VisionFilterState extends ChangeNotifier {
     return replacing ? VisionLayerResult.replaced : VisionLayerResult.added;
   }
 
-  /// [id] の層を外す。選択されていなければ何もせず false。フォーカスの移り方は [toggle] の
+  /// [id] の層を外す。選択されていなければ（未知の id でも）何もせず false。フォーカスの移り方は [toggle] の
   /// 解除と同じ。強度・payload の記憶は消さない。
   bool remove(String id) {
     final layer = _layerById(id);
@@ -366,8 +381,10 @@ class VisionFilterState extends ChangeNotifier {
     _writeStrength(layer, value);
   }
 
-  /// [id] の層の payload を [params] に置き換え、id ごとの記憶にも書く。その層がフォーカスの
-  /// 移り先になる。[id] の層が無ければ何もしない。値の型は呼び出し側責務（[setParam] と同じ）。
+  /// [id] の層の payload を [params] に**丸ごと置き換え**（部分更新ではない。渡さなかったキーは
+  /// 既定値に戻る）、id ごとの記憶にも書く。値の型・範囲は検証しない（呼び出し側責務。
+  /// [setParam] と同じ）ので、UI は現在値に変更を重ねた map 全体を渡す前提。その層が
+  /// フォーカスの移り先になる。[id] の層が無ければ（未知の id でも）何もしない。
   /// プリセット選択中はプリセットの選択表示を解除する。
   void setLayerParams(String id, Map<String, Object> params) {
     final layer = _layerById(id);

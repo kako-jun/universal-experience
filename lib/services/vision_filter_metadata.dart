@@ -90,6 +90,10 @@ ConsultInput mergeConsultInputs(Iterable<ConsultInput> inputs) {
 
 /// [filters]（層の適用順）の受診喚起の入力を、現在の provider から読んで
 /// [mergeConsultInputs] でまとめる（#119）。
+///
+/// 渡された [filters] はすべて数える。**強度 0 の層も含めるかどうかはこの関数では決めない**
+/// （呼び出し側が [VisionFilterState.buildAll] か `pipelineSteps().map((s) => s.filter)` のどちらを
+/// 渡すかで変わる。描画されない層の喚起を出すかの最終決定は #121）。
 ConsultInput consultInputForFilters(Iterable<VisionFilter> filters) =>
     mergeConsultInputs([
       for (final f in filters)

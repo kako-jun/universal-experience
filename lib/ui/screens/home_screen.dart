@@ -378,6 +378,8 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, visionState, imageSourceState, _) {
         final theme = Theme.of(context);
         final l10n = AppLocalizations.of(context)!;
+        // 暫定（#119）: 複数層でもフォーカス中の層だけで判定する。層集合が色覚 1 つのときだけ
+        // 出す方針への切り替えは #122（ADR の暫定挙動）。
         final canCompare = isColorVisionFilterId(visionState.selectedId);
         final comparing = canCompare && _compareColorVision;
         final strength = previewStrength(visionState);

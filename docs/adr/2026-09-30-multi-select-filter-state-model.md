@@ -399,6 +399,11 @@ optics に置く。）
   - 相談喚起の統合 `mergeConsultInputs`（urgency は最大、escalation は段ごとに重複除去）と
     `consultInputForFilters` を追加した。UI・書き出しへの適用は #121。
   - 見出し・書き出し・2×2 比較の出し分け・トレイは #120〜#122 まで単一（フォーカス層）の意味のまま。
+  - **既知の制約**: `toggle(..., origin: quick)` で色覚を足しても `FilterService` の色覚型・
+    `settings.filterType`・色覚の強度スライダーは更新されない（同期は `selectColorVision` 経由のみ）。
+    production から `toggle` を呼ぶのは #120 からなので、同期の持たせ方は #120 で決める。
+  - `consultInputForFilters` は渡された層をすべて数える（強度 0 の層を含めるかは呼び出し側が
+    渡す列で決まり、最終決定は #121）。
   - 合成のバイト一致は #118 の Rust テストが担う。#119 のテストは `pipelineApplier` をフェイクにして、
     渡る列（段順・強度・payload・強度 0 の除外）と状態遷移を固定した。
 
