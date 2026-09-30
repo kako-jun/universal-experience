@@ -74,6 +74,125 @@ void main() {
     });
   });
 
+  group('exportFilename: 複数層（強度なし、#121）', () {
+    test('strengthPercent を省くと「-Npct」の部分が無い名前になる', () {
+      expect(
+        exportFilename(
+          symptomId: 'myopia-protanopia',
+          isoDate: '2026-06-23',
+        ),
+        'ue-myopia-protanopia-2026-06-23.png',
+      );
+      expect(
+        exportFilename(
+          symptomId: 'myopia-protanopia',
+          isoDate: '2026-06-23',
+          time: '140509',
+        ),
+        'ue-myopia-protanopia-2026-06-23_140509.png',
+      );
+    });
+
+    test('強度ありの名前は従来と完全に同じ（1 層の書き出し）', () {
+      expect(
+        exportFilename(
+          symptomId: 'protanopia',
+          strengthPercent: 100,
+          isoDate: '2026-06-23',
+          time: '140509',
+        ),
+        'ue-protanopia-100pct-2026-06-23_140509.png',
+      );
+    });
+  });
+
+  group('exportSymptomId（#121）', () {
+    test('空は none、1 つはそのまま（従来と同じ id）', () {
+      expect(exportSymptomId(const []), 'none');
+      expect(exportSymptomId(const ['protanopia']), 'protanopia');
+      expect(exportSymptomId(const ['deuteranomaly']), 'deuteranomaly');
+      expect(
+        exportFilename(
+          symptomId: exportSymptomId(const ['protanopia']),
+          strengthPercent: 100,
+          isoDate: '2026-06-23',
+        ),
+        'ue-protanopia-100pct-2026-06-23.png',
+        reason: '1 層のファイル名は従来と同一',
+      );
+    });
+
+    test('複数は渡した順（適用順）に「-」でつなぐ', () {
+      expect(
+          exportSymptomId(const ['myopia', 'protanopia']), 'myopia-protanopia');
+      expect(
+          exportSymptomId(const ['protanopia', 'myopia']), 'protanopia-myopia',
+          reason: '順序は呼び出し側の順のまま（並べ替えない）');
+      expect(exportSymptomId(const ['myopia', 'glaucoma', 'vertigo']),
+          'myopia-glaucoma-vertigo');
+    });
+
+    test('上限以内なら切らない（ちょうど上限の長さも）', () {
+      final ids = ['a' * 15, 'b' * 15, 'c' * 16]; // 15+1+15+1+16 = 48
+      final id = exportSymptomId(ids);
+      expect(id.length, kMaxExportSymptomIdLength);
+      expect(id, ids.join('-'));
+    });
+
+    test('上限を超えるときは、収まる分の id だけ残し、落とした層の数を -plusN で示す', () {
+      // 5 層: 長い id ばかり。全部つなぐと上限を超える。
+      const ids = [
+        'macular_degeneration',
+        'contrast_sensitivity',
+        'vestibular_neuritis',
+        'night_blindness',
+        'flickering_stars',
+      ];
+      final id = exportSymptomId(ids);
+      expect(id.length, lessThanOrEqualTo(kMaxExportSymptomIdLength));
+      expect(id, startsWith('macular_degeneration-contrast_sensitivity'));
+      expect(id, matches(RegExp(r'-plus\d+$')));
+      final kept = id.replaceAll(RegExp(r'-plus\d+$'), '').split('-');
+      final omitted =
+          int.parse(RegExp(r'-plus(\d+)$').firstMatch(id)!.group(1)!);
+      expect(kept.length + omitted, ids.length,
+          reason: '残した層 + 落とした層 = 全層（-plusN の N が落とした数）');
+      expect(kept, ids.take(kept.length).toList(),
+          reason: '残すのは先頭（適用順で先）の層から。id の途中では切らない');
+    });
+
+    test('先頭の id 1 つだけで上限を超えても、上限以内に切り詰める', () {
+      final id = exportSymptomId([
+        'x' * 100,
+        'myopia',
+      ]);
+      expect(id.length, lessThanOrEqualTo(kMaxExportSymptomIdLength));
+      expect(id, endsWith('-plus2'));
+      expect(id, startsWith('xxxx'));
+    });
+
+    test('ファイル名に使えない文字を含まない（複数層でも）', () {
+      final name = exportFilename(
+        symptomId: exportSymptomId(const ['we/ird', 'id:with*bad?chars']),
+        isoDate: '2026-06-23',
+      );
+      for (final ch in <String>['/', '\\', ':', '*', '?', '"', '<', '>', '|']) {
+        expect(name.contains(ch), isFalse, reason: 'must not contain "$ch"');
+      }
+      expect(name, endsWith('.png'));
+      expect(name, contains('we-ird-id-with-bad-chars'));
+    });
+
+    test('複数層の名前全体（接頭辞・日付・時刻・拡張子を含む）も長くなりすぎない', () {
+      final name = exportFilename(
+        symptomId: exportSymptomId([for (var i = 0; i < 5; i++) 'l' * 30]),
+        isoDate: '2026-06-23',
+        time: '140509',
+      );
+      expect(name.length, lessThan(100));
+    });
+  });
+
   group('compactTime', () {
     test('HHMMSS（24 時間・ゼロ埋め・コロン無し）で整形する', () {
       expect(compactTime(DateTime(2026, 6, 23, 14, 5, 9)), '140509');
@@ -754,6 +873,211 @@ void main() {
       final expNarrow = narrowBoth - narrowOnly;
       expect(expNarrow, greaterThan((expWide * 0.8).round()));
       expect(expNarrow, lessThan((expWide * 1.2).round()));
+    });
+
+    // ── 複数層（#121）──
+
+    /// 帯の背景色（帯の右下隅の画素。文字は左寄せなので、端の画素は背景のまま）。
+    int bandBackground(({int width, int height, Uint8List rgba}) img) {
+      final o = ((img.height - 1) * img.width + (img.width - 1)) * 4;
+      return (img.rgba[o] << 16) | (img.rgba[o + 1] << 8) | img.rgba[o + 2];
+    }
+
+    /// 帯の中で、背景と違う画素を含む行の塊の数と、その最後の行（画像の下端からの余白の
+    /// 測定用）。文字が下へはみ出して切れていれば、最後の塊が下端に接する。
+    ({int blocks, int lastInkRow}) inkBlocks(
+        ({int width, int height, Uint8List rgba}) img, int bandTop) {
+      final bg = bandBackground(img);
+      var blocks = 0;
+      var inBlock = false;
+      var lastInk = -1;
+      for (var y = bandTop; y < img.height; y++) {
+        var hasInk = false;
+        for (var x = 0; x < img.width; x++) {
+          final o = (y * img.width + x) * 4;
+          final c =
+              (img.rgba[o] << 16) | (img.rgba[o + 1] << 8) | img.rgba[o + 2];
+          if (c != bg) {
+            hasInk = true;
+            break;
+          }
+        }
+        if (hasInk) {
+          if (!inBlock) blocks++;
+          inBlock = true;
+          lastInk = y;
+        } else {
+          inBlock = false;
+        }
+      }
+      return (blocks: blocks, lastInkRow: lastInk);
+    }
+
+    ExportCaption layeredCaption(int n,
+            {String? experimental,
+            String? urgency,
+            List<ExportEscalationGroup> groups = const [],
+            String? disclaimer}) =>
+        ExportCaption.layered(
+          layers: [
+            for (var i = 0; i < n; i++)
+              ExportLayerRow(
+                  name: 'Layer $i',
+                  strengthLabel: 'Strength: ${100 - i * 10}%'),
+          ],
+          isoDate: '2026-06-23',
+          simulationNotice: 'Simulation (approximation)',
+          experimentalNotice: experimental,
+          urgencyMessage: urgency,
+          escalationGroups: groups,
+          disclaimer: disclaimer,
+        );
+
+    Future<({int width, int height, Uint8List rgba})> composeToPixels(
+        ui.Image base, ExportCaption caption) async {
+      final composed = await composeExportImage(base, caption);
+      final png = await encodeImagePng(composed);
+      composed.dispose();
+      return decodePng(png!);
+    }
+
+    test('ExportCaption.layered: 名前を + でつないだ symptomLabel と、空の strengthLabel',
+        () {
+      final c = layeredCaption(3);
+      expect(c.symptomLabel, 'Layer 0 + Layer 1 + Layer 2');
+      expect(c.strengthLabel, isEmpty);
+      expect(c.layers.map((l) => l.strengthLabel).toList(),
+          ['Strength: 100%', 'Strength: 90%', 'Strength: 80%']);
+    });
+
+    test('ExportCaption.layered: 1 層以下は受け付けない', () {
+      expect(() => layeredCaption(1), throwsAssertionError);
+      expect(() => layeredCaption(0), throwsAssertionError);
+    });
+
+    test('層が 1 つの layers は従来の書き出しと画素まで同じ（症状名 + 強度の 2 行）', () async {
+      final base = await makeBase(640, 40);
+      addTearDown(base.dispose);
+      const legacy = ExportCaption(
+        symptomLabel: 'Protanopia',
+        strengthLabel: 'Strength: 100%',
+        isoDate: '2026-06-23',
+        simulationNotice: 'Simulation (approximation)',
+      );
+      const singleRow = ExportCaption(
+        symptomLabel: 'Protanopia',
+        strengthLabel: 'Strength: 100%',
+        isoDate: '2026-06-23',
+        simulationNotice: 'Simulation (approximation)',
+        layers: [
+          ExportLayerRow(name: 'Protanopia', strengthLabel: 'Strength: 100%'),
+        ],
+      );
+      final a = await composeToPixels(base, legacy);
+      final b = await composeToPixels(base, singleRow);
+
+      expect(b.width, a.width);
+      expect(b.height, a.height);
+      expect(b.rgba, a.rgba);
+      // 従来の構成: 症状名・強度・注記・日付の 4 行。
+      expect(inkBlocks(a, base.height).blocks, 4);
+    });
+
+    test('3 層: 層ごとに 1 行（症状名 + 強度の 2 行は描かない）+ 注記 + 日付', () async {
+      final base = await makeBase(1200, 40);
+      addTearDown(base.dispose);
+      final img = await composeToPixels(base, layeredCaption(3));
+
+      // 層 3 行 + シミュレーション注記 + 日付。
+      expect(inkBlocks(img, base.height).blocks, 3 + 1 + 1);
+      // 層の行は「名前 + 強度」を 1 行に収めるので、層の数だけ高くなる
+      // （1 層の書き出しの 2 行 = 症状名 + 強度よりも、3 層のほうが帯が高い）。
+      final single = await composeToPixels(
+          base,
+          const ExportCaption(
+            symptomLabel: 'Protanopia',
+            strengthLabel: 'Strength: 100%',
+            isoDate: '2026-06-23',
+            simulationNotice: 'Simulation (approximation)',
+          ));
+      expect(img.height, greaterThan(single.height));
+    });
+
+    test('層の行は純白（名前）と淡灰（強度）の 2 色で 1 行に並ぶ', () async {
+      final base = await makeBase(1200, 40);
+      addTearDown(base.dispose);
+      final img = await composeToPixels(base, layeredCaption(2));
+      // 純白の塊: 層 2 行 + 注記。強度（E6E6E6）は白の塊に数えない。
+      expect(whiteLineExtents(img, base.height), hasLength(3));
+    });
+
+    test('5 層 + 全部入りの受診喚起・実験的の注記でも、下端で切れず、行が重ならない', () async {
+      // 5 層 × 受診喚起（緊急度・escalation 2 段・免責）× 実験的の注記。
+      final caption = layeredCaption(
+        5,
+        experimental: 'Experimental visualization',
+        urgency: 'Sudden changes in vision can need prompt care.',
+        groups: const [
+          ExportEscalationGroup(
+            header: 'See a doctor right away if:',
+            lines: ['a sudden drop in hearing', 'sudden double vision'],
+          ),
+          ExportEscalationGroup(
+            header: 'Consider seeing a doctor if:',
+            lines: ['recurrent or severe episodes'],
+          ),
+        ],
+        disclaimer: 'Not a diagnosis; not medically reviewed.',
+      );
+      // 広い画像（折り返さない）と、狭い画像（折り返す）の両方で確かめる。
+      for (final width in [1400, 320]) {
+        final base = await makeBase(width, 40);
+        addTearDown(base.dispose);
+        final img = await composeToPixels(base, caption);
+        final ink = inkBlocks(img, base.height);
+
+        // 下端の帯の余白（14px）が文字で潰れていない = 最後の行が切れていない。
+        expect(img.height - 1 - ink.lastInkRow, greaterThanOrEqualTo(8),
+            reason: '$width px 幅: 日付の行が下端で切れている');
+        if (width == 1400) {
+          // 折り返さない幅では、行数ぶんの塊が分かれて並ぶ（重なっていない）:
+          // 層 5 + 注記 + 実験的 + 受診喚起 + 見出し 2 + 条件 3 + 免責 + 日付。
+          expect(ink.blocks, 5 + 1 + 1 + 1 + 2 + 3 + 1 + 1,
+              reason: '行が重なる・欠けると塊の数が変わる');
+        }
+        // 帯は画像の上に足される（base の高さは保たれる）。
+        expect(img.width, width);
+        expect(img.height, greaterThan(base.height));
+      }
+    });
+
+    test('層の行は狭い画像でも省略されず全文が描かれる（折り返す）', () async {
+      Future<int> inkOf(int width) async {
+        final base = await makeBase(width, 40);
+        addTearDown(base.dispose);
+        final bare = await composeToPixels(base, layeredCaption(2));
+        final bg = bandBackground(bare);
+        var n = 0;
+        for (var y = base.height; y < bare.height; y++) {
+          for (var x = 0; x < bare.width; x++) {
+            final o = (y * bare.width + x) * 4;
+            final c = (bare.rgba[o] << 16) |
+                (bare.rgba[o + 1] << 8) |
+                bare.rgba[o + 2];
+            if (c != bg) {
+              n++;
+            }
+          }
+        }
+        return n;
+      }
+
+      final wide = await inkOf(1200);
+      final narrow = await inkOf(200);
+      expect(wide, greaterThan(0));
+      expect(narrow, greaterThan((wide * 0.8).round()),
+          reason: '狭い幅で層の名前・強度が省略記号で切られている');
+      expect(narrow, lessThan((wide * 1.2).round()));
     });
   });
 

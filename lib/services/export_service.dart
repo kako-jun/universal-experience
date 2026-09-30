@@ -48,16 +48,59 @@ String compactTime(DateTime dt) {
 /// 渡すと日付の後ろに `_` 区切りで付き、`ue-protanopia-100pct-2026-06-23_140509.png`
 /// になる（同じ日に何度書き出しても別名になる、#64）。[symptomId] が `none` などでも
 /// 妥当な名前になり、ファイル名に使えない文字（パス区切り・予約文字）は `-` に
-/// 正規化する。pure・決定論的（同じ入力なら常に同じ出力）。
+/// 正規化する。複数の層を重ねた書き出し（[exportSymptomId]）は層ごとに強度が違い
+/// 1 つの % で表せないので、[strengthPercent] を null にして `-Npct` の部分を省く
+/// （例 `ue-protanopia-glaucoma-2026-06-23.png`）。pure・決定論的（同じ入力なら常に同じ出力）。
 String exportFilename({
   required String symptomId,
-  required int strengthPercent,
+  int? strengthPercent,
   required String isoDate,
   String? time,
 }) {
   final safeId = _sanitizeForFilename(symptomId);
   final stamp = time == null ? isoDate : '${isoDate}_$time';
-  return 'ue-$safeId-${strengthPercent}pct-$stamp.png';
+  final pct = strengthPercent == null ? '' : '-${strengthPercent}pct';
+  return 'ue-$safeId$pct-$stamp.png';
+}
+
+/// [exportSymptomId] が返す文字列の最大長。ファイル名全体（`ue-` 接頭辞・日付・時刻・拡張子を
+/// 含む）がファイルシステムの上限に近づかないよう、症状 id の部分だけを抑える。
+const int kMaxExportSymptomIdLength = 48;
+
+/// 書き出しのファイル名に入れる症状 id を、層の id 列 [ids]（**適用順**）から作る。
+///
+/// - 1 つなら、そのまま（[exportFilename] が従来どおり正規化する。長さも変えない）。
+/// - 複数なら、各 id をファイル名用に正規化（[exportFilename] と同じ規則）して `-` でつなぐ。
+///   [kMaxExportSymptomIdLength] を超えるときは、収まる分の id だけを残し、落とした層の数を
+///   `-plusN` で示す（id の途中で切らない。先頭の 1 つだけで上限を超えるときに限り、その id を
+///   上限で切る）。
+///
+/// 並びは呼び出し側の順（層は段順に並んでいるので、選んだ順に依存しない）。空なら `none`。
+/// pure・決定論的。
+String exportSymptomId(List<String> ids) {
+  if (ids.isEmpty) return 'none';
+  if (ids.length == 1) return ids.single;
+  final safe = [for (final id in ids) _sanitizeForFilename(id)];
+  final whole = safe.join('-');
+  if (whole.length <= kMaxExportSymptomIdLength) return whole;
+  final kept = <String>[];
+  for (var i = 0; i < safe.length; i++) {
+    final rest = safe.length - i - 1;
+    final candidate = [...kept, safe[i]].join('-');
+    final withSuffix = rest == 0 ? candidate : '$candidate-plus$rest';
+    if (withSuffix.length > kMaxExportSymptomIdLength) break;
+    kept.add(safe[i]);
+  }
+  final omitted = safe.length - kept.length;
+  if (kept.isEmpty) {
+    // 先頭の id 1 つだけで上限を超える（通常は起きない）。id を切って、残りは数だけ示す。
+    final suffix = '-plus$omitted';
+    final head = safe.first
+        .substring(0, kMaxExportSymptomIdLength - suffix.length)
+        .replaceAll(RegExp(r'-+$'), '');
+    return '$head$suffix';
+  }
+  return omitted == 0 ? kept.join('-') : '${kept.join('-')}-plus$omitted';
 }
 
 /// [filename] の [attempt] 番目の候補名を返す（#64: 同名を上書きしない）。
@@ -96,7 +139,23 @@ class ExportCaption {
     this.urgencyMessage,
     this.escalationGroups = const [],
     this.disclaimer,
+    this.layers = const [],
   });
+
+  /// 複数の層を重ねた書き出し用。[layers]（適用順、2 つ以上）の各行を、[symptomLabel] と
+  /// [strengthLabel] の 2 行の代わりに描く。[symptomLabel] は層の名前を `+` でつないだもの
+  /// （画像には描かない。テストや代替テキストが全層の名前を読める用）、[strengthLabel] は空。
+  ExportCaption.layered({
+    required this.layers,
+    required this.isoDate,
+    required this.simulationNotice,
+    this.experimentalNotice,
+    this.urgencyMessage,
+    this.escalationGroups = const [],
+    this.disclaimer,
+  })  : assert(layers.length > 1, 'layered caption needs 2 or more layers'),
+        symptomLabel = layers.map((l) => l.name).join(' + '),
+        strengthLabel = '';
 
   /// 症状の表示名（例「1型2色覚（赤）」/ "Protanopia"）。
   final String symptomLabel;
@@ -132,6 +191,22 @@ class ExportCaption {
 
   /// ISO 日付（`YYYY-MM-DD`）。[isoDate] 関数で整形済みの文字列を渡す。
   final String isoDate;
+
+  /// 重ねた層ごとの行（適用順）。2 つ以上のときだけ描画に使い（[ExportCaption.layered]）、
+  /// そのとき [symptomLabel]・[strengthLabel] の行は描かない。空・1 つなら従来の
+  /// [symptomLabel] + [strengthLabel] の 2 行（層が 1 つの書き出しは従来と同じ見た目）。
+  final List<ExportLayerRow> layers;
+}
+
+/// [ExportCaption.layers] の 1 行（層の表示名と強度の表示文字列、どちらも解決済み）。
+class ExportLayerRow {
+  const ExportLayerRow({required this.name, required this.strengthLabel});
+
+  /// 層の表示名（例「1型2色覚（赤）」/ "Protanopia"）。
+  final String name;
+
+  /// 強度の表示文字列（例「強度: 100%」/ "Strength: 100%"）。
+  final String strengthLabel;
 }
 
 /// [ExportCaption.escalationGroups] の 1 段（見出し + 条件文のリスト）。
@@ -155,9 +230,12 @@ class ExportEscalationGroup {
 /// [TextPainter] で症状名 / 強度 / シミュレーション（近似）の注記 /
 /// 実験的フィルタの注記（あれば）/ 受診喚起（あれば）/ escalation（段ごとの
 /// 見出し + 条件文、あれば）/ 免責文（あれば）/ ISO 日付を描画する。
-/// シミュレーション（近似）と実験的の注記は、狭い画像でも省略せず折り返して
-/// 全文を描く（画像だけが共有されても近似だと分かるようにするため）。戻り画像の高さは `base.height + 帯の高さ`、幅は
-/// `base.width`。
+/// 複数層（[ExportCaption.layers] が 2 行以上、#121）のときは、症状名 + 強度の 2 行の代わりに、
+/// 層ごとに 1 行（番号 + 名前 + その層の強度）を描く。
+/// シミュレーション（近似）・実験的の注記と層の行は、狭い画像でも省略せず折り返して
+/// 全文を描く（画像だけが共有されても近似だと分かるようにするため）。帯の高さは各行の
+/// 高さの合計なので、行が増えても切れたり重なったりしない。戻り画像の高さは
+/// `base.height + 帯の高さ`、幅は `base.width`。
 ///
 /// **pure**: 引数の解決済み文字列のみを使い、enum/i18n をここで引かない（規律2）。
 /// I/O を持たない（規律3）。
@@ -166,9 +244,20 @@ Future<ui.Image> composeExportImage(
   final width = base.width;
   // 行リストを組む（urgencyMessage/escalationGroups/disclaimer はいずれも
   // 任意。免責文と escalation の行も必ず焼き込む）。
+  final layered = caption.layers.length > 1;
   final lines = <_CaptionLine>[
-    _CaptionLine(caption.symptomLabel, _Style.title),
-    _CaptionLine(caption.strengthLabel, _Style.body),
+    if (layered)
+      // 層ごとに 1 行（番号 + 名前 + 強度）。長い言語では折り返して全文を描く。
+      for (var i = 0; i < caption.layers.length; i++)
+        _CaptionLine(
+          '${i + 1}. ${caption.layers[i].name}',
+          _Style.layerName,
+          suffix: caption.layers[i].strengthLabel,
+        )
+    else ...[
+      _CaptionLine(caption.symptomLabel, _Style.title),
+      _CaptionLine(caption.strengthLabel, _Style.body),
+    ],
     _CaptionLine(caption.simulationNotice, _Style.notice),
     if (caption.experimentalNotice != null)
       _CaptionLine(caption.experimentalNotice!, _Style.notice),
@@ -525,17 +614,33 @@ Future<bool> revealInFolder(
 
 /// キャプション 1 行の文言とスタイル種別。
 class _CaptionLine {
-  const _CaptionLine(this.text, this.style);
+  const _CaptionLine(this.text, this.style, {this.suffix});
 
   final String text;
   final _Style style;
 
+  /// [text] の後ろに [_Style.body] で続ける文字列（層の行の強度）。null なら無し。
+  final String? suffix;
+
   TextPainter buildPainter(double maxWidth) {
-    // 近似・実験的の注記は行数を制限しない（省略記号で「近似」が消えると、
-    // 画像だけが共有されたときに実際の見え方と誤解されるため）。
-    final unlimited = style == _Style.notice;
+    // 近似・実験的の注記と層の行は行数を制限しない（省略記号で「近似」や層の名前・強度が
+    // 消えると、画像だけが共有されたときに実際の見え方と誤解されるため）。
+    final unlimited = style == _Style.notice || style == _Style.layerName;
+    final suffix = this.suffix;
     final tp = TextPainter(
-      text: TextSpan(text: text, style: style.textStyle),
+      text: TextSpan(
+        text: text,
+        style: style.textStyle,
+        children: [
+          if (suffix != null)
+            // 名前（太字）に続く強度は細字。style に太さを書かないと親（太字）の太さを引き継ぐ。
+            TextSpan(
+              text: '  $suffix',
+              style:
+                  _Style.body.textStyle.copyWith(fontWeight: FontWeight.normal),
+            ),
+        ],
+      ),
       textDirection: TextDirection.ltr,
       maxLines: unlimited ? null : (style == _Style.note ? 2 : 1),
       ellipsis: unlimited ? null : '…',
@@ -547,6 +652,7 @@ class _CaptionLine {
 /// 焼き込みテキストのスタイル種別。色は帯（暗背景）に対して読みやすい明色に固定。
 enum _Style {
   title,
+  layerName,
   body,
   notice,
   note,
@@ -559,6 +665,14 @@ enum _Style {
         return const TextStyle(
           color: Color(0xFFFFFFFF),
           fontSize: 18,
+          fontWeight: FontWeight.bold,
+          height: 1.2,
+        );
+      // 複数層の行の名前。title より一回り小さく、強度（body）と並べても名前が先に読める太さ。
+      case _Style.layerName:
+        return const TextStyle(
+          color: Color(0xFFFFFFFF),
+          fontSize: 15,
           fontWeight: FontWeight.bold,
           height: 1.2,
         );
