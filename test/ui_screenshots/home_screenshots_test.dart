@@ -19,12 +19,17 @@
 //   wide-{light|dark}-{ja|en}-languagedialog.png   — 言語ダイアログ（#82）
 //   narrow-{light|dark}-{ja|en}-full.png          — 縦に十分長い画面で全体を撮ったもの
 //                                                    （狭幅の縦積みのスクロール量の確認用）
+//   {wide|narrow}-{light|dark}-{ja|en}-compare-{off|on}.png
+//                                                  — 色覚 4 型の 2×2 比較（#84）の切替前/後
+//   wide-{light|dark}-{ja|en}-compare-export.png   — 2×2 の書き出し PNG（保存されたバイトそのもの）
 //
 // 注意: after ペインは実ブリッジ（sensus の CPU `apply()`）を呼べないため、
 // レイアウト確認用の簡易フェイク（輝度への単純なブレンド）に差し替えている。
-// 色覚シミュレーションの正しさを示す画像ではない。
+// 色覚シミュレーションの正しさを示す画像ではない。2×2 比較（#84）の撮影では、
+// 4 セルが見分けられるよう型ごとに色味を変える別のフェイクに差し替える。
 
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -39,6 +44,7 @@ import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/sample_catalog.dart';
 import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
 import 'package:universal_experience/services/color_vision_selection.dart';
+import 'package:universal_experience/services/export_service.dart';
 import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/hotkey_service.dart';
 import 'package:universal_experience/services/image_source_state.dart';
@@ -49,6 +55,7 @@ import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart';
 import 'package:universal_experience/ui/theme/app_theme.dart';
+import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
 import '../support/screenshot_harness.dart';
@@ -109,6 +116,47 @@ Future<ui.Image> _layoutOnlyApplier(
   return completer.future;
 }
 
+/// 2×2 比較（#84）のレイアウト確認専用フェイク。4 型が見分けられるよう、型ごとに
+/// 異なる色味（チャンネルの混ぜ方）にして strength で元画像と混ぜる。色覚の
+/// アルゴリズムではない。
+Future<ui.Image> _tintedApplier(
+  ui.Image source,
+  VisionFilter filter,
+  double strength,
+) async {
+  // (R', G', B') = 行列 × (R, G, B)。型ごとに大きく違う値にしてある。
+  final List<double> m;
+  if (filter == const VisionFilter.protanopia()) {
+    m = [0.1, 0.9, 0.0, 0.1, 0.9, 0.0, 0.0, 0.3, 0.7];
+  } else if (filter == const VisionFilter.deuteranopia()) {
+    m = [0.6, 0.4, 0.0, 0.6, 0.4, 0.0, 0.0, 0.2, 0.8];
+  } else if (filter == const VisionFilter.tritanopia()) {
+    m = [1.0, 0.0, 0.0, 0.0, 0.4, 0.6, 0.0, 0.4, 0.6];
+  } else {
+    m = [0.33, 0.33, 0.34, 0.33, 0.33, 0.34, 0.33, 0.33, 0.34];
+  }
+  final data = await source.toByteData(format: ui.ImageByteFormat.rawRgba);
+  final bytes = data!.buffer.asUint8List();
+  final out = Uint8List.fromList(bytes);
+  final s = strength.clamp(0.0, 1.0);
+  for (var i = 0; i + 3 < out.length; i += 4) {
+    final r = bytes[i], g = bytes[i + 1], b = bytes[i + 2];
+    for (var c = 0; c < 3; c++) {
+      final t = m[c * 3] * r + m[c * 3 + 1] * g + m[c * 3 + 2] * b;
+      out[i + c] = (bytes[i + c] * (1 - s) + t * s).round().clamp(0, 255);
+    }
+  }
+  final completer = Completer<ui.Image>();
+  ui.decodeImageFromPixels(
+    out,
+    source.width,
+    source.height,
+    ui.PixelFormat.rgba8888,
+    completer.complete,
+  );
+  return completer.future;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -141,6 +189,7 @@ void main() {
     experiencesProvider = experiences;
     resetVisionFilterMetadataProviders();
     CpuVisionRenderer.applier = CpuVisionRenderer.apply;
+    pngSaver = savePng;
   });
 
   ThemeData themed(ThemeData base) => base.copyWith(
@@ -169,7 +218,13 @@ void main() {
     bool expandProvenance = false,
     // 指定すると体験プリセット（[id, 対応するカタログ id]）を選ぶ（#80）。
     (String, String)? preset,
+    // true なら色覚 4 型の 2×2 比較（#84）に切り替えて撮る（4 型が見分けられる
+    // フェイクに差し替える）。[compareExport] が true なら、さらに書き出しを
+    // 実行し、保存された PNG を書き出して 4 セルの色が互いに異なることを確かめる。
+    bool compare = false,
+    bool compareExport = false,
   }) async {
+    if (compare) CpuVisionRenderer.applier = _tintedApplier;
     tester.view.physicalSize = Size(width, height);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -250,6 +305,19 @@ void main() {
     }
 
     final base = '$widthLabel-${dark ? 'dark' : 'light'}-$locale';
+    if (compare) {
+      final l10n = lookupAppLocalizations(Locale(locale));
+      final chip = find.widgetWithText(FilterChip, l10n.compareToggleLabel);
+      await tester.tap(chip);
+      await tester.pump();
+      // 4 型ぶんの描画（実時間の非同期）が終わるまで待つ。
+      for (var i = 0; i < 30; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 100)),
+        );
+        await tester.pump();
+      }
+    }
     if (expandProvenance) {
       for (final key in ['provenance-model', 'provenance-limitations']) {
         final header = find.descendant(
@@ -291,6 +359,75 @@ void main() {
     final path = await writeScreenshot(tester, boundaryKey, '$base$suffix');
     // ignore: avoid_print
     print('[ui_screenshots] wrote $path');
+    if (compareExport) {
+      final l10n = lookupAppLocalizations(Locale(locale));
+      Uint8List? saved;
+      pngSaver = (bytes, filename) async {
+        saved = bytes;
+        return '/fake/Downloads/$filename';
+      };
+      await tester.tap(find.byTooltip(l10n.exportButtonTooltip));
+      await tester.runAsync(() async {
+        for (var i = 0; i < 100 && saved == null; i++) {
+          await tester.pump(const Duration(milliseconds: 20));
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        }
+      });
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(saved, isNotNull, reason: '書き出しが保存まで進む');
+      final exportPath =
+          '${screenshotOutputDir().path}/$base-compare-export.png';
+      await tester.runAsync(() => File(exportPath).writeAsBytes(saved!));
+      // ignore: avoid_print
+      print('[ui_screenshots] wrote $exportPath');
+
+      // 保存された PNG を実際にデコードし、4 セルの画像部分の平均色が互いに
+      // 異なる（= 4 型が別々に描かれて 1 枚に並んでいる）ことを確かめる。
+      final means = await tester.runAsync(() async {
+        final codec = await ui.instantiateImageCodec(saved!);
+        final frame = await codec.getNextFrame();
+        final image = frame.image;
+        final data =
+            await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+        final rgba = data!.buffer.asUint8List();
+        // グリッドは gap + 2 * (セル + gap)（compareGridLayout）。セルの上部は
+        // 正方形の画像。
+        const g = kCompareGridGap;
+        final cellW = (image.width - 3 * g) ~/ 2;
+        final result = <List<double>>[];
+        for (var i = 0; i < 4; i++) {
+          final col = i % 2, row = i ~/ 2;
+          final ox = g + col * (cellW + g);
+          // 行の高さは（画像 + 帯）のセルの最大。行の先頭は g + row * (rowH + g)。
+          final rowH = (image.height - 3 * g) ~/ 2;
+          final oy = g + row * (rowH + g);
+          var r = 0.0, gr = 0.0, b = 0.0;
+          for (var y = oy; y < oy + cellW; y++) {
+            for (var x = ox; x < ox + cellW; x++) {
+              final o = (y * image.width + x) * 4;
+              r += rgba[o];
+              gr += rgba[o + 1];
+              b += rgba[o + 2];
+            }
+          }
+          final n = cellW * cellW;
+          result.add([r / n, gr / n, b / n]);
+        }
+        image.dispose();
+        codec.dispose();
+        return result;
+      });
+      // ignore: avoid_print
+      print('[ui_screenshots] compare-export cell mean RGB: $means');
+      for (var i = 0; i < 4; i++) {
+        for (var j = i + 1; j < 4; j++) {
+          final d = (means![i][0] - means[j][0]).abs() +
+              (means[i][1] - means[j][1]).abs() +
+              (means[i][2] - means[j][2]).abs();
+          expect(d, greaterThan(6.0), reason: 'セル $i と $j の平均色が近すぎる');
+        }
+      }
+    }
     if (clickThrough) {
       await tester.runAsync(() => loupe.setClickThrough(false));
       await tester.runAsync(() => loupe.setAppMode(AppMode.settings));
@@ -457,6 +594,52 @@ void main() {
         locale: locale,
         suffix: '-languagedialog',
         languageDialog: true,
+      ),
+      skip: !screenshotsEnabled,
+    );
+  }
+
+  // 色覚 4 型の 2×2 比較（#84）。切替の前（compare-off）と後（compare-on）。
+  // 広幅は light×ja / dark×en / light×en / dark×ja、狭幅（縦積み）は light×ja と
+  // dark×en。wide の compare-on では書き出しも実行し、保存された PNG も書き出す。
+  for (final (widthLabel, dark, locale) in const <(String, bool, String)>[
+    ('wide', false, 'ja'),
+    ('wide', false, 'en'),
+    ('wide', true, 'ja'),
+    ('wide', true, 'en'),
+    ('narrow', false, 'ja'),
+    ('narrow', true, 'en'),
+  ]) {
+    final size = sizes.firstWhere((s) => s.$1 == widthLabel);
+    final height = widthLabel == 'narrow' ? 2600.0 : 1000.0;
+    final tag = '$widthLabel/${dark ? 'dark' : 'light'}/$locale';
+
+    testWidgets(
+      'screenshot $tag compare-off',
+      (tester) => shoot(
+        tester,
+        widthLabel: widthLabel,
+        width: size.$2,
+        height: height,
+        dark: dark,
+        locale: locale,
+        suffix: '-compare-off',
+      ),
+      skip: !screenshotsEnabled,
+    );
+
+    testWidgets(
+      'screenshot $tag compare-on',
+      (tester) => shoot(
+        tester,
+        widthLabel: widthLabel,
+        width: size.$2,
+        height: height,
+        dark: dark,
+        locale: locale,
+        suffix: '-compare-on',
+        compare: true,
+        compareExport: widthLabel == 'wide',
       ),
       skip: !screenshotsEnabled,
     );
