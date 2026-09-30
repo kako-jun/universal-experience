@@ -715,6 +715,13 @@ void main() {
       }
     });
 
+    test('極小の画像（12px 幅）でも左余白で文字が画像の外に出ない（#80）', () async {
+      // 余白が 16px 固定だと、12px 幅では文字の開始位置が画像の外になり、
+      // 注記が 1 画素も残らない。
+      final narrow = await noticePixelsAtWidth(12);
+      expect(narrow, greaterThan(0));
+    });
+
     test('experimentalNotice は全文が別の行として焼き込まれ、狭い画像でも省略されない（#80）', () async {
       // 広い画像: 症状名・シミュレーション注記・実験的注記の 3 行（純白の塊）。
       final base = await makeBase(640, 40);

@@ -183,10 +183,12 @@ Future<ui.Image> composeExportImage(
     _CaptionLine(caption.isoDate, _Style.meta),
   ];
 
-  const horizontalPadding = 16.0;
   const verticalPadding = 14.0;
   const lineGap = 6.0;
-  // ごく狭い画像でも 0 以下にしない（その場合は 1 文字ずつ折り返して描く）。
+  // 左右の余白は通常 16px。ごく狭い画像では文字が画像の外へ出ないよう、
+  // 幅の 1/8 まで縮める（幅 128px 未満で効く）。
+  final horizontalPadding = math.min(16.0, width / 8);
+  // それでも 0 以下にしない（その場合は 1 文字ずつ折り返して描く）。
   final maxTextWidth = math.max(1.0, width - horizontalPadding * 2);
 
   // 各行の TextPainter を用意し、帯の高さを測る。
