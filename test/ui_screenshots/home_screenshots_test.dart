@@ -22,6 +22,11 @@
 //   {wide|narrow}-{light|dark}-{ja|en}-compare-{off|on}.png
 //                                                  — 色覚 4 型の 2×2 比較（#84）の切替前/後
 //   wide-{light|dark}-{ja|en}-compare-export.png   — 2×2 の書き出し PNG（保存されたバイトそのもの）
+//   {wide|narrow|narrow-xs}-{light|dark}-{ja|en}-multi.png
+//                                                  — 多層選択（3 層。チップ帯・層ごとの調整・見出しの要約、#120）
+//   {wide|narrow|narrow-xs}-{light|dark}-{ja|en}-multi-limit.png
+//                                                  — 上限到達（5 層。未選択の行が理由つきで無効、#120）
+//   narrow*-...-multi*-full.png                    — 狭幅の縦積みを縦に十分長い画面で全体を撮ったもの
 //
 // 注意: after ペインは実ブリッジ（sensus の CPU `apply()`）を呼べないため、
 // レイアウト確認用の簡易フェイク（輝度への単純なブレンド）に差し替えている。
@@ -184,8 +189,17 @@ void main() {
     experiencesProvider = _fixtureExperiences;
     installVisionFilterMetadataFixture();
     CpuVisionRenderer.applier = _layoutOnlyApplier;
+    // 複数層の合成（#119）もレイアウト確認用に、層を順に 1 枚ずつ掛けるフェイクへ。
+    CpuVisionRenderer.pipelineApplier = (source, steps) async {
+      var image = source;
+      for (final step in steps) {
+        image = await _layoutOnlyApplier(image, step.filter, step.strength);
+      }
+      return image;
+    };
   });
   tearDown(() {
+    CpuVisionRenderer.pipelineApplier = CpuVisionRenderer.applyPipeline;
     experiencesProvider = experiences;
     resetVisionFilterMetadataProviders();
     CpuVisionRenderer.applier = CpuVisionRenderer.apply;
@@ -223,6 +237,14 @@ void main() {
     // 実行し、保存された PNG を書き出して 4 セルの色が互いに異なることを確かめる。
     bool compare = false,
     bool compareExport = false,
+    // 指定すると、初回起動の色覚に続けてこれらの advanced フィルタを重ねる（多層選択、#120）。
+    // [layerStrengths] は層 id → 強度。[focusId] は調整中にする層。
+    List<String> extraLayers = const [],
+    Map<String, double> layerStrengths = const {},
+    String? focusId,
+    // 指定すると、一覧のこの行（[FilterListEntry.key]）が見える位置までスクロールして撮る
+    // （上限で無効の行と、その理由の確認用）。
+    String? revealEntryKey,
   }) async {
     if (compare) CpuVisionRenderer.applier = _tintedApplier;
     tester.view.physicalSize = Size(width, height);
@@ -246,6 +268,11 @@ void main() {
       if (strength != null) visionState.setStrength(strength);
     }
     if (preset != null) visionState.selectPreset(preset.$1, preset.$2);
+    for (final id in extraLayers) {
+      visionState.toggle(id);
+    }
+    layerStrengths.forEach(visionState.setLayerStrength);
+    if (focusId != null) visionState.focusLayer(focusId);
     imageSourceState.followRecommendedSample(
       recommendedSampleIdForFilter(visionState.selectedId),
     );
@@ -305,6 +332,11 @@ void main() {
     }
 
     final base = '$widthLabel-${dark ? 'dark' : 'light'}-$locale';
+    if (revealEntryKey != null) {
+      final tile = find.byKey(ValueKey('filter_tile_$revealEntryKey'));
+      await tester.ensureVisible(tile);
+      await tester.pumpAndSettle();
+    }
     if (compare) {
       final l10n = lookupAppLocalizations(Locale(locale));
       final chip = find.widgetWithText(FilterChip, l10n.compareToggleLabel);
@@ -649,6 +681,69 @@ void main() {
       ),
       skip: !screenshotsEnabled,
     );
+  }
+
+  // 多層選択（#120）。3 層（色覚 + 光学 + 運動）と、上限（5 層）。広幅・狭幅・さらに狭い
+  // 幅（narrow-xs=600）で、チップ帯・層ごとの調整・見出しの要約・無効の行の理由を確認する。
+  // 狭幅の縦積みは縦に長い全体撮り（-full）も撮る。
+  const multiExtra = ['myopia', 'vertigo'];
+  const limitExtra = ['myopia', 'vertigo', 'cataract', 'night_blindness'];
+  const multiStrengths = {'myopia': 0.6, 'vertigo': 0.4};
+  const limitStrengths = {
+    'myopia': 0.6,
+    'vertigo': 0.4,
+    'cataract': 0.8,
+    'night_blindness': 0.5,
+  };
+  for (final (widthLabel, w, h, dark, locale, limit)
+      in const <(String, double, double, bool, String, bool)>[
+    ('wide', 1280, 800, false, 'ja', false),
+    ('wide', 1280, 800, true, 'en', false),
+    ('wide', 1280, 800, false, 'ja', true),
+    ('wide', 1280, 800, true, 'en', true),
+    ('narrow', 800, 700, false, 'ja', false),
+    ('narrow', 800, 700, true, 'en', true),
+    ('narrow-xs', 600, 700, false, 'ja', true),
+    ('narrow-xs', 600, 700, true, 'en', false),
+  ]) {
+    final tag = limit ? 'multi-limit' : 'multi';
+    final name = '$widthLabel/${dark ? 'dark' : 'light'}/$locale $tag';
+    Future<void> run(WidgetTester tester, double height, String suffix,
+            {bool reveal = false}) =>
+        shoot(
+          tester,
+          widthLabel: widthLabel,
+          width: w,
+          height: height,
+          dark: dark,
+          locale: locale,
+          suffix: suffix,
+          extraLayers: limit ? limitExtra : multiExtra,
+          layerStrengths: limit ? limitStrengths : multiStrengths,
+          focusId: 'myopia',
+          revealEntryKey: reveal ? 'catalog:tunnel_vision' : null,
+        );
+
+    testWidgets(
+      'screenshot $name',
+      (tester) => run(tester, h, '-$tag'),
+      skip: !screenshotsEnabled,
+    );
+    if (limit) {
+      // 一覧の未選択の行が、理由つきで無効になっている様子。
+      testWidgets(
+        'screenshot $name (disabled rows)',
+        (tester) => run(tester, h, '-$tag-rows', reveal: true),
+        skip: !screenshotsEnabled,
+      );
+    }
+    if (widthLabel.startsWith('narrow')) {
+      testWidgets(
+        'screenshot $name (full length)',
+        (tester) => run(tester, 4200, '-$tag-full'),
+        skip: !screenshotsEnabled,
+      );
+    }
   }
 
   for (final (widthLabel, dark, locale) in combos) {
