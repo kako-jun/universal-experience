@@ -757,12 +757,8 @@
   "@layerChipLabel": {
     "description": "Screen-reader label of one chip in the strip: its application-order number and the filter name (#120).",
     "placeholders": {
-      "order": {
-        "type": "int"
-      },
-      "name": {
-        "type": "String"
-      }
+      "order": { "type": "int" },
+      "name": { "type": "String" }
     }
   },
   "layerChipFocusHint": "Press to adjust this filter",
@@ -773,24 +769,16 @@
   "@layerChipRemove": {
     "description": "Tooltip and screen-reader label of the x button of a chip: removes that one filter (#120).",
     "placeholders": {
-      "name": {
-        "type": "String"
-      }
+      "name": { "type": "String" }
     }
   },
   "layerSectionSummary": "Order {order}, {name}, strength {percent}%",
   "@layerSectionSummary": {
     "description": "Screen-reader label of a collapsed layer section in the adjust panel (application order, name, strength). Pressing it makes that filter the one being adjusted (#120).",
     "placeholders": {
-      "order": {
-        "type": "int"
-      },
-      "name": {
-        "type": "String"
-      },
-      "percent": {
-        "type": "int"
-      }
+      "order": { "type": "int" },
+      "name": { "type": "String" },
+      "percent": { "type": "int" }
     }
   },
   "exportDisabledMultiLayer": "Saving as PNG isn't available yet while several filters are combined.",
