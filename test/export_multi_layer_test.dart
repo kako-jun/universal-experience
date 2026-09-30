@@ -17,7 +17,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/preview_image_source.dart';
 import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
 import 'package:universal_experience/services/export_layers.dart';
@@ -69,7 +68,7 @@ void main() {
     AppLocalizations l10n,
     List<ExportLayer>? layers, {
     String? filterId = 'protanopia',
-    ColorVisionType? colorVisionType = ColorVisionType.protanopia,
+    String? variantId,
     VisionFilter? filter = const VisionFilter.protanopia(),
     double strength = 1.0,
   }) =>
@@ -77,7 +76,7 @@ void main() {
         l10n,
         layers: layers,
         filterId: filterId,
-        colorVisionType: colorVisionType,
+        variantId: variantId,
         filter: filter,
         strength: strength,
         isoDate: '2026-06-23',
@@ -267,7 +266,7 @@ void main() {
       final legacy = buildExportCaption(
         en,
         filterId: 'protanopia',
-        colorVisionType: ColorVisionType.protanopia,
+        variantId: null,
         filter: const VisionFilter.protanopia(),
         strength: 1.0,
         isoDate: '2026-06-23',
@@ -399,7 +398,7 @@ void main() {
         en,
         layers,
         filterId: 'myopia',
-        colorVisionType: null,
+        variantId: null,
         filter: const VisionFilter.myopia(),
         strength: 0.0,
       );
@@ -459,7 +458,7 @@ void main() {
         en,
         layers,
         filterId: 'myopia',
-        colorVisionType: null,
+        variantId: null,
         filter: const VisionFilter.myopia(),
         strength: 0.0,
       );
@@ -478,7 +477,7 @@ void main() {
         en,
         layers,
         filterId: 'tetrachromacy',
-        colorVisionType: null,
+        variantId: null,
         filter: const VisionFilter.tetrachromacy(),
         strength: 0.0,
       );
@@ -707,13 +706,13 @@ void main() {
       Widget viewOf({
         required VisionFilter filter,
         required String filterId,
-        required ColorVisionType type,
+        String? variantId,
         required double strength,
       }) =>
           localized(BeforeAfterView(
             filter: filter,
             filterId: filterId,
-            colorVisionType: type,
+            variantId: variantId,
             strength: strength,
             imageSource: const SamplePreviewImageSource('test'),
             sampleSize: 16,
@@ -723,7 +722,6 @@ void main() {
       await tester.pumpWidget(viewOf(
         filter: const VisionFilter.protanopia(),
         filterId: 'protanopia',
-        type: ColorVisionType.protanopia,
         strength: 0.6,
       ));
       for (var i = 0; i < 5 && renders.isEmpty; i++) {
@@ -735,7 +733,6 @@ void main() {
       await tester.pumpWidget(viewOf(
         filter: const VisionFilter.deuteranopia(),
         filterId: 'deuteranopia',
-        type: ColorVisionType.deuteranopia,
         strength: 0.3,
       ));
       renders[0].complete(after1);

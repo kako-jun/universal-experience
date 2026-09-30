@@ -101,13 +101,7 @@ void main() {
       ];
       final layers = [
         for (final id in layerIds)
-          VisionLayer(
-            id: id,
-            params: _nonDefaultParams(id),
-            origin: id == 'deuteranopia'
-                ? VisionLayerOrigin.quick
-                : VisionLayerOrigin.advanced,
-          ),
+          VisionLayer(id: id, params: _nonDefaultParams(id)),
       ];
       final strengthByKey = <String, double>{};
       final paramsById = <String, Map<String, Object>>{};
@@ -132,7 +126,7 @@ void main() {
       for (var k = 0; k < layers.length; k++) {
         expect(restored.layers[k].params, layers[k].params,
             reason: layers[k].id);
-        expect(restored.layers[k].origin, layers[k].origin,
+        expect(restored.layers[k].variantId, layers[k].variantId,
             reason: layers[k].id);
       }
       expect(restored.focusedId, 'glaucoma');
@@ -168,7 +162,7 @@ void main() {
       }
     });
 
-    test('プリセット・quick 層・別名（-omaly）も往復する', () {
+    test('プリセットと別名（-omaly）の層も往復する', () {
       final preset = VisionFilterSnapshot.fromJson(jsonDecode(jsonEncode(
         VisionFilterSnapshot(
           layers: [VisionLayer(id: 'vertigo')],
@@ -177,22 +171,17 @@ void main() {
         ).toJson(),
       )))!;
       expect(preset.presetId, 'labyrinthitis');
-      expect(preset.layers.single.origin, VisionLayerOrigin.advanced);
+      expect(preset.layers.single.variantId, isNull);
 
       final omaly = VisionFilterSnapshot.fromJson(jsonDecode(jsonEncode(
         VisionFilterSnapshot(
           layers: [
-            VisionLayer(
-              id: 'protanopia',
-              variantId: 'protanomaly',
-              origin: VisionLayerOrigin.quick,
-            ),
+            VisionLayer(id: 'protanopia', variantId: 'protanomaly'),
           ],
           focusedId: 'protanopia',
         ).toJson(),
       )))!;
       expect(omaly.layers.single.variantId, 'protanomaly');
-      expect(omaly.layers.single.origin, VisionLayerOrigin.quick);
       expect(omaly.layers.single.strengthKey, 'protanomaly');
       expect(omaly.presetId, isNull);
     });
@@ -212,7 +201,8 @@ void main() {
       expect((layer['params'] as Map)['seed'], '2');
       expect(layer.containsKey('strength'), isFalse,
           reason: '強度は層でなくキーごとの記憶に持つ');
-      expect(layer['origin'], 'advanced');
+      expect(layer.containsKey('origin'), isFalse,
+          reason: '層の起源は書かない（別名の有無だけで区別する）');
       expect(layer.containsKey('variantId'), isFalse);
       expect((json['strengthByKey'] as Map)['floaters'], 0.5);
     });
@@ -329,21 +319,12 @@ void main() {
       expect(orders, [...orders]..sort());
     });
 
-    test('別名（variantId）は対応する -opia の quick 層にだけ付く', () {
+    test('別名（variantId）は対応する -opia の層にだけ付く', () {
       final s = VisionFilterSnapshot.fromJson(_json(layers: [
-        _layer('protanopia', variantId: 'protanomaly', origin: 'quick'),
+        _layer('protanopia', variantId: 'protanomaly'),
       ]))!;
       expect(s.layers.single.variantId, 'protanomaly');
-      expect(s.layers.single.origin, VisionLayerOrigin.quick);
-
-      // advanced 層（origin が無い・advanced）に付いた別名は捨てる。
-      for (final origin in [null, 'advanced']) {
-        final a = VisionFilterSnapshot.fromJson(_json(layers: [
-          _layer('protanopia', variantId: 'protanomaly', origin: origin),
-        ]))!;
-        expect(a.layers.single.origin, VisionLayerOrigin.advanced);
-        expect(a.layers.single.variantId, isNull, reason: 'origin=$origin');
-      }
+      expect(s.layers.single.strengthKey, 'protanomaly');
 
       for (final bad in [
         ('deuteranopia', 'protanomaly'), // 対応しない別名
@@ -353,33 +334,30 @@ void main() {
         ('achromatopsia', 'tritanomaly'),
       ]) {
         final t = VisionFilterSnapshot.fromJson(_json(layers: [
-          _layer(bad.$1, variantId: bad.$2, origin: 'quick'),
+          _layer(bad.$1, variantId: bad.$2),
         ]))!;
         expect(t.layers.single.variantId, isNull, reason: '$bad');
       }
     });
 
-    test('quick の起源は -opia 4 種の層にだけ許し、他は advanced に落とす', () {
-      final s = VisionFilterSnapshot.fromJson(_json(layers: [
-        _layer('myopia', origin: 'quick'),
-        _layer('tetrachromacy', origin: 'quick'),
-      ]))!;
-      expect([
-        for (final l in s.layers) l.origin
-      ], [
-        VisionLayerOrigin.advanced,
-        VisionLayerOrigin.advanced,
-      ]);
+    test('旧形式が持っていた origin は読んでも無視する（別名は origin に依らず採る）', () {
+      for (final origin in [null, 'quick', 'advanced', 'sideways']) {
+        final s = VisionFilterSnapshot.fromJson(_json(layers: [
+          _layer('protanopia', variantId: 'protanomaly', origin: origin),
+          _layer('myopia', origin: origin),
+        ]))!;
+        expect(_ids(s), ['myopia', 'protanopia'], reason: 'origin=$origin');
+        expect(s.layers.last.variantId, 'protanomaly', reason: 'origin=$origin');
+        expect(s.layers.first.variantId, isNull, reason: 'origin=$origin');
+      }
 
-      final q = VisionFilterSnapshot.fromJson(_json(layers: [
+      final written = VisionFilterSnapshot.fromJson(_json(layers: [
         _layer('achromatopsia', origin: 'quick'),
-      ]))!;
-      expect(q.layers.single.origin, VisionLayerOrigin.quick);
-
-      final unknown = VisionFilterSnapshot.fromJson(_json(layers: [
-        _layer('achromatopsia', origin: 'sideways'),
-      ]))!;
-      expect(unknown.layers.single.origin, VisionLayerOrigin.advanced);
+      ]))!
+          .toJson();
+      final layer = (written['layers'] as List).single as Map;
+      expect(layer.containsKey('origin'), isFalse,
+          reason: '読んだ origin を書き出しへ持ち越さない');
     });
 
     test('focusedId は層に無ければ捨てる', () {
@@ -635,7 +613,7 @@ void main() {
   });
 
   group('版 1（単一選択）の変換', () {
-    test('選択は advanced 層 1 つになり、fromLegacy が立つ', () {
+    test('選択は層 1 つ（別名なし）になり、fromLegacy が立つ', () {
       final s = VisionFilterSnapshot.fromJson(_v1(
         selectedId: 'myopia',
         filters: {
@@ -645,17 +623,17 @@ void main() {
 
       expect(s.fromLegacy, isTrue);
       expect(_ids(s), ['myopia']);
-      expect(s.layers.single.origin, VisionLayerOrigin.advanced);
+      expect(s.layers.single.variantId, isNull);
       expect(s.focusedId, 'myopia');
       expect(s.strengthByKey, {'myopia': 0.4});
     });
 
-    test('色覚クイック選択は quick 層になり、-omaly は別名つきになる', () {
+    test('色覚の選択は色覚の層になり、-omaly は別名つきになる', () {
       final opia = VisionFilterSnapshot.fromJson(_v1(
         selectedId: 'protanopia',
         colorVisionType: 'protanopia',
       ))!;
-      expect(opia.layers.single.origin, VisionLayerOrigin.quick);
+      expect(opia.layers.single.id, 'protanopia');
       expect(opia.layers.single.variantId, isNull);
 
       final omaly = VisionFilterSnapshot.fromJson(_v1(
@@ -664,29 +642,27 @@ void main() {
       ))!;
       expect(omaly.layers.single.id, 'deuteranopia');
       expect(omaly.layers.single.variantId, 'deuteranomaly');
-      expect(omaly.layers.single.origin, VisionLayerOrigin.quick);
       expect(omaly.presetId, isNull);
     });
 
-    test('colorVisionType が選択 id と食い違えば quick にせず advanced 層にする', () {
+    test('colorVisionType が選択 id と食い違えば別名を付けず、選択 id の層にする', () {
       final s = VisionFilterSnapshot.fromJson(_v1(
         selectedId: 'tritanopia',
         colorVisionType: 'protanopia',
       ))!;
 
       expect(s.layers.single.id, 'tritanopia');
-      expect(s.layers.single.origin, VisionLayerOrigin.advanced);
       expect(s.layers.single.variantId, isNull);
     });
 
-    test('プリセット由来は advanced 層 + presetId を引き継ぐ', () {
+    test('プリセット由来は層 + presetId を引き継ぐ', () {
       final s = VisionFilterSnapshot.fromJson(_v1(
         selectedId: 'vertigo',
         presetId: 'labyrinthitis',
       ))!;
 
       expect(s.presetId, 'labyrinthitis');
-      expect(s.layers.single.origin, VisionLayerOrigin.advanced);
+      expect(_ids(s), ['vertigo']);
     });
 
     test('-opia 4 種の強度は持ち越さず、tetrachromacy と他のフィルタの強度は残す', () {
@@ -766,8 +742,8 @@ void main() {
         final s = VisionFilterSnapshot.fromJson(
           _v1(selectedId: 'protanopia', colorVisionType: bad),
         )!;
-        expect(s.layers.single.origin, VisionLayerOrigin.advanced,
-            reason: 'bad=$bad');
+        expect(s.layers.single.id, 'protanopia', reason: 'bad=$bad');
+        expect(s.layers.single.variantId, isNull, reason: 'bad=$bad');
       }
     });
 
@@ -786,7 +762,6 @@ void main() {
 
       expect(again.fromLegacy, isFalse);
       expect(again.layers.single.variantId, 'protanomaly');
-      expect(again.layers.single.origin, VisionLayerOrigin.quick);
       expect(again.strengthByKey, {'myopia': 0.4});
     });
   });

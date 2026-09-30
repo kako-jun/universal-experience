@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-import '../models/disability_type.dart';
 import '../models/vision_filter_catalog.dart';
 
 /// トレイから直接ワンクリック切替できる色覚フィルタの一覧。
@@ -8,20 +7,16 @@ import '../models/vision_filter_catalog.dart';
 /// 全フィルタ catalogue は設定 UI (#16) とトレイの「高度なフィルタ」サブメニュー
 /// (#65) にある。トレイのトップレベルはメニューを短く保つため、よく使う色覚
 /// シミュレーションのみを出す。
-/// [ColorVisionType.none] は「フィルタ解除」項目が担うため意図的に除外する。
-List<ColorVisionType> quickColorVisionFilters() => const <ColorVisionType>[
-      ColorVisionType.protanopia,
-      ColorVisionType.deuteranopia,
-      ColorVisionType.tritanopia,
-      ColorVisionType.achromatopsia,
-    ];
+/// 「フィルタ解除」は専用の項目が担うため、ここには含めない。カタログ id（[kColorVisionQuickCatalogIds]）
+/// で返す。
+List<String> quickColorVisionFilters() => kColorVisionQuickCatalogIds;
 
 /// トレイメニューの表示文言を 1 つにまとめた値オブジェクト (#18)。
 ///
 /// 純粋データ層 (`buildTrayMenuSpec`) は **文言を自前で持たない**。i18n の解決は
 /// UI/副作用層 (`TrayService`) の責務で、起動時ロケールの `AppLocalizations` から
 /// 文字列を取り出してここに詰めて渡す（context を持てないトレイ層の作法）。
-/// color-vision フィルタのラベルは型ごとに [filterLabels] で引く。
+/// color-vision フィルタのラベルはキー（カタログ id または別名 id）ごとに [filterLabels] で引く。
 ///
 /// このファイルを `tray_service.dart` から分けているのは、`l10n_extensions.dart`
 /// （文言の解決）が `tray_service.dart`（統合一覧 `filter_list_selection.dart` 経由で
@@ -71,10 +66,10 @@ class TrayMenuLabels {
   /// 「高度なフィルタ」サブメニュー（カテゴリ別、#65）の見出し。
   final String advancedFilters;
 
-  /// color-vision 型 → 表示ラベル。トップレベルのクイック項目
+  /// color-vision キー（カタログ id または別名 id）→ 表示ラベル。トップレベルのクイック項目
   /// （[quickColorVisionFilters]）と、サブメニュー内の色覚行（-omaly を含む
-  /// 7 型）をカバーする。
-  final Map<ColorVisionType, String> filterLabels;
+  /// 7 種）をカバーする。
+  final Map<String, String> filterLabels;
 
   /// カテゴリ → サブメニュー見出し（#65）。
   final Map<VisionFilterCategory, String> categoryLabels;
@@ -87,8 +82,8 @@ class TrayMenuLabels {
   String toggleLabel({required bool loupeVisible}) =>
       loupeVisible ? hideLoupe : showLoupe;
 
-  /// 指定 color-vision 型のラベル（未登録なら id をフォールバック表示）。
-  String filterLabel(ColorVisionType type) => filterLabels[type] ?? type.id;
+  /// 指定 color-vision キー（カタログ id または別名 id）のラベル（未登録ならキーをフォールバック表示）。
+  String filterLabel(String key) => filterLabels[key] ?? key;
 
   /// カテゴリのサブメニュー見出し（未登録なら enum 名をフォールバック表示）。
   String categoryLabel(VisionFilterCategory category) =>
@@ -96,11 +91,8 @@ class TrayMenuLabels {
 
   /// 統合フィルタ一覧の 1 行のラベル。色覚クイック選択の行は [filterLabel]
   /// （-omaly を区別）、それ以外は [catalogNames]（未登録なら id）。
-  String listEntryLabel({
-    required String catalogId,
-    ColorVisionType? colorVisionType,
-  }) =>
-      colorVisionType != null
-          ? filterLabel(colorVisionType)
-          : (catalogNames[catalogId] ?? catalogId);
+  String listEntryLabel({required String catalogId, String? variantId}) =>
+      isColorVisionQuickKey(variantId ?? catalogId)
+      ? filterLabel(variantId ?? catalogId)
+      : (catalogNames[catalogId] ?? catalogId);
 }

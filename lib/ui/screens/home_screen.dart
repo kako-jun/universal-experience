@@ -10,7 +10,6 @@ import '../../services/app_shortcuts.dart';
 import '../../services/color_vision_compare.dart';
 import '../../services/export_layers.dart';
 import '../../services/filter_list_selection.dart';
-import '../../services/filter_service.dart';
 import '../../services/image_source_state.dart';
 import '../../services/loupe_window_controller.dart';
 import '../../services/preview_selection.dart';
@@ -48,7 +47,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  FilterService? _filterService;
   VisionFilterState? _visionFilterStateForImageSource;
 
   /// 統合フィルタ一覧の検索語・カテゴリ・検索欄フォーカス（#72）。`/` で検索欄へ
@@ -69,35 +67,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Bridge FilterService selection changes into SettingsService so the last
-    // filter type is persisted (#17). Subscribe once.
-    //
-    // #60: this used to also mirror FilterService.currentFilter into
-    // VisionFilterState (the preview's single source of truth) via a
-    // listener here. That mirroring is gone — color-vision selection now
-    // updates both services directly, at the point of the user action
-    // (`lib/services/color_vision_selection.dart`'s `selectColorVision`/
-    // `deactivateColorVision`, called from the unified filter list, the tray, and
-    // `main.dart`'s startup restore). A listener-based mirror needs a
-    // postFrameCallback to avoid "setState() called during build" on first
-    // subscribe, and a "did the type actually change" guard to avoid
-    // clobbering an advanced/preset selection on every unrelated
-    // notification (e.g. dragging the intensity slider) — and even with
-    // that guard, re-tapping an already-current color chip after visiting
-    // advanced wouldn't resync, since the type itself hadn't changed. Direct
-    // updates at the call site need neither workaround.
-    final filterService = context.read<FilterService>();
-    if (!identical(filterService, _filterService)) {
-      _filterService?.removeListener(_persistFilterState);
-      _filterService = filterService;
-      _filterService!.addListener(_persistFilterState);
-    }
+    // （選択状態の保存は VisionFilterStore の責務で、この画面は関与しない。#60/#124）
 
     // #78: switch the preview's sample to the newly-selected filter's
     // recommendation whenever the selection changes (`ImageSourceState`
     // itself no-ops unless auto-follow is active and no user image is
-    // loaded — see that class's doc). Same subscribe-once pattern as
-    // `_filterService` above, on `VisionFilterState` instead.
+    // loaded — see that class's doc). Subscribe once.
     final visionState = context.read<VisionFilterState>();
     if (!identical(visionState, _visionFilterStateForImageSource)) {
       _visionFilterStateForImageSource
@@ -115,23 +90,8 @@ class _HomeScreenState extends State<HomeScreen> {
         );
   }
 
-  // Only filterType is persisted through SettingsService. Intensity lives in
-  // VisionFilterState's per-key strength memory and is persisted by
-  // VisionFilterStore (#57, #117) precisely so that dragging the slider — which
-  // fires this listener on every tick via FilterService.notifyListeners —
-  // never reaches SettingsService.notifyListeners, which the MaterialApp
-  // Consumer (main.dart) rebuilds on. setFilterType's own no-op guard (unchanged type)
-  // keeps this a no-op while only intensity is changing.
-  void _persistFilterState() {
-    final settings = context.read<SettingsService>();
-    final filterService = _filterService;
-    if (filterService == null) return;
-    settings.setFilterType(filterService.currentFilter);
-  }
-
   @override
   void dispose() {
-    _filterService?.removeListener(_persistFilterState);
     _visionFilterStateForImageSource?.removeListener(_followRecommendedSample);
     _browser.dispose();
     _shortcutFocus.dispose();
@@ -368,7 +328,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 中央「見る」: Before / After とサンプル切替（#72）。描画対象は常に
   /// [VisionFilterState] の現在の選択（#60）。strength は [previewStrength] に
-  /// 集約した判定に従う。[VisionFilterState.colorVisionType] も渡し、色覚
+  /// 集約した判定に従う。[VisionFilterState.focusedVariantId] も渡し、色覚
   /// クイック選択のときは見出し・export の caption・ファイル名に -omaly の
   /// 名前を正しく出す。
   ///
@@ -449,7 +409,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           filter: visionState.build(),
                           filterId: visionState.selectedId,
                           strength: strength,
-                          colorVisionType: visionState.colorVisionType,
+                          variantId: visionState.focusedVariantId,
                           // 層が複数のときだけ合成経路（#119）。1 層以下は従来の
                           // 単一フィルタ経路のまま。
                           steps: visionState.layers.length > 1

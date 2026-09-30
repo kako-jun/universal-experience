@@ -118,7 +118,7 @@ void main() {
       l10n,
       layers: layers.length > 1 ? layers : null,
       filterId: ids.last,
-      colorVisionType: null,
+      variantId: state.layers.last.variantId,
       filter: state.buildLayer(state.layers.last),
       strength: 1.0,
       isoDate: '2026-10-01',

@@ -846,7 +846,7 @@ void main() {
       await pressPasteShortcut(tester);
       await _waitUntil(tester, () => harness.imageSource.hasUserImage);
       await tester.pump();
-      harness.visionState.select('cataract');
+      harness.visionState.replaceWith('cataract');
       await tester.pump();
 
       expect(harness.imageSource.isUsingUserImage, isTrue,

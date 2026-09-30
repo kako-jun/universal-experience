@@ -1,4 +1,3 @@
-import '../models/disability_type.dart';
 import '../models/vision_filter_catalog.dart';
 import '../services/tray_menu_labels.dart';
 import '../services/vision_layer.dart';
@@ -7,77 +6,57 @@ import 'app_localizations.dart';
 
 /// 定義（enum / catalog id）→ 表示文言（i18n）の解決をここに集約する (#18)。
 ///
-/// 規律2（定義と表示文言を混ぜない）に従い、`ColorVisionType` /
+/// 規律2（定義と表示文言を混ぜない）に従い、カタログ id・別名 id /
 /// `VisionFilterCategory` / catalog の `id` といった
 /// **識別子** は文言を持たず、表示する側がこのマッピングで `AppLocalizations`
 /// から文字列を引く。UI（home_screen 等）とトレイ（起動時ロケールの
 /// AppLocalizations インスタンス）の両方がここを参照し、二重定義を避ける。
 
-/// [ColorVisionType] の表示名を解決する。
-String colorVisionTypeName(AppLocalizations l10n, ColorVisionType type) {
-  switch (type) {
-    case ColorVisionType.none:
-      return l10n.filterNormalVision;
-    case ColorVisionType.protanopia:
-      return l10n.filterProtanopia;
-    case ColorVisionType.deuteranopia:
-      return l10n.filterDeuteranopia;
-    case ColorVisionType.tritanopia:
-      return l10n.filterTritanopia;
-    case ColorVisionType.achromatopsia:
-      return l10n.filterAchromatopsia;
-    case ColorVisionType.protanomaly:
-      return l10n.filterProtanomaly;
-    case ColorVisionType.deuteranomaly:
-      return l10n.filterDeuteranomaly;
-    case ColorVisionType.tritanomaly:
-      return l10n.filterTritanomaly;
-  }
-}
-
-/// [ColorVisionType] の説明文を解決する。
-String colorVisionTypeDescription(AppLocalizations l10n, ColorVisionType type) {
-  switch (type) {
-    case ColorVisionType.none:
-      return l10n.filterNormalVisionDesc;
-    case ColorVisionType.protanopia:
+/// 色覚キー（カタログ id または別名 id、[isColorVisionQuickKey]）の説明文を解決する。
+/// 色覚クイック選択の 7 種以外は null。
+String? visionFilterDescription(AppLocalizations l10n, String key) {
+  switch (key) {
+    case 'protanopia':
       return l10n.filterProtanopiaDesc;
-    case ColorVisionType.deuteranopia:
+    case 'deuteranopia':
       return l10n.filterDeuteranopiaDesc;
-    case ColorVisionType.tritanopia:
+    case 'tritanopia':
       return l10n.filterTritanopiaDesc;
-    case ColorVisionType.achromatopsia:
+    case 'achromatopsia':
       return l10n.filterAchromatopsiaDesc;
-    case ColorVisionType.protanomaly:
+    case 'protanomaly':
       return l10n.filterProtanomalyDesc;
-    case ColorVisionType.deuteranomaly:
+    case 'deuteranomaly':
       return l10n.filterDeuteranomalyDesc;
-    case ColorVisionType.tritanomaly:
+    case 'tritanomaly':
       return l10n.filterTritanomalyDesc;
+    default:
+      return null;
   }
 }
 
-/// [ColorVisionType] の有病率（おおよその人口比）を解決する。
+/// 色覚キー（カタログ id または別名 id）の有病率（おおよその人口比）を解決する。
+/// 色覚クイック選択の 7 種以外は null。
 ///
 /// 統計値（数値・%）は i18n でも変えず、訳語のみローカライズする。
-String colorVisionTypePrevalence(AppLocalizations l10n, ColorVisionType type) {
-  switch (type) {
-    case ColorVisionType.none:
-      return l10n.prevalenceNormalVision;
-    case ColorVisionType.protanopia:
+String? visionFilterPrevalence(AppLocalizations l10n, String key) {
+  switch (key) {
+    case 'protanopia':
       return l10n.prevalenceProtanopia;
-    case ColorVisionType.deuteranopia:
+    case 'deuteranopia':
       return l10n.prevalenceDeuteranopia;
-    case ColorVisionType.tritanopia:
+    case 'tritanopia':
       return l10n.prevalenceTritanopia;
-    case ColorVisionType.achromatopsia:
+    case 'achromatopsia':
       return l10n.prevalenceAchromatopsia;
-    case ColorVisionType.protanomaly:
+    case 'protanomaly':
       return l10n.prevalenceProtanomaly;
-    case ColorVisionType.deuteranomaly:
+    case 'deuteranomaly':
       return l10n.prevalenceDeuteranomaly;
-    case ColorVisionType.tritanomaly:
+    case 'tritanomaly':
       return l10n.prevalenceTritanomaly;
+    default:
+      return null;
   }
 }
 
@@ -129,11 +108,18 @@ String sampleImageName(AppLocalizations l10n, String id) {
   }
 }
 
-/// Advanced カタログ id（snake_case）→ フィルタ表示名を解決する。
+/// Advanced カタログ id（snake_case）→ フィルタ表示名を解決する。別名 id（-omaly）も
+/// 引ける（カタログ id ではないが、強度の記憶・一覧の行のキーとして同じ位置に現れる）。
 ///
 /// id は sensus shaders 名と一致する安定識別子。表示名はここで i18n に写像する。
 String visionFilterName(AppLocalizations l10n, String id) {
   switch (id) {
+    case 'protanomaly':
+      return l10n.filterProtanomaly;
+    case 'deuteranomaly':
+      return l10n.filterDeuteranomaly;
+    case 'tritanomaly':
+      return l10n.filterTritanomaly;
     case 'protanopia':
       return l10n.filterProtanopia;
     case 'deuteranopia':
@@ -203,33 +189,25 @@ String visionFilterName(AppLocalizations l10n, String id) {
 /// after ペイン見出し・export の caption・ルーペ窓 HUD（`loupe_hud.dart`、#79）
 /// が共有する — 重複定義しない）。
 ///
-/// [colorVisionType] が非 null なら常にそれを優先する（[colorVisionTypeName]、
-/// -omaly の名前も正しく出る）。カタログ（[filterId]）は色覚を 5 種しか持たず、
-/// -omaly は対応する base の -opia と同じ id に写るため、[filterId] だけで
-/// 解決すると常に -opia の名前になってしまう。[colorVisionType] が null なら
-/// [filterId] からカタログの l10n 名（[visionFilterName]）を引く。どちらも
-/// null なら「原画」。
+/// [variantId] が非 null なら常にそれを優先する（-omaly の名前も正しく出る）。
+/// カタログ（[filterId]）は色覚を 5 種しか持たず、-omaly は対応する base の -opia と
+/// 同じ id に写るため、[filterId] だけで解決すると常に -opia の名前になってしまう。
+/// [variantId] が null なら [filterId] からカタログの l10n 名（[visionFilterName]）を引く。
+/// どちらも null なら「原画」。
 String visionFilterDisplayName(
   AppLocalizations l10n,
-  ColorVisionType? colorVisionType,
+  String? variantId,
   String? filterId,
 ) {
-  if (colorVisionType != null) {
-    return colorVisionTypeName(l10n, colorVisionType);
-  }
+  if (variantId != null) return visionFilterName(l10n, variantId);
   if (filterId == null) return l10n.previewPaneOriginal;
   return visionFilterName(l10n, filterId);
 }
 
 /// 重ねている 1 層の表示名（#120）。別名（-omaly）の層は別名の名前、それ以外は
 /// カタログの名前。チップ・調整パネルの節・見出し・HUD が共有する。
-String visionLayerDisplayName(AppLocalizations l10n, VisionLayer layer) {
-  final variant = layer.variantId;
-  final variantType = variant == null ? null : colorVisionTypeByName(variant);
-  return variantType != null
-      ? colorVisionTypeName(l10n, variantType)
-      : visionFilterName(l10n, layer.id);
-}
+String visionLayerDisplayName(AppLocalizations l10n, VisionLayer layer) =>
+    visionFilterName(l10n, layer.strengthKey);
 
 /// 表示名に入れる層の名前の数の上限。これを超えた分は「…（+N）」にまとめる。
 const int kLayerSummaryNamedCount = 2;
@@ -504,7 +482,7 @@ ConsultNotice? resolveConsultNotice(
 ///
 /// トレイは BuildContext を持てないため、`AppLocalizations.of(context)` ではなく
 /// `lookupAppLocalizations(locale)` で得たインスタンスをここに渡す。color-vision
-/// ラベルは [colorVisionTypeName]、「高度なフィルタ」サブメニュー（#65）の
+/// ラベルは [visionFilterName]（別名 id も含む）、「高度なフィルタ」サブメニュー（#65）の
 /// カテゴリ見出し・フィルタ名は [visionCategoryName]・[visionFilterName] で解決する。
 TrayMenuLabels trayMenuLabelsFrom(AppLocalizations l10n) {
   return TrayMenuLabels(
@@ -516,9 +494,11 @@ TrayMenuLabels trayMenuLabelsFrom(AppLocalizations l10n) {
     // トップレベルのクイック 4 型に加え、「高度なフィルタ」サブメニュー（#65）の
     // 色覚行（-omaly を含む 7 型）を全てカバーする。
     filterLabels: {
-      for (final type in ColorVisionType.values)
-        if (type != ColorVisionType.none)
-          type: colorVisionTypeName(l10n, type),
+      for (final key in [
+        ...kColorVisionQuickCatalogIds,
+        ...kVisionAliases.map((a) => a.id),
+      ])
+        key: visionFilterName(l10n, key),
     },
     advancedFilters: l10n.trayAdvancedFilters,
     categoryLabels: {

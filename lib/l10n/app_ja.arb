@@ -91,7 +91,6 @@
   "trayQuit": "終了",
   "trayAdvancedFilters": "高度なフィルタ",
 
-  "filterNormalVision": "正常色覚",
   "filterProtanopia": "1型2色覚（赤）",
   "filterProtanopiaDesc": "L錐体（赤を受け取る錐体）が欠けて起こる赤緑系の色覚特性です。",
   "filterDeuteranopia": "2型2色覚（緑）",
@@ -106,9 +105,7 @@
   "filterDeuteranomalyDesc": "M錐体の感度が弱まって起こる、もっとも多い赤緑系の色覚特性です。",
   "filterTritanomaly": "3型3色覚（青）",
   "filterTritanomalyDesc": "S錐体の感度が弱まって起こる、軽めの青黄系の色覚特性です。",
-  "filterNormalVisionDesc": "シミュレーションを適用していない、通常の色覚です。",
 
-  "prevalenceNormalVision": "男性の約92%、女性の約99.5%",
   "prevalenceProtanopia": "男性の約1%、女性の約0.01%",
   "prevalenceDeuteranopia": "男性の約1%、女性の約0.01%",
   "prevalenceTritanopia": "約0.001%（ごくまれ）",

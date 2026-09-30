@@ -1,7 +1,7 @@
 // FilterBrowser の多選択（チェック式の一覧、#120）の widget test。
 //
 // 行のチェックで層が足される/外れる・適用順の番号バッジ・色覚グループの排他（ラジオ式）・
-// 上限での無効化と理由・体験プリセットの置き換えと点灯条件・FilterService の同期を確認する。
+// 上限での無効化と理由・体験プリセットの置き換えと点灯条件・別名（-omaly）の variantId と強度を確認する。
 // 選択の正本は VisionFilterState のまま（一覧は表示と入口だけを持つ）。
 
 import 'dart:ui' show CheckedState, Tristate;
@@ -12,9 +12,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
@@ -29,7 +27,6 @@ void main() {
   tearDown(resetHomeScreenFixtures);
 
   late FilterBrowserController controller;
-  late FilterService filterService;
   late VisionFilterState state;
 
   Future<void> pumpBrowser(WidgetTester tester, {String locale = 'ja'}) async {
@@ -40,12 +37,10 @@ void main() {
     controller = FilterBrowserController();
     addTearDown(controller.dispose);
     state = VisionFilterState();
-    filterService = FilterService(visionState: state);
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: state),
         ],
         child: MaterialApp(
@@ -266,32 +261,37 @@ void main() {
       expect(badgeOf('cv:deuteranomaly', '2'), findsOneWidget);
     });
 
-    testWidgets('色覚を選ぶと FilterService の色覚型も同期し、外すと none に戻る', (tester) async {
+    testWidgets('別名（-omaly）の行は variantId と既定強度 0.6 の層になり、外すと消える',
+        (tester) async {
       await pumpBrowser(tester);
       await tapRow(tester, 'catalog:myopia');
-      expect(filterService.currentFilter, ColorVisionType.none);
+      expect(state.layers.single.variantId, isNull);
 
       await tapRow(tester, 'cv:tritanomaly');
-      expect(filterService.currentFilter, ColorVisionType.tritanomaly);
-      // 色覚の強度スライダーが読む値も、層の強度と同じ記憶を指す。
+      final layer = state.layers.last;
+      expect(layer.id, 'tritanopia');
+      expect(layer.variantId, 'tritanomaly');
+      expect(layer.strengthKey, 'tritanomaly');
+      expect(state.strengthOf(layer), closeTo(kAnomalyDefaultSeverity, 1e-9));
+      // 強度スライダーが読む値は、層の強度と同じ記憶（別名のキー）を指す。
       state.setLayerStrength('tritanopia', 0.35);
-      expect(filterService.intensity, closeTo(0.35, 1e-9));
+      expect(state.strengthForKey('tritanomaly'), closeTo(0.35, 1e-9));
+      expect(state.strengthOf(state.layers.last), closeTo(0.35, 1e-9));
 
       await tapRow(tester, 'cv:tritanomaly');
-      expect(filterService.currentFilter, ColorVisionType.none);
       expect(layerIds(), ['myopia']);
     });
 
     testWidgets(
-        'カタログ側の色覚グループの行（tetrachromacy）が色覚層を置き換えると FilterService は none に戻る',
+        'カタログ側の色覚グループの行（tetrachromacy）が色覚層を置き換えると色覚の層は消える',
         (tester) async {
       await pumpBrowser(tester);
       await tapRow(tester, 'cv:protanopia');
-      expect(filterService.currentFilter, ColorVisionType.protanopia);
+      expect(layerIds(), ['protanopia']);
 
       await tapRow(tester, 'catalog:tetrachromacy');
       expect(layerIds(), ['tetrachromacy']);
-      expect(filterService.currentFilter, ColorVisionType.none);
+      expect(state.layers.single.variantId, isNull);
     });
   });
 

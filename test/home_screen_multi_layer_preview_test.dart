@@ -17,14 +17,13 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/sample_catalog.dart';
 import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
-import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/preview_selection.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 
+import 'support/color_vision_select.dart';
 import 'support/home_screen_harness.dart';
 import 'support/sample_image_generator.dart';
 
@@ -210,13 +209,12 @@ void main() {
       expect(currentPreview(tester).steps, hasLength(2));
     });
 
-    testWidgets('フォーカスが動かず steps だけ変わる更新（FilterService 経由の強度）でも合成が再実行される',
+    testWidgets('フォーカスが動かず steps だけ変わる更新（フォーカス外の層の強度）でも合成が再実行される',
         (tester) async {
       await installFakes(tester);
       final h = await pumpHomeScreen(tester, size: wide);
-      // 色覚 quick（protanopia）を足してから myopia を足す。フォーカスは myopia。
-      selectColorVision(
-          h.filterService, h.visionState, ColorVisionType.protanopia);
+      // 色覚（protanopia）を足してから myopia を足す。フォーカスは myopia。
+      selectColorVisionKey(h.visionState, 'protanopia');
       h.visionState.toggle('myopia');
       await settle(tester);
       expect(h.visionState.focusedId, 'myopia');
@@ -225,9 +223,9 @@ void main() {
       final focusedFilter = currentPreview(tester).filter;
       final focusedStrength = currentPreview(tester).strength;
 
-      // 色覚スライダー相当の経路。フォーカス中の層（myopia）の強度・filter は変わらず、
-      // protanopia の強度だけが変わる。
-      h.filterService.setIntensity(0.3);
+      // フォーカス外の層の強度の記憶だけを変える（フォーカス・選択は動かさない入口）。
+      // フォーカス中の層（myopia）の強度・filter は変わらず、protanopia の強度だけが変わる。
+      h.visionState.setStrengthForKey('protanopia', 0.3);
       await settle(tester);
 
       expect(h.visionState.focusedId, 'myopia');

@@ -127,7 +127,7 @@ String _sanitizeForFilename(String raw) {
 /// [composeExportImage] に焼き込むキャプション（**解決済み i18n 文字列**）。
 ///
 /// service を pure に保つため、enum/id ではなく既にローカライズされた文字列を受ける。
-/// 文言の解決（`colorVisionTypeName` / `resolveConsultNotice` / 強度ラベル /
+/// 文言の解決（`visionFilterDisplayName` / `resolveConsultNotice` / 強度ラベル /
 /// `isoDate`）は呼び出し側（UI、`before_after_view.dart`）の責務。
 class ExportCaption {
   const ExportCaption({

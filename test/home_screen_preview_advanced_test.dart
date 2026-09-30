@@ -1,10 +1,10 @@
-// HomeScreen のプレビュー（_previewCard の Consumer2<VisionFilterState,
-// FilterService> → BeforeAfterView）が、advanced カタログ（VisionFilterState）の
+// HomeScreen のプレビュー（_previewCard の Consumer<VisionFilterState>
+// → BeforeAfterView）が、advanced カタログ（VisionFilterState）の
 // 選択・パラメータ変更に追従することの回帰テスト（#60）。
 //
 // #60 修正の要点は「プレビューの描画対象を VisionFilterState の現在の選択
 // （VisionFilter + payload + strength）に一本化する」こと。advanced カタログの
-// 選択（統合フィルタ一覧が呼ぶ `VisionFilterState.select`）が
+// 選択（統合フィルタ一覧が呼ぶ `VisionFilterState.replaceWith`）が
 // BeforeAfterView.filter/filterId に反映されること、payload の変更
 // （FilterParamPanel が呼ぶ `VisionFilterState.setParam`）が新しい filter
 // インスタンス（payload 込みの値等価）として反映されることを確認する。
@@ -15,11 +15,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
-import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/filter_list_selection.dart';
 import 'package:universal_experience/main.dart' show WindowModeUiContext;
-import 'package:universal_experience/services/color_vision_selection.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/hotkey_service.dart';
 import 'package:universal_experience/services/image_source_state.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
@@ -32,6 +30,7 @@ import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
 
 import 'support/vision_filter_metadata_fixture.dart';
+import 'support/color_vision_select.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -60,13 +59,11 @@ void main() {
     final settings = SettingsService();
     await settings.load();
     final visionState = VisionFilterState();
-    final filterService = FilterService(visionState: visionState);
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider<SettingsService>.value(value: settings),
-          ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
           ChangeNotifierProvider<ImageSourceState>(
             create: (_) => ImageSourceState(),
@@ -104,7 +101,7 @@ void main() {
 
     // advanced カタログから starbursts を選択する（統合フィルタ一覧の行と同じ
     // 呼び出し）。
-    visionState.select('starbursts');
+    visionState.replaceWith('starbursts');
     await tester.pump();
 
     expect(currentPreview().filterId, 'starbursts');
@@ -134,14 +131,12 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final settings = SettingsService();
     await settings.load();
-    final visionState = VisionFilterState()..select('cataract');
-    final filterService = FilterService(visionState: visionState);
+    final visionState = VisionFilterState()..replaceWith('cataract');
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider<SettingsService>.value(value: settings),
-          ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
           ChangeNotifierProvider<ImageSourceState>(
             create: (_) => ImageSourceState(),
@@ -183,7 +178,7 @@ void main() {
 
   testWidgets(
       '色覚クイック選択 → advanced → 別の色覚クイック選択、と切り替えても '
-      '#57 のタイプ別強度記憶は壊れない（#60）', (WidgetTester tester) async {
+      '#57 のキー別強度記憶は壊れない（#60）', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 4000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -192,13 +187,11 @@ void main() {
     final settings = SettingsService();
     await settings.load();
     final visionState = VisionFilterState();
-    final filterService = FilterService(visionState: visionState);
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider<SettingsService>.value(value: settings),
-          ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
           ChangeNotifierProvider<ImageSourceState>(
             create: (_) => ImageSourceState(),
@@ -231,38 +224,37 @@ void main() {
         tester.widget<BeforeAfterView>(find.byType(BeforeAfterView));
 
     // 1. protanomaly を色覚クイック選択で選び、強度を独自の値に変える
-    //    （#57 のタイプ別記憶）。selectColorVision は統合フィルタ一覧・トレイ
-    //    共通の入口（#60）。
-    selectColorVision(filterService, visionState, ColorVisionType.protanomaly);
+    //    （#57 のキー別記憶）。統合フィルタ一覧・トレイ共通の入口は
+    //    VisionFilterState.replaceWith（#60）。
+    selectColorVisionKey(visionState, 'protanomaly');
     await tester.pump();
-    expect(visionState.isColorQuickSelection, isTrue);
-    expect(currentPreview().strength, filterService.intensity);
-    filterService.setIntensity(0.25);
+    expect(visionState.focusedVariantId, 'protanomaly');
+    expect(currentPreview().strength, visionState.strength);
+    visionState.setStrength(0.25);
     await tester.pump();
     expect(currentPreview().strength, 0.25);
 
-    // 2. advanced（starbursts）へ切り替える。色覚クイック選択の記憶
-    //    （FilterService 側）には触れない。
-    visionState.select('starbursts');
+    // 2. advanced（starbursts）へ切り替える。色覚クイック選択の強度の記憶
+    //    （strengthByKey）には触れない。
+    visionState.replaceWith('starbursts');
     await tester.pump();
-    expect(visionState.isColorQuickSelection, isFalse);
+    expect(visionState.focusedVariantId, isNull);
     expect(currentPreview().filterId, 'starbursts');
     expect(currentPreview().strength, visionState.strength);
 
     // 3. 別の色覚クイック選択（deuteranomaly）に切り替える。プレビューは
     //    deuteranomaly の色覚フィルタに戻り、protanomaly で覚えた強度
     //    （0.25）はそのまま残っている（#57 の記憶がここで巻き戻らない）はず。
-    selectColorVision(
-        filterService, visionState, ColorVisionType.deuteranomaly);
+    selectColorVisionKey(visionState, 'deuteranomaly');
     await tester.pump();
-    expect(visionState.isColorQuickSelection, isTrue);
+    expect(visionState.focusedVariantId, 'deuteranomaly');
     expect(currentPreview().filterId, 'deuteranopia');
-    expect(currentPreview().strength, filterService.intensity);
-    // deuteranomaly は初めて選んだので recommendedStrength（anomaly 既定値）。
+    expect(currentPreview().strength, visionState.strength);
+    // deuteranomaly は初めて選んだので既定強度（anomaly 既定値）。
     expect(currentPreview().strength, kAnomalyDefaultSeverity);
 
     // 4. protanomaly に戻ると、advanced を経由しても 0.25 の記憶は壊れていない。
-    selectColorVision(filterService, visionState, ColorVisionType.protanomaly);
+    selectColorVisionKey(visionState, 'protanomaly');
     await tester.pump();
     expect(currentPreview().strength, 0.25);
   });
@@ -287,13 +279,11 @@ void main() {
     final settings = SettingsService();
     await settings.load();
     final visionState = VisionFilterState();
-    final filterService = FilterService(visionState: visionState);
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider<SettingsService>.value(value: settings),
-          ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
           ChangeNotifierProvider<ImageSourceState>(
             create: (_) => ImageSourceState(),
@@ -344,28 +334,28 @@ void main() {
     expect(currentPreview().filterId, 'protanopia');
     expect(protanopiaRowSelected(), isTrue);
 
-    // 2. プリセット（meniere）をタップする。色覚クイック選択の記憶は
-    //    FilterService 側に残るが、プレビュー・チップの点灯は advanced/
-    //    プリセット側に切り替わる（#60: isColorQuickSelection から導く）。
+    // 2. プリセット（meniere）をタップする。層が vertigo 1 つに置き換わるので、
+    //    プレビュー・行の点灯は色覚からプリセット側に切り替わる（#60）。
     await tester.tap(find.text(en.experienceMeniere));
     await tester.pump();
 
     expect(currentPreview().filterId, 'vertigo');
-    expect(visionState.isColorQuickSelection, isFalse);
+    expect(visionState.layers.map((l) => l.id), ['vertigo']);
     expect(protanopiaRowSelected(), isFalse,
         reason: 'advanced/プリセットを見ている間は色覚の行を点灯させない（#60）');
 
     // 3. protanopia の行に戻す。以前の実装（listener ミラー + 直前の型との
-    //    差分検知）は、FilterService.currentFilter がプリセット遷移中も
-    //    ずっと protanopia のままだったため、この再タップに反応せず
-    //    VisionFilterState が更新されなかった（#60）。
-    //    selectColorVision はタップの都度、無条件に両方のサービスを更新する
-    //    ため、この再タップでも正しく反映される。
+    //    差分検知）は、プリセット遷移中も直前の型が protanopia のままだったため、
+    //    この再タップに反応せず VisionFilterState が更新されなかった（#60）。
+    //    今は行のタップが無条件に VisionFilterState を更新するため、この
+    //    再タップでも正しく反映される。
     await tester.tap(protanopiaRow());
     await tester.pump();
 
+    // 行のタップは層の追加（トグル）なので、プリセットの層は残ったまま色覚が加わる。
     expect(currentPreview().filterId, 'protanopia');
-    expect(visionState.isColorQuickSelection, isTrue);
+    expect(visionState.layers.map((l) => l.id), ['vertigo', 'protanopia']);
+    expect(visionState.focusedId, 'protanopia');
     expect(protanopiaRowSelected(), isTrue);
   });
 
@@ -379,13 +369,11 @@ void main() {
     final settings = SettingsService();
     await settings.load();
     final visionState = VisionFilterState();
-    final filterService = FilterService(visionState: visionState);
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider<SettingsService>.value(value: settings),
-          ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
           ChangeNotifierProvider<ImageSourceState>(
             create: (_) => ImageSourceState(),

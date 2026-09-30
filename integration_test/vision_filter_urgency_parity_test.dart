@@ -62,7 +62,7 @@ void main() {
       testWidgets(
           '${entry.id}: 実ブリッジで例外なく取得でき、recommended_strength は (0.0, 1.0]',
           (tester) async {
-        final state = VisionFilterState()..select(entry.id);
+        final state = VisionFilterState()..replaceWith(entry.id);
         final filter = state.build();
         expect(filter, isNotNull, reason: '${entry.id} が build() できなかった');
 
@@ -85,7 +85,7 @@ void main() {
         (tester) async {
       final nonEmptyIds = <String>[];
       for (final entry in kVisionFilterCatalog) {
-        final state = VisionFilterState()..select(entry.id);
+        final state = VisionFilterState()..replaceWith(entry.id);
         final filter = state.build()!;
         if (visionFilterUrgencyEscalation(filter: filter).isNotEmpty) {
           nonEmptyIds.add(entry.id);
@@ -116,7 +116,7 @@ void main() {
       };
       final cited = <String>{};
       for (final entry in kVisionFilterCatalog) {
-        final filter = (VisionFilterState()..select(entry.id)).build()!;
+        final filter = (VisionFilterState()..replaceWith(entry.id)).build()!;
         expect(visionFilterLimitations(filter: filter).trim(), isNotEmpty,
             reason: entry.id);
         final citation = visionFilterCitation(filter: filter);
@@ -129,7 +129,7 @@ void main() {
 
     testWidgets('代表: 色覚 3 型は Machado 2009 を出典に持ち、四色覚は出典なし', (tester) async {
       String? citationOf(String id) => visionFilterCitation(
-          filter: (VisionFilterState()..select(id)).build()!);
+          filter: (VisionFilterState()..replaceWith(id)).build()!);
 
       expect(citationOf('protanopia'), contains('Machado'));
       expect(citationOf('deuteranopia'), contains('Machado'));
@@ -145,7 +145,7 @@ void main() {
       final presetUrgency =
           experiences().firstWhere((e) => e.id == 'bppv').urgency;
 
-      final state = VisionFilterState()..select('bppv_rotation');
+      final state = VisionFilterState()..replaceWith('bppv_rotation');
       final advancedUrgency = visionFilterUrgency(filter: state.build()!);
 
       expect(presetUrgency, Urgency.none);
@@ -164,7 +164,7 @@ void main() {
     testWidgets('色覚・屈折は none、突然の半盲・前庭神経炎は emergency、緑内障は earlyConsultation',
         (tester) async {
       Urgency urgencyOf(String id) {
-        final state = VisionFilterState()..select(id);
+        final state = VisionFilterState()..replaceWith(id);
         return visionFilterUrgency(filter: state.build()!);
       }
 
@@ -190,7 +190,7 @@ void main() {
       final conditions = <String>{};
 
       for (final entry in kVisionFilterCatalog) {
-        final state = VisionFilterState()..select(entry.id);
+        final state = VisionFilterState()..replaceWith(entry.id);
         final filter = state.build()!;
         for (final e in visionFilterUrgencyEscalation(filter: filter)) {
           conditions.add(e.condition);

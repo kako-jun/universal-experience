@@ -1,7 +1,7 @@
 // VisionLayer と層の列の不変条件（#117）のテスト。
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/models/vision_filter_stage.dart';
 import 'package:universal_experience/services/vision_layer.dart';
 
@@ -26,50 +26,66 @@ void main() {
       expect(() => layer.params['seed'] = BigInt.two, throwsUnsupportedError);
     });
 
-    test('copyWith は id・別名を保ち、params と origin だけ差し替える', () {
-      final layer = VisionLayer(
-        id: 'protanopia',
-        variantId: 'protanomaly',
-        origin: VisionLayerOrigin.quick,
-      );
-      final copy = layer.copyWith(origin: VisionLayerOrigin.advanced);
+    test('copyWith は id・別名を保ち、params だけ差し替える', () {
+      final layer = VisionLayer(id: 'protanopia', variantId: 'protanomaly');
+      final copy = layer.copyWith(params: const {'x': 1});
 
       expect(copy.id, 'protanopia');
       expect(copy.variantId, 'protanomaly');
-      expect(copy.origin, VisionLayerOrigin.advanced);
-      expect(layer.origin, VisionLayerOrigin.quick);
+      expect(copy.params, {'x': 1});
+      expect(layer.params, isEmpty);
     });
   });
 
-  group('色覚型との対応', () {
-    test('-opia 4 種の quick 層は id = 型名で別名なし、-omaly は別名つき', () {
-      for (final type in [
-        ColorVisionType.protanopia,
-        ColorVisionType.deuteranopia,
-        ColorVisionType.tritanopia,
-        ColorVisionType.achromatopsia,
+  group('色覚キーとの対応', () {
+    test('-opia 4 種のキーはカタログ id そのもので別名なし、-omaly は別名つき', () {
+      for (final key in [
+        'protanopia',
+        'deuteranopia',
+        'tritanopia',
+        'achromatopsia',
       ]) {
-        final layer = quickColorVisionLayer(type)!;
-        expect(layer.id, type.name);
-        expect(layer.variantId, isNull);
-        expect(layer.origin, VisionLayerOrigin.quick);
-        expect(quickColorVisionTypeOf(layer), type);
+        final target = resolveVisionKey(key)!;
+        expect(target.id, key);
+        expect(target.variantId, isNull);
+        expect(VisionLayer(id: target.id).strengthKey, key);
       }
-      final omaly = quickColorVisionLayer(ColorVisionType.tritanomaly)!;
+      final omaly = resolveVisionKey('tritanomaly')!;
       expect(omaly.id, 'tritanopia');
       expect(omaly.variantId, 'tritanomaly');
-      expect(quickColorVisionTypeOf(omaly), ColorVisionType.tritanomaly);
+      expect(
+        VisionLayer(id: omaly.id, variantId: omaly.variantId).strengthKey,
+        'tritanomaly',
+      );
     });
 
-    test('none は層を作らず、quick でない層は色覚型を返さない', () {
-      expect(quickColorVisionLayer(ColorVisionType.none), isNull);
-      expect(quickColorVisionTypeOf(VisionLayer(id: 'protanopia')), isNull);
+    test('色覚 7 種のクイックキーは isColorVisionQuickKey が真、none と他の id は偽', () {
+      for (final key in [
+        'protanopia',
+        'deuteranopia',
+        'tritanopia',
+        'achromatopsia',
+        'protanomaly',
+        'deuteranomaly',
+        'tritanomaly',
+      ]) {
+        expect(isColorVisionQuickKey(key), isTrue, reason: key);
+      }
+      expect(isColorVisionQuickKey('none'), isFalse);
+      expect(isColorVisionQuickKey('myopia'), isFalse);
     });
 
-    test('colorVisionTypeByName は none と未知の名前を引かない', () {
-      expect(colorVisionTypeByName('protanomaly'), ColorVisionType.protanomaly);
-      expect(colorVisionTypeByName('none'), isNull);
-      expect(colorVisionTypeByName('myopia'), isNull);
+    test('resolveVisionKey は未知のキーを引かず、none も引かない', () {
+      expect(resolveVisionKey('none'), isNull);
+      expect(resolveVisionKey('removed_in_sensus'), isNull);
+      expect(resolveVisionKey('myopia')!.variantId, isNull);
+    });
+
+    test('既定強度は -opia が 1.0、-omaly が 0.6、それ以外は null', () {
+      expect(colorVisionDefaultStrength('protanopia'), 1.0);
+      expect(colorVisionDefaultStrength('deuteranomaly'),
+          kAnomalyDefaultSeverity);
+      expect(colorVisionDefaultStrength('myopia'), isNull);
     });
 
     test('isValidVariantFor は対応する -opia の別名だけを許す', () {
@@ -95,7 +111,7 @@ void main() {
     });
 
     test('未知の id を捨て、重複は先のものを残す', () {
-      final a = VisionLayer(id: 'myopia', origin: VisionLayerOrigin.advanced);
+      final a = VisionLayer(id: 'myopia', params: const {'y': 2});
       final b = VisionLayer(id: 'myopia', params: const {'x': 1});
       final out = normalizeVisionLayers([
         VisionLayer(id: 'removed_in_sensus'),

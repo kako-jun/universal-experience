@@ -8,7 +8,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
@@ -23,12 +22,10 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late VisionFilterState state;
-  late FilterService filterService;
 
   setUp(() {
     installVisionFilterMetadataFixture();
     state = VisionFilterState();
-    filterService = FilterService(visionState: state);
   });
   tearDown(resetVisionFilterMetadataProviders);
 
@@ -39,7 +36,6 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: state),
         ],
         child: const MaterialApp(

@@ -2,30 +2,27 @@
 // （= それを購読する MaterialApp の Consumer, main.dart, が再構築されない）ことの
 // 回帰テスト（#57）。
 //
-// 元のバグ: HomeScreen._persistFilterState は FilterService の notifyListeners
-// （スライダー 1 目盛りごとに setIntensity が発火する）のたびに
-// SettingsService.setFilterType / setIntensity の両方を呼んでいた。
-// setIntensity は値が変わるたび notifyListeners するため、それを購読する
-// MaterialApp（main.dart の Consumer<SettingsService>）が毎回まるごと再構築
-// されていた。#57 で intensity の管理・通知・永続化を FilterService 自身に
-// 移し、HomeScreen からは setFilterType の呼び出しだけが残った（型が変わって
-// いなければ SettingsService 側の no-op ガードで notify もされない）。
+// 元のバグ: スライダー 1 目盛りごとに発火する強度の変更が、SettingsService の
+// 書き込みと notifyListeners まで波及し、それを購読する MaterialApp
+// （main.dart の Consumer<SettingsService>）が毎回まるごと再構築されていた。
+// 強度の正本は VisionFilterState のキーごとの記憶で、永続化は VisionFilterStore
+// （#65, #124）が担うため、SettingsService（テーマ・言語・バナーだけ）へは
+// 一切届かない。
 //
-// UniversalExperienceApp は main.dart 側で 1 つだけ生成するトップレベル
-// `filterService`（トレイと共有、#15）を Provider 経由で使うため、ここでも
+// UniversalExperienceApp は main.dart 側で 1 つだけ生成するトップレベルの
+// `visionFilterState`（トレイと共有、#15）を Provider 経由で使うため、ここでも
 // それをそのまま使う（widget_test.dart のスモークテストと同じ構成）。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/main.dart';
-import 'package:universal_experience/models/disability_type.dart';
-import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
 import 'support/vision_filter_metadata_fixture.dart';
+import 'support/color_vision_select.dart';
 
 void main() {
   setUp(() {
@@ -50,15 +47,8 @@ void main() {
     await settings.load();
 
     // スライダーを操作可能にするため、フィルタを選択しておく（何も選んでいないと
-    // 調整パネルにスライダーが出ない）。main() では buildRootApp() が selectColorVision
-    // （FilterService と VisionFilterState の両方を更新する唯一の
-    // 入口、#60）で filterService/visionFilterState と settings.filterType を
-    // 揃えて起動するので、ここでもテスト対象外の初期同期として揃えておく
-    // （揃えないと、最初の 1 回だけ HomeScreen._persistFilterState の
-    // setFilterType が「none → protanopia」の実変更として notify してしまい、
-    // これから見たい「intensity だけを動かしたとき」の挙動と混ざってしまう）。
-    selectColorVision(filterService, visionFilterState, ColorVisionType.protanopia);
-    await settings.setFilterType(ColorVisionType.protanopia);
+    // 調整パネルにスライダーが出ない）。
+    selectColorVisionKey(visionFilterState, 'protanopia');
 
     await tester.pumpWidget(UniversalExperienceApp(settings: settings));
     await tester.pump();
@@ -73,7 +63,7 @@ void main() {
     var settingsNotified = 0;
     settings.addListener(() => settingsNotified++);
 
-    final intensityBefore = filterService.intensity;
+    final strengthBefore = visionFilterState.strength;
     // ドラッグ前後で MaterialApp の Element/Widget インスタンスが同一のままか
     // （= 作り直されていないか）を確認する。単に見た目が変わらないだけでは
     // 「再構築されていない」ことの証明にならないため、インスタンス同一性
@@ -89,24 +79,24 @@ void main() {
     await tester.drag(sliderFinder, const Offset(40, 0));
     await tester.pump();
 
-    // FilterService 自身の intensity 永続化はデバウンスされる（既定 300ms）。
+    // VisionFilterStore 側の永続化はデバウンスされる（既定 300ms）。
     // そのデバウンス Timer が発火してもなお SettingsService には波及しない
     // ことまで確認する。
     await tester.pump(const Duration(milliseconds: 400));
 
-    // ドラッグが実際に intensity を動かしたこと自体を確認する（動かせていない
+    // ドラッグが実際に強度を動かしたこと自体を確認する（動かせていない
     // 操作なら、notify が 0 であることに意味がない）。
-    final intensityAfter = filterService.intensity;
+    final strengthAfter = visionFilterState.strength;
     expect(
-      intensityAfter,
-      isNot(equals(intensityBefore)),
-      reason: 'ドラッグ操作そのものが intensity を実際に変えていることの前提確認',
+      strengthAfter,
+      isNot(equals(strengthBefore)),
+      reason: 'ドラッグ操作そのものが強度を実際に変えていることの前提確認',
     );
 
     expect(
       settingsNotified,
       0,
-      reason: 'intensity の変更は FilterService 側だけで完結し、SettingsService '
+      reason: '強度の変更は VisionFilterState 側だけで完結し、SettingsService '
           '（延いては MaterialApp の Consumer）へは伝播しないはず',
     );
 

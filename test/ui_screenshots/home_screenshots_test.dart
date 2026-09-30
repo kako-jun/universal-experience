@@ -51,12 +51,9 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/main.dart' show WindowModeUiContext;
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/sample_catalog.dart';
 import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
-import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/export_service.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/hotkey_service.dart';
 import 'package:universal_experience/services/image_source_state.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
@@ -71,6 +68,7 @@ import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
 import '../support/screenshot_harness.dart';
 import '../support/vision_filter_metadata_fixture.dart';
+import '../support/color_vision_select.dart';
 
 /// sensus の experiences() と同じ id / vision / hearing / urgency の 4 体験
 /// （実ブリッジは native lib が要るため fixture で代替。experience_presets_test と同じ）。
@@ -263,16 +261,11 @@ void main() {
     final settings = SettingsService();
     await settings.load();
     final visionState = VisionFilterState();
-    final filterService = FilterService(visionState: visionState);
     final imageSourceState = ImageSourceState();
     // 初回起動と同じ状態: 2型3色覚（deuteranomaly）を推奨サンプルで選択。
-    selectColorVision(
-      filterService,
-      visionState,
-      ColorVisionType.deuteranomaly,
-    );
+    selectColorVisionKey(visionState, 'deuteranomaly');
     if (advancedFilterId != null) {
-      visionState.select(advancedFilterId);
+      visionState.replaceWith(advancedFilterId);
       if (strength != null) visionState.setStrength(strength);
     }
     if (preset != null) visionState.selectPreset(preset.$1, preset.$2);
@@ -293,7 +286,6 @@ void main() {
         child: MultiProvider(
           providers: [
             ChangeNotifierProvider<SettingsService>.value(value: settings),
-            ChangeNotifierProvider<FilterService>.value(value: filterService),
             ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
             ChangeNotifierProvider<ImageSourceState>.value(
               value: imageSourceState,

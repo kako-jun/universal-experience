@@ -356,10 +356,6 @@
     "description": "Tray submenu title that groups every filter by category (advanced filters and all color-vision types)."
   },
 
-  "filterNormalVision": "Normal vision",
-  "@filterNormalVision": {
-    "description": "Color-vision type: no deficiency."
-  },
   "filterProtanopia": "Protanopia",
   "filterProtanopiaDesc": "Red-green color blindness caused by absent L-cones (red receptors).",
   "filterDeuteranopia": "Deuteranopia",
@@ -374,12 +370,7 @@
   "filterDeuteranomalyDesc": "Partial red-green deficiency with weakened M-cones (the most common form).",
   "filterTritanomaly": "Tritanomaly",
   "filterTritanomalyDesc": "Partial blue-yellow deficiency with weakened S-cones.",
-  "filterNormalVisionDesc": "Normal color vision with no simulation applied.",
 
-  "prevalenceNormalVision": "~92% of males, ~99.5% of females",
-  "@prevalenceNormalVision": {
-    "description": "Approximate population prevalence for the normal-vision (no deficiency) type. Statistics must not be altered when translating."
-  },
   "prevalenceProtanopia": "~1% of males, ~0.01% of females",
   "@prevalenceProtanopia": {
     "description": "Approximate population prevalence for protanopia. Statistics must not be altered when translating."

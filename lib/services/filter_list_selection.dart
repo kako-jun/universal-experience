@@ -4,33 +4,28 @@ import 'package:flutter/foundation.dart';
 
 import '../l10n/app_localizations.dart';
 import '../l10n/l10n_extensions.dart';
-import '../models/disability_type.dart';
 import '../models/vision_filter_catalog.dart';
-import 'color_vision_selection.dart';
-import 'filter_service.dart';
 import 'vision_filter_state.dart';
 import 'vision_layer.dart';
 
-/// 統合フィルタ一覧（#72）の 1 行。色覚 7 型と advanced 30 フィルタを**同じ
+/// 統合フィルタ一覧（#72）の 1 行。色覚 7 種と advanced 30 フィルタを**同じ
 /// 一覧**に並べるための純粋なデータ（Widget もサービスの状態も持たない）。
 ///
-/// 一覧は 33 行になる: advanced カタログ 30 件 + 色覚クイック選択にしか無い
-/// 3 型（protanomaly / deuteranomaly / tritanomaly）。色覚 4 型（protanopia /
-/// deuteranopia / tritanopia / achromatopsia）はカタログにも同名の行があるが、
-/// 一覧では 1 行にまとめ、選ぶと従来どおり色覚クイック選択の入口
-/// （[selectColorVision]。強度は `VisionFilterState` のキーごとの記憶、#117）を通る。
-/// カタログだけにあるもの（tetrachromacy 等）は `VisionFilterState.select`。
-/// **書き込みの入口は変えない**（`VisionFilterState` が唯一の正本のまま）。
+/// 一覧は 33 行になる: advanced カタログ 30 件 + 別名（-omaly、`kVisionAliases`）の 3 行。
+/// 別名の行は対応する -opia のカタログ id に写り、[variantId] で区別する。どの行も
+/// 選ぶと `VisionFilterState.toggle`（カタログ id と別名 id）を通る。
+/// **書き込みの入口は 1 つ**（`VisionFilterState` が唯一の正本）。
 @immutable
 class FilterListEntry {
   const FilterListEntry({
     required this.key,
     required this.category,
     required this.catalogId,
-    this.colorVisionType,
+    this.variantId,
   });
 
-  /// 一覧内で一意な安定キー（テストの `Key` にも使う）。
+  /// 一覧内で一意な安定キー（テストの `Key` にも使う）。色覚クイック選択の 7 種は
+  /// `cv:<別名 id ?? カタログ id>`、それ以外は `catalog:<カタログ id>`。
   final String key;
 
   /// 所属カテゴリ（カテゴリ切替の絞り込み条件）。
@@ -39,8 +34,11 @@ class FilterListEntry {
   /// 対応するカタログ id（-omaly は base の -opia と同じ id に写る）。
   final String catalogId;
 
-  /// 色覚クイック選択で選ぶ行なら、その [ColorVisionType]。advanced だけの行は null。
-  final ColorVisionType? colorVisionType;
+  /// 別名（-omaly）の行なら、その別名 id。別名でなければ null。
+  final String? variantId;
+
+  /// 強度の記憶のキー（別名 id ?? カタログ id）。
+  String get strengthKey => variantId ?? catalogId;
 
   @override
   bool operator ==(Object other) =>
@@ -55,39 +53,29 @@ class FilterListEntry {
 final List<FilterListEntry> kFilterListEntries = _buildEntries();
 
 List<FilterListEntry> _buildEntries() {
-  // ColorVisionType → そのカタログ id。none 以外の 7 型が対象。
-  final Map<ColorVisionType, String> catalogIdByType = {
-    for (final type in ColorVisionType.values)
-      if (type != ColorVisionType.none)
-        type: visionFilterCatalogId(visionFilterForColorVisionType(type)!)!,
-  };
-  // カタログ id → 「base の -opia」（id と型名が同じもの）。
-  final Map<String, ColorVisionType> baseTypeByCatalogId = {
-    for (final e in catalogIdByType.entries)
-      if (e.key.id == e.value) e.value: e.key,
-  };
-
   final entries = <FilterListEntry>[];
   for (final category in VisionFilterCategory.values) {
     for (final catalogEntry in visionFilterEntriesByCategory(category)) {
-      final baseType = baseTypeByCatalogId[catalogEntry.id];
-      entries.add(FilterListEntry(
-        key: baseType != null
-            ? 'cv:${baseType.id}'
-            : 'catalog:${catalogEntry.id}',
-        category: category,
-        catalogId: catalogEntry.id,
-        colorVisionType: baseType,
-      ));
-      // この base 型の -omaly を直後に置く。
-      for (final e in catalogIdByType.entries) {
-        if (e.value == catalogEntry.id && e.key.id != e.value) {
-          entries.add(FilterListEntry(
-            key: 'cv:${e.key.id}',
-            category: category,
-            catalogId: e.value,
-            colorVisionType: e.key,
-          ));
+      entries.add(
+        FilterListEntry(
+          key: kColorVisionQuickCatalogIds.contains(catalogEntry.id)
+              ? 'cv:${catalogEntry.id}'
+              : 'catalog:${catalogEntry.id}',
+          category: category,
+          catalogId: catalogEntry.id,
+        ),
+      );
+      // この -opia の別名（-omaly）を直後に置く。
+      for (final alias in kVisionAliases) {
+        if (alias.catalogId == catalogEntry.id) {
+          entries.add(
+            FilterListEntry(
+              key: 'cv:${alias.id}',
+              category: category,
+              catalogId: alias.catalogId,
+              variantId: alias.id,
+            ),
+          );
         }
       }
     }
@@ -95,14 +83,10 @@ List<FilterListEntry> _buildEntries() {
   return List.unmodifiable(entries);
 }
 
-/// [entry] の表示名を [l10n] で解決する。色覚クイック選択の行は
-/// [colorVisionTypeName]（-omaly を区別するため）、それ以外は [visionFilterName]。
-String filterListEntryName(AppLocalizations l10n, FilterListEntry entry) {
-  final type = entry.colorVisionType;
-  return type != null
-      ? colorVisionTypeName(l10n, type)
-      : visionFilterName(l10n, entry.catalogId);
-}
+/// [entry] の表示名を [l10n] で解決する。-omaly の行は別名の名前（-opia と区別するため）、
+/// それ以外はカタログ id の名前（[visionFilterName]）。
+String filterListEntryName(AppLocalizations l10n, FilterListEntry entry) =>
+    visionFilterName(l10n, entry.strengthKey);
 
 final AppLocalizations _ja = lookupAppLocalizations(const Locale('ja'));
 final AppLocalizations _en = lookupAppLocalizations(const Locale('en'));
@@ -146,11 +130,11 @@ bool matchesFilterQuery(Iterable<String> texts, String query) {
 
 /// [entry] を検索する対象の文字列（ja 名・en 名・catalog id / 型 id）。
 List<String> filterListEntrySearchTexts(FilterListEntry entry) => [
-      filterListEntryName(_ja, entry),
-      filterListEntryName(_en, entry),
-      entry.catalogId,
-      if (entry.colorVisionType != null) entry.colorVisionType!.id,
-    ];
+  filterListEntryName(_ja, entry),
+  filterListEntryName(_en, entry),
+  entry.catalogId,
+  if (entry.variantId != null) entry.variantId!,
+];
 
 /// 体験プリセット [experienceId] が検索語 [query] に当たるか（ja・en 名と id）。
 /// 空の検索語は常に true。
@@ -186,29 +170,12 @@ List<FilterListEntry> visibleFilterListEntries({
 /// トレイ（#121）とメイン画面の一覧のチェックは、これではなく層の集合から決める
 /// （[layerForFilterListEntry]）。
 ///
-/// 色覚クイック選択なら [VisionFilterState.colorVisionType] の行、それ以外
-/// （advanced）は選択中カタログ id の行。プリセット由来の選択は一覧の行では
-/// なく体験プリセットの行が点灯する（[VisionFilterState.selectedPresetId]）。
+/// 層のカタログ id と別名が同じ行（色覚なら -opia / -omaly の別）。プリセット由来の選択は
+/// 一覧の行ではなく体験プリセットの行が点灯する（[VisionFilterState.selectedPresetId]）。
 FilterListEntry? selectedFilterListEntry(VisionFilterState visionState) {
   if (visionState.selectedPresetId != null) return null;
-  final id = visionState.selectedId;
-  if (id == null) return null;
-  if (visionState.isColorQuickSelection) {
-    final type = visionState.colorVisionType;
-    for (final e in kFilterListEntries) {
-      if (e.colorVisionType != null && e.colorVisionType == type) return e;
-    }
-    return null;
-  }
-  // advanced 由来（色覚 base 型を `select(id)` で直接選んだ場合も、同じ
-  // カタログ id の行を点灯させる）。
-  for (final e in kFilterListEntries) {
-    if (e.catalogId == id &&
-        (e.colorVisionType == null || e.colorVisionType!.id == id)) {
-      return e;
-    }
-  }
-  return null;
+  final layer = visionState.focusedLayer;
+  return layer == null ? null : filterListEntryForLayer(layer);
 }
 
 /// ↑↓（#63）で [visible]（今見えている一覧）を順送り/逆送りしたときの次の行。
@@ -236,19 +203,10 @@ FilterListEntry? nextFilterListEntry(
 bool isExclusiveFilterListEntry(FilterListEntry entry) =>
     entry.category == VisionFilterCategory.colorVision;
 
-/// [entry] の層の別名（-omaly の別名 id）。別名でなければ null。
-String? filterListEntryVariantId(FilterListEntry entry) {
-  final type = entry.colorVisionType;
-  return type != null && kVisionVariantIds.contains(type.name)
-      ? type.name
-      : null;
-}
-
-/// [layer] が一覧の行 [entry] に当たるか（カタログ id と別名が同じ）。origin は問わない
-/// （体験プリセットや advanced で足した色覚の層も、同じ行にチェックが付く）。
+/// [layer] が一覧の行 [entry] に当たるか（カタログ id と別名が同じ）。どの入口で足した
+/// 層でも同じ行にチェックが付く。
 bool filterListEntryMatchesLayer(FilterListEntry entry, VisionLayer layer) =>
-    layer.id == entry.catalogId &&
-    layer.variantId == filterListEntryVariantId(entry);
+    layer.id == entry.catalogId && layer.variantId == entry.variantId;
 
 /// 一覧の行 [entry] にチェックが付いている層。無ければ null。
 VisionLayer? layerForFilterListEntry(
@@ -292,16 +250,8 @@ VisionLayerBlockReason? filterListEntryBlockReason(
 
 /// 一覧の行 [entry] を**足し引き**する（多選択の入口、#120）。チェック済みなら外し、未
 /// チェックなら足す（色覚は既存の色覚層と置き換え）。上限で足せなければ何もしない。
-/// どの行でも、呼んだあと `FilterService` を層の集合へ合わせる（tetrachromacy のような
-/// カタログ側の色覚グループの行が、クイック選択の色覚層を置き換えることがあるため）。
+/// トレイの行も同じ入口を通る。
 VisionLayerResult toggleFilterListEntry(
-  FilterService filterService,
   VisionFilterState visionState,
   FilterListEntry entry,
-) {
-  final type = entry.colorVisionType;
-  if (type != null) return toggleColorVision(filterService, visionState, type);
-  final result = visionState.toggle(entry.catalogId);
-  syncFilterServiceWithLayers(filterService, visionState);
-  return result;
-}
+) => visionState.toggle(entry.catalogId, variantId: entry.variantId);

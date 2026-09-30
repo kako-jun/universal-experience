@@ -4,9 +4,8 @@
 // 検証:
 // 1. 4 プリセットが i18n 名で一覧に描画される。
 // 2. タップで VisionFilterState.selectedId が対応 catalog id・selectedPresetId が
-//    experience id になる（meniere→vertigo / bppv→bppv_rotation）。色覚
-//    FilterService は、置き換えで無くなる色覚クイック選択の層に合わせて none へ
-//    導き直す（#120。settings.filterType に「いま無い色覚」を残さない）。
+//    experience id になる（meniere→vertigo / bppv→bppv_rotation）。選択中の
+//    色覚クイック選択の層は、プリセットが層の集合を置き換えるので無くなる（#120）。
 // 3. 選んだあと右カラムに、urgency=emergency（vestibular_neuritis）で緊急受診、
 //    earlyConsultation（meniere）で早期受診メッセージ、none（bppv）では受診喚起が
 //    出ない。選ぶまでは何も出ない。
@@ -26,9 +25,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
-import 'package:universal_experience/models/disability_type.dart';
-import 'package:universal_experience/services/color_vision_selection.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
@@ -37,6 +33,7 @@ import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
 
 import 'support/vision_filter_metadata_fixture.dart';
+import 'support/color_vision_select.dart';
 
 /// テスト用の 4 体験 fixture（sensus の experiences() と同じ id / vision / hearing /
 /// urgency）。実 bridge は native を要求するため fixture で代替する。
@@ -67,7 +64,6 @@ List<Experience> _fixtureExperiences() => const [
 
 void main() {
   late VisionFilterState visionState;
-  late FilterService filterService;
   late FilterBrowserController browser;
 
   setUp(() {
@@ -75,7 +71,6 @@ void main() {
     experiencesProvider = _fixtureExperiences;
     installVisionFilterMetadataFixture();
     visionState = VisionFilterState();
-    filterService = FilterService(visionState: visionState);
   });
   tearDown(() {
     browser.dispose();
@@ -93,7 +88,6 @@ void main() {
       MultiProvider(
         providers: [
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
-          ChangeNotifierProvider<FilterService>.value(value: filterService),
         ],
         child: MaterialApp(
           locale: locale,
@@ -148,23 +142,22 @@ void main() {
 
   testWidgets(
       'meniere タップで vision=vertigo・selectedPresetId=meniere を選択し、'
-      '層が無くなる色覚クイック選択は FilterService からも外れる（#120）', (tester) async {
+      '選択中の色覚クイック選択の層は置き換わって無くなる（#120）', (tester) async {
     await pumpPresets(tester, const Locale('en'));
 
     // 事前に色覚クイック選択を有効化しておく。プリセットは層の集合を置き換える
-    // ので、色覚の層ごと外れる。FilterService（settings.filterType・トレイの読み口）に
-    // 「いま無い色覚」が残らないよう、層の集合から導いた none になる。
-    selectColorVision(filterService, visionState, ColorVisionType.protanopia);
-    expect(filterService.currentFilter, ColorVisionType.protanopia);
+    // ので、色覚の層ごと外れる。
+    selectColorVisionKey(visionState, 'protanopia');
+    expect(visionState.layers.map((l) => l.id), ['protanopia']);
 
     await tester.tap(find.byKey(experienceCardKey('meniere')));
     await tester.pump();
 
     expect(visionState.selectedId, 'vertigo');
     expect(visionState.selectedPresetId, 'meniere');
-    expect(visionState.isColorQuickSelection, isFalse);
-    expect(filterService.currentFilter, ColorVisionType.none,
+    expect(visionState.layers.map((l) => l.id), ['vertigo'],
         reason: 'プリセットが層の集合を置き換えたので、色覚の層はもう無い');
+    expect(visionState.focusedVariantId, isNull);
   });
 
   testWidgets('bppv タップで vision=bppv_rotation・selectedPresetId=bppv を選択する',

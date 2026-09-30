@@ -16,12 +16,12 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/filter_param_panel.dart';
 
+import 'support/color_vision_select.dart';
 import 'support/vision_filter_metadata_fixture.dart';
 
 void main() {
@@ -56,8 +56,8 @@ void main() {
   testWidgets('advanced カタログ由来の選択では strength スライダーを表示する', (tester) async {
     // protanopia は payload を持たないため、Slider は strength 用の 1 本だけ
     // になる（他パラメータのスライダーと混同しない）。
-    visionState.select('protanopia');
-    expect(visionState.isColorQuickSelection, isFalse);
+    visionState.replaceWith('protanopia');
+    expect(visionState.focusedVariantId, isNull);
 
     await pumpPanel(tester);
 
@@ -66,17 +66,17 @@ void main() {
 
   testWidgets('体験プリセット由来の選択でも strength スライダーを表示する', (tester) async {
     visionState.selectPreset('vestibular_neuritis', 'vestibular_neuritis');
-    expect(visionState.isColorQuickSelection, isFalse);
+    expect(visionState.selectedPresetId, 'vestibular_neuritis');
 
     await pumpPanel(tester);
 
     expect(find.byType(Slider), findsOneWidget);
   });
 
-  testWidgets('色覚クイック選択由来の選択でも strength スライダーは 1 本だけ表示する（#120）',
+  testWidgets('色覚の別名（-omaly）の選択でも strength スライダーは 1 本だけ表示する（#120）',
       (tester) async {
-    visionState.selectColorVisionType(ColorVisionType.protanopia, 'protanopia');
-    expect(visionState.isColorQuickSelection, isTrue);
+    selectColorVisionKey(visionState, 'protanomaly');
+    expect(visionState.focusedVariantId, 'protanomaly');
 
     await pumpPanel(tester);
 
@@ -85,7 +85,7 @@ void main() {
   });
 
   testWidgets('strength スライダーは調整中の層の強度の記憶を動かし、原画比較を解除する', (tester) async {
-    visionState.selectColorVisionType(ColorVisionType.protanopia, 'protanopia');
+    selectColorVisionKey(visionState, 'protanopia');
     visionState.toggle('myopia');
     visionState.focusLayer('protanopia');
     visionState.acquireBypass(Object());
@@ -105,7 +105,7 @@ void main() {
     testWidgets('urgency=none かつ escalation なしでは何も表示しない', (tester) async {
       visionFilterUrgencyProvider = (_) => Urgency.none;
       visionFilterUrgencyEscalationProvider = (_) => const [];
-      visionState.select('protanopia');
+      visionState.replaceWith('protanopia');
 
       await pumpPanel(tester);
       final en = lookupAppLocalizations(const Locale('en'));
@@ -119,7 +119,7 @@ void main() {
         (tester) async {
       visionFilterUrgencyProvider = (_) => Urgency.emergency;
       visionFilterUrgencyEscalationProvider = (_) => const [];
-      visionState.select('hemianopia');
+      visionState.replaceWith('hemianopia');
 
       await pumpPanel(tester);
       final en = lookupAppLocalizations(const Locale('en'));
@@ -140,7 +140,7 @@ void main() {
               condition: 'recurrent or severe episodes',
             ),
           ];
-      visionState.select('bppv_rotation');
+      visionState.replaceWith('bppv_rotation');
 
       await pumpPanel(tester, locale: const Locale('ja'));
       final ja = lookupAppLocalizations(const Locale('ja'));
@@ -164,7 +164,7 @@ void main() {
               condition: unknownCondition,
             ),
           ];
-      visionState.select('teichopsia');
+      visionState.replaceWith('teichopsia');
 
       await pumpPanel(tester);
 
@@ -189,7 +189,7 @@ void main() {
               condition: 'recurrent or severe episodes',
             ),
           ];
-      visionState.select('bppv_rotation');
+      visionState.replaceWith('bppv_rotation');
 
       await pumpPanel(tester);
       final en = lookupAppLocalizations(const Locale('en'));
@@ -210,7 +210,7 @@ void main() {
         (tester) async {
       visionFilterUrgencyProvider = (_) => Urgency.emergency;
       visionFilterUrgencyEscalationProvider = (_) => const [];
-      visionState.select('hemianopia');
+      visionState.replaceWith('hemianopia');
 
       await pumpPanel(tester);
       final en = lookupAppLocalizations(const Locale('en'));
@@ -229,7 +229,7 @@ void main() {
         (tester) async {
       visionFilterUrgencyProvider = (_) => Urgency.earlyConsultation;
       visionFilterUrgencyEscalationProvider = (_) => const [];
-      visionState.select('glaucoma');
+      visionState.replaceWith('glaucoma');
 
       await pumpPanel(tester);
 
@@ -241,7 +241,7 @@ void main() {
   group('推奨値に戻す（#77）', () {
     testWidgets('強度・パラメータを変更後、ボタンで推奨値・既定値に戻る', (tester) async {
       visionFilterRecommendedStrengthProvider = (_) => 0.5;
-      visionState.select('astigmatism');
+      visionState.replaceWith('astigmatism');
       expect(visionState.strength, 0.5);
 
       visionState.setStrength(0.9);

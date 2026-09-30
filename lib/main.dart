@@ -11,11 +11,8 @@ import 'dart:ui' show AppExitResponse;
 import 'l10n/app_localizations.dart';
 import 'l10n/l10n_extensions.dart';
 import 'l10n/locale_resolution.dart';
-import 'models/disability_type.dart';
 import 'models/sample_catalog.dart';
-import 'services/color_vision_selection.dart';
 import 'services/experience_source.dart' show isValidExperiencePreset;
-import 'services/filter_service.dart';
 import 'services/image_source_state.dart';
 import 'services/vision_filter_state.dart';
 import 'services/hotkey_actions.dart';
@@ -36,19 +33,10 @@ import 'ui/widgets/loupe_hud.dart';
 final LoupeWindowController loupeWindow = LoupeWindowController();
 
 /// トレイとウィンドウ UI で共有する VisionFilterState（プレビューの選択の
-/// 唯一の正本、#60）。[filterService] と同じ理由でアプリ最上位に 1 つだけ
-/// 生成する — 色覚のクイック選択はトレイ・ウィンドウ内どちらから行っても
-/// `lib/services/color_vision_selection.dart` の `selectColorVision` を経由して
-/// 同じインスタンスを更新する必要があるため（#60）。
+/// 唯一の正本、#60, #124）。色覚のクイック選択も advanced も体験プリセットも、
+/// トレイ・ウィンドウ内どちらから選んでも同じインスタンスを更新する必要があるため、
+/// アプリ最上位に 1 つだけ生成する。
 final VisionFilterState visionFilterState = VisionFilterState();
-
-/// トレイとウィンドウ UI で共有する FilterService。
-/// トレイのクイックフィルタとウィンドウ内のドロップダウンが同じ状態を見るよう、
-/// アプリ最上位で 1 つだけ生成する (#15)。色覚タイプごとの強度は
-/// [visionFilterState] のキーごとの記憶を読み書きする（#117）ので、同じ
-/// [visionFilterState] を渡して生成する。
-final FilterService filterService =
-    FilterService(visionState: visionFilterState);
 
 /// [visionFilterState]（選んだフィルタ・payload・強度）の永続化（#65）。
 /// [buildRootApp] が復元して購読を張り、終了シーケンス（トレイの終了・ウィンドウ
@@ -62,9 +50,9 @@ final VisionFilterStore visionFilterStore = VisionFilterStore();
 final Object _hotkeyBypassSource = Object();
 
 /// トレイとウィンドウ UI で共有する [ImageSourceState]（プレビュー原画の選択の
-/// 唯一の正本、#78）。[filterService]/[visionFilterState] と同じ理由で
+/// 唯一の正本、#78）。[visionFilterState] と同じ理由で
 /// アプリ最上位に 1 つだけ生成する。初期サンプルは [buildRootApp] が
-/// 起動時の選択済みフィルタ（[selectColorVision] でシードした直後の
+/// 起動時の選択済みフィルタ（初回起動の層・復元を済ませた直後の
 /// `visionFilterState.focusedId`）の推奨サンプルに合わせる。
 final ImageSourceState imageSourceState = ImageSourceState();
 
@@ -125,7 +113,6 @@ TrayService _buildTrayService(SettingsService settings) {
   final locale = resolveSupportedLocale(settings.locale);
   final l10n = lookupAppLocalizations(locale);
   return TrayService(
-    filterService: filterService,
     visionFilterState: visionFilterState,
     loupeWindow: loupeWindow,
     iconPath: _trayIconPath,
@@ -159,7 +146,7 @@ TrayService _buildTrayService(SettingsService settings) {
 }
 
 /// アプリのルート Widget を組み立てる (#55)。Rust ブリッジ初期化・設定復元・
-/// 共有 `filterService`/`visionFilterState` のシードまでを担い、`main()` と
+/// 共有 `visionFilterState` のシードまでを担い、`main()` と
 /// （実プロセスで `main()` 相当の起動経路を踏みたい）
 /// `integration_test/app_bootstrap_test.dart` の両方から呼ばれる唯一の
 /// bootstrap 関数。
@@ -172,16 +159,16 @@ TrayService _buildTrayService(SettingsService settings) {
 ///   （services/native_bridge_service.dart）。失敗時（native lib が壊れている・
 ///   同梱されていない等。#52 の実害: プリセット欄が本番で例外表示になっていた）は
 ///   クラッシュさせず、`bridgeReady: false` と [NativeBridgeErrorApp] を返す。
-///   以降 [settings] の読込・`filterService` のシードも行わない（Rust ブリッジに
+///   以降 [settings] の読込・初回起動の層のシードも行わない（Rust ブリッジに
 ///   依存する機能を使わせないための最小構成）。integration test がテストダブルの
 ///   `initBridge` を注入して失敗系を確認できるよう関数として差し替え可能にしてある。
 /// - 成功時は [settings]（未指定なら新規 `SettingsService()`）を読み込み、
-///   旧 per-type 強度（`settings.intensityByType`）を v2 の保存へ一度だけ取り込み
-///   （[VisionFilterStore.migrateLegacyStrengths]、#117）、復元済みのフィルタ種別を
-///   `selectColorVision`（#60）で一度だけ適用して `bridgeReady: true` と
-///   [UniversalExperienceApp] を返す。トップレベル共有の `filterService`（#15、
-///   トレイとウィンドウ内 UI が同じインスタンスを見る）と `visionFilterState` の
-///   両方が同じ値になる。強度は `visionFilterState` のキーごとの記憶が正本
+///   初回起動の層（[VisionFilterState.seedInitialLayers]）を入れ、旧保存
+///   （`settings.filterType`・`settings.intensityByType`・版 1 の `settings.visionFilter`）を
+///   v2 の保存へ一度だけ取り込み（[VisionFilterStore.migrateLegacySettings]、#117/#124）、
+///   `bridgeReady: true` と [UniversalExperienceApp] を返す。選択状態の正本は
+///   `visionFilterState` 1 つだけで、トレイとウィンドウ内 UI が同じインスタンスを見る。
+///   強度は `visionFilterState` のキーごとの記憶が正本
 ///   （`settings.intensity` は #57 で撤去済み。旧キーからの移行はしない）。
 ///
 /// - 続けて [VisionFilterStore]（#65）が前回の選択・payload・強度を復元する
@@ -198,58 +185,35 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
     return (app: const NativeBridgeErrorApp(), bridgeReady: false);
   }
 
-  // Restore persisted settings (theme mode / last filter / locale) before
-  // building the app so the first frame already reflects the user's choices
-  // (#17/#18, settings_service.dart).
+  // Restore persisted settings (theme mode / locale) before building the app
+  // so the first frame already reflects the user's choices (#17/#18,
+  // settings_service.dart).
   final s = settings ?? SettingsService();
   await s.load();
 
-  // #78: on a genuine first launch (s.isFirstRun — see that getter's doc),
-  // seed deuteranomaly (at its recommended strength, same mechanism as any
-  // other type) instead of s.filterType, and persist that choice immediately
-  // so isFirstRun is false on every later launch. A later explicit "Normal
-  // vision" pick persists `none` normally from then on (setFilterType's
-  // no-op guard no longer short-circuits once the in-memory type has moved
-  // off its struct default).
-  final seedType = s.isFirstRun ? ColorVisionType.deuteranomaly : s.filterType;
+  // #124: the first-launch layers (deuteranomaly at its recommended strength)
+  // are owned by VisionFilterState. Anything saved overrides them below.
+  visionFilterState.seedInitialLayers();
 
-  // #117: fold the legacy per-type intensity store (settings.intensityByType,
-  // formerly owned by FilterService) into the v2 persisted state — once, before
-  // the color seed below and before restoreAndBind. The per-key strength memory
-  // in VisionFilterState is the only place strengths live now. The folded
-  // snapshot is handed to restoreAndBind directly so it reaches memory even if
-  // writing it failed (the legacy key is then kept and folded again next launch).
+  // #117/#124: fold the legacy saves (settings.filterType, per-type intensity
+  // settings.intensityByType, v1 settings.visionFilter) into the v2 persisted
+  // state — once, before restoreAndBind. The folded snapshot is handed to
+  // restoreAndBind directly so it reaches memory even if writing it failed (the
+  // legacy keys are then kept and folded again next launch). On a fresh install
+  // nothing is folded (null) and the first-launch layers above stay.
   final vfStore = store ?? visionFilterStore;
-  final migrated = await vfStore.migrateLegacyStrengths(seedType: seedType);
-
-  // Seed the shared FilterService and VisionFilterState (#15/#60) from the
-  // restored settings (#17) so the previously selected filter is reflected on
-  // startup — through selectColorVision (#60), the single entry point that
-  // keeps both services in sync, same as FilterBrowser/tray. No explicit
-  // intensity override here (#57): the type's own remembered/recommended
-  // strength is used instead of resetting it.
-  selectColorVision(filterService, visionFilterState, seedType);
-  if (s.isFirstRun) {
-    await s.setFilterType(seedType);
-  }
+  final migrated = await vfStore.migrateLegacySettings();
 
   // #65: 前回の選択・payload・強度を復元し、以後の変更の保存を始める。上の
-  // 色覚シードの**後**に行い、保存があればそちらを優先する（advanced /
+  // 初回起動の層の**後**に行い、保存があればそちらを優先する（advanced /
   // 体験プリセット / 色覚クイック選択のいずれで終了しても、その選択のまま起動
   // する）。保存が無い・壊れている・カタログと合わない部分は既定値に落ち、
-  // 起動は止まらない。色覚クイック選択に戻した場合は、トレイとウィンドウ内 UI の
-  // 両方が見る filterService も、層の集合から導いた型に合わせる。
-  final restored = await vfStore.restoreAndBind(
+  // 起動は止まらない。
+  await vfStore.restoreAndBind(
     visionFilterState,
     isValidPreset: isValidExperiencePreset,
     snapshot: migrated,
   );
-  if (restored) {
-    // 復元した層の集合（色覚クイック選択の層があればその型、無ければ none）へ
-    // 合わせる。フォーカス層だけを見ると、色覚の層があってもフォーカスが別の層に
-    // あるとき、色覚シードの型が FilterService に残ってしまう（#120）。
-    syncFilterServiceWithLayers(filterService, visionFilterState);
-  }
 
   // #78: seed the initial sample from the just-restored/seeded filter
   // selection's recommendation, so the preview never starts on a sample that
@@ -277,7 +241,7 @@ void main() async {
     },
   );
 
-  // buildRootApp() が Rust ブリッジ初期化・設定復元・filterService のシードを
+  // buildRootApp() が Rust ブリッジ初期化・設定復元・初回起動の層のシードを
   // 行い、成功/失敗いずれの場合も表示すべき Widget を bridgeReady と共に返す（#55）。
   final settings = SettingsService();
   final result = await buildRootApp(settings: settings);
@@ -348,11 +312,8 @@ void main() async {
     // （非常口アクションがトレイ経由の showAndFocusLoupe を使うため）。
     hotkeyService = HotkeyService();
     final hotkeyActions = HotkeyActions(
-      // #60 の唯一の入口（selectColorVision/deactivateColorVision）を経由する。
-      // filterService.deactivate() + visionFilterState.clear() と同じフィールド
-      // をクリアする実装だが、規律に合わせて置き換える。
-      deactivateFilters:
-          hotkeyDeactivateFilters(filterService, visionFilterState),
+      // 重ねている全層を外す（#124: 選択の正本は VisionFilterState だけ）。
+      deactivateFilters: visionFilterState.clear,
       setClickThrough: loupeWindow.setClickThrough,
       setAlwaysOnTop: loupeWindow.setAlwaysOnTop,
       getClickThrough: () => loupeWindow.clickThrough,
@@ -488,16 +449,10 @@ class UniversalExperienceApp extends StatelessWidget {
         // SettingsService is created+loaded in main() so the first frame uses
         // restored values; provide the existing instance (not a fresh one).
         ChangeNotifierProvider<SettingsService>.value(value: settings),
-        // トレイ (#15) と共有する単一の FilterService を供給する。新しい
-        // インスタンスを作らず、トレイのクイックフィルタとウィンドウ内の
-        // ドロップダウンが同じ状態を見るようトップレベルの 1 個を使い回す。
-        // 復元した設定 (#17) によるシードは main() 内で適用済み。
-        ChangeNotifierProvider<FilterService>.value(value: filterService),
         // VisionFilterState (#16) drives the filter-selection / parameter UI,
-        // and is the preview's single source of truth (#60). Same top-level
-        // singleton reasoning as filterService above — provide the existing
-        // instance, not a fresh one, so it stays the same one the tray and
-        // selectColorVision (#60) update.
+        // and is the preview's single source of truth (#60). Provide the
+        // top-level singleton (not a fresh instance) so it stays the same one
+        // the tray updates.
         ChangeNotifierProvider<VisionFilterState>.value(
           value: visionFilterState,
         ),
@@ -571,7 +526,7 @@ class UniversalExperienceApp extends StatelessWidget {
 /// Rust ブリッジの初期化失敗時 (#55) に `UniversalExperienceApp` の代わりに
 /// 表示するエラー画面。`initNativeBridge()` が false を返したときだけ使う。
 ///
-/// `VisionFilterState` / `FilterService` 等の状態も `SettingsService` も
+/// `VisionFilterState` 等の状態も `SettingsService` も
 /// 一切構築しない（Rust ブリッジに依存する機能を使わせないための最小構成）。
 /// ロケールはシステム追従（設定の読込前なので永続化ロケールは見られない）が、
 /// [locale] を渡せばテスト等から明示的に固定できる（未指定時は

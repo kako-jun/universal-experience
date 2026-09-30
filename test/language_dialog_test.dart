@@ -12,14 +12,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/main.dart';
-import 'package:universal_experience/models/disability_type.dart';
-import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/services/tray_locale_sync.dart';
 import 'package:universal_experience/ui/widgets/adjust_panel.dart';
 import 'package:universal_experience/ui/widgets/language_dialog.dart';
 
 import 'support/home_screen_harness.dart';
+import 'support/color_vision_select.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -30,11 +29,11 @@ void main() {
   setUp(() {
     installHomeScreenFixtures();
     // main.dart のトップレベル共有状態を、テスト間で持ち越さない。
-    deactivateColorVision(filterService, visionFilterState);
+    visionFilterState.clear();
   });
   tearDown(() {
     resetHomeScreenFixtures();
-    deactivateColorVision(filterService, visionFilterState);
+    visionFilterState.clear();
   });
 
   Future<SettingsService> pumpApp(
@@ -112,11 +111,7 @@ void main() {
   group('AppBar の言語ピッカー', () {
     testWidgets('English を選ぶと画面・フィルタ名・説明が英語になり、永続化される', (tester) async {
       final settings = await pumpApp(tester, persisted: const Locale('ja'));
-      selectColorVision(
-        filterService,
-        visionFilterState,
-        ColorVisionType.protanopia,
-      );
+      selectColorVisionKey(visionFilterState, 'protanopia');
       await tester.pump();
 
       // ja: 右カラムの名前（sensus のカタログ id → ARB）と説明が日本語。
@@ -160,7 +155,7 @@ void main() {
     testWidgets('advanced フィルタと体験プリセットの名前も言語に追従する', (tester) async {
       await pumpApp(tester, persisted: const Locale('en'));
 
-      visionFilterState.select('tunnel_vision');
+      visionFilterState.replaceWith('tunnel_vision');
       await tester.pump();
       expect(
           inAdjustPanel(visionFilterName(en, 'tunnel_vision')), findsOneWidget);
@@ -190,11 +185,7 @@ void main() {
         persisted: const Locale('en'),
         system: const [Locale('ja')],
       );
-      selectColorVision(
-        filterService,
-        visionFilterState,
-        ColorVisionType.deuteranopia,
-      );
+      selectColorVisionKey(visionFilterState, 'deuteranopia');
       await tester.pump();
       expect(inAdjustPanel(en.filterDeuteranopia), findsOneWidget);
 

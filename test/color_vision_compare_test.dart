@@ -1,8 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/color_vision_compare.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/services/vision_layer.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
@@ -166,7 +164,7 @@ void main() {
   });
 
   group('colorVisionCompareFilter', () {
-    test('色覚クイック選択と同じ対応表（visionFilterForColorVisionType）を引く', () {
+    test('色覚クイック選択と同じ対応表（visionFilterForCatalogId）を引く', () {
       const expected = <String, VisionFilter>{
         'protanopia': VisionFilter.protanopia(),
         'deuteranopia': VisionFilter.deuteranopia(),
@@ -174,13 +172,11 @@ void main() {
         'achromatopsia': VisionFilter.achromatopsia(),
       };
       for (final entry in kColorVisionCompareEntries) {
-        final type =
-            ColorVisionType.values.singleWhere((t) => t.id == entry.id);
         expect(colorVisionCompareFilter(entry), expected[entry.id],
             reason: entry.id);
         expect(
           colorVisionCompareFilter(entry),
-          visionFilterForColorVisionType(type),
+          visionFilterForCatalogId(entry.id),
           reason: entry.id,
         );
       }
@@ -197,21 +193,20 @@ void main() {
       }
     });
 
-    test('色覚型に対応しないカタログ項目は StateError（黙って別物に落とさない）', () {
+    test('固定インスタンスの対応が無いカタログ項目は StateError（黙って別物に落とさない）', () {
+      // payload を持つフィルタ（パラメータで中身が決まる）は固定の対応表に無い。
       expect(
         () => colorVisionCompareFilter(
           kVisionFilterCatalog.firstWhere(
-            (e) => e.category != VisionFilterCategory.colorVision,
+            (e) => visionFilterForCatalogId(e.id) == null,
           ),
         ),
         throwsStateError,
       );
-      // 四色覚は色覚カテゴリだが ColorVisionType に対応が無い。
+      // 四色覚は固定インスタンスの対応はあるが、実験的な可視化なので比較のセルには並ばない。
       expect(
-        () => colorVisionCompareFilter(
-          kVisionFilterCatalog.firstWhere((e) => e.id == 'tetrachromacy'),
-        ),
-        throwsStateError,
+        kColorVisionCompareEntries.map((e) => e.id),
+        isNot(contains('tetrachromacy')),
       );
     });
   });

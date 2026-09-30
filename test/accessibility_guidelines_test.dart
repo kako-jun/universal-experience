@@ -18,20 +18,18 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
-import 'package:universal_experience/models/disability_type.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart'
     show Urgency;
 import 'package:universal_experience/ui/widgets/loupe_hud.dart';
-import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/ui/theme/app_theme.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 
 import 'support/home_screen_harness.dart';
 import 'support/sample_image_generator.dart';
+import 'support/color_vision_select.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -75,7 +73,7 @@ void main() {
       size: size,
       theme: theme,
       locale: locale,
-      select: (f, s) => selectColorVision(f, s, ColorVisionType.protanopia),
+      select: (s) => selectColorVisionKey(s, 'protanopia'),
     );
     await settle(tester);
   }
@@ -131,12 +129,11 @@ void main() {
   // シード・受診喚起・2×2 比較を順に出して、ガイドラインを当てる。
   group('選択ごとの調整パネル', () {
     final cases = <String, void Function(HomeScreenHarness h)>{
-      '色覚 + 2×2 比較の切替': (h) => selectColorVision(
-          h.filterService, h.visionState, ColorVisionType.protanopia),
-      'advanced（列挙 + 小数のパラメータ）': (h) => h.visionState.select('glaucoma'),
-      'advanced（整数のパラメータ）': (h) => h.visionState.select('starbursts'),
-      'advanced（シード）': (h) => h.visionState.select('floaters'),
-      'advanced（強度の注意つき）': (h) => h.visionState.select('tunnel_vision'),
+      '色覚 + 2×2 比較の切替': (h) => selectColorVisionKey(h.visionState, 'protanopia'),
+      'advanced（列挙 + 小数のパラメータ）': (h) => h.visionState.replaceWith('glaucoma'),
+      'advanced（整数のパラメータ）': (h) => h.visionState.replaceWith('starbursts'),
+      'advanced（シード）': (h) => h.visionState.replaceWith('floaters'),
+      'advanced（強度の注意つき）': (h) => h.visionState.replaceWith('tunnel_vision'),
       '体験プリセット（緊急の受診喚起）': (h) => h.visionState
           .selectPreset('vestibular_neuritis', 'vestibular_neuritis'),
       '体験プリセット（早めの受診喚起）': (h) =>
@@ -162,8 +159,7 @@ void main() {
       await installFakes(tester);
       final h =
           await pumpHomeScreen(tester, size: wide, theme: AppTheme.lightTheme);
-      selectColorVision(
-          h.filterService, h.visionState, ColorVisionType.protanopia);
+      selectColorVisionKey(h.visionState, 'protanopia');
       await tester.pump();
       await tester.tap(find.byType(FilterChip));
       await settle(tester);
@@ -178,8 +174,8 @@ void main() {
     final cases = <String, void Function(HomeScreenHarness h)>{
       '体験プリセット（緊急の受診喚起）': (h) => h.visionState
           .selectPreset('vestibular_neuritis', 'vestibular_neuritis'),
-      'advanced（強度の注意つき）': (h) => h.visionState.select('tunnel_vision'),
-      'advanced（列挙 + 小数のパラメータ）': (h) => h.visionState.select('glaucoma'),
+      'advanced（強度の注意つき）': (h) => h.visionState.replaceWith('tunnel_vision'),
+      'advanced（列挙 + 小数のパラメータ）': (h) => h.visionState.replaceWith('glaucoma'),
     };
     for (final theme in themes.entries) {
       for (final entry in cases.entries) {
@@ -223,8 +219,7 @@ void main() {
       visionFilterUrgencyProvider = (_) => urgency;
       visionFilterUrgencyEscalationProvider = (_) => const [];
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      final visionState = VisionFilterState()..select('photophobia');
-      final filterService = FilterService(visionState: visionState);
+      final visionState = VisionFilterState()..replaceWith('photophobia');
       final loupe = LoupeWindowController();
       await tester.runAsync(() => loupe.setAppMode(AppMode.loupe));
       tester.view.physicalSize = const Size(900, 300);
@@ -234,7 +229,6 @@ void main() {
         MultiProvider(
           providers: [
             ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
-            ChangeNotifierProvider<FilterService>.value(value: filterService),
             ChangeNotifierProvider<LoupeWindowController>.value(value: loupe),
           ],
           child: MaterialApp(

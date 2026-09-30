@@ -1,14 +1,12 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:universal_experience/models/disability_type.dart';
-import 'package:universal_experience/services/color_vision_selection.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/tray_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 
 import 'support/vision_filter_metadata_fixture.dart';
+import 'support/color_vision_select.dart';
 
 /// 文言は i18n 解決済みで [buildTrayMenuSpec] に注入する (#18)。純粋層のテストは
 /// app_ja.arb の ja 訳と同じ文字列を渡し、メニュー構造とラベル配線を検証する。
@@ -19,10 +17,11 @@ const _labels = TrayMenuLabels(
   openSettings: '設定を開く…',
   quit: '終了',
   filterLabels: {
-    ColorVisionType.protanopia: '1型2色覚（赤）',
-    ColorVisionType.deuteranopia: '2型2色覚（緑）',
-    ColorVisionType.tritanopia: '3型2色覚（青）',
-    ColorVisionType.achromatopsia: '1色覚（全色盲）',
+    'protanopia': '1型2色覚（赤）',
+    'deuteranopia': '2型2色覚（緑）',
+    'tritanopia': '3型2色覚（青）',
+    'achromatopsia': '1色覚（全色盲）',
+    'protanomaly': '1型3色覚（赤）',
   },
   appModeLoupeLabel: 'ルーペ窓',
   alwaysOnTopLabel: '最前面に固定',
@@ -33,7 +32,7 @@ const _labels = TrayMenuLabels(
 void main() {
   // TrayService.init() は（ネイティブ初期化が失敗する場合も）内部で
   // `tray_manager` の MethodChannel を触るため、WidgetsFlutterBinding の
-  // 初期化を要する（#60、'TrayService の filterService/visionFilterState
+  // 初期化を要する（#60、'TrayService の visionFilterState
   // listener' グループ参照）。
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -41,13 +40,13 @@ void main() {
   tearDown(resetVisionFilterMetadataProviders);
 
   group('quickColorVisionFilters', () {
-    test('よく使う色覚フィルタを含み none を含まない', () {
+    test('よく使う色覚フィルタ（-opia 4 種）を含み、別名（-omaly）は含まない', () {
       final filters = quickColorVisionFilters();
-      expect(filters, contains(ColorVisionType.protanopia));
-      expect(filters, contains(ColorVisionType.deuteranopia));
-      expect(filters, contains(ColorVisionType.tritanopia));
-      expect(filters, contains(ColorVisionType.achromatopsia));
-      expect(filters, isNot(contains(ColorVisionType.none)));
+      expect(filters, contains('protanopia'));
+      expect(filters, contains('deuteranopia'));
+      expect(filters, contains('tritanopia'));
+      expect(filters, contains('achromatopsia'));
+      expect(filters, isNot(contains('protanomaly')));
     });
   });
 
@@ -60,20 +59,31 @@ void main() {
       expect(_labels.toggleLabel(loupeVisible: false), 'ルーペ窓を表示');
     });
 
-    test('未登録の型は id をフォールバック表示する', () {
+    test('未登録のキーは id をフォールバック表示する', () {
+      expect(_labels.filterLabel('unknown_filter'), 'unknown_filter');
+    });
+
+    test('別名（-omaly）は variantId の表示名を一覧ラベルに使う', () {
       expect(
-          _labels.filterLabel(ColorVisionType.none), ColorVisionType.none.id);
+        _labels.listEntryLabel(
+            catalogId: 'protanopia', variantId: 'protanomaly'),
+        '1型3色覚（赤）',
+      );
+      expect(
+        _labels.listEntryLabel(catalogId: 'protanopia'),
+        '1型2色覚（赤）',
+      );
     });
   });
 
   group('colorVisionEntryKey', () {
     test('フィルタ名から安定したキーを導出する', () {
       expect(
-        colorVisionEntryKey(ColorVisionType.protanopia),
+        colorVisionEntryKey('protanopia'),
         'filter_protanopia',
       );
       expect(
-        colorVisionEntryKey(ColorVisionType.achromatopsia),
+        colorVisionEntryKey('achromatopsia'),
         'filter_achromatopsia',
       );
     });
@@ -115,7 +125,7 @@ void main() {
 
       expect(apply.length, quickColorVisionFilters().length);
       expect(
-        apply.map((e) => e.colorVisionType).toSet(),
+        apply.map((e) => e.colorVisionKey).toSet(),
         quickColorVisionFilters().toSet(),
       );
     });
@@ -164,7 +174,7 @@ void main() {
         alwaysOnTop: false,
         clickThrough: false,
         checkedListEntryKeys: {
-          colorVisionListEntryKey(ColorVisionType.deuteranopia)
+          colorVisionListEntryKey('deuteranopia')
         },
         hasLayers: true,
       );
@@ -172,10 +182,10 @@ void main() {
       final checked = spec
           .where(
               (e) => e.kind == TrayMenuKind.applyColorVisionFilter && e.checked)
-          .map((e) => e.colorVisionType)
+          .map((e) => e.colorVisionKey)
           .toList();
 
-      expect(checked, [ColorVisionType.deuteranopia]);
+      expect(checked, ['deuteranopia']);
     });
 
     test('フィルタ解除は層が無いときだけチェックされる', () {
@@ -218,7 +228,7 @@ void main() {
         alwaysOnTop: false,
         clickThrough: false,
         checkedListEntryKeys: {
-          colorVisionListEntryKey(ColorVisionType.protanopia)
+          colorVisionListEntryKey('protanopia')
         },
         hasLayers: true,
       );
@@ -231,7 +241,7 @@ void main() {
       final proto = spec.firstWhere(
         (e) =>
             e.kind == TrayMenuKind.applyColorVisionFilter &&
-            e.colorVisionType == ColorVisionType.protanopia,
+            e.colorVisionKey == 'protanopia',
       );
       expect(proto.label, '1型2色覚（赤）');
     });
@@ -359,7 +369,7 @@ void main() {
     });
   });
 
-  group('TrayService の filterService/visionFilterState listener (#60)', () {
+  group('TrayService の visionFilterState listener (#60)', () {
     // TrayService.init() 自体は tray_manager のネイティブプラグインを叩く
     // ため、plain `flutter test`（platform channel 未登録）では常に例外に
     // なる。TrayService はそれを握り潰して `_initialised = false` のまま
@@ -369,15 +379,12 @@ void main() {
     // `TrayService.selectionChangedCallCount`（テスト専用フック）で確認する
     // （メニューの実際の再構築＝trayManager 呼び出しは別途 refresh() が
     // `_initialised` を見て no-op にするので、ここでは検証しない）。
-    late FilterService filterService;
     late VisionFilterState visionFilterState;
     late TrayService trayService;
 
     setUp(() {
       visionFilterState = VisionFilterState();
-      filterService = FilterService(visionState: visionFilterState);
       trayService = TrayService(
-        filterService: filterService,
         visionFilterState: visionFilterState,
         loupeWindow: LoupeWindowController(),
         iconPath: 'assets/tray/tray_icon.png',
@@ -390,33 +397,32 @@ void main() {
       );
     });
 
-    test('init() のあと filterService/visionFilterState の変化で listener が発火する',
+    test('init() のあと visionFilterState の変化で listener が発火する',
         () async {
       await trayService.init();
       expect(trayService.selectionChangedCallCount, 0);
 
-      // selectColorVision は filterService と visionFilterState の両方を
-      // 更新する（#60）ため、どちらにも listener を付けている以上 2 回
-      // 発火する。
-      selectColorVision(
-          filterService, visionFilterState, ColorVisionType.protanopia);
+      // 状態の正本は visionFilterState だけなので、色覚の選択は 1 回発火する。
+      selectColorVisionKey(visionFilterState, 'protanopia');
+      expect(trayService.selectionChangedCallCount, 1);
+
+      // 別名（-omaly）の選択も 1 回（variantId 付きの層に置き換わる）。
+      selectColorVisionKey(visionFilterState, 'protanomaly');
       expect(trayService.selectionChangedCallCount, 2);
 
-      // visionFilterState だけを更新する操作（advanced カタログの選択）は
-      // +1 だけ増える。
-      visionFilterState.select('starbursts');
+      // advanced カタログの選択も同じく +1。
+      visionFilterState.replaceWith('starbursts');
       expect(trayService.selectionChangedCallCount, 3);
 
       await trayService.dispose();
     });
 
-    test('dispose() のあとは filterService/visionFilterState の変化で listener が発火しない',
+    test('dispose() のあとは visionFilterState の変化で listener が発火しない',
         () async {
       await trayService.init();
       await trayService.dispose();
 
-      selectColorVision(
-          filterService, visionFilterState, ColorVisionType.protanopia);
+      selectColorVisionKey(visionFilterState, 'protanopia');
 
       expect(trayService.selectionChangedCallCount, 0);
     });
@@ -430,8 +436,7 @@ void main() {
       expect(trayService.isAvailable, isFalse);
 
       expect(
-        () => selectColorVision(
-            filterService, visionFilterState, ColorVisionType.protanopia),
+        () => selectColorVisionKey(visionFilterState, 'protanopia'),
         returnsNormally,
       );
 
@@ -445,7 +450,6 @@ void main() {
       var hideCalls = 0;
       final vs = VisionFilterState();
       final trayService = TrayService(
-        filterService: FilterService(visionState: vs),
         visionFilterState: vs,
         loupeWindow: LoupeWindowController(),
         iconPath: 'assets/tray/tray_icon.png',
@@ -487,7 +491,6 @@ void main() {
       final loupeWindow = LoupeWindowController();
       final vs = VisionFilterState();
       final trayService = TrayService(
-        filterService: FilterService(visionState: vs),
         visionFilterState: vs,
         loupeWindow: loupeWindow,
         iconPath: 'assets/tray/tray_icon.png',
@@ -516,7 +519,6 @@ void main() {
       await loupeWindow.load();
       final vs = VisionFilterState();
       TrayService(
-        filterService: FilterService(visionState: vs),
         visionFilterState: vs,
         loupeWindow: loupeWindow,
         iconPath: 'assets/tray/tray_icon.png',
@@ -552,10 +554,10 @@ void main() {
       openSettings: 'Open settings…',
       quit: 'Quit',
       filterLabels: {
-        ColorVisionType.protanopia: 'Protanopia',
-        ColorVisionType.deuteranopia: 'Deuteranopia',
-        ColorVisionType.tritanopia: 'Tritanopia',
-        ColorVisionType.achromatopsia: 'Achromatopsia',
+        'protanopia': 'Protanopia',
+        'deuteranopia': 'Deuteranopia',
+        'tritanopia': 'Tritanopia',
+        'achromatopsia': 'Achromatopsia',
       },
       appModeLoupeLabel: 'Loupe window',
       alwaysOnTopLabel: 'Always on top',
@@ -565,8 +567,7 @@ void main() {
 
     final vs = VisionFilterState();
     TrayService buildTray() => TrayService(
-          filterService: FilterService(visionState: vs),
-          visionFilterState: vs,
+            visionFilterState: vs,
           loupeWindow: LoupeWindowController(),
           iconPath: 'assets/tray/tray_icon.png',
           labels: _labels,
