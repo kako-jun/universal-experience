@@ -8,9 +8,10 @@
 
 PNG エクスポート（#43）は `getDownloadsDirectory()` へ書いていたが、次の問題があった。
 
-- macOS のサンドボックスに Downloads の entitlement が無く、書き込みがサンドボックスに拒否された。
-  取得できるパスもコンテナ内（`~/Library/Containers/<bundle>/Data/Downloads`）で、SnackBar に出るパスは
-  ユーザーが辿らない場所だった。
+- macOS のサンドボックスに Downloads の entitlement が無かった。Issue #64 の指摘では、SnackBar に出た
+  パスはコンテナ内（`~/Library/Containers/<bundle>/Data/Downloads`）のもので、ユーザーが辿らない場所
+  だった。コンテナ内 `Data/Downloads` が実 `~/Downloads` へのリンクなら、リンク先への書き込みが
+  サンドボックスに拒否されていた可能性もあるが、修正前の実機挙動は未検証（推定）。
 - ファイル名が日付までで、同じ日の 2 回目は無言で上書きされた。
 
 ## 決定
@@ -34,7 +35,7 @@ PNG エクスポート（#43）は `getDownloadsDirectory()` へ書いていた�
   たびに選択が要り、アイコン 1 タップで出せる現行の使い勝手が落ちる。user-selected の read-write
   entitlement へ変える必要もあった。Issue も第一案として Downloads entitlement を挙げていた。
 - **ドキュメントフォルダ固定**: 追加の entitlement は要らないが、コンテナ内に入ってユーザーに見えない
-  のは同じ。
+  のは同じ（と推定。未検証）。
 - **`url_launcher` 等でフォルダを開く**: 新規依存が要る。OS コマンドで足りる。
 
 ## 根拠

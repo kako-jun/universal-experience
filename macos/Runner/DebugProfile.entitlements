@@ -17,10 +17,11 @@
 	<true/>
 	<!-- PNG エクスポート (#64)。サンドボックス下の getDownloadsDirectory() は
 	     コンテナ内 Data/Downloads を返し、実機ではそれが実 ~/Downloads への
-	     シンボリックリンクになっている。この entitlement が無いとリンク先への
-	     書き込みが拒否される。付けるとリンク経由で実 ~/Downloads に書ける
-	     （表示・「フォルダで表示」に使うパスは resolveSymbolicLinks で実パスに
-	     揃える。export_service.dart の savePng 参照）。 -->
+	     シンボリックリンクになっている想定。この entitlement が無いとリンク先への
+	     書き込みがサンドボックスに拒否される想定で、付けるとリンク経由で実
+	     ~/Downloads に書ける（どちらも修正前の実機挙動は未検証）。表示・「フォルダ
+	     で表示」に使うパスは resolveSymbolicLinks で実パスに揃える
+	     （export_service.dart の savePng 参照）。 -->
 	<key>com.apple.security.files.downloads.read-write</key>
 	<true/>
 </dict>

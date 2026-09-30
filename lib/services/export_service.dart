@@ -311,8 +311,9 @@ Future<String> savePngInto(
 /// [getApplicationDocumentsDirectory] にフォールバックする。macOS のサンドボックス
 /// では、`com.apple.security.files.downloads.read-write` entitlement が無いと
 /// コンテナ内 `Data/Downloads` のリンク先（実 `~/Downloads`）への書き込みが
-/// サンドボックスに拒否される。付けるとリンク経由で実 `~/Downloads` に書ける
-/// ため、`macos/Runner/*.entitlements` に入れてある（#64）。同名ファイルは
+/// サンドボックスに拒否される想定で、付けるとリンク経由で実 `~/Downloads` に
+/// 書ける（どちらも修正前の実機挙動は未検証）ため、`macos/Runner/*.entitlements`
+/// に入れてある（#64）。同名ファイルは
 /// 上書きせず連番にする（[writeBytesWithoutOverwrite]）。
 Future<String> savePng(Uint8List bytes, String filename) async {
   final dir = (await getDownloadsDirectory()) ??

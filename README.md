@@ -124,8 +124,9 @@ sensus-core の `experiences()` です。
   ドキュメントフォルダ。macOS のサンドボックスでは `getDownloadsDirectory()` が
   コンテナ内 `Data/Downloads`（実 `~/Downloads` へのシンボリックリンク）を返すため、
   `macos/Runner/*.entitlements` の `com.apple.security.files.downloads.read-write`
-  が無いとリンク先への書き込みが拒否されます。表示・クリップボード・「フォルダで
-  表示」に使うパスは、シンボリックリンクを解決した実パスです。
+  が無いとリンク先への書き込みが拒否される想定です（修正前の実機挙動は未検証）。
+  表示・クリップボード・「フォルダで表示」に使うパスは、シンボリックリンクを
+  解決した実パスです。
 - **ファイル名**: `ue-<症状 id>-<強度>pct-<日付>_<時刻>.png`
   （例 `ue-protanopia-100pct-2026-06-23_140509.png`）。同名のファイルが既にあれば
   上書きせず `-2`, `-3` … と連番にします。

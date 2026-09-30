@@ -800,7 +800,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   書き出し先は Downloads。macOS のサンドボックスでは `getDownloadsDirectory()` が
   コンテナ内 `Data/Downloads`（実 `~/Downloads` へのシンボリックリンク）を返し、
   `files.downloads.read-write` entitlement が無いとリンク先への書き込みが拒否される
-  （#64）。`savePngInto` は保存先とファイルの最終パスを `resolveSymbolicLinks` で
+  想定（#64。修正前の実機挙動は未検証）。`savePngInto` は保存先とファイルの最終パスを `resolveSymbolicLinks` で
   実パスにして返す（SnackBar・クリップボード・「フォルダで表示」用）。ファイル名は
   日付＋時刻（`exportFilename`）で、同名があっても `writeBytesWithoutOverwrite` が
   `File.create(exclusive: true)` で連番にし上書きしない（書き込み失敗時は作りかけの
