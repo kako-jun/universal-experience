@@ -311,7 +311,7 @@ void main() {
         });
       }
 
-      walk(tester.binding.pipelineOwner.semanticsOwner!.rootSemanticsNode!);
+      walk(tester.getSemantics(find.byType(Scaffold)));
 
       int indexOf(String text) => labels.indexWhere((l) => l.contains(text));
       final beforeHeading = indexOf(l10n.previewPaneOriginal);
