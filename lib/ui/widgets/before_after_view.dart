@@ -142,6 +142,7 @@ class BeforeAfterView extends StatefulWidget {
     this.colorVisionType,
     this.sampleSize,
     this.steps,
+    this.layerNames,
   }) : assert(
           (filter == null) == (filterId == null),
           'filter and filterId must both be null or both be set',
@@ -186,6 +187,12 @@ class BeforeAfterView extends StatefulWidget {
   /// [strength] は描画に使わない（見出し・書き出しが代表として参照する、フォーカス中の層の
   /// 値。複数層の見出し・書き出しは #120/#121）。空なら原画をそのまま見せる。
   final List<VisionStep>? steps;
+
+  /// 重ねている層の表示名（適用順、#120）。2 つ以上のときだけ複数層として扱う（それ以外は従来どおり
+  /// [filterId]/[colorVisionType] の名前）。複数層のときは、after 側の見出しを
+  /// 「名前 + 名前 …（+N）」（[layerNamesSummary]）にし（切らずに折り返す）、PNG 書き出しは
+  /// 理由つきで無効にする（複数層の書き出しは #121）。
+  final List<String>? layerNames;
 
   /// Explicit width/height (in pixels) for the generated square sample
   /// image. When `null` (the default, used by real callers), the resolution
@@ -745,8 +752,11 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
           );
         }
 
+        final layerNames = widget.layerNames;
+        final multiLayer = layerNames != null && layerNames.length > 1;
         final beforePane = _Pane(
           label: l10n.previewPaneOriginal,
+          wrapLabel: multiLayer,
           // 見出し「元の画像」が説明を担うので、画像には代替テキストを付けない
           // （同じ文言の二重読み上げを避ける、#45）。
           child: PreviewImageView(image: _before),
@@ -759,8 +769,10 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         // いなければこの分岐に来る前に上の `_loading` ガードで preparing 表示に
         // なる）。それでも [PreviewImageView] 自身が null を安全に扱うため、二分岐で
         // 十分（「描画は近日対応」プレースホルダは #86 で YAGNI と判断して撤去）。
-        final afterName = visionFilterDisplayName(
-            l10n, widget.colorVisionType, widget.filterId);
+        final afterName = multiLayer
+            ? layerNamesSummary(l10n, layerNames)
+            : visionFilterDisplayName(
+                l10n, widget.colorVisionType, widget.filterId);
         final Widget afterChild = _failed
             ? PreviewErrorPlaceholder(theme: theme, label: l10n.previewFailed)
             : PreviewImageView(
@@ -773,7 +785,9 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                 semanticLabel:
                     widget.filterId == null && widget.colorVisionType == null
                         ? null
-                        : l10n.previewImageFilteredSemantics(afterName),
+                        // 複数層の代替テキストは、まとめずに全部の名前を読ませる。
+                        : l10n.previewImageFilteredSemantics(
+                            multiLayer ? layerNames.join(' + ') : afterName),
               );
         // #60: 時間依存の注記は widget.filterId（カタログ id）からカタログを
         // 引いて解決する。after ペインの見出しは widget.colorVisionType が
@@ -784,14 +798,21 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
             : kVisionFilterCatalogById[widget.filterId];
         final afterPane = _Pane(
           label: afterName,
+          // 複数層の見出しは切らずに折り返す。左右の見出し行の高さを揃えるため、
+          // 両ペインに同じ最小の高さを与える（[_Pane.wrapLabel]）。
+          wrapLabel: multiLayer,
           // Export is only meaningful when a real "after" image exists.
           // The failed state (null _after) gets no button.
+          // 複数層の間は無効にし、理由を下に見せる（#120。複数層の書き出しは #121）。
           trailing: _after != null
               ? IconButton(
                   icon: const Icon(Icons.download_outlined),
                   iconSize: 20,
-                  tooltip: l10n.exportButtonTooltip,
-                  onPressed: _exporting ? null : () => _export(l10n),
+                  tooltip: multiLayer
+                      ? l10n.exportDisabledMultiLayer
+                      : l10n.exportButtonTooltip,
+                  onPressed:
+                      _exporting || multiLayer ? null : () => _export(l10n),
                 )
               : null,
           child: afterChild,
@@ -810,6 +831,19 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                 ],
               );
 
+        // 複数層の間の PNG 書き出しの無効の理由（#120。ボタンの tooltip だけに頼らず常に見せる）。
+        final Widget? exportReason = multiLayer && _after != null
+            ? Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  l10n.exportDisabledMultiLayer,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              )
+            : null;
+
         // #60: vertigo / bppv_rotation のような時間依存フィルタは、CPU
         // プレビュー（時刻を受け取らず常に同じ内部時刻で描画する、
         // `CpuVisionRenderer` の doc 参照）では静止フレームにしかならない。
@@ -819,6 +853,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               panes,
+              if (exportReason != null) exportReason,
               const SizedBox(height: 8),
               Text(
                 l10n.previewStaticFrameNote,
@@ -827,6 +862,12 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                 ),
               ),
             ],
+          );
+        }
+        if (exportReason != null) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [panes, exportReason],
           );
         }
         return panes;
@@ -871,8 +912,8 @@ ExportCaption buildExportCaption(
     simulationNotice: l10n.exportSimulationNotice,
     experimentalNotice:
         (kVisionFilterCatalogById[filterId]?.isExperimental ?? false)
-        ? l10n.exportExperimentalNotice
-        : null,
+            ? l10n.exportExperimentalNotice
+            : null,
     urgencyMessage: notice?.message,
     escalationGroups: [
       for (final g in notice?.escalationGroups ?? const [])
@@ -939,9 +980,17 @@ void showExportSuccess(
 }
 
 class _Pane extends StatelessWidget {
-  const _Pane({required this.label, required this.child, this.trailing});
+  const _Pane({
+    required this.label,
+    required this.child,
+    this.trailing,
+    this.wrapLabel = false,
+  });
 
   final String label;
+
+  /// 見出しを切らずに折り返す（複数層の見出し、#120）。false なら 1 行で省略記号。
+  final bool wrapLabel;
   final Widget child;
 
   /// Optional action shown to the right of the label (e.g. the export button).
@@ -957,15 +1006,19 @@ class _Pane extends StatelessWidget {
         // 書き出しボタン（after 側だけ）を含む行は 48dp（タップ領域の下限、#45）。
         // before 側にも同じ高さを使うのは、左右の見出し行の高さを揃えて
         // 画像の上端をずらさないため。
-        SizedBox(
-          height: 48,
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            // 折り返す見出しは 3 行（labelLarge の 20dp × 3）まで高さを揃える。
+            minHeight: wrapLabel ? 64 : 48,
+            maxHeight: wrapLabel ? double.infinity : 48,
+          ),
           child: Row(
             children: [
               Expanded(
                 child: Text(
                   label,
                   style: theme.textTheme.labelLarge,
-                  overflow: TextOverflow.ellipsis,
+                  overflow: wrapLabel ? null : TextOverflow.ellipsis,
                 ),
               ),
               if (trailing != null) trailing!,

@@ -793,6 +793,10 @@
       }
     }
   },
+  "exportDisabledMultiLayer": "Saving as PNG isn't available yet while several filters are combined.",
+  "@exportDisabledMultiLayer": {
+    "description": "Visible reason next to the disabled PNG export button while several filters are layered (the export caption for combined filters comes in a later step, #121)."
+  },
   "adjustHeading": "Adjust",
   "@adjustHeading": {
     "description": "Heading of the right column (adjustment) on the home screen (#72)."

@@ -161,6 +161,58 @@ void main() {
     });
   });
 
+  group('複数層の表示 (#120)', () {
+    testWidgets('複数層: 名前の要約を出し、強度は出さない', (tester) async {
+      await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
+      visionState.toggle('protanopia');
+      visionState.toggle('myopia');
+      visionState.toggle('vertigo');
+
+      await pumpHud(tester);
+
+      // 段順（運動 → 光学 → 色覚）の先頭 2 つ + 「…（+N）」。
+      expect(find.textContaining('… (+1)'), findsOneWidget);
+      expect(find.textContaining('Strength:'), findsNothing);
+    });
+
+    testWidgets('1 層は従来どおり名前と強度', (tester) async {
+      await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
+      visionState.toggle('myopia');
+
+      await pumpHud(tester);
+
+      expect(find.text('Strength: 100%'), findsOneWidget);
+      expect(find.textContaining('+'), findsNothing);
+    });
+
+    testWidgets('層ごとの受診喚起は、名前の見出しつきでダイアログに並ぶ', (tester) async {
+      visionFilterUrgencyProvider = (filter) =>
+          filter == const VisionFilter.photophobia()
+              ? Urgency.emergency
+              : Urgency.none;
+      visionFilterUrgencyEscalationProvider = (_) => const [];
+      await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
+      visionState.toggle('myopia');
+      visionState.toggle('photophobia');
+
+      await pumpHud(tester);
+      expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.warning_amber_rounded));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Medical guidance'), findsOneWidget);
+      expect(
+        find.text(
+          'If these symptoms appear suddenly, seek medical care right away.',
+        ),
+        findsOneWidget,
+      );
+      // 喚起のある層の名前が見出しとして付く（喚起の無い層は出ない）。
+      expect(find.text('Photophobia'), findsWidgets);
+    });
+  });
+
   group('受診喚起アイコン', () {
     testWidgets('喚起が無ければアイコンを出さない', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));

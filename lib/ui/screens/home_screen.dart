@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
+import '../../l10n/l10n_extensions.dart';
 import '../../models/sample_catalog.dart';
 import '../../services/app_shortcuts.dart';
 import '../../services/color_vision_compare.dart';
@@ -447,6 +448,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           // 単一フィルタ経路のまま。
                           steps: visionState.layers.length > 1
                               ? previewPipelineSteps(visionState)
+                              : null,
+                          // 複数層の見出し・HUD は名前の要約にする（#120）。
+                          layerNames: visionState.layers.length > 1
+                              ? [
+                                  for (final layer in visionState.layers)
+                                    visionLayerDisplayName(l10n, layer),
+                                ]
                               : null,
                           imageSource: imageSourceState.current,
                         ),

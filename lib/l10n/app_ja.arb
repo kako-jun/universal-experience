@@ -253,6 +253,7 @@
   "layerChipFocusHint": "押すと、このフィルタを調整します",
   "layerChipRemove": "{name}を外す",
   "layerSectionSummary": "適用順 {order} 番目、{name}、強さ {percent}%",
+  "exportDisabledMultiLayer": "複数のフィルタを重ねている間は、PNG で保存する機能はまだ使えません。",
   "adjustHeading": "調整",
   "selectionEmptyTitle": "何も選択されていません",
   "selectionEmptyBody": "一覧から見え方を選ぶと、ここに強さやパラメータが表示されます。",
