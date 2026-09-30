@@ -149,7 +149,7 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 - **スライダー・ドロップダウンは名前を持たせる。** 上に置いた見出し `Text` は別ノードなので、
   `MergeSemantics(child: Semantics(label: 名前, child: Slider(...)))` で束ね、値は
   `semanticFormatterCallback` で読める書式にする（`IntensitySlider`・`FilterParamPanel`）。
-- 見出しの `Text` は `Semantics(header: true)`、画像（`PreviewImageView`）は `semanticLabel`、
+- 見出しの `Text` は `Semantics(header: true)`、画像（`PreviewImageView`）は `semanticLabel`（見出しが説明を担う画像には付けず、二重読み上げを避ける）、
   状態が変わる文言（準備中・失敗）は `liveRegion`。
 - アニメーション（フェード・スクロール・枠の遷移）は `MediaQuery.disableAnimationsOf(context)` が真なら
   `Duration.zero` にする。点滅は使わない。
