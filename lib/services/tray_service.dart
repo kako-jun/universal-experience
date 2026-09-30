@@ -477,20 +477,20 @@ class TrayService with TrayListener {
   }
 
   Future<void> _rebuildMenu() async {
+    // チェックはすべて VisionFilterState から決める（ウィンドウ内 UI の選択が
+    // そのままトレイに出る、#65）。一覧の選択行は統合一覧（FilterBrowser）と同じ
+    // 判定なので、色覚 base 型（protanopia 等）を高度なフィルタ側から選んだ場合も、
+    // 一覧と同じくトップレベルの同名項目に点灯する。プリセット選択中は一覧の行が
+    // 無い（null）ので、何もチェックしない（トレイにプリセットは出さない）。
+    final selectedEntry = selectedFilterListEntry(visionFilterState);
     final spec = buildTrayMenuSpec(
       loupeVisible: _loupeVisible,
       labels: _labels,
       appMode: loupeWindow.appMode,
       alwaysOnTop: loupeWindow.alwaysOnTop,
       clickThrough: loupeWindow.clickThrough,
-      // advanced/プリセットを選んでいる間は、色覚クイック選択のチェックマークを
-      // 出さない（#60。FilterBrowser 一覧の選択行の強調と同じ判定）。
-      activeFilter: visionFilterState.isColorQuickSelection
-          ? filterService.currentFilter
-          : ColorVisionType.none,
-      // 「高度なフィルタ」サブメニューのチェックも VisionFilterState から決める
-      // （ウィンドウ内 UI の選択がそのままトレイに出る、#65）。
-      selectedListEntry: selectedFilterListEntry(visionFilterState),
+      activeFilter: selectedEntry?.colorVisionType ?? ColorVisionType.none,
+      selectedListEntry: selectedEntry,
       advancedSelected: visionFilterState.selectedId != null &&
           !visionFilterState.isColorQuickSelection,
     );
@@ -498,12 +498,17 @@ class TrayService with TrayListener {
     // visionFilterState が連続通知されても、ネイティブメニューを作り直し続けない。
     final last = _lastSpec;
     if (last != null && listEquals(last, spec)) return;
+    // 送信の完了を待たずに「最後に送った構造」を更新する。完了後に更新すると、
+    // 送信中に A→B→A と変わったとき、最後の A が（まだ記録が古い A と等しいため）
+    // 送られず、ネイティブが B のまま残る。チャネルは送信順に処理される。
+    _lastSpec = spec;
     final menu = Menu(items: spec.map(_toMenuItem).toList());
     try {
       await trayManager.setContextMenu(menu);
-      _lastSpec = spec;
     } catch (error) {
-      _lastSpec = null;
+      // 失敗した送信が最新なら、次の再構築で必ず再送させる（より新しい送信が
+      // すでに走っているなら、その記録を消さない）。
+      if (identical(_lastSpec, spec)) _lastSpec = null;
       debugPrint('TrayService.setContextMenu failed: $error');
     }
   }
@@ -649,6 +654,8 @@ class TrayService with TrayListener {
     filterService.removeListener(_onSelectionChanged);
     visionFilterState.removeListener(_onSelectionChanged);
     loupeWindow.removeListener(_onSelectionChanged);
+    // 破棄後の再 init で、同じ構造でも必ず送り直させる。
+    _lastSpec = null;
     if (!isTraySupportedPlatform) return;
     try {
       trayManager.removeListener(this);

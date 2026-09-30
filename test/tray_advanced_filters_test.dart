@@ -11,6 +11,8 @@
 
 import 'dart:ui' show Locale;
 
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -168,7 +170,11 @@ void main() {
     late TrayService tray;
     late int loupeNotifications;
 
+    /// 非 null の間、setContextMenu の完了を止める（送信中の状態を作る）。
+    Completer<void>? sendGate;
+
     setUp(() async {
+      sendGate = null;
       SharedPreferences.setMockInitialValues({});
       calls = [];
       final messenger =
@@ -176,6 +182,10 @@ void main() {
       messenger.setMockMethodCallHandler(const MethodChannel('tray_manager'),
           (call) async {
         calls.add(call);
+        final gate = sendGate;
+        if (gate != null && call.method == 'setContextMenu') {
+          await gate.future;
+        }
         return null;
       });
       addTearDown(() => messenger.setMockMethodCallHandler(
@@ -352,6 +362,56 @@ void main() {
       await click('list_catalog:starbursts');
       expect(menuSends(), greaterThan(sends));
       expect(checked('list_catalog:starbursts'), isTrue);
+    });
+
+    test('送信中に A→B→A と変わっても、最後の状態がネイティブに残る', () async {
+      visionState.select('starbursts'); // A（送信完了済み）
+      await settle();
+      expect(checked('list_catalog:starbursts'), isTrue);
+
+      sendGate = Completer<void>();
+      visionState.select('myopia'); // B（送信中で完了しない）
+      await settle();
+      visionState.select('starbursts'); // 再び A
+      await settle();
+      sendGate!.complete();
+      await settle();
+
+      expect(checked('list_catalog:starbursts'), isTrue,
+          reason: '最後に送ったメニューが最新の選択（A）を指す');
+      expect(checked('list_catalog:myopia'), isFalse);
+    });
+
+    test('色覚の base 型を高度なフィルタ側から選んでも、トップレベルの同名項目に点灯する', () async {
+      visionState.select('protanopia');
+      await settle();
+
+      expect(checked(colorVisionEntryKey(ColorVisionType.protanopia)), isTrue);
+      expect(checked('list_cv:protanopia'), isTrue);
+      expect(checked(kClearFilterKey), isFalse);
+
+      // 色覚ではない advanced ならトップレベルには何も点かない。
+      visionState.select('myopia');
+      await settle();
+      expect(
+          [
+            for (final f in quickColorVisionFilters())
+              checked(colorVisionEntryKey(f))
+          ].where((c) => c),
+          isEmpty);
+    });
+
+    test('プリセット選択中はトップレベルも解除項目も含めて何もチェックしない', () async {
+      visionState.selectPreset('labyrinthitis', 'vertigo');
+      await settle();
+
+      expect(
+          [
+            for (final f in quickColorVisionFilters())
+              checked(colorVisionEntryKey(f))
+          ].where((c) => c),
+          isEmpty);
+      expect(checked(kClearFilterKey), isFalse);
     });
 
     test('言語が変わるとサブメニューの文言も差し替わり、チェックは保たれる (#82)', () async {
