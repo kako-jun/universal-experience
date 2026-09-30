@@ -51,7 +51,7 @@ class SingleFlightCache<K, V> {
 /// `ui.Image` に適用するヘルパ。
 ///
 /// 色覚 3 型（protanopia/deuteranopia/tritanopia）+ achromatopsia が実描画対応
-/// 済み（#59）。配線の骨格は #11 のゴールのまま:
+/// 済み（#59）。配線の骨格:
 ///   FragmentProgram.fromAsset → fragmentShader() → setFloat で uniform を積む
 ///   → setImageSampler(0, src) → PictureRecorder.drawRect(Paint..shader) → toImage。
 ///

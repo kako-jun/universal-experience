@@ -109,7 +109,7 @@
 
 ルーペ窓のウィンドウ設定の責務。実装は `lib/services/loupe_window_controller.dart`
 (window_manager ラッパ + 純粋ロジック `LoupeWindowPolicy`) と `lib/main.dart` の配線。
-画面キャプチャ (#3/#4/#5)・ライブ適用・描画 (#11)・フィルタ UI (#16)・トレイ (#15) は本節のスコープ外。
+画面キャプチャ (#3/#4/#5)・ライブ適用・描画 (#1)・フィルタ UI (#16)・トレイ (#15) は本節のスコープ外。
 
 対象アプリ指定モード（ルーペ窓の自動配置モード）の設計判断・要検証事項・OS ごとの
 提供可否は `docs/adr/2026-09-26-loupe-as-single-render-unit.md` 参照。
@@ -145,7 +145,7 @@
   `setTitleBarStyle` を呼ぶ順序。プラットフォームによっては全画面遷移と
   タイトルバースタイル変更の順序差で「全画面なのにタイトルバーが残る/枠が
   二重に出る」等が起きうる。この順序 (fullscreen → titleBar) が破綻しないかは
-  **実機目視で確認が必要 (#11 後)**。
+  **実機目視で確認が必要（ライブキャプチャ #1 の実装後）**。
 
 ### リサイズ追従
 
@@ -191,7 +191,7 @@
   **macOS 専用**で、Linux/Windows では window_manager 側で無視される。Linux では
   「自ウィンドウがイベントを無視する」までは効くが、「下のアプリへ転送する」挙動は
   forward では保証されない (コンポジタ/OS 依存)。クリックスルー時に下のアプリを
-  実際に操作できるかは **Linux 実機での確認が必要 (#11 後)**。
+  実際に操作できるかは **Linux 実機での確認が必要（ライブキャプチャ #1 の実装後）**。
 - フレームレス/クリックスルー forward 引数はプラットフォーム差・未対応があるため、
   全 window_manager I/O は try/catch + ログで握り、未対応でも落とさない。
 
@@ -761,8 +761,9 @@ HUD より下のレイヤだけに限定する」実装がしやすい構造に�
 ### 実機目視について
 
 透過・クリックスルー・最大化時の縁などの GUI 目視確認は、Wayland/grim 制約と
-#11 描画統合前のため本実装段階では未実施。`flutter analyze` / `flutter test` /
-`flutter build linux --debug` で静的・ビルド確認のみ。実機目視は #11 描画統合後に行う。
+ライブキャプチャ（#1）の実装前のため本実装段階では未実施。`flutter analyze` /
+`flutter test` / `flutter build linux --debug` で静的・ビルド確認のみ。実機目視は
+#1 の実装後に行う。
 
 ## システムアーキテクチャ（現行）
 
@@ -1153,7 +1154,7 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   この検討を経ていないため前提としない）
 - **視野欠損・視覚ぼやけ等**: sensus-core のカタログには既に含まれ、
   advanced フィルタとして選択・パラメータ調整はできる。live GPU 描画・専用 UI の
-  拡張は個別 Issue（#59 等）で順次対応する。運動障害・認知障害は非目標
+  拡張は個別 Issue（#61 等）で順次対応する。運動障害・認知障害は非目標
   （`README.md`「やらないこと（非目標）」参照）
 - **depth_aware_blur の配線**（#78 着手コメント参照）: `depth_landscape` の
   深度マップ（`assets/samples/depth_landscape_depth.png`）は素材として同梱

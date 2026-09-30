@@ -288,7 +288,7 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
   /// では window_manager 側で無視される。つまり Linux では「自ウィンドウはイベントを
   /// 無視する」までは効くが、「下のアプリへ転送する」挙動は forward では保証されない
   /// (コンポジタ/OS 依存)。クリックスルー時に下のアプリが実際に操作できるかは
-  /// **Linux 実機での確認が必要 (#11 描画統合後)**。未対応でも落ちないよう
+  /// **Linux 実機での確認が必要（ライブキャプチャ #1 の実装後）**。未対応でも落ちないよう
   /// try/catch で握る。
   Future<void> setClickThrough(bool value) async {
     if (value && _appMode == AppMode.settings) {
