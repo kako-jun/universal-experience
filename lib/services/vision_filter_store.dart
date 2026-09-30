@@ -185,7 +185,9 @@ class VisionFilterStore {
   /// snapshot が無い・復元が例外で失敗したときは [state] は変更しない（後者は
   /// [VisionFilterState.restore] が巻き戻す）。購読は復元の成否に関わらず張る。
   /// 空の版 1 は復元しない（何も運んでこない）が、空の v2 は「未選択で終了した」
-  /// 状態として復元する。復元済みかどうかを返す。
+  /// 状態として復元する。例外として、-opia の強度だけを持つ版 1 は変換後には何も
+  /// 運ばないが、[VisionFilterSnapshot.legacyHadContent] により非空として復元する
+  /// （旧実装の挙動を保つ。先にシードした色覚選択は解除される）。復元済みかどうかを返す。
   Future<bool> restoreAndBind(
     VisionFilterState state, {
     bool Function(String presetId, String catalogId)? isValidPreset,
@@ -194,7 +196,8 @@ class VisionFilterStore {
     snapshot ??= await load();
     var restored = false;
     // 読める v2 は空でも復元する（「何も選ばずに終了した」が正本で、設定側の色覚
-    // シードより優先される）。空なのは版 1 だけ無視する（何も運んでこない）。
+    // シードより優先される）。空なのは版 1 だけ無視する（何も運んでこない）。ただし
+    // -opia の強度だけの版 1 は legacyHadContent で isEmpty が false になり、復元する。
     if (snapshot != null && (!snapshot.isEmpty || !snapshot.fromLegacy)) {
       try {
         state.restore(snapshot, isValidPreset: isValidPreset);
