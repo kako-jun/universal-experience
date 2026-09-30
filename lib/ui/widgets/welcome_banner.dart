@@ -76,8 +76,7 @@ class WelcomeBanner extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   l10n.welcomeBannerBody,
-                  style:
-                      theme.textTheme.bodyMedium?.copyWith(color: onContainer),
+                  style: theme.textTheme.bodyMedium?.copyWith(color: onContainer),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
