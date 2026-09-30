@@ -83,6 +83,7 @@
   "trayClearFilter": "フィルタを解除",
   "trayOpenSettings": "設定を開く…",
   "trayQuit": "終了",
+  "trayAdvancedFilters": "高度なフィルタ",
 
   "filterNormalVision": "正常色覚",
   "filterProtanopia": "1型2色覚（赤）",

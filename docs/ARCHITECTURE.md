@@ -208,10 +208,15 @@
 `tray_service.dart` は 2 層に分かれている。
 
 - **純粋ロジック層** (`TrayMenuKind` / `TrayMenuEntry` /
-  `quickColorVisionFilters()` / `buildTrayMenuSpec()` / `trayToggleLabel()` /
+  `quickColorVisionFilters()` / `buildTrayMenuSpec()` /
+  `buildAdvancedFiltersSubmenu()` / `trayToggleLabel()` /
   `resolveCloseAction()`) — 「トレイメニューに何を出すか」をデータとして表現する。
   tray_manager に一切依存しないため、ウィンドウシステム無しで単体テストできる
-  (`test/tray_service_test.dart`)。
+  (`test/tray_service_test.dart`、`test/tray_advanced_filters_test.dart`)。
+  文言の値オブジェクト `TrayMenuLabels` と `quickColorVisionFilters()` は
+  `lib/services/tray_menu_labels.dart` にあり（`tray_service.dart` が再 export）、
+  `l10n_extensions.dart` ⇄ `filter_list_selection.dart` ⇄ `tray_service.dart` の
+  import 循環を避けている。
 - **`TrayService`** — tray_manager を叩く副作用層。上記スペックを実際の
   `Menu` / `MenuItem` に変換し、クリックを `FilterService` (#14) と、main.dart
   から注入されるウィンドウ表示/非表示コールバックに橋渡しする。
@@ -257,16 +262,39 @@ main.dart が `windowManager.show()` / `hide()` を `onShowLoupe` / `onHideLoupe
 6. (区切り線)
 7. **即切替フィルタ** (`quickColorVisionFilters()`) — よく使う色覚シミュレーションを
    直接適用: Protanopia / Deuteranopia / Tritanopia / Achromatopsia。
-   `FilterService.applyFilter()` を呼び、アクティブなものにチェックが付く。全フィルタ
-   catalogue は設定 UI (#16) にあり、トレイは短く保つため代表のみ出す。
-8. **フィルタを解除** — `FilterService.deactivate()`
-9. (区切り線)
-10. **設定を開く…** — フィルタ選択 UI はメインウィンドウ内にあるため
+   `selectColorVision`（`FilterService.applyFilter()` と `VisionFilterState` を
+   同時に更新する色覚クイック選択の入口）を通り、選択中のものにチェックが付く。
+   チェックは項番 8 と同じ選択行から決めるため、色覚の base 型（Protanopia 等）を
+   「高度なフィルタ」側から選んでも同名のトップレベル項目に点灯する（統合一覧と同じ）。
+   トップレベルは短く保つため代表のみで、全フィルタは次項の「高度なフィルタ」
+   サブメニューから選べる (#65)。
+8. **高度なフィルタ** (#65) — カテゴリ別の入れ子サブメニュー（7 カテゴリ）。統合
+   フィルタ一覧 `kFilterListEntries`（色覚 7 型 + advanced 30 = 33 行、#72）の行を
+   すべて並べ、選ぶとウィンドウ内一覧と同じ入口 `applyFilterListEntry`
+   （色覚の行は `selectColorVision`、それ以外は `VisionFilterState.select`）を通る。
+   チェックは `selectedFilterListEntry(visionFilterState)` で決めるため、
+   ウィンドウ内 UI で選んだものもトレイに反映される（体験プリセット選択中は
+   トレイに何もチェックを付けない。トレイにプリセットは出さず、ウィンドウ内一覧も
+   一覧の行を点灯させないため）。ラベルは `TrayMenuLabels` の
+   `advancedFilters` / `categoryLabels` / `catalogNames` / `filterLabels` で、
+   ARB（ja/en）から解決し `updateLocalization` で言語変更に追従する
+9. **フィルタを解除** — `deactivateColorVision`（色覚・advanced・プリセットを
+   まとめて未選択へ戻す）。何も選ばれていないときにチェックが付く
+10. (区切り線)
+11. **設定を開く…** — フィルタ選択 UI はメインウィンドウ内にあるため
    `windowManager.show()` + `focus()` でウィンドウを表示する
-11. (区切り線)
-12. **終了** — 先頭で `FilterService.flush()`（#57、保留中の intensity
-   デバウンス書き込みを取りこぼさない）した上で、トレイを破棄し
+12. (区切り線)
+13. **終了** — 先頭で `FilterService.flush()`（#57、保留中の intensity
+   デバウンス書き込みを取りこぼさない）・`VisionFilterStore.flush()`（#65、
+   フィルタ選択の保留書き込み）した上で、トレイを破棄し
    `setPreventClose(false)` の上で `windowManager.destroy()`
+
+`TrayService._rebuildMenu` は、組み立てたメニュー構造が直前にネイティブへ送った
+ものと等しければ送り直さない（スライダーのドラッグ中に `VisionFilterState` が
+連続通知されても、33 行 + カテゴリのメニューを作り直し続けないため）。ただし
+メニュー項目のクリック後は、ネイティブ側が先にチェック表示を反転させる環境でも
+見た目が食い違わないよう、必ず送り直す。フィルタ切替のクリックは
+`LoupeWindowController`（クリックスルー・最前面・モード、#63）に一切触れない。
 
 ### ウィンドウクローズ・ポリシー
 
@@ -351,6 +379,46 @@ Linux debug ビルド成功で代替している:
 いつでも ON にしてよい（2 つの復帰経路が常にあるため）ので復帰手段の可用性を
 待つ必要はもう無いが、`main()` は診断ログのタイミングを揃えるため、引き続き
 トレイ/ホットキーの初期化が終わったあとにこれを呼ぶ構成のままにしている。
+
+## フィルタ選択の永続化 (#65)
+
+`VisionFilterState`（プレビューの選択の唯一の正本）を再起動をまたいで残す。
+
+- **保存するもの**: 選択中のカタログ id・体験プリセット id・色覚クイック選択の型・
+  フィルタ id ごとの強度と payload パラメータ（選択中のものを含む）。原画比較
+  （bypass）など一時的な状態は保存しない。JSON は `version`（現在 1）つきで、
+  seed（u64）は double を経由して精度が落ちないよう 10 進文字列で持つ。
+- **定義と状態を分ける**: 保存するのは状態だけで、min/max/default/options は
+  カタログ（`vision_filter_catalog.dart`）が正本のまま。**読み込み時に**
+  `VisionFilterSnapshot.fromJson` / `sanitizeVisionParams` がカタログに照らして補正する
+  — 未知のフィルタ id・定義に無いパラメータは捨て、範囲外は min/max に丸め、
+  型違い・NaN・未知の選択肢・範囲外の seed は既定値に戻し、欠けたパラメータは既定値で
+  埋める。版が違う・JSON が壊れている・旧形式のときは丸ごと捨てて既定で起動する。
+  したがって sensus 側でフィルタ id やパラメータが変わっても起動は止まらない
+  （`test/vision_filter_snapshot_test.dart` が固定）。
+- **復元の順序（`buildRootApp`）**: 設定の `filterType` による色覚シード（初回起動は
+  deuteranomaly）→ `VisionFilterStore.restoreAndBind`。復元できる保存値があれば
+  それが勝つ（「解除して終了」した場合、設定側に前回の色覚が残っていても
+  未選択で始まる）。保存値が無い・空・壊れているときは state に触れず、色覚シードの
+  まま。色覚クイック選択が復元されたときは `FilterService.applyFilter` も呼び、
+  トレイとウィンドウ内 UI が同じ `FilterService` を見るようにする。advanced 選択中の
+  `FilterService` は従来どおり古いまま（消費側は `isColorQuickSelection` で判定する）。
+- **体験プリセット**: 保存された体験 id が今の体験一覧にあり、かつそのフィルタが
+  保存されたカタログ id と一致するときだけプリセット選択として戻す。一覧から消えて
+  いれば advanced の選択として戻す（`isValidExperiencePreset`。widget を経由せず
+  main から使えるよう `lib/services/experience_source.dart` に置く）。
+- **書き込み**: `FilterService` の per-type 強度（#57）と同じ作法で、変更は 300ms
+  デバウンスで書き、JSON が直前と同じ変化（原画比較の切替など）は書かない。
+  終了経路（トレイの終了・`onExitRequested`・ウィンドウクローズ）で `flush()` する。
+  書き込み失敗は握りつぶす（次回は既定値で起動するだけ）。`flush()` は、タイマー発火後
+  にすでに走っている書き込みの完了も待つ。
+- **復元の失敗**: 復元の途中（推奨強度の算出・体験一覧の取得など sensus 呼び出し）で
+  例外が出ても起動は止めない。`VisionFilterState.restore` は失敗時に呼び出し前の
+  状態へ巻き戻して rethrow し、`VisionFilterStore.restoreAndBind` が握って、色覚シード
+  のまま以後の保存だけ始める。
+- **テスト**: 往復・補正・フォールバックの純粋テスト（`test/vision_filter_snapshot_test.dart`・
+  `test/vision_filter_store_test.dart`）と、`buildRootApp` を 2 回起動して復元を確かめる
+  実アプリ経路のテスト（`test/vision_filter_persistence_app_test.dart`）。
 
 ## グローバルホットキー (#63)
 
@@ -735,7 +803,8 @@ macOS / Linux アプリに同梱される。`lib/main.dart` の `buildRootApp()`
 （`test/native_bridge_error_app_test.dart`）。
 
 `buildRootApp()` は `initBridge`（既定 `initNativeBridge`）と `settings`
-（既定で新規 `SettingsService()`）を差し替え可能な引数に取る。windowManager /
+（既定で新規 `SettingsService()`）、`store`（フィルタ選択の永続化 `VisionFilterStore`、#65）を
+差し替え可能な引数に取る。windowManager /
 trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に閉じたまま
 残している（デスクトップ専用の副作用をブリッジ初期化のテストに持ち込まない
 ため）。`integration_test/app_bootstrap_test.dart`（#55 レビュー M1）は
@@ -786,7 +855,13 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   `SettingsService.setFilterType` 経由で引き続き通知・永続化する。フィルタの
   選び直しはユーザー操作としてスライダー操作ほど高頻度ではないため、
   `MaterialApp` 再構築が起きること自体は許容している
-- `VisionFilterState`: advanced カタログ（sensus 全 30 種）の選択・パラメータ状態
+- `VisionFilterState`: advanced カタログ（sensus 全 30 種）の選択・パラメータ状態。
+  選択（id・体験プリセット id・色覚クイック選択の型）とフィルタ id ごとの
+  強度・payload の記憶は `snapshot()` / `restore()` で `VisionFilterSnapshot`
+  （`lib/services/vision_filter_snapshot.dart`）と往復し、`VisionFilterStore`
+  （`lib/services/vision_filter_store.dart`）が `SharedPreferences`
+  （キー `settings.visionFilter`、版つき JSON）へ永続化する（#65。下記
+  「フィルタ選択の永続化」）
 - `CpuVisionRenderer`（`lib/rendering/cpu_vision_renderer.dart`）: sensus の CPU
   `apply()`（`applyVisionCpuRgba8`）で `ui.Image` にフィルタを適用する、
   **プレビュー（静止画）描画の正本**（#85）。`ui.Image` → straight RGBA8

@@ -1,6 +1,6 @@
 import '../models/disability_type.dart';
 import '../models/vision_filter_catalog.dart';
-import '../services/tray_service.dart';
+import '../services/tray_menu_labels.dart';
 import '../src/rust/api/sensus_bridge.dart';
 import 'app_localizations.dart';
 
@@ -479,7 +479,8 @@ ConsultNotice? resolveConsultNotice(
 ///
 /// トレイは BuildContext を持てないため、`AppLocalizations.of(context)` ではなく
 /// `lookupAppLocalizations(locale)` で得たインスタンスをここに渡す。color-vision
-/// ラベルは [quickColorVisionFilters] の各型を [colorVisionTypeName] で解決する。
+/// ラベルは [colorVisionTypeName]、「高度なフィルタ」サブメニュー（#65）の
+/// カテゴリ見出し・フィルタ名は [visionCategoryName]・[visionFilterName] で解決する。
 TrayMenuLabels trayMenuLabelsFrom(AppLocalizations l10n) {
   return TrayMenuLabels(
     showLoupe: l10n.trayShowLoupe,
@@ -487,9 +488,21 @@ TrayMenuLabels trayMenuLabelsFrom(AppLocalizations l10n) {
     clearFilter: l10n.trayClearFilter,
     openSettings: l10n.trayOpenSettings,
     quit: l10n.trayQuit,
+    // トップレベルのクイック 4 型に加え、「高度なフィルタ」サブメニュー（#65）の
+    // 色覚行（-omaly を含む 7 型）を全てカバーする。
     filterLabels: {
-      for (final type in quickColorVisionFilters())
-        type: colorVisionTypeName(l10n, type),
+      for (final type in ColorVisionType.values)
+        if (type != ColorVisionType.none)
+          type: colorVisionTypeName(l10n, type),
+    },
+    advancedFilters: l10n.trayAdvancedFilters,
+    categoryLabels: {
+      for (final category in VisionFilterCategory.values)
+        category: visionCategoryName(l10n, category),
+    },
+    catalogNames: {
+      for (final entry in kVisionFilterCatalog)
+        entry.id: visionFilterName(l10n, entry.id),
     },
     // 起動モード・最前面・クリックスルーのトレイ項目 (#63) は WindowModePanel が
     // 使っているのと同じ ARB キーを再利用する（新規キー不要）。
