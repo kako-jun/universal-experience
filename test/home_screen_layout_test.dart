@@ -447,10 +447,8 @@ void main() {
           ?.findAncestorWidgetOfExactType<FilterListTile>()
           ?.key;
 
-      // 受け口からの ↓ は先頭の行に入る。以降は見えている行の順に進む。
-      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-      await tester.pump();
-      expect(focusedRowKey(), filterListTileKey(visible[0]));
+      // 受け口からの ↓ は、調整中の層の行（visible[0]）の次の行に入る（先頭へは戻らない）。
+      // 以降は見えている行の順に進む。
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.pump();
       expect(focusedRowKey(), filterListTileKey(visible[1]));
@@ -469,6 +467,31 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.pump();
       expect(h.visionState.layers.map((l) => l.id), ['protanopia']);
+    });
+  });
+
+  group('行にフォーカスが無いときの ↑↓ は、調整中の層の行から送る（#120）', () {
+    Key? focusedRowKey(WidgetTester tester) =>
+        tester.binding.focusManager.primaryFocus?.context
+            ?.findAncestorWidgetOfExactType<FilterListTile>()
+            ?.key;
+
+    testWidgets('選んだ行が末尾側にあるとき、↑ は末尾ではなく直前の行に入る', (tester) async {
+      final h = await pumpHomeScreen(tester, size: wide);
+      await tester.enterText(find.byType(TextField), 'protan');
+      await tester.pump();
+      final visible = visibleFilterListEntries(query: 'protan');
+      expect(visible.length, greaterThanOrEqualTo(2));
+
+      final row = find.byKey(filterListTileKey(visible[1]));
+      await tester.ensureVisible(row);
+      await tester.tap(row);
+      await tester.pump();
+      expect(selectedFilterListEntry(h.visionState), visible[1]);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pump();
+      expect(focusedRowKey(tester), filterListTileKey(visible[0]));
     });
   });
 

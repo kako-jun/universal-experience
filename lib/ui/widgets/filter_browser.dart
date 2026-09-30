@@ -68,11 +68,12 @@ class FilterBrowserController extends ChangeNotifier {
   bool get isRowFocused => focusedRowEntry != null;
 
   /// ↑↓: 今見えている行の間でフォーカスを送る（#63, #120）。**選択は変えない**（足し引きは
-  /// Space/Enter）。行にフォーカスが無いときは、順送りは先頭・逆送りは末尾の行へ入る。
+  /// Space/Enter）。行にフォーカスが無いときは、[from]（調整中の層の行）の次・前の行へ入る。
+  /// [from] が無い・見えている行に無いときは、順送りは先頭・逆送りは末尾の行へ入る。
   /// 選べない行（上限で無効）は飛ばす。末尾の次は先頭へ折り返す。
-  void moveRowFocus({required bool forward}) {
+  void moveRowFocus({required bool forward, FilterListEntry? from}) {
     final visible = visibleEntries;
-    var current = focusedRowEntry;
+    var current = focusedRowEntry ?? from;
     for (var i = 0; i < visible.length; i++) {
       final next = nextFilterListEntry(visible, current, forward: forward);
       if (next == null) return;

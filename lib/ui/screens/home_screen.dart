@@ -8,6 +8,7 @@ import '../../l10n/l10n_extensions.dart';
 import '../../models/sample_catalog.dart';
 import '../../services/app_shortcuts.dart';
 import '../../services/color_vision_compare.dart';
+import '../../services/filter_list_selection.dart';
 import '../../services/filter_service.dart';
 import '../../services/image_source_state.dart';
 import '../../services/loupe_window_controller.dart';
@@ -173,7 +174,12 @@ class _HomeScreenState extends State<HomeScreen> {
           CycleFilterIntent: _RowAwareCycleAction(
             isRowFocused: () => _browser.isRowFocused,
             onInvoke: (intent) {
-              _browser.moveRowFocus(forward: intent.forward);
+              // 行にフォーカスが無いときは、調整中の層の行から送る（先頭からではなく）。
+              final focused = context.read<VisionFilterState>().focusedLayer;
+              _browser.moveRowFocus(
+                forward: intent.forward,
+                from: focused == null ? null : filterListEntryForLayer(focused),
+              );
               return null;
             },
           ),
