@@ -681,3 +681,22 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   `_paramsById` の値は seed パラメータを [BigInt] で持つ（`kSeedMax` 参照）。
   `BigInt` は `jsonEncode` が標準ではシリアライズできないため、#65 で永続化
   する際は seed を文字列（10進数）化するなど明示的な変換が要る。
+
+---
+
+## 11. #51 契約注記の処理状況（#66）
+
+sensus 消費側の API 契約注記（#51）を、UI・テストへどう反映したかの一覧。
+
+| 注記 | 内容 | ue での扱い |
+|---|---|---|
+| 1 | tunnel-vision は strength=1.0 でほぼ全黒（末期＝完全喪失の設計） | 推奨強度 0.5 から始める（#77）ことに加え、強度スライダの 80% の位置に印、下に注記、80% 以上で警告へ切り替える（#66）。対象・閾値は `lib/models/vision_filter_contract_notes.dart`、表示は `lib/ui/widgets/strength_caution.dart`、文言は ARB（`strengthCautionMarkerNote` / `strengthCautionNearLimit`）。sensus-core 0.6.1 のメタデータ API に「上限付近の注意」の項目は無いので ue が持つ。警告は受診喚起と混同しないようコンテナ色を使わない。`test/strength_caution_test.dart` |
+| 2 | DetailLoss が strength を無視 | sensus#167/#175 で解消済み（§7）。共通の強度スライダに直結 |
+| 3 | starbursts は広い高輝度面で白塊化する | 推奨サンプルは夜景（`night_scene`）。白画素（RGB すべて 240 以上）が 1% 未満であることを実画素で検証（`test/strength_caution_test.dart`） |
+| 4 | hearing 増幅系は hard clamp で歪む | 聴覚 UI は #80 のスコープ。音量正規化を後段に足さない方針のまま（現時点で UI・コードとも該当なし） |
+| 5 | sudden-hearing-loss の既定 freq は noise-induced と同一出力 | 同上（#80 でプリセットを並べるときに freq を変える） |
+| 6 | 色覚の中間 severity の出力変更 | sensus 0.6.0 取り込み済み（§7・§8） |
+| 7 | 視線・アニメーション系は GUI 層の担当 | ライブ経路（#1-#5）のスコープ |
+
+視野欠損 4 種の `FieldLossMode`（Blur は CPU のみ・GLSL 未対応）は §7 のとおり、カタログのパラメータとして
+出していない。

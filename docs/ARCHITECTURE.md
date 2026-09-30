@@ -98,6 +98,14 @@
 > よう、S-b）。根拠 URL には Medical notes 節そのものを指すアンカーを付けた
 > （nit）。
 > 詳細は `docs/sensus-integration.md` §10。
+>
+> **追補（#66）**: sensus の API 契約上ユーザーに知らせるべき挙動（#51 の契約注記）のうち、
+> UI に出すものは `lib/models/vision_filter_contract_notes.dart`（定義: フィルタ id →
+> 強度の上限付近の注意の閾値）と `lib/ui/widgets/strength_caution.dart`（閾値位置の印
+> `StrengthCautionTrackShape` と注記 `StrengthCautionNote`）が担い、`FilterParamPanel` の
+> 強度スライダが使う。sensus-core 0.6.1 のメタデータ API には該当項目が無いので、
+> 対象・閾値は ue が持ち、文言は ARB（ja/en 対称）。受診喚起（`ConsultNoticeBlock`）の
+> 位置・表現は変えない。処理状況は `docs/sensus-integration.md` §11。
 
 ## ルーペ窓挙動 (#14)
 
