@@ -160,6 +160,10 @@ void main() {
     bool clickThrough = false,
     bool viaDialog = false,
     bool languageDialog = false,
+    // 指定すると、初回起動の色覚ではなくこの advanced フィルタを選び、強度を
+    // [strength] にする（契約注記の警告表示の確認用、#66）。
+    String? advancedFilterId,
+    double? strength,
   }) async {
     tester.view.physicalSize = Size(width, height);
     tester.view.devicePixelRatio = 1.0;
@@ -177,6 +181,10 @@ void main() {
       visionState,
       ColorVisionType.deuteranomaly,
     );
+    if (advancedFilterId != null) {
+      visionState.select(advancedFilterId);
+      if (strength != null) visionState.setStrength(strength);
+    }
     imageSourceState.followRecommendedSample(
       recommendedSampleIdForFilter(visionState.selectedId),
     );
@@ -286,6 +294,43 @@ void main() {
         locale: 'ja',
         suffix: '-hc',
         highContrast: true,
+      ),
+      skip: !screenshotsEnabled,
+    );
+  }
+
+  // 強度スライダの上限付近の注意（#66、#51 注記1）。tunnel_vision を選び、
+  // 中程度（印の説明）と上限（警告）を撮る。ファイル名は
+  // wide-{light|dark}-{ja|en}-tunnel-{mid|max}.png（ハイコントラストは末尾 -hc）。
+  for (final (label, width, height, dark, locale, hc, s, tag) in const <(
+    String,
+    double,
+    double,
+    bool,
+    String,
+    bool,
+    double,
+    String
+  )>[
+    ('wide', 1280, 800, false, 'ja', false, 0.5, 'mid'),
+    ('wide', 1280, 800, false, 'ja', false, 1.0, 'max'),
+    ('wide', 1280, 800, true, 'ja', false, 1.0, 'max'),
+    ('wide', 1280, 800, false, 'en', false, 1.0, 'max'),
+    ('wide', 1280, 800, false, 'ja', true, 1.0, 'max'),
+  ]) {
+    testWidgets(
+      'screenshot $label/${dark ? 'dark' : 'light'}/$locale tunnel-vision $tag${hc ? ' hc' : ''}',
+      (tester) => shoot(
+        tester,
+        widthLabel: label,
+        width: width,
+        height: height,
+        dark: dark,
+        locale: locale,
+        suffix: '-tunnel-$tag${hc ? '-hc' : ''}',
+        highContrast: hc,
+        advancedFilterId: 'tunnel_vision',
+        strength: s,
       ),
       skip: !screenshotsEnabled,
     );

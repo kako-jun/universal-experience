@@ -68,7 +68,7 @@
 > `surfaceContainerHighest`）で塗った専用ブロックに表示し、emergency は
 > earlyConsultation より大きい文字サイズにする。escalation は emergency/
 > earlyConsultation で見出しを分ける（vision フィルタは全て earlyConsultation
-> だが、`HearingFilter` の聴力低下系は emergency も持つため、聴覚側 UI #80 に
+> だが、`HearingFilter` の聴力低下系は emergency も持つため、聴覚側 UI（#20 で聴覚モードを足すか判断、FRB 公開は #10）に
 > 備える）。末尾には「医学的な診断ではない・医療監修を受けたものではない」旨と
 > sensus の Medical notes への参照を必ず添える（レビュー M2）。喚起文からは
 > 診療科名を外した（レビュー S4。めまい系フィルタは眼科の話ではないため）。
@@ -98,6 +98,14 @@
 > よう、S-b）。根拠 URL には Medical notes 節そのものを指すアンカーを付けた
 > （nit）。
 > 詳細は `docs/sensus-integration.md` §10。
+>
+> **追補（#66）**: sensus の API 契約上ユーザーに知らせるべき挙動（#51 の契約注記）のうち、
+> UI に出すものは `lib/models/vision_filter_contract_notes.dart`（定義: フィルタ id →
+> 強度の上限付近の注意の閾値）と `lib/ui/widgets/strength_caution.dart`（閾値位置の印
+> `StrengthCautionTrackShape` と注記 `StrengthCautionNote`）が担い、`FilterParamPanel` の
+> 強度スライダが使う。sensus-core 0.6.1 のメタデータ API には該当項目が無いので、
+> 対象・閾値は ue が持ち、文言は ARB（ja/en 対称）。受診喚起（`ConsultNoticeBlock`）の
+> 位置・表現は変えない。処理状況は `docs/sensus-integration.md` §11。
 
 ## ルーペ窓挙動 (#14)
 

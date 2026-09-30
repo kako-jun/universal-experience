@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
+import '../../models/vision_filter_contract_notes.dart' as contract_notes;
 import '../../services/filter_service.dart';
 import '../../services/loupe_window_controller.dart';
 import '../../services/preview_selection.dart';
@@ -186,9 +187,9 @@ class _LoupeHudBar extends StatelessWidget {
         // 「今選んでいるフィルタは何%か」が見え続けるように）。原画表示中で
         // あること自体は原画比較ボタンのアイコンの色で示す
         // （[_CompareOriginalButtonState] 参照）。
-        final strengthPercent =
-            (selectedStrength(visionState, filterService).clamp(0.0, 1.0) * 100)
-                .round();
+        final strengthPercent = contract_notes.strengthPercent(
+          selectedStrength(visionState, filterService),
+        );
         // #76 と同じく、喚起の解決は resolveConsultNotice 1 箇所に集約する
         // （FilterParamPanel・ExperiencePresetTile・export と同じ経路）。
         final notice = filter == null
@@ -502,8 +503,7 @@ class _CompareOriginalButtonState extends State<_CompareOriginalButton> {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   // 非比較時は同じロールの alpha=0（Colors.transparent を使わない）。
-                  color: scheme.primaryContainer
-                      .withAlpha(comparing ? 255 : 0),
+                  color: scheme.primaryContainer.withAlpha(comparing ? 255 : 0),
                   borderRadius: BorderRadius.circular(24),
                   border: _hasFocus
                       ? Border.all(color: scheme.primary, width: 2)
