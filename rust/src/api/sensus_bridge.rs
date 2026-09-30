@@ -701,7 +701,7 @@ fn color_matrix_flat(u: shaders::ColorMatrixUniforms) -> Vec<f32> {
 /// Dart 側はこのラベル列で「インデックス i は何の値か」を機械的に確認できる
 /// （`.frag` の uniform 宣言順と突き合わせる用途）。
 #[flutter_rust_bridge::frb(sync)]
-pub fn vision_uniform_layout_x(filter: VisionFilter) -> Vec<String> {
+pub fn vision_uniform_layout(filter: VisionFilter) -> Vec<String> {
     let labels: &[&str] = match filter {
         VisionFilter::Protanopia | VisionFilter::Deuteranopia | VisionFilter::Tritanopia => &[
             "uStrength",
