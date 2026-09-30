@@ -57,18 +57,27 @@ class IntensitySlider extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Slider(
-              value: filterService.intensity,
-              onChanged: isEnabled
-                  ? (value) {
-                      visionState.clearBypass();
-                      filterService.setIntensity(value);
-                    }
-                  : null,
-              min: 0.0,
-              max: 1.0,
-              divisions: 20,
-              label: '${strengthPercent(filterService.intensity)}%',
+            // 読み上げは「強さ、スライダー、50%」。見た目の文言（上の Text）は
+            // スライダーと別のノードなので、名前はここで Semantics に載せる（#45）。
+            MergeSemantics(
+              child: Semantics(
+                label: l10n.intensitySliderName,
+                child: Slider(
+                  value: filterService.intensity,
+                  onChanged: isEnabled
+                      ? (value) {
+                          visionState.clearBypass();
+                          filterService.setIntensity(value);
+                        }
+                      : null,
+                  min: 0.0,
+                  max: 1.0,
+                  divisions: 20,
+                  label: '${strengthPercent(filterService.intensity)}%',
+                  semanticFormatterCallback: (value) =>
+                      '${strengthPercent(value)}%',
+                ),
+              ),
             ),
           ],
         );

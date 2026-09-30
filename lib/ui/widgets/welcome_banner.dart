@@ -55,11 +55,14 @@ class WelcomeBanner extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        l10n.welcomeBannerTitle,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: onContainer,
-                          fontWeight: FontWeight.bold,
+                      child: Semantics(
+                        header: true,
+                        child: Text(
+                          l10n.welcomeBannerTitle,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: onContainer,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),

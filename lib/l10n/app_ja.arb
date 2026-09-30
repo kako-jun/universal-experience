@@ -19,6 +19,9 @@
 
   "intensityValue": "強さ：{percent}%",
   "intensityActive": "適用中",
+  "intensitySliderName": "強さ",
+  "strengthSliderName": "強さ",
+  "previewImageFilteredSemantics": "{name}を適用した画像",
 
   "clearFilter": "フィルタを解除",
   "clear": "クリア",

@@ -61,6 +61,21 @@
   "@intensityActive": {
     "description": "Status label when a filter is currently active."
   },
+  "intensitySliderName": "Intensity",
+  "@intensitySliderName": {
+    "description": "Screen-reader name of the intensity slider of the color-vision rows. Same word as the on-screen 'Intensity: N%' text; the value is read separately by the slider (#45)."
+  },
+  "strengthSliderName": "Strength",
+  "@strengthSliderName": {
+    "description": "Screen-reader name of the strength slider of an advanced filter / experience. Same word as the on-screen 'Strength: N%' text; the value is read separately by the slider (#45)."
+  },
+  "previewImageFilteredSemantics": "Image with {name} applied",
+  "@previewImageFilteredSemantics": {
+    "description": "Screen-reader label of the 'after' preview image. {name} is the name of the selected way of seeing (#45).",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
 
   "clearFilter": "Clear filter",
   "@clearFilter": {

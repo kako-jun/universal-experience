@@ -62,11 +62,16 @@ class _FilterListTileState extends State<FilterListTile> {
   void didUpdateWidget(FilterListTile oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.selected && !oldWidget.selected) {
-      _revealAfterFrame();
+      // 「視差効果を減らす」等（disableAnimations）の値は、post-frame コールバックの
+      // 中ではなくここで読む。didUpdateWidget での MediaQuery の参照は許されており
+      // （initState だけが不可）、選択の変更と設定の変更が同じフレームでも最新の値になる（#45）。
+      _revealAfterFrame(
+        disableAnimations: MediaQuery.disableAnimationsOf(context),
+      );
     }
   }
 
-  void _revealAfterFrame() {
+  void _revealAfterFrame({required bool disableAnimations}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final scrollable = Scrollable.maybeOf(context);
@@ -85,7 +90,10 @@ class _FilterListTileState extends State<FilterListTile> {
         alignmentPolicy: isBeforeViewport
             ? ScrollPositionAlignmentPolicy.keepVisibleAtStart
             : ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
-        duration: const Duration(milliseconds: 150),
+        // OS の「視差効果を減らす」等（disableAnimations）ではスクロールを瞬時に（#45）。
+        duration: disableAnimations
+            ? Duration.zero
+            : const Duration(milliseconds: 150),
         curve: Curves.easeOut,
       );
     });

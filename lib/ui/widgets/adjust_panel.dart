@@ -45,9 +45,12 @@ class AdjustPanel extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    l10n.adjustHeading,
-                    style: theme.textTheme.titleMedium,
+                  child: Semantics(
+                    header: true,
+                    child: Text(
+                      l10n.adjustHeading,
+                      style: theme.textTheme.titleMedium,
+                    ),
                   ),
                 ),
                 TextButton.icon(
@@ -94,10 +97,13 @@ class _EmptyState extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Text(
-            l10n.selectionEmptyTitle,
-            style: theme.textTheme.titleMedium,
-            textAlign: TextAlign.center,
+          Semantics(
+            header: true,
+            child: Text(
+              l10n.selectionEmptyTitle,
+              style: theme.textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
           ),
           const SizedBox(height: 8),
           Text(

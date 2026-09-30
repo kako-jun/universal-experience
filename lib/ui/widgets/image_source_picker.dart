@@ -325,7 +325,10 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
                 unawaited(_handleDrop(details));
               },
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 120),
+                // OS の「視差効果を減らす」等（disableAnimations）では遷移を省く（#45）。
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 120),
                 decoration: BoxDecoration(
                   // Colors.transparent ではなく colorScheme
                   // のロール（primary、alpha=0）を使う。見た目は同じ透明だが、

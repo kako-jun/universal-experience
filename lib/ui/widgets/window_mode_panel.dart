@@ -235,10 +235,13 @@ class WindowModePanel extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Text(
-              l10n.hotkeySectionTitle,
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.bold),
+            Semantics(
+              header: true,
+              child: Text(
+                l10n.hotkeySectionTitle,
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
             ),
             const SizedBox(height: 8),
             for (final action in AppHotkeyAction.values)

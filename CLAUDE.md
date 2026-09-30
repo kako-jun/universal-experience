@@ -114,6 +114,8 @@ test/
 ├── no_hardcoded_colors_test.dart   # lib/ の色ハードコードを検出（例外は DESIGN.md の例外表と一致させる、#72）
 ├── app_theme_test.dart             # ハイコントラストテーマの生成と MaterialApp での切替（#72）
 ├── home_screen_layout_test.dart    # 3 カラム/縦積み・プレビューの初回ビューポート・空状態・キー操作（#72）
+├── accessibility_guidelines_test.dart # Flutter 標準ガイドライン（タップ領域・ラベル・コントラスト）を主画面・選択別パネル・ダイアログ・HUD に 4 テーマ × ja/en で当てる（#45）
+├── accessibility_semantics_test.dart  # スライダー/ドロップダウンの名前と値・見出し・選択状態・画像の代替テキスト・liveRegion・視差効果・Esc で閉じてフォーカスが戻る（#45）
 ├── tap_target_size_test.dart       # macOS 指定で操作領域が 48dp 以上（padded + standard・言語ダイアログの選択肢、#72/#82）
 ├── intensity_slider_test.dart      # 色覚クイック選択の間だけ「適用中」を出しスライダーを操作可能にする（#67）
 ├── filter_browser_test.dart        # 統合一覧の検索・カテゴリ切替・行の選択（#72）
@@ -134,6 +136,7 @@ test/
 
 docs/
 ├── adr/                     # 設計判断の正本（Architecture Decision Records）
+├── accessibility.md         # ue 自身の UI のアクセシビリティ: 画面別チェックリスト・既知の制約・実機確認の項目（#45）
 ├── ADDING_A_LANGUAGE.md     # 言語の追加手順と医学用語の訳の確認方針（#82）
 ├── ARCHITECTURE.md
 ├── COLOR_ALGORITHM.md
