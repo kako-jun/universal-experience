@@ -7,13 +7,15 @@ import '../../services/color_vision_selection.dart';
 import '../../services/filter_service.dart';
 import '../../services/vision_filter_state.dart';
 import 'experience_presets.dart';
+import 'experimental_badge.dart';
 import 'filter_param_panel.dart';
+import 'filter_provenance.dart';
 import 'intensity_slider.dart';
 
 /// 右カラム「調整」（#72）: 選んだ見え方の説明・強度・受診喚起・パラメータ。
 ///
 /// 並びは上から **見出し（+ 解除）→ 選んだ症状の名前と説明 → 強度 → 受診喚起 →
-/// パラメータ**。受診喚起は強度のすぐ下に常時展開で出す（動かさない・隠さない、
+/// パラメータ → モデルと出典・表現できないこと（#80、折りたたみ）**。受診喚起は強度のすぐ下に常時展開で出す（動かさない・隠さない、
 /// DESIGN §6.2）。
 ///
 /// - 色覚の行を選んでいるとき: 強度は [IntensitySlider]（`FilterService` の
@@ -123,6 +125,7 @@ class _SelectedContent extends StatelessWidget {
     final experience = selectedExperience(state);
     final colorType = state.colorVisionType;
     final entry = state.selectedEntry;
+    final provenanceFilter = state.build();
 
     final String name;
     final String? categoryLabel;
@@ -144,7 +147,8 @@ class _SelectedContent extends StatelessWidget {
       prevalence = null;
     } else if (colorType != null) {
       description = colorVisionTypeDescription(l10n, colorType);
-      prevalence = l10n.prevalenceLabel(colorVisionTypePrevalence(l10n, colorType));
+      prevalence =
+          l10n.prevalenceLabel(colorVisionTypePrevalence(l10n, colorType));
     } else {
       description = null;
       prevalence = null;
@@ -155,7 +159,16 @@ class _SelectedContent extends StatelessWidget {
       children: [
         Semantics(
           header: true,
-          child: Text(name, style: theme.textTheme.titleLarge),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(name, style: theme.textTheme.titleLarge),
+              if (experience == null && (entry?.isExperimental ?? false))
+                const ExperimentalBadge(),
+            ],
+          ),
         ),
         if (categoryLabel != null) ...[
           const SizedBox(height: 4),
@@ -198,9 +211,16 @@ class _SelectedContent extends StatelessWidget {
           const SizedBox(height: 16),
         ],
         FilterParamPanel(
-          noticeOverride:
-              experience == null ? null : experienceConsultNotice(l10n, experience),
+          noticeOverride: experience == null
+              ? null
+              : experienceConsultNotice(l10n, experience),
         ),
+        // モデルと出典・表現できないこと（#80）。受診喚起・パラメータより下に
+        // 置き、それらの位置を動かさない。
+        if (provenanceFilter != null) ...[
+          const SizedBox(height: 16),
+          FilterProvenanceSection(filter: provenanceFilter),
+        ],
       ],
     );
   }

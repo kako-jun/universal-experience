@@ -164,6 +164,7 @@ class VisionFilterEntry {
     required this.category,
     this.parameters = const [],
     this.isTimeDependent = false,
+    this.isExperimental = false,
   });
 
   /// snake_case の安定 id（sensus shaders 名と一致。例: `bppv_rotation`）。
@@ -190,6 +191,15 @@ class VisionFilterEntry {
   /// `VisionFilter.bppvRotation` の doc コメント「時間依存」参照）は
   /// プレビューにその旨の注記を出す（`before_after_view.dart`）。
   final bool isTimeDependent;
+
+  /// 「実験的」バッジを付けるか（#80）。
+  ///
+  /// 障害ではなく、確立した生理学モデルでもない可視化（現状は tetrachromacy
+  /// だけ。sensus の限界の記述も「validated model が存在しない」としている）。
+  /// これは **ue 側の既定の扱い**で、sensus のメタデータではない。後から
+  /// 対象を変える・外すときはこのフラグだけを変える（一覧の行・右カラムの
+  /// 表示はすべてこのフラグを見る）。
+  final bool isExperimental;
 }
 
 /// 緑内障モードの選択肢（[VisionGlaucomaMode] のミラー）。
@@ -264,6 +274,7 @@ const List<VisionFilterEntry> kVisionFilterCatalog = [
     displayName: 'Tetrachromacy',
     i18nKey: 'filter.tetrachromacy',
     category: VisionFilterCategory.colorVision,
+    isExperimental: true,
   ),
 
   // ── 屈折 ──────────────────────────────────────────────
