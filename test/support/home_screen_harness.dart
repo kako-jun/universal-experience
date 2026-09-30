@@ -5,6 +5,9 @@
 // 何度も書かずに済むようにする。`setUp` で [installHomeScreenFixtures]、
 // `tearDown` で [resetHomeScreenFixtures] を呼ぶこと。
 
+import 'dart:async' show Completer;
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +23,7 @@ import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart';
+import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
 import 'vision_filter_metadata_fixture.dart';
@@ -51,16 +55,53 @@ List<Experience> fixtureExperiences() => const [
       ),
     ];
 
-/// 体験プリセット・視覚フィルタのメタデータ（urgency 等）を fixture に差し替える。
+/// 体験プリセット・視覚フィルタのメタデータ（urgency 等）と、プレビュー画像の
+/// 供給源を fixture に差し替える。
+///
+/// プレビュー（[BeforeAfterView]）の読み込み・フィルタ適用は既定だと実ブリッジ
+/// （native lib の CPU `apply()`）に届く。`flutter test` には native lib も
+/// `RustLib.init()` も無いので、フィルタを選んだ状態で実時間が進む（`runAsync`
+/// の間など）と、画像の読み込み完了のタイミング次第で「FRB 未初期化」の非同期例外が
+/// 走っているテストのどれかに漏れて不安定になる（#127）。ここで Rust にも実時間にも
+/// 依存しない供給源へ揃える。
+///
+/// - 読み込み: 完了しない（[Completer] を返すだけ）。プレビューは「準備中」のまま
+///   止まる。画面構成・操作系のテストは従来もこの状態で測っていた（実画像の完了は
+///   実時間次第で、`runAsync` の有無で揺れていた）。画像が載った状態を見たい
+///   テストは、`setUp` のあとで [fixturePreviewImage] を返すローダに差し替える。
+/// - 適用: フィルタを掛けず入力の複製を返す（Rust に触れない）。
 void installHomeScreenFixtures() {
   experiencesProvider = fixtureExperiences;
   installVisionFilterMetadataFixture();
+  previewSourceImageLoader = (source, size) => Completer<ui.Image>().future;
+  afterImageRenderer = (source, filter, strength) async => source.clone();
 }
 
 /// [installHomeScreenFixtures] を元に戻す。
 void resetHomeScreenFixtures() {
   experiencesProvider = experiences;
   resetVisionFilterMetadataProviders();
+  previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
+  afterImageRenderer = BeforeAfterView.renderAfter;
+}
+
+/// 画像のエンコード/デコードを待たずに作れる、単色の小さな [ui.Image]。
+///
+/// `toImageSync` は即座に返るので、`testWidgets` の fake async の中でも実時間を
+/// 進めずに済む（`toImage` は `runAsync` が要る）。呼び出しごとに新しい画像を返す
+/// （[BeforeAfterView] が受け取った画像を dispose するため、使い回さない）。
+ui.Image fixturePreviewImage() {
+  final recorder = ui.PictureRecorder();
+  ui.Canvas(recorder).drawRect(
+    const Rect.fromLTWH(0, 0, 8, 8),
+    Paint()..color = const Color(0xFF808080),
+  );
+  final picture = recorder.endRecording();
+  try {
+    return picture.toImageSync(8, 8);
+  } finally {
+    picture.dispose();
+  }
 }
 
 /// [pumpHomeScreen] が組んだ状態の束。

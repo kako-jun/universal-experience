@@ -130,7 +130,7 @@ test/
 ├── vision_filter_snapshot_test.dart # 永続 JSON の往復・壊れた値/未知 id/範囲外/旧形式のフォールバック（#65）
 ├── vision_filter_store_test.dart   # 永続化ストアと VisionFilterState.snapshot/restore（#65）
 ├── vision_filter_persistence_app_test.dart # 実アプリ（buildRootApp）を作り直して選択が復元される（#65）
-├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品
+├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品（プレビューの読み込み/適用は Rust 非依存のフェイクに固定）
 ├── support/screenshot_harness.dart # スクリーンショット用フォント読込・PNG 書出し（フォントはコミットしない）
 └── ui_screenshots/                 # HomeScreen の PNG 書出し。`UE_SCREENSHOTS=1` のときだけ実行（DESIGN.md §8）
 
