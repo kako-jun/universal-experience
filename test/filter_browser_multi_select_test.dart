@@ -4,7 +4,10 @@
 // 上限での無効化と理由・体験プリセットの置き換えと点灯条件・FilterService の同期を確認する。
 // 選択の正本は VisionFilterState のまま（一覧は表示と入口だけを持つ）。
 
+import 'dart:ui' show CheckedState, Tristate;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -73,6 +76,10 @@ void main() {
     await tester.tap(tileOf(key));
     await tester.pump();
   }
+
+  /// 行（[tileOf]）の読み上げ用のデータ。
+  SemanticsData semanticsOf(WidgetTester tester, String key) =>
+      tester.getSemantics(tileOf(key)).getSemanticsData();
 
   Finder badgeOf(String key, String number) =>
       find.descendant(of: tileOf(key), matching: find.text(number));
@@ -161,8 +168,65 @@ void main() {
       await pumpBrowser(tester);
       await tapRow(tester, 'catalog:myopia');
 
-      expect(find.bySemanticsLabel('適用順 1 番号目'), findsNothing);
-      expect(find.bySemanticsLabel(RegExp('適用順 1 番目')), findsWidgets);
+      // 選択済みの行の読み上げ（行の label は子の文字・バッジの意味づけを束ねる）に
+      // 「適用順 1 番目」が入り、未選択の行には入らない。
+      final selected = semanticsOf(tester, 'catalog:myopia');
+      expect(selected.label, contains('適用順 1 番目'));
+      expect(semanticsOf(tester, 'catalog:glaucoma').label,
+          isNot(contains('適用順')));
+      handle.dispose();
+    });
+  });
+
+  group('読み上げ（Semantics）', () {
+    testWidgets('行の checked は選択と一致し、色覚行はラジオ式の排他グループになる', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpBrowser(tester);
+      await tapRow(tester, 'catalog:myopia');
+      await tapRow(tester, 'cv:protanopia');
+
+      final checked = semanticsOf(tester, 'catalog:myopia');
+      expect(checked.flagsCollection.isChecked, CheckedState.isTrue);
+      expect(checked.flagsCollection.isInMutuallyExclusiveGroup, isFalse);
+
+      final unchecked = semanticsOf(tester, 'catalog:glaucoma');
+      expect(unchecked.flagsCollection.isChecked, CheckedState.isFalse);
+
+      final radioOn = semanticsOf(tester, 'cv:protanopia');
+      expect(radioOn.flagsCollection.isChecked, CheckedState.isTrue);
+      expect(radioOn.flagsCollection.isInMutuallyExclusiveGroup, isTrue);
+      final radioOff = semanticsOf(tester, 'cv:deuteranopia');
+      expect(radioOff.flagsCollection.isChecked, CheckedState.isFalse);
+      expect(radioOff.flagsCollection.isInMutuallyExclusiveGroup, isTrue);
+
+      // 外すと checked も外れる。
+      await tapRow(tester, 'catalog:myopia');
+      expect(semanticsOf(tester, 'catalog:myopia').flagsCollection.isChecked,
+          CheckedState.isFalse);
+      handle.dispose();
+    });
+
+    testWidgets('上限で無効の行は isEnabled=false で、理由が label に入る', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpBrowser(tester);
+      for (final key in [
+        'catalog:myopia',
+        'catalog:cataract',
+        'catalog:floaters',
+        'catalog:glaucoma',
+        'catalog:teichopsia',
+      ]) {
+        await tapRow(tester, key);
+      }
+
+      await tester.ensureVisible(tileOf('catalog:hyperopia'));
+      final disabled = semanticsOf(tester, 'catalog:hyperopia');
+      expect(disabled.flagsCollection.isEnabled, Tristate.isFalse);
+      expect(disabled.label, contains('上限の 5 件に達しています'));
+
+      final enabled = semanticsOf(tester, 'catalog:myopia');
+      expect(enabled.flagsCollection.isEnabled, Tristate.isTrue);
+      expect(enabled.label, isNot(contains('上限')));
       handle.dispose();
     });
   });
