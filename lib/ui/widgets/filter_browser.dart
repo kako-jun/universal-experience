@@ -105,7 +105,11 @@ class FilterBrowser extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.filterListHeading, style: theme.textTheme.titleMedium),
+        Semantics(
+          header: true,
+          child:
+              Text(l10n.filterListHeading, style: theme.textTheme.titleMedium),
+        ),
         const SizedBox(height: 12),
         _SearchField(controller: controller),
         const SizedBox(height: 8),

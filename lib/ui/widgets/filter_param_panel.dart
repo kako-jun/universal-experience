@@ -91,13 +91,18 @@ class FilterParamPanel extends StatelessWidget {
   ) {
     final percent = strengthPercent(state.strength);
     final caution = kStrengthCautionByFilterId[state.selectedId];
-    final slider = Slider(
-      value: state.strength,
-      min: 0.0,
-      max: 1.0,
-      divisions: 20,
-      label: '$percent%',
-      onChanged: (v) => state.setStrength(v),
+    final slider = MergeSemantics(
+      child: Semantics(
+          label: l10n.strengthSliderName,
+          child: Slider(
+            value: state.strength,
+            min: 0.0,
+            max: 1.0,
+            divisions: 20,
+            label: '$percent%',
+            semanticFormatterCallback: (v) => '${strengthPercent(v)}%',
+            onChanged: (v) => state.setStrength(v),
+          )),
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -171,12 +176,18 @@ class FilterParamPanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text('$label: ${clamped.toStringAsFixed(2)}'),
-        Slider(
-          value: clamped,
-          min: min,
-          max: max,
-          label: clamped.toStringAsFixed(2),
-          onChanged: (v) => state.setParam(param.name, v),
+        MergeSemantics(
+          child: Semantics(
+              label: label,
+              child: Slider(
+                value: clamped,
+                min: min,
+                max: max,
+                label: clamped.toStringAsFixed(2),
+                // 既定の読み上げは「範囲に対する割合（%）」で、実際の値と食い違う。
+                semanticFormatterCallback: (v) => v.toStringAsFixed(2),
+                onChanged: (v) => state.setParam(param.name, v),
+              )),
         ),
       ],
     );
@@ -198,13 +209,18 @@ class FilterParamPanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text('$label: $clamped'),
-        Slider(
-          value: clamped.toDouble(),
-          min: min.toDouble(),
-          max: max.toDouble(),
-          divisions: divisions,
-          label: '$clamped',
-          onChanged: (v) => state.setParam(param.name, v.round()),
+        MergeSemantics(
+          child: Semantics(
+              label: label,
+              child: Slider(
+                value: clamped.toDouble(),
+                min: min.toDouble(),
+                max: max.toDouble(),
+                divisions: divisions,
+                label: '$clamped',
+                semanticFormatterCallback: (v) => '${v.round()}',
+                onChanged: (v) => state.setParam(param.name, v.round()),
+              )),
         ),
       ],
     );
@@ -216,25 +232,31 @@ class FilterParamPanel extends StatelessWidget {
     VisionParam param,
   ) {
     final current = state.paramValue(param) as String?;
+    final label = visionParamLabel(l10n, param.labelKey);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(visionParamLabel(l10n, param.labelKey)),
+        Text(label),
         const SizedBox(height: 4),
-        DropdownButton<String>(
-          isExpanded: true,
-          value: current,
-          items: param.options
-              .map(
-                (o) => DropdownMenuItem<String>(
-                  value: o.value,
-                  child: Text(visionParamLabel(l10n, o.labelKey)),
-                ),
-              )
-              .toList(),
-          onChanged: (v) {
-            if (v != null) state.setParam(param.name, v);
-          },
+        // 上の Text とドロップダウンは別ノードなので、名前を Semantics に載せる（#45）。
+        MergeSemantics(
+          child: Semantics(
+              label: label,
+              child: DropdownButton<String>(
+                isExpanded: true,
+                value: current,
+                items: param.options
+                    .map(
+                      (o) => DropdownMenuItem<String>(
+                        value: o.value,
+                        child: Text(visionParamLabel(l10n, o.labelKey)),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) state.setParam(param.name, v);
+                },
+              )),
         ),
       ],
     );
