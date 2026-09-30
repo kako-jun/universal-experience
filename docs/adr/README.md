@@ -36,6 +36,7 @@ Universal Experience（ue）の主要な設計判断を記録する正本ディ�
 
 | ファイル | タイトル | 決定日 | ステータス |
 |---|---|---|---|
+| [2026-09-30-multi-select-filter-state-model.md](2026-09-30-multi-select-filter-state-model.md) | 状態モデルを「順序つきレイヤー列」の 1 系統に統一し、複数症状の同時適用を sensus の Pipeline で合成する | 2026-09-30 | Accepted（設計のみ・実装は #117〜#125） |
 | [2026-09-30-color-vision-2x2-compare.md](2026-09-30-color-vision-2x2-compare.md) | 色覚 4 型の一覧比較（2×2）は Before / After の代わりに中央カラムへ出し、既存の描画・書き出しの経路を再利用する | 2026-09-30 | Accepted |
 | [2026-09-30-filter-selection-persistence-and-tray-submenu.md](2026-09-30-filter-selection-persistence-and-tray-submenu.md) | フィルタ選択は版つき JSON で永続化し、トレイは統合一覧をカテゴリ別サブメニューで出す | 2026-09-30 | Accepted |
 | [2026-09-30-clipboard-image-paste.md](2026-09-30-clipboard-image-paste.md) | クリップボードの画像貼り付けに `pasteboard` を使う | 2026-09-30 | Accepted |
