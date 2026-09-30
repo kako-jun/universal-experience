@@ -111,10 +111,11 @@ class StrengthCautionNote extends StatelessWidget {
 
   /// 強度が閾値以上か（警告表現にするか）。
   ///
-  /// スライダは 5% 刻みで、浮動小数の誤差（0.7999…など）で 80% の位置が警告に
-  /// ならないよう、整数パーセントに丸めて比べる。
+  /// 画面に出す整数パーセント（[strengthPercent]）で比べるので、「80%」と
+  /// 表示されているときは必ず警告になり、浮動小数の誤差（0.7999…）で
+  /// ずれない。
   bool get isNearLimit =>
-      (strength * 100).round() >= (caution.threshold * 100).round();
+      strengthPercent(strength) >= strengthPercent(caution.threshold);
 
   @override
   Widget build(BuildContext context) {
@@ -124,7 +125,7 @@ class StrengthCautionNote extends StatelessWidget {
     final near = isNearLimit;
     final text = near
         ? l10n.strengthCautionNearLimit
-        : l10n.strengthCautionMarkerNote((caution.threshold * 100).round());
+        : l10n.strengthCautionMarkerNote(strengthPercent(caution.threshold));
     final style = near
         ? theme.textTheme.bodySmall?.copyWith(
             color: colorScheme.onSurface,

@@ -52,9 +52,8 @@ class FilterParamPanel extends StatelessWidget {
         // 参照）ため、現在の選択（payload 込み）から組み立てた実インスタンスを
         // そのまま渡せばよい（メタデータ専用の別インスタンスは不要）。
         final filter = state.build();
-        final urgency = filter == null
-            ? Urgency.none
-            : visionFilterUrgencyProvider(filter);
+        final urgency =
+            filter == null ? Urgency.none : visionFilterUrgencyProvider(filter);
         final escalation = filter == null
             ? const <UrgencyEscalation>[]
             : visionFilterUrgencyEscalationProvider(filter);
@@ -90,7 +89,7 @@ class FilterParamPanel extends StatelessWidget {
     AppLocalizations l10n,
     VisionFilterState state,
   ) {
-    final percent = (state.strength * 100).toInt();
+    final percent = strengthPercent(state.strength);
     final caution = kStrengthCautionByFilterId[state.selectedId];
     final slider = Slider(
       value: state.strength,

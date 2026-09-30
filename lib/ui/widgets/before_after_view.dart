@@ -11,6 +11,7 @@ import '../../models/disability_type.dart';
 import '../../models/preview_image_source.dart';
 import '../../models/sample_catalog.dart';
 import '../../models/vision_filter_catalog.dart';
+import '../../models/vision_filter_contract_notes.dart' as contract_notes;
 import '../../rendering/cpu_vision_renderer.dart';
 import '../../rendering/image_fit.dart';
 import '../../services/export_service.dart';
@@ -109,7 +110,7 @@ class BeforeAfterView extends StatefulWidget {
     required this.imageSource,
     this.colorVisionType,
     this.sampleSize,
-  })  : assert(
+  }) : assert(
           (filter == null) == (filterId == null),
           'filter and filterId must both be null or both be set',
         );
@@ -533,7 +534,8 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       _afterStrength = widget.strength; // #85 レビュー S8
       _afterFilter = widget.filter; // #76
       _currentSampleSize = sampleSize;
-      _currentImageSource = source; // #78 レビュー M1: widget.imageSource ではなく source
+      _currentImageSource =
+          source; // #78 レビュー M1: widget.imageSource ではなく source
       _loading = false;
       _failed = false; // #58 レビュー SHOULD-1: 成功したら失敗表示を解除する。
     });
@@ -596,7 +598,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
 
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final strengthPercent = (strength.clamp(0.0, 1.0) * 100).round();
+      final strengthPercent = contract_notes.strengthPercent(strength);
       final date = isoDate(DateTime.now());
       // #76 レビュー M1: プレビューの注記（FilterParamPanel・
       // ExperiencePresetTile）と同じ正本・同じ解決経路（resolveConsultNotice）を
@@ -708,8 +710,9 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         // 引いて解決する。after ペインの見出しは widget.colorVisionType が
         // あればそちらを優先する（#60: -omaly の名前を正しく出すため、
         // [visionFilterDisplayName] 参照）。
-        final entry =
-            widget.filterId == null ? null : kVisionFilterCatalogById[widget.filterId];
+        final entry = widget.filterId == null
+            ? null
+            : kVisionFilterCatalogById[widget.filterId];
         final afterPane = _Pane(
           label: visionFilterDisplayName(
               l10n, widget.colorVisionType, widget.filterId),

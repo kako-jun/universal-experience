@@ -7,6 +7,12 @@
 /// ここに置き、sensus 側の挙動（下記）の変更に追従する責務は本ファイルが持つ。
 library;
 
+/// 強度（0.0..1.0）を整数パーセントにする。強さの表示・スライダのラベル・
+/// 上限付近の警告判定はすべてこの 1 つを使う（表示と判定を食い違わせない。
+/// 0.7999… は「80%」と表示され、80% の閾値の警告も出る）。
+int strengthPercent(double strength) =>
+    (strength.clamp(0.0, 1.0) * 100).round();
+
 /// 強度スライダの上限付近で注意を出す定義。
 class StrengthCaution {
   const StrengthCaution({required this.threshold})

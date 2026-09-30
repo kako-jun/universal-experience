@@ -693,7 +693,7 @@ sensus 消費側の API 契約注記（#51）を、UI・テストへどう反映
 | 1 | tunnel-vision は strength=1.0 でほぼ全黒（視野のほぼすべてを失った最も進行した段階を再現する設計） | 推奨強度 0.5 から始める（#77）ことに加え、強度スライダの 80% の位置に印、下に注記、80% 以上で警告へ切り替える（#66）。対象・閾値は `lib/models/vision_filter_contract_notes.dart`、表示は `lib/ui/widgets/strength_caution.dart`、文言は ARB（`strengthCautionMarkerNote` / `strengthCautionNearLimit`）。sensus-core 0.6.1 のメタデータ API に「上限付近の注意」の項目は無いので ue が持つ。警告は受診喚起と混同しないようコンテナ色を使わない。`test/strength_caution_test.dart` |
 | 2 | DetailLoss が strength を無視 | sensus#167/#175 で解消済み（§7）。共通の強度スライダに直結 |
 | 3 | starbursts は広い高輝度面で白塊化する | 推奨サンプルは夜景（`night_scene`）。白画素（RGB すべて 240 以上）が 1% 未満であることを実画素で検証（`test/strength_caution_test.dart`） |
-| 4 | hearing 増幅系は hard clamp で歪む | 聴覚 UI は #20（聴覚モードを足すかの設計判断）、HearingFilter の FRB 公開は #10 に引き継ぎ済み。音量正規化を後段に足さない方針のまま（現時点で UI・コードとも該当なし） |
+| 4 | hearing 増幅系は hard clamp で歪む | 聴覚 UI は #20（聴覚モードを足すかの設計判断）、#20 に引き継ぎ済み（HearingFilter の FRB 公開は #10）。音量正規化を後段に足さない方針のまま（現時点で UI・コードとも該当なし） |
 | 5 | sudden-hearing-loss の既定 freq は noise-induced と同一出力 | 同上（#20 で聴覚モードを足し、プリセットを並べるときに freq を変える） |
 | 6 | 色覚の中間 severity の出力変更 | sensus 0.6.0 取り込み済み（§7・§8） |
 | 7 | 視線・アニメーション系は GUI 層の担当 | ライブ経路（#1-#5）のスコープ |

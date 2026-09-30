@@ -194,6 +194,7 @@ void main() {
           })
           ..something((Symbol method, List<dynamic> args) {
             // つまみ（半径の大きい円）。目盛りは半径 2 未満の小さな円。
+            // 半径 5 での見分けは year2023: true（現行 M3）のスライダ前提。
             if (method != #drawCircle) return false;
             final center = args[0] as Offset;
             final radius = args[1] as double;
@@ -264,7 +265,8 @@ void main() {
       expect(almost, lessThan(0.8));
       const caution = StrengthCaution(threshold: 0.8);
       expect(
-          const StrengthCautionNote(caution: caution, strength: almost).isNearLimit,
+          const StrengthCautionNote(caution: caution, strength: almost)
+              .isNearLimit,
           isTrue);
       expect(
           const StrengthCautionNote(caution: caution, strength: 0.79)
@@ -274,6 +276,30 @@ void main() {
           const StrengthCautionNote(caution: caution, strength: 0.8)
               .isNearLimit,
           isTrue);
+    });
+
+    testWidgets('強さの % 表示と警告判定が同じ丸めで一致する（0.7999… / 0.795 / 0.79）',
+        (tester) async {
+      state.select('tunnel_vision');
+      // 表示された % が閾値（80%）以上のときだけ警告が出る。
+      for (final (value, shown, warns) in [
+        (0.1 + 0.7, 80, true),
+        (0.795, 80, true),
+        (0.79, 79, false),
+        (0.7949, 79, false),
+      ]) {
+        state.setStrength(value);
+        await pumpPanel(tester);
+        expect(strengthPercent(value), shown, reason: '$value');
+        expect(find.text(en().strengthLabel(shown)), findsOneWidget,
+            reason: '$value の表示');
+        expect(find.text(en().strengthCautionNearLimit),
+            warns ? findsOneWidget : findsNothing,
+            reason: '$value の警告');
+        expect(find.byType(Slider), findsOneWidget);
+        final slider = tester.widget<Slider>(find.byType(Slider));
+        expect(slider.label, '$shown%', reason: '$value のスライダのラベル');
+      }
     });
 
     testWidgets('受診喚起ブロックは強度（スライダと注記）のすぐ下に出続ける（位置・内容を動かさない）', (tester) async {
