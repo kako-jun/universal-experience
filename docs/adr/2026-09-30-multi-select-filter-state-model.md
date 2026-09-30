@@ -41,7 +41,7 @@ achromatopsia / protanomaly / deuteranomaly / tritanomaly。）
 `selectColorVision`（`color_vision_selection.dart`）が 2 系統をつなぐ**唯一の橋**で、色覚を
 クイック選択すると `VisionFilterState._isColorQuickSelection = true` と `_colorVisionType` が立つ。
 **強度の出どころが 2 つある**のが核心で、`preview_selection.dart` の `selectedStrength` /
-`adjustPreviewStrength` / `showsAdvancedStrengthSlider` は `isColorQuickSelection` を見て
+`adjustPreviewStrength` / `showsAdvancedStrengthSlider`（#120 で廃止）は `isColorQuickSelection` を見て
 「色覚クイック選択なら `FilterService.intensity`（型別記憶）、それ以外は `VisionFilterState.strength`
 （id 別記憶）」と分岐する。つまり同じカタログ id（例: protanopia）でも、クイック選択で見えている
 強度は `settings.intensityByType` 側、永続 JSON v1 の `strengthById` に入っているのは advanced 側の値で、
@@ -144,7 +144,7 @@ VisionFilterState.focusedId : String?                      // 調整パネルが
   なる。`settings.intensityByType` は移行して消す（下記）。これで `selectedStrength` /
   `adjustPreviewStrength` / `showsAdvancedStrengthSlider` の「どちらから読むか」の分岐は強度について
   不要になり（常に per-key 記憶から導いた層の強度）、見た目の挙動は変わらない。
-- **通知経路**: `IntensitySlider` は `Consumer2<FilterService, VisionFilterState>`（`intensity_slider.dart`
+- **通知経路**: `IntensitySlider`（#120 で廃止し、調整パネルの強度スライダー 1 本に統合）は `Consumer2<FilterService, VisionFilterState>`（`intensity_slider.dart`
   25 行付近）なので、per-key 記憶の更新を `VisionFilterState` の通知として出せばスライダーは再描画される。
   一方 `FilterService` の listener にはトレイ（`tray_service.dart` の `_onSelectionChanged`）と
   `home_screen.dart` の `_persistFilterState` がある。これらを壊さないため、`FilterService.setIntensity`
@@ -398,7 +398,7 @@ optics に置く。）
     （`selectedId` はフォーカス層の id の別名。削除は #124）。推奨サンプル（#78）の 3 箇所は `focusedId` に変えた。
   - 相談喚起の統合 `mergeConsultInputs`（urgency は最大、escalation は段ごとに重複除去）と
     `consultInputForFilters` を追加した。UI・書き出しへの適用は #121。
-  - 見出し・書き出し・2×2 比較の出し分け・トレイは #120〜#122 まで単一（フォーカス層）の意味のまま。
+  - 見出し・書き出し・2×2 比較の出し分け・トレイは #120〜#122 まで単一（フォーカス層）の意味のまま（#120 で見出し・HUD・書き出し・2×2 の出し分けは複数層に対応した。下の第 4 段を参照）。
   - **既知の制約**: `toggle(..., origin: quick)` で色覚を足しても `FilterService` の色覚型・
     `settings.filterType`・色覚の強度スライダーは更新されない（同期は `selectColorVision` 経由のみ）。
     production から `toggle` を呼ぶのは #120 からなので、同期の持たせ方は #120 で決める。
@@ -406,6 +406,34 @@ optics に置く。）
     渡す列で決まり、最終決定は #121）。
   - 合成のバイト一致は #118 の Rust テストが担う。#119 のテストは `pipelineApplier` をフェイクにして、
     渡る列（段順・強度・payload・強度 0 の除外）と状態遷移を固定した。
+
+- **第 4 段（#120）実装済み**: 統合一覧・調整パネル・HUD・プレビュー周りを多選択 UI にした。実装時に確定した点は次のとおり。
+  - **統合一覧**は行頭にチェック（色覚行はラジオ式の見た目）を持ち、チェック済みの行に適用順の番号バッジ
+    （`LayerOrderBadge`）を出す。番号は段順で、クリック順には依存しない。色覚の見出しは「いずれか 1 つ」。
+    色覚行は `toggleColorVision`（`color_vision_selection.dart`）で足す・外す・別の色覚へ置き換える。
+    他の層は残る。
+  - **上限（5）に達すると**、未選択の行はチェックを無効にし、理由を行内の文言で出す（色だけに頼らない）。
+    既存の色覚層があるときの色覚行と体験プリセットの行は、置き換えになるので有効のまま。
+  - **チップ帯**（`LayerChipStrip`）を Before / After の上に出す（2 層以上のときだけ。1 層は従来の見た目）。
+    チップ = 番号 + 名前 + ✕。チップを押すとその層が調整中（`focusedId`）になる。調整中は塗り + 太い枠で
+    形でも区別する。末尾の「すべて解除」は全層を外す。
+  - **調整パネル**は 2 層以上で層ごとの節になる。調整中の層だけ展開し、ほかは「番号・名前・強度」の 1 行に畳む。
+    強度スライダーは 1 本（旧 `IntensitySlider` と `showsAdvancedStrengthSlider` は廃止。強度の出どころが
+    1 つになったため）で、`setLayerStrength` がその層を調整中にする。受診喚起・注意書き・出典は層の節ごと。
+  - **プリセット**は層全体を置き換える。プリセットの行が強調されるのは、層集合がそのプリセット単体に
+    ちょうど一致するときだけ。
+  - **キー操作**: ↑↓ は行フォーカスの移動だけ（選択は変えない）。Space / Enter が足し引き。←→ は
+    `focusedId` の層の強度。行からの ←→ が受け口へ出る挙動（#84）は変えていない。
+    `CycleFilterIntent` は行にフォーカスがあるときか、操作部品にフォーカスが無いときだけ動く
+    （`_RowAwareCycleAction`）。
+  - **見出し・HUD**: 複数層の Before / After の見出しと HUD は「名前 + 名前 …（+N）」（強度は出さない。
+    先頭 2 件を名前で出す）。HUD の相談喚起ダイアログは層ごとに名前の見出しを付けて並べる。
+  - **暫定の 2 点を入れた**: 複数層のとき PNG 書き出しを無効にして理由を表示する（#121 で解除）。
+    「2×2 で比較」は層集合がちょうど色覚 1 層のときだけ出す（#122 で解除）。
+  - **`FilterService` との同期**（第 3 段の「既知の制約」）は `syncFilterServiceWithLayers` に決めた。
+    UI の足し引きの後に、色覚クイック選択（origin が quick）の層があればその型、無ければ none へ
+    `FilterService.currentFilter` を合わせる。トレイ・`settings.filterType` はこれを読む。
+  - トレイのチェック式への拡張は #121 のまま。
 
 **#120〜#122 の間の暫定挙動**（この間の退行を防ぐための取り決め）:
 

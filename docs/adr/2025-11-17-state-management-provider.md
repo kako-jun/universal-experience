@@ -9,7 +9,7 @@
 
 ue は Flutter（Dart）アプリで、フィルタの選択状態・強度・有効/無効を UI 全体で
 共有する必要がある。フィルタを選択・調整すると、関係するウィジェット
-（`FilterBrowser` / `IntensitySlider` / `HomeScreen` 等）が再描画される。
+（`FilterBrowser` / `AdjustPanel` / `HomeScreen` 等（当時は `IntensitySlider` も。#120 で調整パネルの強度スライダーへ統合））が再描画される。
 
 このアプリ規模の状態を、どの状態管理手法で持つかを決める必要があった。
 

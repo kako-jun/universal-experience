@@ -34,7 +34,7 @@
 > その場で `FilterService` と `VisionFilterState` の両方を更新する（listener
 > によるミラーはしない）。これに伴い `VisionFilterState` も `filterService`
 > と同じくトップレベル singleton（`main.dart` の `visionFilterState`）に昇格
-> した。色覚チップの点灯・`IntensitySlider` の有効/無効・解除ボタンの有効/
+> した。色覚チップの点灯・強度スライダー（当時の `IntensitySlider`。#120 で廃止）の有効/
 > 無効は、すべて `VisionFilterState.isColorQuickSelection` から導く（advanced/
 > プリセットを見ている間はいずれも無効）。ただし「Normal vision」
 > （`ColorVisionType.none`）チップだけは `VisionFilterState.selectedId == null`
@@ -588,8 +588,8 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
 | キー | 効果 |
 |---|---|
 | `/` | 左カラムの検索欄（`FilterBrowserController.searchFocus`）にフォーカスを移し、入力済みの文字を全選択する |
-| `↑` / `↓` | 統合フィルタ一覧（色覚 7 型 + advanced 30 件）の、今見えている行を逆送り/順送り（wraparound） |
-| `←` / `→` | 選択中フィルタの強度を `kKeyboardStrengthStep`（5%）刻みで増減 |
+| `↑` / `↓` | 統合フィルタ一覧（色覚 7 型 + advanced 30 件）の、今見えている行への**フォーカスの**逆送り/順送り（wraparound。選択は変えない。#120）。足し引きは行で `Space` / `Enter` |
+| `←` / `→` | 調整中の層（`VisionFilterState.focusedId`）の強度を `kKeyboardStrengthStep`（5%）刻みで増減 |
 | `Esc` | クリックスルーが ON のとき解除する（クリックスルーの復帰経路。上記「クリックスルーの復帰経路」参照） |
 | `Cmd+V`（macOS）/ `Ctrl+V` | クリップボードの画像をプレビューの原画として貼り付ける（#97。下記） |
 
@@ -606,6 +606,14 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
 - **`/` は検索欄へフォーカスする**（#72 で左カラムに検索欄が入った。それ以前は
   advanced カタログへフォーカスしていた）。検索欄は `TextField` なので、フォーカス
   中は `/` 自体を含むキー入力が本来の文字入力として通る（上記ガード）。
+- **↑↓ は行フォーカスの移動だけで、選択は変えない**（#120）。多選択にしたので、移動のたびに層が
+  増減しないよう、足し引きは行にフォーカスがあるときの `Space` / `Enter` に分けた。`CycleFilterIntent` は
+  `_RowAwareCycleAction`（`home_screen.dart`）が受け、行にフォーカスがあるとき、または操作部品にフォーカスが
+  無いときだけ有効（ボタン・入力欄など行以外の部品の上では奪わない）。`FilterBrowserController.moveRowFocus` が
+  今見えている行（検索・カテゴリで絞った行）を `nextFilterListEntry()` で順送りし、`canRequestFocus` が false の行
+  （上限で無効の行）は飛ばす。受け口から `↓` は最初の行、`↑` は最後の行へ入る。フォーカスが入った行は
+  `FilterListTile` が一覧の内側のスクロールだけで見える位置へ入れる。以下は #72 時点の記述（選択が変わる前提の
+  部分は #120 で上のとおり置き換わった）。
 - **↑↓ の対象は統合一覧の「今見えている行」**（#72）。色覚 7 型 + advanced 30 件を
   1 つの一覧にまとめたので、順送りもその一覧を対象にする（`nextFilterListEntry()`。
   検索・カテゴリで絞っていれば絞った行だけ）。体験プリセットは一覧の最上段にあるが
@@ -699,7 +707,7 @@ LoupeHud()])` として組み立て、`LoupeHud` を `HomeScreen` とは別の�
   解除する。フィルタ選択（`select`/`selectColorVisionType`/`selectPreset`/
   `clear`）・強度変更（`setStrength`/`setParam`/`randomizeSeed`/
   `resetToRecommended`）・アプリ内ショートカット（`adjustPreviewStrength`）・
-  `IntensitySlider` の操作・非常口（`HotkeyActions.emergencyExit`）が使う —
+  強度スライダーの操作・非常口（`HotkeyActions.emergencyExit`）が使う —
   これらは「原画比較の状態に関わらず必ずフィルタ表示に戻す」操作なので、
   誰が原画比較していたかは問わない。
 - `hotkey_actions.dart` は `VisionFilterState.bypassed` のようなグローバル値
@@ -907,8 +915,9 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   それ未満は プレビュー → 調整 → 選択 の縦積み。`FilterBrowser` は検索・カテゴリ・
   統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行、ロジックは
   `filter_list_selection.dart`）と体験プリセットの最上段を持つ。`AdjustPanel` は選んだ
-  症状の説明・強度（`IntensitySlider`）・受診喚起（`ConsultNoticeBlock` 常時展開）・
-  `FilterParamPanel` を持ち、未選択時は空状態を出す。起動モード・最前面・クリックスルー・
+  症状の説明・強度スライダー 1 本・受診喚起（`ConsultNoticeBlock` 常時展開）を
+  `FilterParamPanel` で持ち、2 層以上のときは層ごとの節（調整中の層だけ展開、#120）にする。
+  未選択時は空状態を出す。中央カラムの先頭には 2 層以上のときだけ `LayerChipStrip`（適用順のチップ・✕・すべて解除）を置く。起動モード・最前面・クリックスルー・
   ホットキー一覧（`WindowModePanel`）は AppBar のダイアログに退避し、クリックスルー ON
   の間は復帰方法を `ClickThroughRecoveryBanner` が画面最上部に常時出す（#63）。
   PNG エクスポートはプレビュー側に置く。選択の状態は従来どおり `VisionFilterState` が
