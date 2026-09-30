@@ -98,6 +98,13 @@
       "percent": { "type": "int" }
     }
   },
+  "compareBaseNote": "Applied before the four types: {names}",
+  "@compareBaseNote": {
+    "description": "Note above the 2x2 color-vision comparison grid, shown only while other layers are stacked with the color-vision layer: every cell starts from the image with these layers (applied in order) already applied, so the cells differ by the color-vision type only (#122). {names} is the layer names in applied order, joined with ' + ' (long lists are summarized).",
+    "placeholders": {
+      "names": { "type": "String" }
+    }
+  },
   "compareCellFailedSemanticsLabel": "{name} simulation, rendering failed",
   "@compareCellFailedSemanticsLabel": {
     "description": "Screen-reader label of one cell of the 2x2 comparison grid when rendering failed. {name} is the color-vision type name (#84).",

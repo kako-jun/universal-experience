@@ -5,7 +5,10 @@ import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/models/disability_type.dart';
+import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
 import 'package:universal_experience/services/color_vision_selection.dart';
+import 'package:universal_experience/src/rust/api/sensus_bridge.dart'
+    show VisionStep;
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/color_vision_compare_view.dart';
 import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
@@ -13,7 +16,7 @@ import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 import 'support/home_screen_harness.dart';
 import 'support/sample_image_generator.dart';
 
-/// 「2×2 で比較」の切替（#84）が、色覚カテゴリを選んでいるときだけ出て、
+/// 「2×2 で比較」の切替（#84）が、層の集合に色覚層があるときだけ出て（#122）、
 /// ON の間は Before / After の代わりに 2×2 を出すことの確認。
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -27,14 +30,19 @@ void main() {
     resetHomeScreenFixtures();
     previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
     afterImageRenderer = BeforeAfterView.renderAfter;
+    CpuVisionRenderer.pipelineApplier = CpuVisionRenderer.applyPipeline;
   });
 
   /// afterImageRenderer に渡された強さの記録（[installFakes] が積む）。
   final renderedStrengths = <double>[];
 
+  /// 土台の合成（pipelineApplier）に渡された steps の記録。
+  final pipelineCalls = <List<VisionStep>>[];
+
   /// 描画は実ブリッジを要るのでフェイク（同じ画像の複製）に差し替える。
   Future<void> installFakes(WidgetTester tester) async {
     renderedStrengths.clear();
+    pipelineCalls.clear();
     await tester.runAsync(() async {
       master = await generateSampleImage(64);
     });
@@ -42,6 +50,10 @@ void main() {
     previewSourceImageLoader = (source, size) async => master.clone();
     afterImageRenderer = (source, filter, strength) async {
       renderedStrengths.add(strength);
+      return master.clone();
+    };
+    CpuVisionRenderer.pipelineApplier = (source, steps) async {
+      pipelineCalls.add(steps);
       return master.clone();
     };
   }
@@ -140,7 +152,7 @@ void main() {
     expect(find.byType(ColorVisionCompareView), findsOneWidget);
   });
 
-  testWidgets('層の集合が色覚 1 層だけのときに限り切替が出る（他の層が重なると出ない、#120）', (tester) async {
+  testWidgets('層の集合に色覚層があれば、他の層を重ねていても切替が出る（色覚が無ければ出ない、#122）', (tester) async {
     await installFakes(tester);
     final h = await pumpHomeScreen(tester, size: wide);
     h.visionState.toggle('protanopia');
@@ -153,20 +165,143 @@ void main() {
     }
     expect(find.byType(ColorVisionCompareView), findsOneWidget);
 
-    // 色覚に別の層を重ねると、切替ごと消えて Before / After に戻る（調整中が色覚でも）。
+    // 色覚に別の層を重ねても、切替と 2×2 は残る（調整中が色覚でなくても）。
     h.visionState.toggle('myopia');
-    h.visionState.focusLayer('protanopia');
     await tester.pump();
-    expect(h.visionState.focusedId, 'protanopia');
+    expect(toggle(), findsOneWidget);
+    expect(find.byType(ColorVisionCompareView), findsOneWidget);
+    expect(find.byType(BeforeAfterView), findsNothing);
+    h.visionState.focusLayer('myopia');
+    await tester.pump();
+    expect(h.visionState.focusedId, 'myopia');
+    expect(toggle(), findsOneWidget);
+    expect(find.byType(ColorVisionCompareView), findsOneWidget);
+
+    // 色覚層を外すと、切替ごと消えて Before / After に戻る。
+    h.visionState.remove('protanopia');
+    await tester.pump();
     expect(toggle(), findsNothing);
     expect(find.byType(ColorVisionCompareView), findsNothing);
     expect(find.byType(BeforeAfterView), findsOneWidget);
 
-    // 他の層を外して色覚 1 層へ戻ると、直前の選び方（2×2）に戻る。
-    h.visionState.remove('myopia');
+    // 色覚を足し直すと、直前の選び方（2×2）に戻る。
+    h.visionState.toggle('deuteranopia');
     await tester.pump();
     expect(toggle(), findsOneWidget);
     expect(find.byType(ColorVisionCompareView), findsOneWidget);
+  });
+
+  testWidgets('色覚以外の層だけ（複数でも）のときは切替が出ない（#122）', (tester) async {
+    await installFakes(tester);
+    final h = await pumpHomeScreen(tester, size: wide);
+    h.visionState.toggle('myopia');
+    h.visionState.toggle('vertigo');
+    await tester.pump();
+    expect(toggle(), findsNothing);
+    expect(find.byType(ColorVisionCompareView), findsNothing);
+    expect(find.byType(BeforeAfterView), findsOneWidget);
+  });
+
+  testWidgets(
+      '色覚 + 他の層の 2×2: 土台は色覚以外の層の steps（色覚層は含まない）、強さは色覚層の強度。'
+      '色覚の強度だけを動かしても土台は作り直さない（#122）', (tester) async {
+    await installFakes(tester);
+    final h = await pumpHomeScreen(tester, size: wide);
+    h.visionState.toggle('protanopia');
+    h.visionState.toggle('myopia');
+    h.visionState.setLayerStrength('myopia', 0.5);
+    h.visionState.setLayerStrength('protanopia', 0.4);
+    await tester.pump();
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(); // 切替前の Before / After の描画を流しきる。
+    }
+    pipelineCalls.clear();
+    await tester.tap(toggle());
+    await tester.pump();
+    for (var i = 0; i < 20; i++) {
+      await tester.pump();
+    }
+
+    ColorVisionCompareView view() => tester
+        .widget<ColorVisionCompareView>(find.byType(ColorVisionCompareView));
+    expect(view().strength, 0.4, reason: '調整中の層ではなく色覚層の強度');
+    expect(view().baseSteps.length, 1);
+    expect(view().baseSteps.single.strength, 0.5);
+    expect([for (final l in view().baseLayers) l.layer.id], ['myopia']);
+    expect(find.text(l10n.compareSharedStrengthNote(40)), findsOneWidget);
+    expect(find.textContaining(l10n.compareBaseNote('').split('：').first),
+        findsOneWidget,
+        reason: '土台の注記が出る');
+    expect(pipelineCalls.length, 1, reason: '土台は 1 回だけ合成');
+
+    // 色覚の強度だけを動かす: 土台の steps は同じなので再合成しない。
+    h.visionState.setLayerStrength('protanopia', 0.8);
+    await tester.pump();
+    for (var i = 0; i < 20; i++) {
+      await tester.pump();
+    }
+    expect(view().strength, 0.8);
+    expect(pipelineCalls.length, 1);
+
+    // 色覚層を調整中にしても同じ。
+    h.visionState.focusLayer('protanopia');
+    await tester.pump();
+    expect(view().strength, 0.8);
+  });
+
+  testWidgets('色覚 + 他の層でも、原画に戻す（bypass）は 2×2 に効く（強度 0・土台なし）', (tester) async {
+    await installFakes(tester);
+    final h = await pumpHomeScreen(tester, size: wide);
+    h.visionState.toggle('protanopia');
+    h.visionState.toggle('myopia');
+    await tester.pump();
+    for (var i = 0; i < 20; i++) {
+      await tester.pump();
+    }
+    pipelineCalls.clear();
+    await tester.tap(toggle());
+    await tester.pump();
+    for (var i = 0; i < 20; i++) {
+      await tester.pump();
+    }
+    expect(pipelineCalls.length, 1);
+
+    final holder = Object();
+    renderedStrengths.clear();
+    final composedBeforeBypass = pipelineCalls.length;
+    h.visionState.acquireBypass(holder);
+    await tester.pump();
+    for (var i = 0; i < 20; i++) {
+      await tester.pump();
+    }
+    final view = tester
+        .widget<ColorVisionCompareView>(find.byType(ColorVisionCompareView));
+    expect(view.strength, 0.0);
+    expect(view.baseSteps, isEmpty);
+    expect(find.text(l10n.compareSharedStrengthNote(0)), findsOneWidget);
+    expect(h.visionState.layers.length, 2, reason: '選択は残る');
+    expect(renderedStrengths.length, 4, reason: 'バイパス中は 4 セルとも描き直す');
+    expect(renderedStrengths, everyElement(0.0),
+        reason: 'バイパス中は 4 セルとも強度 0（原画）');
+    expect(pipelineCalls.length, composedBeforeBypass,
+        reason: 'バイパス中は土台を合成しない');
+
+    renderedStrengths.clear();
+    h.visionState.releaseBypass(holder);
+    await tester.pump();
+    for (var i = 0; i < 20; i++) {
+      await tester.pump();
+    }
+    expect(pipelineCalls.length, composedBeforeBypass,
+        reason: '解除しても層が同じなら土台を再合成しない');
+    expect(renderedStrengths.length, 4, reason: '解除で 4 セルとも描き直す');
+    expect(renderedStrengths, everyElement(1.0), reason: '色覚層の強度（既定 100%）に戻る');
+    expect(
+      tester
+          .widget<ColorVisionCompareView>(find.byType(ColorVisionCompareView))
+          .baseSteps,
+      isNotEmpty,
+    );
   });
 
   testWidgets('2×2 の強さは、現在の強さ（色覚の強度スライダー）が 4 セル共通で使われる', (tester) async {
@@ -256,6 +391,7 @@ void main() {
     for (var i = 0; i < 20; i++) {
       await tester.pump();
     }
+    expect(renderedStrengths.length, 4, reason: '解除で 4 セルとも描き直す');
     expect(renderedStrengths, everyElement(0.6));
     await tester.pump(const Duration(milliseconds: 400));
   });

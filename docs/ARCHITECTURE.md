@@ -459,7 +459,7 @@ Linux debug ビルド成功で代替している:
 > （`selectColorVision` 経由でだけ同期する）。プレビューは `VisionFilterState` だけを見るので描画は
 > 正しいが、`FilterService` 側とはずれる。`toggle` を呼ぶ production の経路は #120 まで無く、
 > 同期の持たせ方はそこで決める（#120 で `syncFilterServiceWithLayers` に決まった）。2×2 比較の出し分け
-> （`canCompare`）は複数層で出さない暫定（#122 で解除）。書き出しのキャプションは #121 で層ごとの行に
+> （`canCompare`）は複数層で出さない暫定だったが、#122 で「色覚層があれば出す」に解除した。書き出しのキャプションは #121 で層ごとの行に
 > なった（下の `ExportService`）。
 > `FilterService` は色覚クイック選択の型を持ち、強度は `VisionFilterState` の記憶へ委譲する薄い窓に
 > なった（`ColorVisionType` / `FilterService` の削除は最終段 #124）。下の「現状は状態が 2 系統」
@@ -1009,7 +1009,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   （`colorVisionCompareFilter`）。専用のレンダラは持たず、`BeforeAfterView` と同じ経路
   （`previewSourceImageLoader` / `afterImageRenderer`。本番コードからは公開ラッパー
   `loadPreviewImage` / `renderPreviewAfter` 経由）で `CpuVisionRenderer` を 4 回、直列・最新優先で呼ぶ。
-  強さは呼び出し側（`previewStrength`）が決めた値を 4 セル共通で受け取り、選択状態は読まない。
+  強さは呼び出し側が決めた値（色覚層の強度。`colorVisionCompareInputOf` が決め、bypass 中は 0）を 4 セル共通で受け取り、選択状態は読まない。
   セルの Semantics ラベルと「4 型とも同じ強さ」の注記は、表示中の画像を描いた強さ（`_afterStrength`、
   まだ無ければ `widget.strength`）から作り、再描画中に新しい強さが古い画像に被らない。失敗したセルは
   「描画に失敗しました」の文言に切り替わる。新しい描画が控えている間（`_rebuildPending`）の失敗は
@@ -1018,6 +1018,17 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   焼き込み、`composeCompareGrid`（`export_service.dart`。配置は pure な `compareGridLayout`）で
   1 枚に並べる。キャプションは描画時点の強さから作り、保存・通知・失敗の扱いは
   `savePngWithClipboard` / `showExportSuccess`（`BeforeAfterView` の書き出しと共通）を使う。
+  **層の土台（#122）**: `colorVisionCompareInputOf(VisionFilterState)`（`color_vision_compare.dart`）が
+  色覚層の有無（`colorVisionLayerOf`）・色覚層の強度・土台（色覚以外の強度 > 0 の層を状態の順に、
+  `VisionStep` と `ExportLayer` の両方）を決める。色覚層が無ければ null（切替を出さない）。bypass 中は強度 0 で土台なし。
+  `ColorVisionCompareView` は `baseSteps` / `baseLayers` を受け取り、`_rebuild` の先頭で
+  `BeforeAfterView.renderAfterPipeline` を **1 回だけ**呼んで土台を作り（空なら原画）、4 セルは土台の複製に色覚 1 段を適用する。
+  土台は「steps・元画像・サイズ」をキーに保持し、色覚の強度だけが動いたときは作り直さない（層・強度・パラメータが
+  変わると `didUpdateWidget` が再構築し、既存の直列・最新優先に乗る）。描画時点の値（強さ・土台の層）は控え
+  （`_afterStrength` / `_afterBaseLayers`）に固定し、書き出し（キャプションの症状名行・ファイル名）はその控えから作るので
+  画像と食い違わない。土台があるときのキャプションは `buildLayeredExportCaption`（土台の層 + 色覚 1 層）、ファイル名は
+  `exportSymptomId`（比較の印 → 土台の id、適用順、48 文字上限）。色覚だけのときは従来と同一。
+  色覚の強度 0 は、単独選択の挙動（2×2 は出たまま、4 セルとも恒等で「0%」）に揃える。
   `BeforeAfterView` との関係は `docs/adr/2026-09-30-color-vision-2x2-compare.md`
 - `ShaderFilter`（`lib/rendering/shader_filter.dart`）: sensus 由来 GLSL を変換した
   Impeller `FragmentProgram` で `ui.Image` にフィルタを適用する。色覚 7 型

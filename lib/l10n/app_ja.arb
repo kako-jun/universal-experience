@@ -29,6 +29,7 @@
   "compareToggleTooltip": "色覚の 4 型の見え方を並べて表示します",
   "compareSectionTitle": "色覚 4 型の比較",
   "compareSharedStrengthNote": "4 型とも同じ強さで表示しています：{percent}%",
+  "compareBaseNote": "4 型の前に適用している層：{names}",
   "compareCellSemanticsLabel": "{name}のシミュレーション、強さ{percent}%",
   "compareCellFailedSemanticsLabel": "{name}のシミュレーション、描画に失敗しました",
   "previewPreparing": "プレビューを準備中…",

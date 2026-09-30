@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -8,7 +9,10 @@ import '../../l10n/l10n_extensions.dart';
 import '../../models/preview_image_source.dart';
 import '../../models/vision_filter_contract_notes.dart' as contract_notes;
 import '../../services/color_vision_compare.dart';
+import '../../services/export_layers.dart';
 import '../../services/export_service.dart';
+import '../../services/vision_layer.dart';
+import '../../src/rust/api/sensus_bridge.dart' show VisionStep;
 import 'before_after_view.dart';
 
 /// [ColorVisionCompareView] の書き出しファイル名に入れる識別子（`exportFilename` の
@@ -29,8 +33,15 @@ const String kColorVisionCompareExportId = 'color-vision-compare';
 ///   [savePngWithClipboard] / [showExportSuccess]（単独の書き出しと共通）。
 ///
 /// 並べる型は `kColorVisionCompareEntries`（カタログが正本）、強さは全セル共通で
-/// [strength] を受け取る（`home_screen.dart` が `previewStrength` で決めた値）。
+/// [strength] を受け取る（色覚層の強度。`colorVisionCompareInputOf` が決める）。
 /// このウィジェットは選択状態を読まない presentational な部品。
+///
+/// **他の層を重ねているとき（#122）**: 4 セルは、色覚以外の層（[baseSteps]、適用順）を
+/// **1 回だけ**合成した画像（土台）を共通の出発点にして、その上に色覚 4 型を 1 枚ずつ
+/// 適用したもの。土台は (steps, サイズ, 元画像) が同じ間は使い回し、色覚の強さだけが動く
+/// ときは再合成しない（セルごとの描画コストは色覚 1 回ぶんのまま）。[baseSteps] が空なら
+/// 土台 = 原画（従来どおり）。土台・強さ・層の控えは描画した時点の値で固定し、書き出しは
+/// それを使う（[_afterStrength] / [_afterBaseLayers]）。
 ///
 /// 並行制御は [BeforeAfterView] と同じ「直列・最新優先」: 描画中に入力が変わったら
 /// 途中の結果は捨て、進行中の 1 本が終わってから最新の入力で 1 回だけやり直す
@@ -40,11 +51,21 @@ class ColorVisionCompareView extends StatefulWidget {
     super.key,
     required this.strength,
     required this.imageSource,
+    this.baseSteps = const [],
+    this.baseLayers = const [],
     this.sampleSize,
   });
 
-  /// 4 セル共通の強さ 0.0..1.0。
+  /// 4 セル共通の強さ 0.0..1.0（色覚層の強度）。
   final double strength;
+
+  /// 4 型の前に 1 回だけ適用する層のステップ列（適用順、強度 0 は除いたもの、#122）。
+  /// 空なら土台 = 原画。
+  final List<VisionStep> baseSteps;
+
+  /// [baseSteps] と同じ層の控え（書き出しのキャプション・ファイル名と注記の素）。
+  /// [ColorVisionCompareInput.baseLayers] と同じ。
+  final List<ExportLayer> baseLayers;
 
   /// 4 セルが共通で使う元画像（サンプル or 読み込んだ画像、#78）。
   final PreviewImageSource imageSource;
@@ -65,6 +86,16 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
   int? _currentSampleSize;
   PreviewImageSource? _currentImageSource;
 
+  /// 土台（[_before] に [ColorVisionCompareView.baseSteps] を 1 回適用した画像、#122）。
+  /// まだ作っていない間は null。steps が空の間は使わず（土台 = [_before]）、ソース・サイズが
+  /// 変わるか dispose されるまで保持する。表示には使わない。
+  ui.Image? _baseImage;
+
+  /// [_baseImage] を作ったときの入力（再利用の判定用）。
+  List<VisionStep>? _baseImageSteps;
+  int? _baseImageSize;
+  PreviewImageSource? _baseImageSource;
+
   /// 表示中の 4 セル（[kColorVisionCompareEntries] と同じ順）。まだ 1 回も
   /// 成功していない・最新の描画が失敗した間は null。
   List<ui.Image>? _afters;
@@ -73,6 +104,10 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
   /// （widget.strength は描画より先に進んでいることがあるため、
   /// [BeforeAfterView] と同じ理由）。
   double? _afterStrength;
+
+  /// [_afters] を描画したときの、土台に入っている層（強度が表示上 0 より大きいもの、適用順）。
+  /// 書き出しのキャプション・ファイル名と、土台の注記はこれから作る（[_afterStrength] と同じ理由）。
+  List<ExportLayer>? _afterBaseLayers;
 
   /// 最新の描画が失敗したか。次の入力の変化で再試行するまで残る（自動リトライしない）。
   bool _failed = false;
@@ -99,10 +134,16 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.strength != widget.strength ||
         oldWidget.sampleSize != widget.sampleSize ||
-        oldWidget.imageSource != widget.imageSource) {
+        oldWidget.imageSource != widget.imageSource ||
+        !listEquals(oldWidget.baseSteps, widget.baseSteps) ||
+        !listEquals(
+            _layerKeys(oldWidget.baseLayers), _layerKeys(widget.baseLayers))) {
       _scheduleRebuild();
     }
   }
+
+  static List<String> _layerKeys(List<ExportLayer> layers) =>
+      [for (final l in layers) l.layer.strengthKey];
 
   void _scheduleRebuild() {
     if (_rebuildInFlight) {
@@ -147,6 +188,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       _failed = true;
       _afters = null;
       _afterStrength = null;
+      _afterBaseLayers = null;
     });
     if (old != null) {
       for (final image in old) {
@@ -166,6 +208,9 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
     final source = widget.imageSource;
     final strength = widget.strength;
     final size = _effectiveSampleSize;
+    // 土台の入力も冒頭で固定する（await の間に widget が先へ進んでも、この 1 回は固定した値）。
+    final baseSteps = List<VisionStep>.unmodifiable(widget.baseSteps);
+    final baseLayers = effectiveExportLayers(widget.baseLayers);
 
     final ui.Image before;
     if (_before != null &&
@@ -193,6 +238,54 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       old?.dispose();
     }
 
+    // 土台: steps が空なら原画、あれば 1 回だけ合成（同じ入力の間は使い回す）。
+    // 保持した土台を捨てるのはソース・サイズが変わったときと dispose のときだけ。
+    // steps が空の間（原画比較のホールド中など）も捨てずに持ち、解除後に層が
+    // 変わっていなければ CPU 再合成しない（空 steps の間は土台を使わず原画を使う）。
+    if (_baseImage != null &&
+        (_baseImageSize != size || _baseImageSource != source)) {
+      final stale = _baseImage;
+      _baseImage = null;
+      _baseImageSteps = null;
+      stale?.dispose();
+    }
+    final ui.Image base;
+    if (baseSteps.isEmpty) {
+      base = before;
+    } else if (_baseImage != null &&
+        _baseImageSize == size &&
+        _baseImageSource == source &&
+        listEquals(_baseImageSteps, baseSteps)) {
+      base = _baseImage!;
+    } else {
+      // renderer に渡すのは複製（原画は以降も使う）。
+      final input = before.clone();
+      ui.Image? composed;
+      try {
+        composed = await BeforeAfterView.renderAfterPipeline(input, baseSteps);
+        if (composed == null) {
+          throw StateError('Renderer returned no base image');
+        }
+      } catch (e, st) {
+        _reportError(e, st);
+        _onRebuildFailed(generation);
+        return;
+      } finally {
+        if (!identical(composed, input)) input.dispose();
+      }
+      if (generation != _generation || !mounted) {
+        composed.dispose();
+        return;
+      }
+      final old = _baseImage;
+      _baseImage = composed;
+      _baseImageSteps = baseSteps;
+      _baseImageSize = size;
+      _baseImageSource = source;
+      old?.dispose();
+      base = composed;
+    }
+
     final produced = <ui.Image>[];
     void discardProduced() {
       for (final image in produced) {
@@ -206,9 +299,9 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
         discardProduced();
         return;
       }
-      // renderer に渡すのは複製（原画は次のセルでも使う。await の間に
+      // renderer に渡すのは複製（土台は次のセルでも使う。await の間に
       // 別の入れ替えで dispose されても複製は生きている）。
-      final input = before.clone();
+      final input = base.clone();
       ui.Image? after;
       try {
         after = await renderPreviewAfter(
@@ -239,6 +332,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
     setState(() {
       _afters = produced;
       _afterStrength = strength;
+      _afterBaseLayers = baseLayers;
       _failed = false;
     });
     if (old != null) {
@@ -251,6 +345,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
   @override
   void dispose() {
     _before?.dispose();
+    _baseImage?.dispose();
     final afters = _afters;
     if (afters != null) {
       for (final image in afters) {
@@ -263,8 +358,13 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
   /// 4 セルを 1 枚の PNG に合成して書き出す（#84）。
   ///
   /// 単独の書き出し（[BeforeAfterView] の `_export`）と同じ規約:
-  /// - キャプションは **描画した時点の強さ**（[_afterStrength]）から
-  ///   [buildExportCaption] で作る。widget.strength は使わない。
+  /// - キャプションは **描画した時点の強さ**（[_afterStrength]）と土台の層（[_afterBaseLayers]）
+  ///   から作る。widget の値は使わない。土台が無ければ従来どおり 1 型ずつの
+  ///   [buildExportCaption]。土台があれば [buildLayeredExportCaption]（土台の層の行 + そのセルの
+  ///   色覚の行。色覚の強度が 0% でも、画像と同じく行は残す）。
+  /// - ファイル名は土台が無ければ従来どおり（[kColorVisionCompareExportId] + 強度の %）。
+  ///   あれば [exportSymptomId] で「比較の印 + 土台の層の id（適用順）」をつなぐ（強度の % は
+  ///   層ごとに違うので付けない。上限で落ちるのは末尾の層だけで、先頭の印は残る）。
   /// - 表示中の画像は書き出しの途中で入れ替わって破棄されうるので、開始時に複製する。
   /// - 二重起動しない。失敗（描画・合成・エンコード・保存のどれでも）は
   ///   [AppLocalizations.exportFailure] の SnackBar で知らせ、成功は保存先と
@@ -272,7 +372,13 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
   Future<void> _export(AppLocalizations l10n) async {
     final afters = _afters;
     final strength = _afterStrength;
-    if (afters == null || strength == null || _exporting) return;
+    final baseLayers = _afterBaseLayers;
+    if (afters == null ||
+        strength == null ||
+        baseLayers == null ||
+        _exporting) {
+      return;
+    }
     setState(() => _exporting = true);
     final clones = [for (final image in afters) image.clone()];
     final composedCells = <ui.Image>[];
@@ -282,22 +388,43 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       final date = isoDate(now);
       for (var i = 0; i < kColorVisionCompareEntries.length; i++) {
         final entry = kColorVisionCompareEntries[i];
-        final caption = buildExportCaption(
-          l10n,
-          filterId: entry.id,
-          colorVisionType: null,
-          filter: colorVisionCompareFilter(entry),
-          strength: strength,
-          isoDate: date,
-        );
+        final filter = colorVisionCompareFilter(entry);
+        final caption = baseLayers.isEmpty
+            ? buildExportCaption(
+                l10n,
+                filterId: entry.id,
+                colorVisionType: null,
+                filter: filter,
+                strength: strength,
+                isoDate: date,
+              )
+            : buildLayeredExportCaption(
+                l10n,
+                layers: [
+                  ...baseLayers,
+                  ExportLayer(
+                    layer: VisionLayer(id: entry.id),
+                    filter: filter,
+                    strength: strength,
+                  ),
+                ],
+                isoDate: date,
+              );
         composedCells
             .add(await composeCaptionedExportImage(clones[i], caption));
       }
       final grid = await composeCompareGrid(composedCells);
       final bytes = await encodePngAndDispose(grid);
       final filename = exportFilename(
-        symptomId: kColorVisionCompareExportId,
-        strengthPercent: contract_notes.strengthPercent(strength),
+        symptomId: baseLayers.isEmpty
+            ? kColorVisionCompareExportId
+            : exportSymptomId([
+                kColorVisionCompareExportId,
+                for (final l in baseLayers) l.layer.strengthKey,
+              ]),
+        strengthPercent: baseLayers.isEmpty
+            ? contract_notes.strengthPercent(strength)
+            : null,
         isoDate: date,
         time: compactTime(now),
       );
@@ -346,6 +473,8 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
     final percent =
         contract_notes.strengthPercent(_afterStrength ?? widget.strength);
     final entries = kColorVisionCompareEntries;
+    final shownBaseLayers =
+        _afterBaseLayers ?? effectiveExportLayers(widget.baseLayers);
     final cells = <Widget>[
       for (var i = 0; i < entries.length; i++)
         _CompareCell(
@@ -370,11 +499,29 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
         Row(
           children: [
             Expanded(
-              child: Text(
-                l10n.compareSharedStrengthNote(percent),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.compareSharedStrengthNote(percent),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  // 他の層を重ねているときだけ: 4 枚は、この層を先に適用した画像から始まる。
+                  if (shownBaseLayers.isNotEmpty)
+                    Text(
+                      l10n.compareBaseNote(
+                        layerNamesSummary(l10n, [
+                          for (final l in shownBaseLayers)
+                            visionLayerDisplayName(l10n, l.layer),
+                        ]),
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                ],
               ),
             ),
             // 書き出せるのは 4 セルそろって描けているときだけ。

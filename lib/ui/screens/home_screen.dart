@@ -372,20 +372,21 @@ class _HomeScreenState extends State<HomeScreen> {
   /// クイック選択のときは見出し・export の caption・ファイル名に -omaly の
   /// 名前を正しく出す。
   ///
-  /// 色覚カテゴリを選んでいる間は「2×2 で比較」の切替を出し、ON の間は
+  /// 層の集合に色覚層がある間は「2×2 で比較」の切替を出し、ON の間は
   /// Before / After の代わりに色覚 4 型の 2×2（[ColorVisionCompareView]、#84）を
-  /// 出す。強さは Before / After と同じ [previewStrength] を 4 セル共通で使うので、
-  /// 原画に戻すホットキー（bypass）も 2×2 にそのまま効く。
+  /// 出す。強さは色覚層の強度を 4 セル共通で使い、他の層（色覚より前の段）は先に 1 回だけ
+  /// 適用した土台にする（#122、[colorVisionCompareInputOf]）。原画に戻すホットキー
+  /// （bypass）は 2×2 にもそのまま効く（強度 0・土台なし）。
   Widget _previewCard() {
     return Consumer2<VisionFilterState, ImageSourceState>(
       builder: (context, visionState, imageSourceState, _) {
         final theme = Theme.of(context);
         final l10n = AppLocalizations.of(context)!;
-        // 暫定（#120）: 「2×2 で比較」は、層の集合がちょうど色覚 1 層のときだけ出す。
-        // 他の層が重なっている間は、4 型の一覧が「重ねた結果」と食い違うため。複数層との
-        // 合成での 2×2 は #122 で解除する。
-        final canCompare = visionState.layers.length == 1 &&
-            isColorVisionFilterId(visionState.layers.single.id);
+        // 「2×2 で比較」は、層の集合に色覚層があるときだけ出す（#122）。他の層を重ねていても
+        // 出せて、そのとき 4 枚は「色覚以外の層を先に適用した画像」の上に色覚 4 型を 1 つずつ
+        // 適用したもの。色覚層が無ければ切替も 2×2 も出ない（compareInput が null）。
+        final compareInput = colorVisionCompareInputOf(visionState);
+        final canCompare = compareInput != null;
         final comparing = canCompare && _compareColorVision;
         final strength = previewStrength(visionState);
         return Card(
@@ -439,7 +440,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ImageSourcePicker(
                   child: comparing
                       ? ColorVisionCompareView(
-                          strength: strength,
+                          strength: compareInput.strength,
+                          baseSteps: compareInput.baseSteps,
+                          baseLayers: compareInput.baseLayers,
                           imageSource: imageSourceState.current,
                         )
                       : BeforeAfterView(
