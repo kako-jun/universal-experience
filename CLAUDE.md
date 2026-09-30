@@ -34,7 +34,8 @@ lib/
 │   ├── app_shortcuts.dart           # アプリ内キー操作（/, ↑↓, ←→, Esc, Cmd/Ctrl+V）の Intent 定義（#63/#72/#97/#120）
 │   ├── clipboard_image_reader.dart  # クリップボード画像取得の seam（実体は pasteboard、#97）
 │   ├── color_vision_compare.dart    # 色覚 4 型の 2×2 比較で並べる型（カタログ順・実験的を除く）と
-│   │                                 # 切替を出す条件・セルのフィルタ（#84）
+│   │                                 # 切替を出す条件（色覚層があるとき。colorVisionLayerOf）・セルのフィルタ（#84）・
+│   │                                 # 他の層の土台と色覚の強度（colorVisionCompareInputOf、#122）
 │   ├── color_vision_selection.dart  # 色覚クイック選択の唯一の入口（FilterService/
 │   │                                 # VisionFilterState を同時更新、#60）
 │   ├── export_service.dart          # PNG エクスポート（メタ焼き込み・「シミュレーション（近似）」と実験的フィルタの注記の焼き込み #80・Downloads へ非上書き保存・フォルダで表示、#43/#64）。2×2 比較の書き出し用に composeCompareGrid（#84）。複数層はキャプションを層ごとの行にし（ExportCaption.layered）、ファイル名の症状 id は exportSymptomId（適用順・48 文字上限・`-plusN`、#121）
@@ -81,7 +82,7 @@ lib/
     │                                 # layer_chip_strip（プレビュー上の適用順チップ帯・✕・すべて解除、#120）,
     │                                 # adjust_panel（右カラム「調整」: 2 層以上は層ごとの節、#72/#120）,
     │                                 # before_after_view（複数層は名前の要約見出し・書き出しは層ごとの行と併合した受診喚起、#120/#121）, loupe_hud,
-    │                                 # color_vision_compare_view（色覚 4 型の 2×2 比較と書き出し、#84）,
+    │                                 # color_vision_compare_view（色覚 4 型の 2×2 比較と書き出し、#84。他の層の土台つき、#122）,
     │                                 # experience_presets（体験プリセットの行 ExperiencePresetTile）, filter_param_panel,
     │                                 # consult_notice_block（受診喚起の共有表示ウィジェット、#76）,
     │                                 # strength_caution（強度スライダの上限付近の印・注記、#66）,
@@ -134,13 +135,13 @@ test/
 ├── filter_browser_multi_select_test.dart # 統合一覧のチェック式・番号バッジが段順・色覚の排他置き換え・上限で未選択の行が無効（色覚置き換え行とプリセットは有効）・プリセット置換と一致時だけ強調・行フォーカス移動（#120）
 ├── layer_chip_strip_test.dart      # チップ帯: 2 層以上で出る・チップで調整中が移る・✕ で 1 層除去・すべて解除・状態が形で分かる（#120）
 ├── adjust_panel_layers_test.dart   # 調整パネルの層ごとの節・調整中の層だけ展開・強度スライダー 1 本・1 層は従来の見た目（#120）
-├── home_screen_multi_layer_heading_test.dart # 複数層の見出し（名前の要約）・書き出しボタンが複数層でも有効・2×2 スイッチが色覚 1 層のときだけ（#120/#121）
+├── home_screen_multi_layer_heading_test.dart # 複数層の見出し（名前の要約）・書き出しボタンが複数層でも有効・2×2 スイッチが色覚層のあるときだけ（#120/#121/#122）
 ├── export_multi_layer_test.dart    # 複数層の書き出し: 層ごとの行・最大の緊急度と併合した escalation・実験的の注記・強度 0 の層を数えない・ファイル名・描画時点の控え・単一層の従来どおり（#121）
 ├── home_screen_multi_select_keys_test.dart # ↑↓ は選択を変えず Space/Enter で足し引き・←→ は調整中の層の強度（#120）
 ├── filter_list_selection_test.dart # 統合一覧の純粋ロジック（#72）
-├── color_vision_compare_test.dart  # 2×2 比較で並べる型の順・切替の条件・フィルタの対応表（#84）
-├── color_vision_compare_view_test.dart # 2×2 の描画・Semantics（失敗文言・描画済みの強さ）・直列最新優先・失敗（控えがある間は出さない）・書き出し PNG の実画素（#84）
-├── home_screen_color_vision_compare_test.dart # 「2×2 で比較」の切替が層の集合がちょうど色覚 1 層のときだけ出て Before / After・見出しと入れ替わる／Tab で操作できる／行からの → は高さによらず受け口／bypass（#84）
+├── color_vision_compare_test.dart  # 2×2 比較で並べる型の順・色覚層の検出・土台と強度（colorVisionCompareInputOf）・フィルタの対応表（#84/#122）
+├── color_vision_compare_view_test.dart # 2×2 の描画・Semantics（失敗文言・描画済みの強さ）・直列最新優先・失敗（控えがある間は出さない）・書き出し PNG の実画素・土台（1 回だけ合成・色覚の強度だけ動かしても再合成しない・4 セルが土台 + 各型とバイト一致・層の名前つきキャプション／ファイル名）（#84/#122）
+├── home_screen_color_vision_compare_test.dart # 「2×2 で比較」の切替が色覚層のあるときだけ出て（他の層と重ねていても出る・色覚が無ければ出ない）Before / After・見出しと入れ替わる／Tab で操作できる／行からの → は高さによらず受け口／bypass（#84）
 ├── clipboard_paste_test.dart       # クリップボード画像の貼り付け経路・失敗 5 種・Cmd/Ctrl+V・ボタン（#97）
 ├── language_dialog_test.dart       # 言語ピッカー: 切替で追従・永続化・自称名の網羅と読み上げ言語・画面とトレイの言語一致（#82）
 ├── tray_locale_sync_test.dart      # 言語の選択/OS ロケール変更でトレイの文言が更新される（#82）
@@ -254,9 +255,11 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 
 ### 色覚 4 型の 2×2 比較
 
-色覚カテゴリを選んでいる間だけ「2×2 で比較」を出し、ON の間は中央カラムの Before / After の代わりに
+層の集合に色覚の層があるときだけ「2×2 で比較」を出し、ON の間は中央カラムの Before / After の代わりに
 色覚 4 型（カタログの非実験的な色覚）を同じ画像・同じ強さで並べる。描画・書き出しは既存の経路を
-再利用する（専用レンダラを持たない）。Before / After との関係と理由は
+再利用する（専用レンダラを持たない）。他の層（強度 > 0、色覚より前）を重ねているときは、それらを 1 回だけ適用した画像を
+土台にして 4 型を 1 枚ずつ重ねる（土台は色覚の強度だけが動いても作り直さない。書き出しのキャプションに症状名行、ファイル名は
+層の id の適用順連結）。色覚の強度 0 は単独選択と同じく切替は出たまま 4 セルとも恒等で「0%」（#122）。Before / After との関係と理由は
 `docs/adr/2026-09-30-color-vision-2x2-compare.md`。
 
 ### 状態モデルの統一と多症状の同時適用（第 4 段 #120 まで実装）
@@ -290,8 +293,8 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 - キー: ↑↓ は行フォーカスの移動だけ、Space / Enter が足し引き、←→ は調整中の層（`focusedId`）の強度。
 - 複数層の見出し・HUD は「名前 + 名前 …（+N）」（強度は出さない）。PNG 書き出しは複数層でも使え（#121）、画像に効いている層
   （強度 > 0）ごとの行・最大の緊急度と併合した escalation・実験的の注記を焼き込む。強度 0 の層は症状行・受診喚起・注記・
-  ファイル名に数えない（画像だけが共有されたとき実際の見え方と食い違わないため）。「2×2 で比較」は層の集合がちょうど
-  色覚 1 層のときだけ出す（#122 で解除）。
+  ファイル名に数えない（画像だけが共有されたとき実際の見え方と食い違わないため）。「2×2 で比較」は色覚層があるとき
+  だけ出し、他の層は土台として重ねる（#122）。
 - トレイ（#121）: 「高度なフィルタ」はチェック式。クリックはメイン画面の一覧と同じ入口（`toggleColorVision` /
   `toggleFilterListEntry`）を通り、チェックは層の集合から導く（origin を見ない。トレイに `isColorQuickSelection` の消費者は残らない）。
   色覚 4 項目は排他（別の型で置き換え）、上限 5 で未選択の項目は灰色（色覚の置き換えは有効）。フィルタ解除（トレイ・ホットキー）は全層を外す。

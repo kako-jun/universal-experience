@@ -177,14 +177,15 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
   調整中のチップは塗り + 太い枠、それ以外は細い枠で、状態を形で示す。チップ・✕ とも 48dp。1 層のときは出さない
   （従来どおり調整パネルの「フィルタを解除」が入口）。その下に `BeforeAfterView` と、それに隣接する `ImageSourcePicker`（サンプル画像の切替）。
   その下に `WelcomeBanner`（プレビューを最初のビューポートから押し出さない位置）。
-  層の集合が色覚 1 層だけのときに限り（#120。複数層の 2×2 は #122 で解除）、見出しの行に `FilterChip`「2×2 で比較」（`compareToggleLabel`。
+  層の集合に色覚の層があるときに限り（#120 で色覚 1 層のみ、#122 で他の層と重ねていても出す。色覚が無ければ出さない）、見出しの行に `FilterChip`「2×2 で比較」（`compareToggleLabel`。
   補助の説明は tooltip の `compareToggleTooltip`）を出す。ON の間は見出しが「ビフォー / アフター」から
   「色覚 4 型の比較」（`compareSectionTitle`）に切り替わり、OFF で戻る。ON の間は
   `BeforeAfterView` の代わりに `ColorVisionCompareView`（色覚 4 型を 2×2 に並べる。各セルは
   `labelLarge` の型名 + 正方形の画像で、型名と強さを 1 つの Semantics ラベルにまとめる。強さは
   4 セル共通で、`bodySmall` / `onSurfaceVariant` の一文で示す）を出す。書き出しボタンは既存と同じ
   `IconButton`（tooltip 付き）。Before / After と同時には出さない（理由は
-  `docs/adr/2026-09-30-color-vision-2x2-compare.md`）。
+  `docs/adr/2026-09-30-color-vision-2x2-compare.md`）。他の層を重ねているときは、強さの注記の下に
+  `bodySmall` / `onSurfaceVariant` の一文 `compareBaseNote`「4 型の前に適用している層：名前 + 名前」（適用順。長いときは要約）を足す。
 - **右「調整」**（`AdjustPanel`）: 選んだ症状の名前・カテゴリ・説明、強度スライダー（`FilterParamPanel` の 1 本。
   旧 `IntensitySlider` は #120 で統合。強度の上限付近に注意が要るフィルタでは、スライダの印と注記がここに入る。#66）、その下に `ConsultNoticeBlock`（常時展開）、最下段に
   `FilterProvenanceSection`（「モデルと出典」「表現できないこと」の折りたたみ 2 行、既定は閉じる。強度・パラメータ・受診喚起の位置を動かさない。#80）。
@@ -345,6 +346,7 @@ UE_SCREENSHOTS=1 UE_SCREENSHOT_DIR=/path/to/out \
   `{wide|narrow}-{light|dark}-{ja|en}-explain-{deutan|cataract|floaters|tetrachromacy}.png`（出典・限界を両方開いた状態。
   色覚・advanced・seed 型・四色覚の「実験的」バッジ。#80。文言はレイアウト確認用の差し込みで実データではない）、
   `{wide|narrow}-{light|dark}-{ja|en}-compare-{off|on}.png`（色覚 4 型の 2×2 比較の切替前/後。#84）と
+  `{wide|narrow}-{light|dark}-{ja|en}-compare-layers-on.png` / `wide-{light|dark}-{ja|en}-compare-layers-export.png`（めまい + 近視 + 色覚を重ねた 2×2 と、その書き出し。土台の注記・症状名行つき。#122）、
   `wide-{light|dark}-{ja|en}-compare-export.png`（2×2 の書き出しで保存された PNG のバイトそのもの。撮影時に
   デコードして 4 セルの色が互いに異なることも確かめる）。2×2 の撮影だけは、4 型が見分けられるよう型ごとに色味を
   変えた別のフェイクに差し替える（同じく色覚の正しさを示す画像ではない）。
