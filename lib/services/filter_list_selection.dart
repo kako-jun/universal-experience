@@ -182,7 +182,9 @@ List<FilterListEntry> visibleFilterListEntries({
   ];
 }
 
-/// 現在の選択に対応する一覧の行。体験プリセット選択中・未選択なら null。
+/// フォーカス中の層に対応する一覧の行（単一選択の見方）。体験プリセット選択中・未選択なら null。
+/// トレイ（#121）とメイン画面の一覧のチェックは、これではなく層の集合から決める
+/// （[layerForFilterListEntry]）。
 ///
 /// 色覚クイック選択なら [VisionFilterState.colorVisionType] の行、それ以外
 /// （advanced）は選択中カタログ id の行。プリセット由来の選択は一覧の行では
@@ -209,24 +211,6 @@ FilterListEntry? selectedFilterListEntry(VisionFilterState visionState) {
   return null;
 }
 
-/// 一覧の行を**単一選択**として選ぶ（層の集合をその行 1 つへ置き換える）。統合一覧の行は
-/// 多選択の [toggleFilterListEntry] を使うので、これを呼ぶのは**トレイ**（`tray_service.dart`、
-/// チェック式への拡張は #121）だけ。色覚クイック選択の行は [selectColorVision]
-/// （`FilterService` と `VisionFilterState` の両方を更新）、それ以外は
-/// [VisionFilterState.replaceWith]（従来の単一選択と同じ置き換え）。
-void applyFilterListEntry(
-  FilterService filterService,
-  VisionFilterState visionState,
-  FilterListEntry entry,
-) {
-  final type = entry.colorVisionType;
-  if (type != null) {
-    selectColorVision(filterService, visionState, type);
-  } else {
-    visionState.replaceWith(entry.catalogId);
-  }
-}
-
 /// ↑↓（#63）で [visible]（今見えている一覧）を順送り/逆送りしたときの次の行。
 /// [current] が一覧に無い（未選択・絞り込みで消えた・プリセット選択中）なら、
 /// 順送りは先頭・逆送りは末尾に入る。末尾の次は先頭へ折り返す。
@@ -245,7 +229,7 @@ FilterListEntry? nextFilterListEntry(
 
 // ── 多選択（#120）──
 //
-// 統合一覧の行は、単一選択の「今の 1 行」（[selectedFilterListEntry]、トレイが使う）ではなく
+// 統合一覧の行は、単一選択の「今の 1 行」（[selectedFilterListEntry]）ではなく
 // **層の集合**と対応づける。チェックされている行 = 層がある行、番号バッジ = 適用順。
 
 /// [entry] が色覚グループ（排他のラジオ式）の行か。

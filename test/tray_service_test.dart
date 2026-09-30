@@ -156,14 +156,17 @@ void main() {
       expect(hidden.checked, isFalse);
     });
 
-    test('アクティブなフィルタだけがチェックされる', () {
+    test('チェック対象に渡した色覚だけがチェックされる（色覚は排他）', () {
       final spec = buildTrayMenuSpec(
         loupeVisible: true,
         labels: _labels,
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
-        activeFilter: ColorVisionType.deuteranopia,
+        checkedListEntryKeys: {
+          colorVisionListEntryKey(ColorVisionType.deuteranopia)
+        },
+        hasLayers: true,
       );
 
       final checked = spec
@@ -175,7 +178,7 @@ void main() {
       expect(checked, [ColorVisionType.deuteranopia]);
     });
 
-    test('フィルタ解除はフィルタ無しのときだけチェックされる', () {
+    test('フィルタ解除は層が無いときだけチェックされる', () {
       final active = buildTrayMenuSpec(
         loupeVisible: true,
         labels: _labels,
@@ -189,7 +192,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
-        activeFilter: ColorVisionType.protanopia,
+        hasLayers: true,
       ).firstWhere((e) => e.kind == TrayMenuKind.clearFilter);
 
       expect(active.checked, isTrue);
@@ -214,7 +217,10 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
-        activeFilter: ColorVisionType.protanopia,
+        checkedListEntryKeys: {
+          colorVisionListEntryKey(ColorVisionType.protanopia)
+        },
+        hasLayers: true,
       );
       String labelOf(TrayMenuKind kind) =>
           spec.firstWhere((e) => e.kind == kind).label!;
