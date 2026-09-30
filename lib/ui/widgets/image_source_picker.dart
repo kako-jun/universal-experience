@@ -152,6 +152,23 @@ class ClipboardImageUnsupportedException implements Exception {
   String toString() => 'ClipboardImageUnsupportedException: $cause';
 }
 
+/// Thrown by [pasteUserImageFromClipboard] when the clipboard holds only files
+/// that aren't an image format we read (#97, e.g. a HEIC copied in Finder) —
+/// "no image on the clipboard" would be untrue, so it gets its own SnackBar
+/// (`imageSourcePasteUnsupportedFile`).
+class ClipboardFileUnsupportedException implements Exception {
+  const ClipboardFileUnsupportedException();
+
+  @override
+  String toString() => 'ClipboardFileUnsupportedException';
+}
+
+/// How long [pasteUserImageFromClipboard] waits for [clipboardImageReader] (#97).
+/// A clipboard owner that never answers (a hung app on X11, say) would
+/// otherwise leave the in-flight guard set forever. A timeout is reported like
+/// any read failure (`imageSourcePasteFailed`). Mutable only for tests.
+Duration clipboardReadTimeout = const Duration(seconds: 5);
+
 /// Pastes the clipboard's image as the preview's user image (#97, Cmd/Ctrl+V
 /// and the "Paste" button). Goes through the **same** decode + hand-over
 /// path as [loadUserImageFile] — [decodeUserImageBytes] (downscales during
@@ -167,7 +184,10 @@ class ClipboardImageUnsupportedException implements Exception {
 /// data ([UserImageTooLargeException], `imageSourcePasteTooLarge` — checked
 /// before decoding), bytes the codec can't read
 /// ([ClipboardImageUnsupportedException], `imageSourcePasteUnsupported`), or
-/// the clipboard read itself failing (`imageSourcePasteFailed`).
+/// the clipboard read itself failing or taking longer than
+/// [clipboardReadTimeout] (`imageSourcePasteFailed`), or only files of a format
+/// we don't read being copied ([ClipboardFileUnsupportedException],
+/// `imageSourcePasteUnsupportedFile`).
 ///
 /// If the clipboard holds an image **file** (copied in a file manager) the
 /// file goes through [loadUserImageFile] instead — the byte-level check above
@@ -193,12 +213,16 @@ Future<bool> _pasteUserImageFromClipboard(BuildContext context) async {
   final imageSourceState = context.read<ImageSourceState>();
   ui.Image decoded;
   try {
-    final content = await clipboardImageReader.read();
+    final content =
+        await clipboardImageReader.read().timeout(clipboardReadTimeout);
     if (content is ClipboardImageFile) {
       // ファイルをコピーした場合（#97）: 選択・ドロップと同じ経路（サイズの
       // 事前判定・縮小デコード・失敗の SnackBar は loadUserImageFile が持つ）。
       if (!context.mounted) return false;
       return loadUserImageFile(context, XFile(content.path));
+    }
+    if (content is ClipboardUnsupportedFiles) {
+      throw const ClipboardFileUnsupportedException();
     }
     if (content is! ClipboardImageData || content.bytes.isEmpty) {
       throw const ClipboardHasNoImageException();
@@ -225,6 +249,8 @@ Future<bool> _pasteUserImageFromClipboard(BuildContext context) async {
           ),
         ClipboardImageUnsupportedException() =>
           l10n.imageSourcePasteUnsupported,
+        ClipboardFileUnsupportedException() =>
+          l10n.imageSourcePasteUnsupportedFile,
         _ => l10n.imageSourcePasteFailed,
       },
     );

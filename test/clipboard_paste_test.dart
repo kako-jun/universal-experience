@@ -2,7 +2,7 @@
 //
 // - pasteUserImageFromClipboard: 取得（ClipboardImageReader の seam）→
 //   サイズ確認 → ダウンスケールデコード → ImageSourceState.setUserImage の経路と、
-//   失敗 4 種（画像なし / 巨大 / 非対応形式 / 読み取り失敗）の SnackBar。
+//   失敗 5 種（画像なし / 巨大 / 非対応形式 / 非対応ファイルのみ / 読み取り失敗）の SnackBar。
 // - HomeScreen の Cmd/Ctrl+V と「貼り付け」ボタン: 同じ経路に配線されていること、
 //   テキスト入力にフォーカスがある間はキーを奪わないこと（DESIGN.md §6.3）。
 //
@@ -92,6 +92,7 @@ void main() {
 
   tearDown(() {
     clipboardImageReader = const PasteboardClipboardImageReader();
+    clipboardReadTimeout = const Duration(seconds: 5);
   });
 
   group('pasteUserImageFromClipboard', () {
@@ -297,6 +298,65 @@ void main() {
       expect(imageSourceState.hasUserImage, isTrue);
     });
 
+    testWidgets('画像でないファイルだけをコピーしていれば、専用文言（「画像なし」ではない）', (tester) async {
+      _suppressFlutterErrorReporting();
+      final imageSourceState = ImageSourceState();
+      clipboardImageReader = _FakeClipboardImageReader.content(
+        () async => const ClipboardUnsupportedFiles(),
+      );
+
+      final ok = await paste(tester, imageSourceState);
+
+      expect(ok, isFalse);
+      expect(imageSourceState.hasUserImage, isFalse);
+      expect(find.text(en.imageSourcePasteUnsupportedFile), findsOneWidget);
+      expect(find.text(en.imageSourcePasteNoImage), findsNothing);
+    });
+
+    testWidgets('読み取りが期限内に終わらなければ「読み取り失敗」になり、ガードも解除される', (tester) async {
+      _suppressFlutterErrorReporting();
+      clipboardReadTimeout = const Duration(milliseconds: 200);
+      final imageSourceState = ImageSourceState();
+      final bytes = await tester.runAsync(_validPngBytes);
+      var hang = true;
+      final reader = _FakeClipboardImageReader(() {
+        // 返事をしないクリップボード所有者（Future が永久に完了しない）。
+        if (hang) return Completer<Uint8List?>().future;
+        return Future.value(bytes);
+      });
+      clipboardImageReader = reader;
+      await tester.pumpWidget(localized(imageSourceState));
+      final context = tester.element(find.byKey(_hostKey));
+
+      final first = pasteUserImageFromClipboard(context);
+      bool? firstResult;
+      unawaited(first.then((v) => firstResult = v));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(firstResult, isNull, reason: '期限前はまだ待っている');
+      // 待っている間の再入は無視される。
+      expect(
+        await pasteUserImageFromClipboard(context),
+        isFalse,
+        reason: '実行中は二重起動を無視',
+      );
+      expect(reader.calls, 1);
+
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump();
+
+      expect(firstResult, isFalse);
+      expect(imageSourceState.hasUserImage, isFalse);
+      expect(find.text(en.imageSourcePasteFailed), findsOneWidget);
+
+      // ガードは解除されているので、次の貼り付けは通る。
+      hang = false;
+      final ok =
+          await tester.runAsync(() => pasteUserImageFromClipboard(context));
+      expect(ok, isTrue, reason: 'タイムアウト後も in-flight ガードが残らない');
+      expect(reader.calls, 2);
+      expect(imageSourceState.hasUserImage, isTrue);
+    });
+
     group('ファイルをコピーした場合', () {
       late Directory dir;
 
@@ -361,9 +421,11 @@ void main() {
     Future<ClipboardContent> resolve({
       List<String> files = const [],
       Uint8List? image,
+      bool Function(String path)? exists,
       required List<String> log,
     }) {
       return resolveClipboardContent(
+        fileExists: exists == null ? null : (p) async => exists(p),
         files: () async {
           log.add('files');
           return files;
@@ -397,16 +459,77 @@ void main() {
       expect((content as ClipboardImageFile).path, '/x/first.jpg');
     });
 
-    test('画像でないファイルだけなら、画像データへ進まず「画像なし」', () async {
+    test('拡張子つきの非対応ファイルだけなら、画像データへ進まず「非対応ファイルのみ」', () async {
       final log = <String>[];
       final content = await resolve(
-        files: ['/x/readme.txt', '/x/archive.zip', '/x/noextension'],
+        files: ['/x/readme.txt', '/x/photo.heic'],
         image: pngBytes,
         log: log,
       );
 
-      expect(content, isA<ClipboardNoImage>());
+      expect(content, isA<ClipboardUnsupportedFiles>());
       expect(log, ['files'], reason: 'ファイルのアイコン画像を貼り付けない');
+    });
+
+    test('実在しないパス（ブラウザの画像 URL など）は無視して画像データを返す', () async {
+      final log = <String>[];
+      final content = await resolve(
+        files: ['https://example.com/cat.png', '/gone/missing.png'],
+        image: pngBytes,
+        exists: (_) => false,
+        log: log,
+      );
+
+      expect(content, isA<ClipboardImageData>());
+      expect((content as ClipboardImageData).bytes, pngBytes);
+      expect(log, ['files', 'image']);
+    });
+
+    test('実在しない非対応拡張子のパスも無視され、画像データが優先される', () async {
+      final content = await resolve(
+        files: ['https://example.com/page.html'],
+        image: pngBytes,
+        exists: (_) => false,
+        log: [],
+      );
+
+      expect(content, isA<ClipboardImageData>());
+    });
+
+    test('拡張子のない実在パスだけなら、種類を決められないので画像データへ', () async {
+      final log = <String>[];
+      final content = await resolve(
+        files: ['/x/noextension', '/x/Makefile'],
+        image: pngBytes,
+        log: log,
+      );
+
+      expect(content, isA<ClipboardImageData>());
+      expect(log, ['files', 'image']);
+    });
+
+    test('実在するパスだけが数えられる（実在しない画像より、実在する画像）', () async {
+      final content = await resolve(
+        files: ['/gone/first.png', '/here/second.jpg'],
+        exists: (p) => p.startsWith('/here/'),
+        log: [],
+      );
+
+      expect((content as ClipboardImageFile).path, '/here/second.jpg');
+    });
+
+    test('存在判定には、files が返した各パスがそのまま渡る', () async {
+      final asked = <String>[];
+      await resolve(
+        files: ['/a/1.png', '/b/2.txt'],
+        exists: (p) {
+          asked.add(p);
+          return true;
+        },
+        log: [],
+      );
+
+      expect(asked, contains('/a/1.png'));
     });
 
     test('ファイルが無ければ画像データを返す', () async {

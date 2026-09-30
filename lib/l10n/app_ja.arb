@@ -209,6 +209,7 @@
   "imageSourcePasteNoImage": "クリップボードに画像がありません。先に画像をコピーしてから貼り付けてください。",
   "imageSourcePasteTooLarge": "クリップボードの画像は大きすぎます（上限 {maxMegabytes}MB）。",
   "imageSourcePasteUnsupported": "クリップボードの画像を読み込めませんでした。対応していない形式かもしれません。",
+  "imageSourcePasteUnsupportedFile": "そのファイルは読み込めない形式です。PNG・JPEG・GIF・BMP・WebP の画像をコピーしてください。",
   "imageSourcePasteFailed": "クリップボードを読み取れませんでした。もう一度お試しください。",
 
   "welcomeBannerTitle": "はじめての方へ",

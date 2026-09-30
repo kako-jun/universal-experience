@@ -23,9 +23,15 @@ Flutter 標準の `Clipboard` はテキストしか扱えないため、画像�
    背後に置く。既存の `pickImageFile`（#78）と同じ seam パターンで、テストは
    `clipboardImageReader` をフェイクに差し替える。プラグインは素の `flutter test` では動かない。
 3. **ファイルを先に見る**。`ClipboardImageReader.read()` は `Pasteboard.files` を先に読み、
-   画像拡張子（png/jpg/jpeg/gif/bmp/webp）のファイルがあれば先頭の 1 枚を `ClipboardImageFile`
-   として返し、選択・ドロップと同じ `loadUserImageFile`（50MB の事前判定付き）に回す。
-   画像でないファイルだけがコピーされているときは、画像データ取得へ進まず「画像なし」にする。
+   **実在するローカルファイル**（`File(path).exists()`。判定は `resolveClipboardContent` に注入する
+   ので純粋関数のまま）だけを対象にする。画像拡張子（png/jpg/jpeg/gif/bmp/webp）のものがあれば先頭の
+   1 枚を `ClipboardImageFile` として返し、選択・ドロップと同じ `loadUserImageFile`（50MB の事前判定付き）
+   に回す。拡張子つきの非対応形式（HEIC 等）だけなら、画像データ取得へ進まず
+   `ClipboardUnsupportedFiles`（「そのファイルは読み込めない形式」）にする。実在しないパス
+   （ディレクトリ・URL）と拡張子のないパスは無視し、画像データへ進む。macOS の上流実装は
+   `files()` が options なしの `readObjects(NSURL)` で http(s) URL も返し得るため、ブラウザの
+   「イメージをコピー」で URL と画像データが両方載る場合に、実在しない URL に引っ張られて画像が
+   貼り付けられなくなる退行を避ける（どのブラウザが URL を載せるかは実機未確認）。
    ファイラでファイルをコピーすると、OS がファイルのアイコン画像も一緒に載せることがある
    （macOS の Finder はファイル URL とアイコンの TIFF）。先に画像データを見ると、画像ファイルの
    中身ではなくアイコンを貼り付けてしまうため。判定は純粋関数 `resolveClipboardContent` に切り出して
@@ -37,8 +43,10 @@ Flutter 標準の `Clipboard` はテキストしか扱えないため、画像�
    あるときだけ奪わない（DESIGN.md §6.3）。キーの押しっぱなし（リピート）は無視し
    （`includeRepeats: false`）、貼り付けの実行中に再度呼ばれても無視する（in-flight ガード、
    例外でも解除）。
-6. 失敗は SnackBar で 4 種に分けて示す（画像なし / 大きすぎる / 読めない形式 / 読み取り失敗）。
-   失敗しても現在の原画は変えない。
+6. 失敗は SnackBar で 5 種に分けて示す（画像なし / 大きすぎる / 読めない形式 / 非対応ファイルのみ /
+   読み取り失敗）。失敗しても現在の原画は変えない。読み取りには 5 秒のタイムアウトを付け、
+   `TimeoutException` は読み取り失敗として扱う（返事をしないクリップボード所有者で in-flight ガードが
+   残らないように）。
 
 ## 代替案
 
@@ -70,9 +78,13 @@ Flutter 標準の `Clipboard` はテキストしか扱えないため、画像�
   （`linux/pasteboard_plugin.cc`、`clipboard_request_image_callback`）は、
   `gdk_pixbuf_save_to_buffer` が確保した `buffer` を Flutter へ渡した後に `g_free` せず、
   エラー時の `GError` も `g_error_free` しない。画像を貼り付けるたびに PNG 1 枚分のメモリが
-  解放されない（プロセス終了まで残る）。当アプリ側では回避できない（プラグイン内部の確保のため）。
+  解放されない（プロセス終了まで残る）。同じく `gtk_clipboard_request_uris_callback`（ファイルのコピー
+  取得）も `g_file_get_path` の戻り値を `g_free` していない（パス 1 本ごとの小さなリーク）。当アプリ側では回避できない（プラグイン内部の確保のため）。
   上流への起票は第三者への公開行為なので行っていない（起票用の文案は Issue #97 のコメントにある。起票するかは
   kako-jun の判断）。macOS の実装は Swift で、同種の手動解放の漏れはコード上にない。
+- **ブラウザの画像コピーで載るクリップボードの中身は実機未確認**: どのブラウザ・OS の組み合わせで
+  http(s) URL がファイル一覧に載るかは確認していない。実在判定で無視する設計にしてあるが、挙動は
+  実機で確認が要る。
 - **ファイルのコピー経路は実機未確認**: `Pasteboard.files` が Finder（macOS）・Nautilus 等（Linux）で
   実際にどう返るか（macOS は Finder が載せるアイコンの TIFF を避けられるか、Linux は URI のみの
   クリップボードからパスを取れるか）は、コード上の想定であり実機で確認していない。実機確認が要る。

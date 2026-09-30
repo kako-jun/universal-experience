@@ -912,17 +912,20 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   実行中の再入は無視する（in-flight ガード。キーのリピートは `includeRepeats: false` でも弾く）。
   クリップボード取得は `lib/services/clipboard_image_reader.dart` の
   `ClipboardImageReader`（interface。`read()` が `ClipboardContent` =
-  画像なし / 画像データ / 画像ファイルのパス を返す）に切り出してあり、本番実装は
+  画像なし / 画像データ / 画像ファイルのパス / 非対応ファイルのみ を返す）に切り出してあり、本番実装は
   `pasteboard` パッケージ（macOS: NSPasteboard、Linux: GtkClipboard。画像は PNG
   バイト列）、テストは `clipboardImageReader` をフェイクへ差し替える。
   **ファイルを先に見る**（`resolveClipboardContent`）: ファイラでファイルをコピーすると
-  OS がアイコン画像も載せるため、画像拡張子のファイルがあれば先頭 1 枚を
-  `loadUserImageFile`（選択・ドロップと同じ経路）に回し、画像でないファイルだけなら
-  画像データへ進まず「画像なし」にする。失敗は 4 種
+  OS がアイコン画像も載せるため、**実在するローカルファイル**（`fileExists` を注入して判定。
+  ブラウザの画像コピーで載る http(s) URL など実在しないパスは無視して画像データへ）に画像拡張子の
+  ものがあれば先頭 1 枚を `loadUserImageFile`（選択・ドロップと同じ経路）に回す。拡張子つきの
+  非対応形式（HEIC 等）だけなら画像データへ進まず「非対応ファイルのみ」、拡張子のないものだけなら
+  種類を決められないので画像データへ進む。読み取りには 5 秒のタイムアウトがあり、超えたら読み取り
+  失敗として扱う（in-flight ガードも解除される）。失敗は 5 種
   （画像なし `imageSourcePasteNoImage` / 巨大 `imageSourcePasteTooLarge` /
-  デコード不能 `imageSourcePasteUnsupported` / 読み取り失敗
-  `imageSourcePasteFailed`）を SnackBar で示し、`ImageSourceState` には触れない
-  （ファイル経路の失敗は `loadUserImageFile` の文言）。
+  デコード不能 `imageSourcePasteUnsupported` / 非対応ファイルのみ
+  `imageSourcePasteUnsupportedFile` / 読み取り失敗 `imageSourcePasteFailed`）を SnackBar で示し、
+  `ImageSourceState` には触れない（ファイル経路の失敗は `loadUserImageFile` の文言）。
   依存に `pasteboard` を選んだ理由は `docs/adr/2026-09-30-clipboard-image-paste.md`
 - `WelcomeBanner`（`lib/ui/widgets/welcome_banner.dart`）: 初回起動時だけ出す
   案内バナー（#78）。表示条件・恒久的な非表示は `SettingsService.
