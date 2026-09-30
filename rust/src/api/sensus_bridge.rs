@@ -813,6 +813,74 @@ pub fn apply_vision_cpu_rgba8(
     height: u32,
     strength: f32,
 ) -> Result<Vec<u8>, String> {
+    let dynimg = rgba8_to_dynamic_image(rgba8, width, height)?;
+
+    let out =
+        sensus_core::apply(filter.to_sensus(), dynimg, strength).map_err(|e| e.to_string())?;
+    Ok(out.to_rgba8().into_raw())
+}
+
+/// [`apply_vision_pipeline_cpu_rgba8`] の 1 ステップ。
+/// `sensus_core::pipeline::FilterStep` の FRB 公開ミラー。
+///
+/// `strength` は [`apply_vision_cpu_rgba8`] の `strength` と同じ扱い（0.0..=1.0 の
+/// clamp / NaN の処理は sensus 側の責務で、ここでは加工せずそのまま渡す）。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct VisionStep {
+    /// このステップで適用するフィルタ（payload 込み）。
+    pub filter: VisionFilter,
+    /// このステップの強度。
+    pub strength: f32,
+}
+
+/// 複数のフィルタを **`steps` の並びの順に**順番に適用する
+/// （`sensus_core::pipeline::Pipeline`）。
+///
+/// 並び順がそのまま適用順になる。ここでは並べ替えも重複除去もしない（どの順で並べるかは
+/// 呼び出し側の責務。ue では段順の表から作る）。各ステップは単体で
+/// [`apply_vision_cpu_rgba8`] を呼んだ結果と同じ挙動になる（sensus の `FilterStep::apply` は
+/// `apply` へ委譲する）。ただし 8bit ↔ f32 の往復が 1 ステップごとに入るため、
+/// 段数に応じて量子化誤差が累積する（sensus `pipeline.rs` 冒頭の注記）。
+/// どれかのステップが失敗したら、そのステップの番号とフィルタ名を含むエラー文字列を返す。
+///
+/// **空の `steps` は入力をそのまま返す**（エラーにしない）。sensus の空の `Pipeline` が
+/// 恒等写像であることに合わせ、「フィルタを 1 つも選んでいない」状態を呼び出し側が
+/// 特別扱いせずに済ませるため。ただしバッファ長の検証は空でも行う。
+///
+/// 入出力のレイアウトと非同期公開の理由は [`apply_vision_cpu_rgba8`] と同じ
+/// （生 RGBA8 `width * height * 4` バイト。`#[frb(sync)]` を付けず Rust 側スレッドプールで
+/// 実行する）。複数ステップは合計時間が層数に比例して重くなるため、UI スレッド上では走らせない。
+pub fn apply_vision_pipeline_cpu_rgba8(
+    steps: Vec<VisionStep>,
+    rgba8: Vec<u8>,
+    width: u32,
+    height: u32,
+) -> Result<Vec<u8>, String> {
+    let dynimg = rgba8_to_dynamic_image(rgba8, width, height)?;
+
+    if steps.is_empty() {
+        return Ok(dynimg.to_rgba8().into_raw());
+    }
+
+    let mut pipeline = sensus_core::pipeline::Pipeline::new();
+    for step in steps {
+        pipeline = pipeline.push(sensus_core::pipeline::FilterStep::new(
+            step.filter.to_sensus(),
+            step.strength,
+        ));
+    }
+    let out = pipeline.apply(dynimg).map_err(|e| e.to_string())?;
+    Ok(out.to_rgba8().into_raw())
+}
+
+/// 生 RGBA8 を検証して `DynamicImage`（Rgba8）にする。`apply_vision_cpu_rgba8` と
+/// `apply_vision_pipeline_cpu_rgba8` で検証とエラー文言をそろえるための共通部
+/// （`pub` にしない: FRB の公開対象にしない）。
+fn rgba8_to_dynamic_image(
+    rgba8: Vec<u8>,
+    width: u32,
+    height: u32,
+) -> Result<image::DynamicImage, String> {
     let expected = (width as usize) * (height as usize) * 4;
     if rgba8.len() != expected {
         return Err(format!(
@@ -824,11 +892,7 @@ pub fn apply_vision_cpu_rgba8(
 
     let img = image::RgbaImage::from_raw(width, height, rgba8)
         .ok_or_else(|| "failed to build RgbaImage from raw buffer".to_string())?;
-    let dynimg = image::DynamicImage::ImageRgba8(img);
-
-    let out =
-        sensus_core::apply(filter.to_sensus(), dynimg, strength).map_err(|e| e.to_string())?;
-    Ok(out.to_rgba8().into_raw())
+    Ok(image::DynamicImage::ImageRgba8(img))
 }
 
 // =============================================================================
@@ -1304,6 +1368,120 @@ pub(crate) mod tests {
     fn cpu_apply_rejects_wrong_buffer_len() {
         let r = apply_vision_cpu_rgba8(VisionFilter::Protanopia, vec![0u8; 10], 4, 4, 1.0);
         assert!(r.is_err());
+    }
+
+    // --- 複数ステップ CPU 適用（apply_vision_pipeline_cpu_rgba8、#118）---
+
+    /// 決定的な擬似ノイズの不透明 RGBA8（ぼかし・ピクセル化の順序差が必ず出る入力）。
+    fn pipeline_test_rgba(w: u32, h: u32) -> Vec<u8> {
+        let mut buf = Vec::with_capacity((w * h * 4) as usize);
+        for y in 0..h {
+            for x in 0..w {
+                buf.push(((x * 37 + y * 91 + x * y) % 256) as u8);
+                buf.push(((x * 53 + y * 17 + 101) % 256) as u8);
+                buf.push(((x * 11 + y * 73 + x * x) % 256) as u8);
+                buf.push(255);
+            }
+        }
+        buf
+    }
+
+    fn step(filter: VisionFilter, strength: f32) -> VisionStep {
+        VisionStep { filter, strength }
+    }
+
+    /// ステップを 1 つずつ `apply_vision_cpu_rgba8` で単体適用して得る期待値。
+    fn apply_steps_one_by_one(steps: &[VisionStep], buf: Vec<u8>, w: u32, h: u32) -> Vec<u8> {
+        let mut cur = buf;
+        for s in steps {
+            cur = apply_vision_cpu_rgba8(s.filter, cur, w, h, s.strength).unwrap();
+        }
+        cur
+    }
+
+    #[test]
+    fn pipeline_single_step_matches_single_apply_for_all_filters() {
+        let (w, h) = (16u32, 12u32);
+        let input = pipeline_test_rgba(w, h);
+        for f in ALL_FILTERS {
+            let single = apply_vision_cpu_rgba8(f, input.clone(), w, h, 0.7).unwrap();
+            let piped =
+                apply_vision_pipeline_cpu_rgba8(vec![step(f, 0.7)], input.clone(), w, h).unwrap();
+            assert_eq!(piped, single, "{f:?}: 1 ステップが単体適用と不一致");
+        }
+    }
+
+    #[test]
+    fn pipeline_two_to_five_steps_match_one_by_one_application() {
+        let (w, h) = (32u32, 24u32);
+        let input = pipeline_test_rgba(w, h);
+        let all = [
+            step(VisionFilter::Protanopia, 1.0),
+            step(VisionFilter::Myopia, 0.8),
+            step(
+                VisionFilter::Glaucoma {
+                    mode: VisionGlaucomaMode::Vignette,
+                    field_loss_mode: VisionFieldLossMode::Darken,
+                },
+                0.6,
+            ),
+            step(VisionFilter::ContrastSensitivity, 0.5),
+            step(VisionFilter::Cataract { seed: 7 }, 0.4),
+        ];
+        for n in 2..=5 {
+            let steps = all[..n].to_vec();
+            let expected = apply_steps_one_by_one(&steps, input.clone(), w, h);
+            let piped = apply_vision_pipeline_cpu_rgba8(steps, input.clone(), w, h).unwrap();
+            assert_eq!(piped, expected, "{n} ステップが 1 つずつの単体適用と不一致");
+        }
+    }
+
+    #[test]
+    fn pipeline_rejects_wrong_buffer_len() {
+        let r = apply_vision_pipeline_cpu_rgba8(
+            vec![step(VisionFilter::Protanopia, 1.0)],
+            vec![0u8; 10],
+            4,
+            4,
+        );
+        assert!(r.is_err());
+    }
+
+    /// 空の steps は入力をそのまま返す（エラーにしない）。長さ検証は空でも効く。
+    #[test]
+    fn pipeline_empty_steps_returns_input_unchanged() {
+        let (w, h) = (8u32, 6u32);
+        let input = pipeline_test_rgba(w, h);
+        let out = apply_vision_pipeline_cpu_rgba8(vec![], input.clone(), w, h).unwrap();
+        assert_eq!(out, input);
+
+        let bad = apply_vision_pipeline_cpu_rgba8(vec![], vec![0u8; 10], 4, 4);
+        assert!(bad.is_err(), "空でもバッファ長不一致はエラー");
+    }
+
+    /// 非可換な組（ピクセル化とぼかし）は、並べた順がそのまま結果に反映される。
+    /// 順序を入れ替えた結果が元と異なり、かつそれぞれが対応する順の単体適用と一致する。
+    #[test]
+    fn pipeline_order_is_reflected_in_result() {
+        let (w, h) = (64u32, 64u32);
+        let input = pipeline_test_rgba(w, h);
+        let detail = step(VisionFilter::DetailLoss { cell_size: 8 }, 1.0);
+        let blur = step(VisionFilter::Myopia, 1.0);
+
+        let detail_then_blur = vec![detail, blur];
+        let blur_then_detail = vec![blur, detail];
+
+        let a =
+            apply_vision_pipeline_cpu_rgba8(detail_then_blur.clone(), input.clone(), w, h).unwrap();
+        let b =
+            apply_vision_pipeline_cpu_rgba8(blur_then_detail.clone(), input.clone(), w, h).unwrap();
+
+        assert_ne!(a, b, "順序を入れ替えても結果が同じ（順序が無視されている）");
+        assert_eq!(
+            a,
+            apply_steps_one_by_one(&detail_then_blur, input.clone(), w, h)
+        );
+        assert_eq!(b, apply_steps_one_by_one(&blur_then_detail, input, w, h));
     }
 
     // --- フィルタ別レイアウト・値の回帰 ---
