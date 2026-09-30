@@ -1,17 +1,6 @@
-/// Enumeration of supported disability simulation types
-enum DisabilityType {
-  /// Color vision deficiencies
-  colorVision,
-
-  /// Hearing impairments (future)
-  hearing,
-
-  /// Visual field defects (future)
-  visualField,
-
-  /// Motor impairments (future)
-  motor,
-}
+// 色覚タイプの安定識別子 [ColorVisionType]。ファイル名は歴史的経緯で
+// `disability_type.dart` のまま（障害種別の enum は使われなかったため撤去した）。
+// import の一斉書き換えが必要になるので、改名は別の機会に行う。
 
 /// Enumeration of color vision deficiency types
 ///
