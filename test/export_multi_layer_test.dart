@@ -10,6 +10,7 @@
 // さらに BeforeAfterView の書き出しボタンから、その内容が実際に焼き込み・保存へ渡ることを
 // widget test で確かめる。
 
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -483,6 +484,88 @@ void main() {
       expect(r.filename, startsWith('ue-vertigo-myopia-protanopia-'));
       expect(r.filename, isNot(contains('pct')));
       expect(r.filename, endsWith('.png'));
+    });
+
+    testWidgets('描画中に親が層を差し替えても、画像に写っている層の集合・強度を焼く', (tester) async {
+      late ui.Image before, after1, after2, composedStub;
+      await tester.runAsync(() async {
+        before = await generateSampleImage(4);
+        after1 = await generateSampleImage(4);
+        after2 = await generateSampleImage(4);
+        composedStub = await generateSampleImage(4);
+      });
+      previewSourceImageLoader = (source, size) => Future.value(before);
+      final renders = <Completer<ui.Image>>[];
+      CpuVisionRenderer.pipelineApplier = (source, steps) {
+        final c = Completer<ui.Image>();
+        renders.add(c);
+        return c.future;
+      };
+      ExportCaption? captured;
+      exportImageComposer = (base, caption) async {
+        captured = caption;
+        return composedStub;
+      };
+      String? savedFilename;
+      pngSaver = (bytes, filename) async {
+        savedFilename = filename;
+        return '/fake/downloads/$filename';
+      };
+
+      Widget viewOf(VisionFilterState state) => localized(BeforeAfterView(
+            filter: state.buildLayer(state.layers.first),
+            filterId: state.layers.first.id,
+            strength: 1.0,
+            steps: state.pipelineSteps(),
+            exportLayers: exportLayersOf(state),
+            imageSource: const SamplePreviewImageSource('test'),
+            sampleSize: 16,
+          ));
+
+      // 画像に写る層: protanopia 100% + myopia 50%。
+      final drawn = VisionFilterState()
+        ..toggle('protanopia')
+        ..toggle('myopia');
+      drawn.setLayerStrength('myopia', 0.5);
+      await tester.pumpWidget(viewOf(drawn));
+      for (var i = 0; i < 5 && renders.isEmpty; i++) {
+        await tester.pump();
+      }
+      expect(renders, hasLength(1), reason: '1 回目の描画が await 中');
+
+      // 描画中に親が層を足す（vertigo）。描画は待避されるだけで、1 回目の世代は最新のまま。
+      final newer = VisionFilterState()
+        ..toggle('protanopia')
+        ..toggle('myopia')
+        ..toggle('vertigo');
+      await tester.pumpWidget(viewOf(newer));
+      renders[0].complete(after1);
+      for (var i = 0; i < 5 && renders.length < 2; i++) {
+        await tester.pump();
+      }
+      expect(renders, hasLength(2), reason: '待避された 2 回目の描画が始まる（まだ await 中）');
+
+      await tester.pump(); // 1 回目の結果の setState を描画へ反映する
+      // 表示中の画像は 1 回目（2 層）。2 回目の描画が終わる前に書き出す。
+      await tester.tap(find.byTooltip(en.exportButtonTooltip));
+      await tester.runAsync(() async {
+        for (var i = 0; i < 50; i++) {
+          if (savedFilename != null) return;
+          await tester.pump(const Duration(milliseconds: 20));
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+      });
+      await tester.pump();
+
+      expect([for (final l in captured!.layers) l.name],
+          [en.filterMyopia, en.filterProtanopia],
+          reason: '画像に写っている 2 層だけ。後から足された vertigo は焼かない');
+      expect(captured!.layers[0].strengthLabel, en.strengthLabel(50));
+      expect(savedFilename, startsWith('ue-myopia-protanopia-'));
+
+      renders[1].complete(after2);
+      await tester.pump();
+      await tester.pump();
     });
 
     testWidgets('実験的の層を含む 2 層: 実験的の注記を渡す', (tester) async {

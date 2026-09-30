@@ -562,14 +562,25 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     final bool clonedInput = reuseBefore;
     final ui.Image rendererInput = clonedInput ? before.clone() : before;
 
+    // 描画器に渡す入力と、描画した画像に記録する値（書き出しのキャプション・強度・
+    // フィルタ）は、ここで一度だけ読んでローカルに固定する。描画器の await の間に親が
+    // 再 build して `widget.*` が新しい値になっても（[_scheduleRebuild] は実行中は世代を
+    // 上げず待避させるだけなので、この呼び出しが最新のまま完了し得る）、画像に写っている
+    // 層の集合・強度と、書き出しに焼く値がずれないようにする（#121）。
+    final steps = widget.steps;
+    final renderFilter = widget.filter;
+    final renderStrength = widget.strength;
+    final renderFilterId = widget.filterId;
+    final renderColorVisionType = widget.colorVisionType;
+    final renderExportLayers = widget.exportLayers;
+
     ui.Image? after;
     try {
-      final steps = widget.steps;
       after = steps == null
           ? await afterImageRenderer(
               rendererInput,
-              widget.filter,
-              widget.strength,
+              renderFilter,
+              renderStrength,
             )
           : await BeforeAfterView.renderAfterPipeline(rendererInput, steps);
     } catch (e, st) {
@@ -629,11 +640,11 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     setState(() {
       _before = before;
       _after = after;
-      _afterFilterId = widget.filterId; // #60
-      _afterColorVisionType = widget.colorVisionType; // #60
-      _afterStrength = widget.strength;
-      _afterFilter = widget.filter; // #76
-      _afterExportLayers = widget.exportLayers; // #121
+      _afterFilterId = renderFilterId; // #60
+      _afterColorVisionType = renderColorVisionType; // #60
+      _afterStrength = renderStrength;
+      _afterFilter = renderFilter; // #76
+      _afterExportLayers = renderExportLayers; // #121
       _currentSampleSize = sampleSize;
       _currentImageSource = source; // widget.imageSource ではなく、冒頭で固定した source
       _loading = false;
