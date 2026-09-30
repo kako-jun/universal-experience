@@ -26,6 +26,7 @@
 //                                                  — 多層選択（3 層。チップ帯・層ごとの調整・見出しの要約、#120）
 //   {wide|narrow|narrow-xs}-{light|dark}-{ja|en}-multi-limit.png
 //                                                  — 上限到達（5 層。未選択の行が理由つきで無効、#120）
+//   ...-multi-limit-rows.png                       — 上限到達で、一覧を無効の行までスクロールして撮ったもの
 //   narrow*-...-multi*-full.png                    — 狭幅の縦積みを縦に十分長い画面で全体を撮ったもの
 //
 // 注意: after ペインは実ブリッジ（sensus の CPU `apply()`）を呼べないため、
