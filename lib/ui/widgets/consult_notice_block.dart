@@ -4,7 +4,7 @@ import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../src/rust/api/sensus_bridge.dart';
 
-/// [ConsultNotice] の表示ウィジェット。
+/// [ConsultNotice] の表示ウィジェット（#76）。
 ///
 /// 右カラム「調整」（`FilterParamPanel`、#72）が、advanced カタログ・体験
 /// プリセットのどちらを選んでいても使う、受診喚起の唯一の表示ウィジェット。
@@ -13,14 +13,15 @@ import '../../src/rust/api/sensus_bridge.dart';
 ///
 /// - 段階名（旧「緊急度：高」のような表示）は一切出さない。喚起文
 ///   （[ConsultNotice.message]）だけを、本文サイズ以上で表示する。emergency は
-///   [TextTheme.bodyLarge]（w600）で目立たせる（プリセットカードのタイトル titleMedium と
-///   サイズがぶつからないよう bodyLarge にした）。
+///   [TextTheme.bodyLarge]（w600）で目立たせる（#76。
+///   プリセットカードのタイトル titleMedium とサイズがぶつからないよう
+///   bodyLarge にした）。
 /// - 色は [ColorScheme] のロールのみ使う（urgency に応じて
 ///   [ColorScheme.tertiaryContainer] / [ColorScheme.errorContainer]。
 ///   [Urgency.none] だが escalation が非空のフィルタは中立の
 ///   [ColorScheme.surfaceContainerHighest]）。
 /// - escalation は emergency → earlyConsultation の順で見出しを分けて表示する
-///   （現状 vision フィルタの escalation は全て
+///   （#76。現状 vision フィルタの escalation は全て
 ///   earlyConsultation だが、聴覚側（#80）は emergency も持つため備えておく。
 ///   段ごとの構成は [ConsultNotice.escalationGroups]（[resolveConsultNotice]）
 ///   が組み立て済みで、PNG export もこれをそのまま使う）。

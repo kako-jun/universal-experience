@@ -373,8 +373,8 @@ String escalationConditionText(AppLocalizations l10n, String condition) {
 
 /// sensus の公開ドキュメントのうち、受診喚起の根拠（Medical notes 節）を指す URL。
 /// [ConsultNotice.citationUrl] の値。UI（`ConsultNoticeBlock`）はこれを
-/// 選択可能なテキストとして表示する。アンカーは節そのもの
-/// を指す。
+/// 選択可能なテキストとして表示する（#76）。アンカーは節そのもの
+/// を指す（#76）。
 const String kSensusMedicalNotesUrl =
     'https://github.com/kako-jun/sensus/blob/main/docs/overview.md'
     '#medical-notes-when-to-see-a-doctor';
@@ -382,7 +382,7 @@ const String kSensusMedicalNotesUrl =
 /// [resolveConsultNotice] が返す、緊急度の段ごとにまとめた escalation
 /// （見出し + 条件文のリスト）。UI（`ConsultNoticeBlock`）と PNG export
 /// （`ExportCaption.escalationGroups`）の両方がこの単位で表示する
-/// （PNG でも段ごとの見出しを出す）。
+/// （#76: PNG でも段ごとの見出しを出す）。
 class ConsultEscalationGroup {
   const ConsultEscalationGroup({required this.header, required this.lines});
 

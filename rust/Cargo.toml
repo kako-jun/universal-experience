@@ -34,7 +34,7 @@ opt-level = 3
 strip = true
 
 # デバッグビルド（flutter run / flutter test の既定）でも sensus-core（CPU
-# apply() の実処理を持つ依存）を最適化する。dev プロファイル
+# apply() の実処理を持つ依存）を最適化する（#85）。dev プロファイル
 # の既定 opt-level=0 だと、静止画プレビュー1枚の CPU apply() が体感できる遅さ
 # になる。`package."*"` は依存クレートにのみ適用され（ワークスペースのメンバー
 # ＝この crate 自身には効かない）、自分のコードの反復ビルドは opt-level=0 の

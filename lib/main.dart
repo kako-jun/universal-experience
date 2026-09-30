@@ -72,7 +72,7 @@ final ImageSourceState imageSourceState = ImageSourceState();
 const String _trayIconPath = 'assets/tray/tray_icon.png';
 
 /// OS からの終了要求（macOS の Cmd+Q / メニューバーの「終了」/ ログアウト等）を
-/// 捕捉し、[FilterService.flush] を挟んでから終了を許可する。
+/// 捕捉し、[FilterService.flush] を挟んでから終了を許可する（#57）。
 /// トレイ経由・ウィンドウクローズ経由の flush（[_setUpTray] /
 /// `onQuit`）は window_manager のクローズイベントしか見ておらず、Cmd+Q や
 /// ログアウトはそれらを経由せず直接プロセス終了に向かうため、二重の安全網として
@@ -164,7 +164,7 @@ TrayService _buildTrayService(SettingsService settings) {
 ///
 /// 戻り値は `({Widget app, bool bridgeReady})` レコード。呼び出し側は
 /// `bridgeReady` を見て分岐する（Widget のランタイム型 `is NativeBridgeErrorApp`
-/// を見て分岐する必要がない）。
+/// を見て分岐する必要がない、#55）。
 ///
 /// - [initBridge] は既定で `initNativeBridge()`
 ///   （services/native_bridge_service.dart）。失敗時（native lib が壊れている・

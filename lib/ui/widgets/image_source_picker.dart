@@ -23,7 +23,7 @@ import '../../services/vision_filter_state.dart';
 /// [_defaultPickImageFile], which calls the real `file_selector` plugin
 /// (platform channel — not available in plain `flutter test`). Returns the
 /// [XFile] itself (not its bytes) so [loadUserImageFile] can check
-/// [XFile.length] **before** reading the file body.
+/// [XFile.length] **before** reading the file body (#78).
 typedef ImageFilePicker = Future<XFile?> Function();
 
 @visibleForTesting
@@ -37,13 +37,13 @@ Future<XFile?> _defaultPickImageFile() {
   return openFile(acceptedTypeGroups: [typeGroup]);
 }
 
-/// Maximum accepted user image file size, checked via
+/// Maximum accepted user image file size (#78), checked via
 /// [XFile.length] **before** [loadUserImageFile] reads the file body — an
 /// oversized file is rejected without ever loading its bytes into memory.
 const int kMaxUserImageFileBytes = 50 * 1024 * 1024; // 50MB
 
 /// Thrown by [loadUserImageFile] when a file's reported length exceeds
-/// [kMaxUserImageFileBytes]. A distinct type (rather than
+/// [kMaxUserImageFileBytes] (#78). A distinct type (rather than
 /// a plain [StateError]) so the catch block can show a size-specific
 /// SnackBar (`imageSourceFileTooLarge`) instead of the generic
 /// `imageSourcePickFailed` one — a 200MB RAW file and a corrupt PNG are

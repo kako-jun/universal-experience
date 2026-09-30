@@ -25,7 +25,7 @@ typedef VisionCpuApplier = Future<ui.Image> Function(
 /// `applyVisionCpuRgba8` は非同期公開（`#[frb(sync)]` を外した、#85）なので、
 /// Rust 側スレッドプールで実行され、待っている間 UI スレッドを塞がない。
 ///
-/// ## alpha の扱い
+/// ## alpha の扱い（#85）
 ///
 /// Flutter の `ui.Image` は内部的に **premultiplied alpha** で GPU テクスチャを
 /// 保持する（`ImageByteFormat.rawRgba` で読む生バイト列、`PixelFormat.rgba8888`
@@ -67,7 +67,7 @@ class CpuVisionRenderer {
   /// の clamp/NaN 処理も sensus 側の責務）。
   ///
   /// デコードに失敗した場合（[rgba8ToImage] 参照）は例外がそのまま呼び出し元へ
-  /// 伝わる。無限に待ち続けてハングすることはない。
+  /// 伝わる。無限に待ち続けてハングすることはない（#85）。
   static Future<ui.Image> apply(
     ui.Image source,
     VisionFilter filter,
@@ -87,7 +87,7 @@ class CpuVisionRenderer {
   /// [image] を **straight**（非 premultiplied）RGBA8 の生バイト列に変換する。
   ///
   /// `ImageByteFormat.rawRgba` ではなく [ui.ImageByteFormat.rawStraightRgba] を
-  /// 使う: 前者は premultiplied alpha を返すため、alpha<255
+  /// 使う（#85）: 前者は premultiplied alpha を返すため、alpha<255
   /// のピクセルを straight alpha 前提の sensus にそのまま渡すと RGB が実際より
   /// 暗く解釈されてしまう。
   ///

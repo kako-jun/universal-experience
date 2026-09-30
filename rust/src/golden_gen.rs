@@ -134,7 +134,7 @@ mod tests {
         eprintln!("wrote {}", json_path.display());
     }
 
-    /// クロスチェック用の強度別行列 fixture（#59）:
+    /// クロスチェック用の強度別行列 fixture（#59、#86）:
     /// `strength` = 0.0/0.125/0.25/0.5/0.75/0.875/1.0 の 7 点で `vision_uniforms()`
     /// から取り出した解決済み行列を書き出す。
     ///

@@ -69,7 +69,7 @@ img.Image _canvas(img.Color background) {
   return image;
 }
 
-/// Draws a solid thick line as a filled quadrilateral.
+/// Draws a solid thick line as a filled quadrilateral (#78).
 ///
 /// `package:image`'s `drawLine(thickness: ...)` builds a thick line out of
 /// short perpendicular strokes, which leaves a visible "hatched"/striped
@@ -146,7 +146,7 @@ img.Image _generateRouteMap() {
     final color = img.ColorRgb8(r, g, b);
     final px = points.map((p) => (p[0] * kSize, p[1] * kSize)).toList();
     for (var i = 0; i < px.length - 1; i++) {
-      // drawLine(thickness:) の斜め区間の縞模様を避けるため
+      // #78: drawLine(thickness:) の斜め区間の縞模様を避けるため
       // 太線は塗りつぶしクアッドで描く（_fillThickLine 参照）。butt cap で
       // 継ぎ目に隙間が出るが、各頂点に駅マーカー（白丸+リング）を重ねて描く
       // ため隠れる。
@@ -324,7 +324,7 @@ img.Image _generateTrafficSigns() {
   ];
   img.fillPolygon(image,
       vertices: triPoints, color: img.ColorRgb8(0xFD, 0xD8, 0x35));
-  // fillPolygon にアンチエイリアスが無いため、塗りの縁が
+  // #78: fillPolygon にアンチエイリアスが無いため、塗りの縁が
   // ジャギーになる。_fillThickLine（塗りつぶしクアッド）で境界を十分太く
   // 覆って隠す（旧版の drawLine(thickness:10) は縁を覆いきれていなかった）。
   final triBorderColor = img.ColorRgb8(0x21, 0x21, 0x21);
