@@ -97,7 +97,11 @@ class _LanguageSelector extends StatelessWidget {
           segments: [
             ButtonSegment(
               value: kLanguageFollowSystem,
-              label: Text(l10n.languageOptionSystem),
+              // 見た目は短い「自動」のまま、読み上げだけ「端末の言語」に従うことを伝える。
+              label: Semantics(
+                label: l10n.languageOptionSystemSemantics,
+                child: ExcludeSemantics(child: Text(l10n.languageOptionSystem)),
+              ),
             ),
             for (final locale in AppLocalizations.supportedLocales)
               ButtonSegment(

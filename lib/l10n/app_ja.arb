@@ -222,6 +222,7 @@
   "windowModeCloseButton": "閉じる",
   "languageSectionTitle": "言語",
   "languageOptionSystem": "自動",
+  "languageOptionSystemSemantics": "自動（端末の言語）",
   "languageDialogNote": "「自動」は端末の言語に合わせます（未対応の言語のときは英語）。トレイのメニューの言語も変わります。",
   "languageCloseButton": "閉じる"
 }
