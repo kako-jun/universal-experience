@@ -565,9 +565,10 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
   画面のショートカット受け口（`homeShortcuts`）へ出る**ので、次の ←→ から強度が動く。これは標準の
   方向フォーカス移動任せにしていない。標準の走査は幾何（隣のカラムのコントロールとの縦帯の重なり）で
   着地点が決まり、色覚選択時に中央カラムへ出る「2×2 で比較」の切替が見出し行を高くすると、`→` が中央
-  カラムのサンプル切替チップへ着地して強度に届かなくなった。そこで左カラムの `FocusTraversalGroup` に
+  カラムのサンプル切替チップへ着地して強度に届かなくなった。そこで「選ぶ」カードの `FocusTraversalGroup` に
   `_ListExitToShortcutsPolicy`（`ReadingOrderTraversalPolicy` を継承し、`FilterListTile` 上からの
-  左右だけ受け口へ固定。それ以外の方向・部品は標準）を付け、着地点を幾何から切り離した
+  左右だけ受け口へ固定。体験プリセットの行も同じ `FilterListTile` なので含み、それ以外の方向・部品は
+  標準）を、広幅の左カラム・狭幅の末尾で共通の `_browserCard()` に付け、着地点を幾何から切り離した
   （`home_screen_layout_test.dart` / `home_screen_color_vision_compare_test.dart` がウィンドウ高さを
   変えて確認）。他のカラムへは Tab で行く。ポインタで行を選び直しても、フォーカスはショートカット
   受け口へ戻る。
