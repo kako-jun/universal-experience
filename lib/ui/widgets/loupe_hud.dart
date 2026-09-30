@@ -138,7 +138,10 @@ class _LoupeHudState extends State<LoupeHud> {
                 onExit: (_) => _scheduleHide(),
                 child: AnimatedOpacity(
                   opacity: visible ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 150),
+                  // OS の「視差効果を減らす」等（disableAnimations）ではフェードを省く（#45）。
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 150),
                   // #79: 表示/非表示でウィジェットツリーの形を変えない —
                   // ExcludeSemantics/IgnorePointer/ExcludeFocus は常に存在
                   // させ、フラグ（excluding/ignoring）だけを切り替える。
@@ -308,18 +311,18 @@ class _HudIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: tooltip,
-      child: Tooltip(
-        message: tooltip,
-        excludeFromSemantics: true,
-        child: IconButton(
-          icon: Icon(icon, color: color),
-          iconSize: 26,
-          padding: const EdgeInsets.all(12),
-          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-          onPressed: onPressed,
-        ),
+    // 読み上げ名は Icon の semanticLabel で IconButton 自身のノードに載せる。
+    // 外側の Semantics に label を置くと、タップできるボタンのノードが名前なしの
+    // まま残る（スクリーンリーダーがボタンにフォーカスしても何も読まない）。
+    return Tooltip(
+      message: tooltip,
+      excludeFromSemantics: true,
+      child: IconButton(
+        icon: Icon(icon, color: color, semanticLabel: tooltip),
+        iconSize: 26,
+        padding: const EdgeInsets.all(12),
+        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        onPressed: onPressed,
       ),
     );
   }
