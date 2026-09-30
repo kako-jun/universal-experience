@@ -210,7 +210,8 @@ FilterListEntry? selectedFilterListEntry(VisionFilterState visionState) {
 
 /// 一覧の行を選ぶ。**書き込みの入口は既存のまま**: 色覚クイック選択の行は
 /// [selectColorVision]（`FilterService` と `VisionFilterState` の両方を更新）、
-/// それ以外は [VisionFilterState.select]。
+/// それ以外は [VisionFilterState.replaceWith]（従来の単一選択と同じ置き換え。
+/// 複数選択の足し引きは #120 の UI が [VisionFilterState.toggle] で行う）。
 void applyFilterListEntry(
   FilterService filterService,
   VisionFilterState visionState,
@@ -220,7 +221,7 @@ void applyFilterListEntry(
   if (type != null) {
     selectColorVision(filterService, visionState, type);
   } else {
-    visionState.select(entry.catalogId);
+    visionState.replaceWith(entry.catalogId);
   }
 }
 
