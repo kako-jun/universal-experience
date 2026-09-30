@@ -140,6 +140,35 @@ void main() {
     expect(find.byType(ColorVisionCompareView), findsOneWidget);
   });
 
+  testWidgets('層の集合が色覚 1 層だけのときに限り切替が出る（他の層が重なると出ない、#120）', (tester) async {
+    await installFakes(tester);
+    final h = await pumpHomeScreen(tester, size: wide);
+    h.visionState.toggle('protanopia');
+    await tester.pump();
+    expect(toggle(), findsOneWidget);
+    await tester.tap(toggle());
+    await tester.pump();
+    for (var i = 0; i < 20; i++) {
+      await tester.pump();
+    }
+    expect(find.byType(ColorVisionCompareView), findsOneWidget);
+
+    // 色覚に別の層を重ねると、切替ごと消えて Before / After に戻る（調整中が色覚でも）。
+    h.visionState.toggle('myopia');
+    h.visionState.focusLayer('protanopia');
+    await tester.pump();
+    expect(h.visionState.focusedId, 'protanopia');
+    expect(toggle(), findsNothing);
+    expect(find.byType(ColorVisionCompareView), findsNothing);
+    expect(find.byType(BeforeAfterView), findsOneWidget);
+
+    // 他の層を外して色覚 1 層へ戻ると、直前の選び方（2×2）に戻る。
+    h.visionState.remove('myopia');
+    await tester.pump();
+    expect(toggle(), findsOneWidget);
+    expect(find.byType(ColorVisionCompareView), findsOneWidget);
+  });
+
   testWidgets('2×2 の強さは、現在の強さ（色覚の強度スライダー）が 4 セル共通で使われる', (tester) async {
     await installFakes(tester);
     final h = await pumpHomeScreen(tester, size: wide);

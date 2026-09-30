@@ -374,9 +374,11 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, visionState, imageSourceState, _) {
         final theme = Theme.of(context);
         final l10n = AppLocalizations.of(context)!;
-        // 暫定（#119）: 複数層でもフォーカス中の層だけで判定する。層集合が色覚 1 つのときだけ
-        // 出す方針への切り替えは #122（ADR の暫定挙動）。
-        final canCompare = isColorVisionFilterId(visionState.selectedId);
+        // 暫定（#120）: 「2×2 で比較」は、層の集合がちょうど色覚 1 層のときだけ出す。
+        // 他の層が重なっている間は、4 型の一覧が「重ねた結果」と食い違うため。複数層との
+        // 合成での 2×2 は #122 で解除する。
+        final canCompare = visionState.layers.length == 1 &&
+            isColorVisionFilterId(visionState.layers.single.id);
         final comparing = canCompare && _compareColorVision;
         final strength = previewStrength(visionState);
         return Card(
