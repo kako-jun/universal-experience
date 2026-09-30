@@ -263,7 +263,7 @@ ue が二重に持っていた色覚ロジックを撤去し、アルゴリズ�
 - **削除**: `plugins/color_vision_filter/`（OS 全体 system-wide フィルタを適用する
   独自ネイティブプラグイン）と `pubspec.yaml` の `color_vision_filter` path 依存。
 - **`FilterService` の一本化**: plugin 呼び出し（apply/setIntensity/remove/getState）と
-  permission 概念、`colorMatrix` getter（simulator 依存）を撤去。現在は純粋な
+  permission 概念、`colorMatrix` getter（simulator 依存）を撤去。当時は純粋な
   選択状態モデル（`currentFilter` / `intensity` / `isActive`）で、選択・強度変更で
   `notifyListeners` するだけ。`ColorVisionType` → sensus `VisionFilter` の
   マッピング（`VisionFilter? get sensusFilter`）を追加した（追記: `isActive` と

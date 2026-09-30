@@ -1,6 +1,6 @@
 // IntensitySlider の状態表示。色覚クイック選択が有効な間は必ず「適用中」を
-// 出し、無効（何も選んでいない・advanced を見ている）間は状態表示を出さず
-// スライダーも操作不能にする。かつて存在した「未適用」表示は、有効なら必ず
+// 出し、無効（何も選んでいない・advanced フィルタ / 体験プリセットを見ている）
+// 間は状態表示を出さずスライダーも操作不能にする。かつて存在した「未適用」表示は、有効なら必ず
 // FilterService も適用中になるため到達不能だった（#67 で撤去）。
 
 import 'package:flutter/material.dart';
@@ -73,6 +73,40 @@ void main() {
     deactivateColorVision(filterService, visionState);
     await tester.pump();
 
+    expect(find.text(en.intensityActive), findsNothing);
+    expect(tester.widget<Slider>(find.byType(Slider)).onChanged, isNull);
+  });
+
+  testWidgets('advanced フィルタを選ぶと、FilterService が色覚を覚えたままでも「適用中」は消えてスライダーは操作不能',
+      (tester) async {
+    final filterService = FilterService();
+    final visionState = VisionFilterState();
+    selectColorVision(filterService, visionState, ColorVisionType.protanopia);
+    await tester.pumpWidget(harness(filterService, visionState));
+    expect(find.text(en.intensityActive), findsOneWidget);
+
+    visionState.select('myopia');
+    await tester.pump();
+
+    expect(filterService.currentFilter, ColorVisionType.protanopia);
+    expect(visionState.isColorQuickSelection, isFalse);
+    expect(find.text(en.intensityActive), findsNothing);
+    expect(tester.widget<Slider>(find.byType(Slider)).onChanged, isNull);
+  });
+
+  testWidgets('体験プリセットを選ぶと、FilterService が色覚を覚えたままでも「適用中」は消えてスライダーは操作不能',
+      (tester) async {
+    final filterService = FilterService();
+    final visionState = VisionFilterState();
+    selectColorVision(filterService, visionState, ColorVisionType.protanopia);
+    await tester.pumpWidget(harness(filterService, visionState));
+    expect(find.text(en.intensityActive), findsOneWidget);
+
+    visionState.selectPreset('labyrinthitis', 'vertigo');
+    await tester.pump();
+
+    expect(filterService.currentFilter, ColorVisionType.protanopia);
+    expect(visionState.isColorQuickSelection, isFalse);
     expect(find.text(en.intensityActive), findsNothing);
     expect(tester.widget<Slider>(find.byType(Slider)).onChanged, isNull);
   });

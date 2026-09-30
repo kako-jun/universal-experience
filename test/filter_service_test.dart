@@ -245,7 +245,8 @@ void main() {
 
     test(
         '旧単一 intensity キーが 1.0 で残っていても読まれない。load 後は protanomaly が '
-        'recommendedStrength になり、旧キーも消えている（移行は行わない）', () async {
+        'recommendedStrength になり、旧キーも消えている（移行は行わない）',
+        () async {
       SharedPreferences.setMockInitialValues({
         FilterService.legacyIntensityKey: 1.0,
       });

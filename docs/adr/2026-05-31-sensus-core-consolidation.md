@@ -32,7 +32,7 @@ ue は色覚シミュレーションのアルゴリズムを**二重に**持っ�
   プラグイン）と `pubspec.yaml` の `color_vision_filter` path 依存、
   `filter_service.dart` の import。
 - **`FilterService` の一本化**: plugin 呼び出し（apply/setIntensity/remove/getState）・
-  permission 概念・`colorMatrix` getter（simulator 依存）を撤去。現在は純粋な選択状態
+  permission 概念・`colorMatrix` getter（simulator 依存）を撤去。当時は純粋な選択状態
   モデル（`currentFilter` / `intensity` / `isActive`）で、選択・強度変更時に
   `notifyListeners` するだけ。`ColorVisionType` → sensus `VisionFilter` のマッピング
   （`VisionFilter? get sensusFilter`）を追加。（追記: `isActive` と `sensusFilter` は

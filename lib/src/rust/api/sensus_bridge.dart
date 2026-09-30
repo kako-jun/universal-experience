@@ -120,13 +120,13 @@ double visionFilterRecommendedStrength({required VisionFilter filter}) =>
         .crateApiSensusBridgeVisionFilterRecommendedStrength(filter: filter);
 
 /// モデル名と出典（DOI 等）。出典が無ければ `None`
-/// （[`sensus_core::Filter::citation`] 参照。出典・限界の表示、#80、が使う）。
+/// （[`sensus_core::Filter::citation`] 参照。#80 の出典・限界の表示が使う）。
 String? visionFilterCitation({required VisionFilter filter}) =>
     RustLib.instance.api
         .crateApiSensusBridgeVisionFilterCitation(filter: filter);
 
 /// このシミュレーションで表現できないことの簡潔な説明（英語）
-/// （[`sensus_core::Filter::limitations`] 参照。出典・限界の表示、#80、が使う）。
+/// （[`sensus_core::Filter::limitations`] 参照。#80 の出典・限界の表示が使う）。
 String visionFilterLimitations({required VisionFilter filter}) =>
     RustLib.instance.api
         .crateApiSensusBridgeVisionFilterLimitations(filter: filter);
