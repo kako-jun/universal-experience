@@ -50,7 +50,7 @@ String compactTime(DateTime dt) {
 /// 妥当な名前になり、ファイル名に使えない文字（パス区切り・予約文字）は `-` に
 /// 正規化する。複数の層を重ねた書き出し（[exportSymptomId]）は層ごとに強度が違い
 /// 1 つの % で表せないので、[strengthPercent] を null にして `-Npct` の部分を省く
-/// （例 `ue-protanopia-glaucoma-2026-06-23.png`）。pure・決定論的（同じ入力なら常に同じ出力）。
+/// （例 `ue-glaucoma-protanopia-2026-06-23.png`）。pure・決定論的（同じ入力なら常に同じ出力）。
 String exportFilename({
   required String symptomId,
   int? strengthPercent,
