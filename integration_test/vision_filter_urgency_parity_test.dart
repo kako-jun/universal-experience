@@ -59,7 +59,8 @@ void main() {
 
   group('vision_filter_urgency 系メタデータ: kVisionFilterCatalog 全 30 種', () {
     for (final entry in kVisionFilterCatalog) {
-      testWidgets('${entry.id}: 実ブリッジで例外なく取得でき、recommended_strength は (0.0, 1.0]',
+      testWidgets(
+          '${entry.id}: 実ブリッジで例外なく取得でき、recommended_strength は (0.0, 1.0]',
           (tester) async {
         final state = VisionFilterState()..select(entry.id);
         final filter = state.build();
@@ -79,7 +80,8 @@ void main() {
     // rust 側の `vision_filter_urgency_escalation_nonempty_count_matches_sensus`
     // （rust/src/api/sensus_bridge.rs）と同じ不変条件を、Dart から見た実ブリッジ
     // 経由でも確認する（ブリッジ層で取りこぼす／余計に足すと壊れる）。
-    testWidgets('escalation が非空なのはちょうど 3 フィルタ（photophobia/bppv_rotation/dry_eye）',
+    testWidgets(
+        'escalation が非空なのはちょうど 3 フィルタ（photophobia/bppv_rotation/dry_eye）',
         (tester) async {
       final nonEmptyIds = <String>[];
       for (final entry in kVisionFilterCatalog) {
@@ -89,13 +91,38 @@ void main() {
           nonEmptyIds.add(entry.id);
         }
       }
-      expect(nonEmptyIds.toSet(),
-          {'photophobia', 'bppv_rotation', 'dry_eye'});
+      expect(nonEmptyIds.toSet(), {'photophobia', 'bppv_rotation', 'dry_eye'});
+    });
+  });
+
+  group('出典・限界のメタデータ（#80）: 実ブリッジの値を UI がそのまま出す', () {
+    testWidgets('limitations は全 30 種で非空、citation は空文字にならない（null は「出典なし」）',
+        (tester) async {
+      for (final entry in kVisionFilterCatalog) {
+        final filter = (VisionFilterState()..select(entry.id)).build()!;
+        expect(visionFilterLimitations(filter: filter).trim(), isNotEmpty,
+            reason: entry.id);
+        final citation = visionFilterCitation(filter: filter);
+        if (citation != null) {
+          expect(citation.trim(), isNotEmpty, reason: entry.id);
+        }
+      }
+    });
+
+    testWidgets('代表: 色覚 3 型は Machado 2009 を出典に持ち、四色覚は出典なし', (tester) async {
+      String? citationOf(String id) => visionFilterCitation(
+          filter: (VisionFilterState()..select(id)).build()!);
+
+      expect(citationOf('protanopia'), contains('Machado'));
+      expect(citationOf('deuteranopia'), contains('Machado'));
+      expect(citationOf('tritanopia'), contains('Machado'));
+      expect(citationOf('tetrachromacy'), isNull);
     });
   });
 
   group('#76 の食い違い回帰: BPPV はプリセット・advanced のどちらでも urgency=none', () {
-    testWidgets('Experience(bppv).urgency と Filter(bppv_rotation).urgency が一致する',
+    testWidgets(
+        'Experience(bppv).urgency と Filter(bppv_rotation).urgency が一致する',
         (tester) async {
       final presetUrgency =
           experiences().firstWhere((e) => e.id == 'bppv').urgency;
@@ -109,8 +136,7 @@ void main() {
 
       // 典型的には良性だが、反復・重症例では受診喚起の対象になる
       // （urgency_escalation が非空）ことも確認する。
-      final escalation =
-          visionFilterUrgencyEscalation(filter: state.build()!);
+      final escalation = visionFilterUrgencyEscalation(filter: state.build()!);
       expect(escalation, isNotEmpty);
       expect(escalation.first.urgency, Urgency.earlyConsultation);
     });
@@ -140,8 +166,7 @@ void main() {
     // 全条件文」について、ja 訳が英語と異なる（＝対応表にヒットしている）
     // ことを確認する。ヒットしなくなったら、この integration test が最初に
     // 検知する場所になる。
-    testWidgets(
-        'vision 30 種 + HearingFilter 14 種の escalation 条件文はすべて ja 訳を持つ',
+    testWidgets('vision 30 種 + HearingFilter 14 種の escalation 条件文はすべて ja 訳を持つ',
         (tester) async {
       final ja = lookupAppLocalizations(const Locale('ja'));
       final conditions = <String>{};

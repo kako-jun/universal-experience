@@ -1,4 +1,4 @@
-// #76 / #77: VisionFilterState は選択のたびに sensus ブリッジの
+// #76 / #77 / #80: VisionFilterState は選択のたびに sensus ブリッジの
 // urgency/urgency_escalation/recommended_strength（`lib/services/
 // vision_filter_metadata.dart` の provider seam）を呼ぶ。実ブリッジは native
 // lib を要求し `flutter test`（FFI 未ロード）では呼べないため
@@ -19,7 +19,12 @@ void installVisionFilterMetadataFixture() {
   visionFilterUrgencyProvider = (_) => Urgency.none;
   visionFilterUrgencyEscalationProvider = (_) => const [];
   visionFilterRecommendedStrengthProvider = (_) => 1.0;
+  visionFilterCitationProvider = (_) => null;
+  visionFilterLimitationsProvider = (_) => kFixtureLimitations;
 }
+
+/// フィクスチャの limitations（実ブリッジの英文とは無関係なテスト用の固定文）。
+const String kFixtureLimitations = 'Fixture limitation text.';
 
 /// production の既定（実ブリッジ）に戻す。`tearDown` で呼ぶ。
 void resetVisionFilterMetadataProviders() {
@@ -28,4 +33,8 @@ void resetVisionFilterMetadataProviders() {
       (filter) => visionFilterUrgencyEscalation(filter: filter);
   visionFilterRecommendedStrengthProvider =
       (filter) => visionFilterRecommendedStrength(filter: filter);
+  visionFilterCitationProvider =
+      (filter) => visionFilterCitation(filter: filter);
+  visionFilterLimitationsProvider =
+      (filter) => visionFilterLimitations(filter: filter);
 }
