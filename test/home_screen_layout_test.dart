@@ -5,9 +5,9 @@
 // 反映されること、クリックスルー ON の復帰方法が主画面に常時見えること、`/` で検索欄へ
 // 移ること、何も選んでいないときの空状態を確認する。
 //
-// 注意: ハーネスはプレビュー画像を「準備中」のプレースホルダのまま止めるので、
-// ここでの「最初のビューポートに収まる」は準備中状態での測定。読み込み済みだと
-// ImageSourcePicker が 800x600 で約 612dp になり収まらない既知の差は #130。
+// 注意: ハーネスはプレビュー画像を「準備中」のプレースホルダのまま止める。
+// 「最初のビューポートに収まる」は準備中と、画像が載った状態（読み込み済み）の両方で
+// 測る（読み込み済みは縦が大きくなる。#130）。
 // 「フィルタを選んだまま runAsync で実時間を進めても例外が出ない」テストは、
 // ハーネスの契約（Rust 非依存の供給源）を守る回帰テスト（#127）。
 
@@ -20,9 +20,11 @@ import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/main.dart' show WindowModeUiContext;
 import 'package:universal_experience/services/filter_list_selection.dart';
 import 'package:universal_experience/services/hotkey_service.dart';
-import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
+import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
+import 'package:universal_experience/ui/screens/home_screen.dart'
+    show kMinPreviewPaneSide, previewPaneSideFor;
 import 'package:universal_experience/ui/widgets/adjust_panel.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/consult_notice_block.dart';
@@ -53,31 +55,146 @@ void main() {
   FilterListEntry entry(String key) =>
       kFilterListEntries.firstWhere((e) => e.key == key);
 
-  group('プレビューは最初のビューポートに収まる', () {
-    // 画像は準備中のプレースホルダ状態で測っている。読み込み済みでは ImageSourcePicker が
-    // 800x600 で約 612dp になり収まらない既知の差は #130。
-    for (final (label, size) in [
-      ('広幅 1280x800', wide),
-      ('狭幅 800x700', narrow),
-      ('既定ウィンドウ 800x600', defaultWindow),
-    ]) {
-      testWidgets(label, (tester) async {
-        await pumpHomeScreen(tester, size: size);
+  // 画像が載った状態（ハーネスの既定は「準備中」で止める）。
+  void loadPreviewImages() {
+    previewSourceImageLoader = (source, size) async => fixturePreviewImage();
+  }
 
-        for (final finder in [
-          find.byType(BeforeAfterView),
-          find.byType(ImageSourcePicker),
-        ]) {
-          expect(finder, findsOneWidget);
-          final rect = tester.getRect(finder);
-          expect(rect.top, greaterThanOrEqualTo(0), reason: '$label $finder');
-          expect(rect.bottom, lessThanOrEqualTo(size.height),
-              reason: '$label $finder はビューポート内に収まる');
-          expect(rect.left, greaterThanOrEqualTo(0));
-          expect(rect.right, lessThanOrEqualTo(size.width));
-        }
+  for (final (stateLabel, loaded) in [('準備中', false), ('読み込み済み', true)]) {
+    group('プレビューは最初のビューポートに収まる（$stateLabel）', () {
+      for (final (label, size) in [
+        ('広幅 1280x800', wide),
+        ('狭幅 800x700', narrow),
+        ('既定ウィンドウ 800x600', defaultWindow),
+      ]) {
+        testWidgets(label, (tester) async {
+          if (loaded) loadPreviewImages();
+          await pumpHomeScreen(tester, size: size);
+          if (loaded) {
+            // 画像が載っている（準備中のプレースホルダで測っていない）。
+            final panes = tester.widgetList<PreviewImageView>(
+              find.byType(PreviewImageView),
+            );
+            expect(panes.length, 2);
+            expect(panes.every((p) => p.image != null), isTrue);
+          }
+
+          for (final finder in [
+            find.byType(BeforeAfterView),
+            find.byType(ImageSourcePicker),
+          ]) {
+            expect(finder, findsOneWidget);
+            final rect = tester.getRect(finder);
+            expect(rect.top, greaterThanOrEqualTo(0), reason: '$label $finder');
+            expect(rect.bottom, lessThanOrEqualTo(size.height),
+                reason: '$label $finder はビューポート内に収まる');
+            expect(rect.left, greaterThanOrEqualTo(0));
+            expect(rect.right, lessThanOrEqualTo(size.width));
+          }
+        });
+      }
+    });
+  }
+
+  group('previewPaneSideFor（#130）', () {
+    // 画像以外の高さ 360 を引いた残りが一辺。下限は kMinPreviewPaneSide。
+    test('下限 + 画像以外の高さ（520）ちょうどで下限、1 足すと 1 増える', () {
+      expect(previewPaneSideFor(520), kMinPreviewPaneSide);
+      expect(previewPaneSideFor(521), kMinPreviewPaneSide + 1);
+      expect(previewPaneSideFor(519), kMinPreviewPaneSide);
+    });
+
+    test('小数の高さは切り捨てる', () {
+      expect(previewPaneSideFor(544), 184);
+      expect(previewPaneSideFor(544.9), 184);
+    });
+
+    test('負・0・極端に小さい高さは下限になる', () {
+      expect(previewPaneSideFor(-100), kMinPreviewPaneSide);
+      expect(previewPaneSideFor(0), kMinPreviewPaneSide);
+      expect(previewPaneSideFor(1), kMinPreviewPaneSide);
+    });
+
+    test('高さが無制限（double.infinity）なら上限なし', () {
+      expect(previewPaneSideFor(double.infinity), double.infinity);
+    });
+  });
+
+  group('プレビュー画像の高さ配分（読み込み済み）', () {
+    // 画像 1 枚（正方形）の一辺。
+    double paneSide(WidgetTester tester) {
+      final rect = tester.getRect(find.byType(PreviewImageView).first);
+      expect(rect.width, closeTo(rect.height, 0.01), reason: '画像は正方形');
+      return rect.width;
+    }
+
+    Future<double> sideAt(WidgetTester tester, Size size) async {
+      loadPreviewImages();
+      await pumpHomeScreen(tester, size: size);
+      return paneSide(tester);
+    }
+
+    testWidgets('既定 800x600: 画像は下限より大きく、選択欄の下に余白が残る', (tester) async {
+      final side = await sideAt(tester, defaultWindow);
+      expect(side, greaterThan(kMinPreviewPaneSide));
+      // 本体領域の高さ 544（600 - AppBar 56）から、画像以外の高さ 360 を引いた値。
+      expect(side, closeTo(184, 0.01));
+      final picker = tester.getRect(find.byType(ImageSourcePicker));
+      expect(picker.bottom, lessThanOrEqualTo(defaultWindow.height - 8),
+          reason: '選択欄の下端がウィンドウの縁に貼り付かない');
+    });
+
+    testWidgets('高さが足りなくても画像は下限（kMinPreviewPaneSide）を割らない（狭幅 800x400）',
+        (tester) async {
+      expect(await sideAt(tester, const Size(800, 400)),
+          closeTo(kMinPreviewPaneSide, 0.01));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('高さが足りなくても画像は下限を割らない（低い広幅 1280x480）', (tester) async {
+      expect(await sideAt(tester, wideLow), closeTo(kMinPreviewPaneSide, 0.01));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('余裕のある高さでは縮めない: 狭幅 800x700 は従来の 256', (tester) async {
+      expect(await sideAt(tester, narrow), closeTo(256, 0.01));
+    });
+
+    testWidgets('余裕のある高さでは縮めない: 広幅 1280x800 は中央カラムの幅いっぱい（従来どおり）',
+        (tester) async {
+      final side = await sideAt(tester, wide);
+      final preview = tester.getRect(find.byType(BeforeAfterView));
+      // 画像 2 枚 + 間の 12。
+      expect(side * 2 + 12, closeTo(preview.width, 0.01));
+    });
+
+    for (final (low, high) in [(560.0, 600.0), (600.0, 640.0)]) {
+      testWidgets('高さに追従する: ${low.toInt()} より ${high.toInt()} の方が大きい',
+          (tester) async {
+        final small = await sideAt(tester, Size(800, low));
+        // 同じテストの中で作り直すため、いったん外す。
+        await tester.pumpWidget(const SizedBox());
+        final large = await sideAt(tester, Size(800, high));
+        expect(large, greaterThan(small));
       });
     }
+
+    testWidgets('クリックスルーの案内が出ていても下限は守る（既定 800x600）', (tester) async {
+      loadPreviewImages();
+      const uiContext = WindowModeUiContext(
+        trayAvailable: true,
+        hotkeyStatus: HotkeyStatus(),
+      );
+      final h = await pumpHomeScreen(tester,
+          size: defaultWindow, uiContext: uiContext);
+      await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
+      await tester.runAsync(() => h.loupe.setClickThrough(true));
+      await tester.pump();
+      expect(paneSide(tester), greaterThanOrEqualTo(kMinPreviewPaneSide));
+      expect(tester.takeException(), isNull);
+      await tester.runAsync(() => h.loupe.setClickThrough(false));
+      await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
+    });
   });
 
   testWidgets('既定ウィンドウは LoupeWindowPolicy.defaultSize（800x600）',
@@ -149,7 +266,7 @@ void main() {
     // 進む `runAsync` をまたいで確かめる。
     // 画像が載った状態にする（既定のハーネスは「準備中」で止める）。フィルタ適用は
     // ハーネスの既定（Rust 非依存）のまま。
-    previewSourceImageLoader = (source, size) async => fixturePreviewImage();
+    loadPreviewImages();
     await pumpHomeScreen(
       tester,
       size: wide,

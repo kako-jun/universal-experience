@@ -897,7 +897,9 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
 
 - `HomeScreen`: メイン画面（#72）。幅 1000dp 以上は 3 カラム（左「選ぶ」=`FilterBrowser`、
   中央「見る」=`BeforeAfterView` + `ImageSourcePicker`、右「調整」=`AdjustPanel`）、
-  それ未満は プレビュー → 調整 → 選択 の縦積み。`FilterBrowser` は検索・カテゴリ・
+  それ未満は プレビュー → 調整 → 選択 の縦積み。プレビュー画像の一辺は本体領域の高さから
+  `previewPaneSideFor` で上限を決め（高さ - 360dp、下限 `kMinPreviewPaneSide` = 160dp）、
+  `BeforeAfterView.maxPaneSide` へ渡す。既定ウィンドウ 800x600 でも選択欄まで最初のビューポートに収める（#130）。`FilterBrowser` は検索・カテゴリ・
   統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行、ロジックは
   `filter_list_selection.dart`）と体験プリセットの最上段を持つ。`AdjustPanel` は選んだ
   症状の説明・強度スライダー 1 本・受診喚起（`ConsultNoticeBlock` 常時展開）を
@@ -956,7 +958,8 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   空の列は描画器を呼ばず原画を返す。層が 0〜1 のときは従来の単一フィルタの経路のままで、
   最新優先の `_generation` はどちらの経路でも同じ。見出しは複数層で名前の要約（#120）、書き出しは層ごとの行（#121）
 - `BeforeAfterView`（`lib/ui/widgets/before_after_view.dart`）: before/after
-  プレビューペイン。#85 で、ペインの論理サイズ・
+  プレビューペイン。横並びのとき、画像 1 枚の一辺は `maxPaneSide`（呼び出し側が高さから決める、#130）を
+  上限にでき、超える幅では 2 枚を中央に寄せる（縦積みでは使わない）。#85 で、ペインの論理サイズ・
   `devicePixelRatio` に連動して都度サイズを変えていた旧 GPU 時代の auto-sizing
   （#58）を撤去し、常に固定の正準サイズ（`canonicalSampleSize` = 1024）で
   `CpuVisionRenderer` に描画させ、表示側は `FilterQuality.medium` でスケールする

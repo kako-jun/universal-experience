@@ -36,6 +36,28 @@ const double _kNarrowContentMaxWidth = 800;
 /// 高さを抑え、800x700 でも最初の画面に収める。
 const double _kNarrowPreviewMaxWidth = 560;
 
+/// プレビュー画像（Before / After 各 1 枚の正方形）の一辺の下限（#130）。高さが足りなくても
+/// これより小さくはしない（使い物にならない小ささになるより、縦にスクロールさせる）。
+const double kMinPreviewPaneSide = 160;
+
+/// プレビューカードのうち、画像以外が縦に使う高さ（dp、#130）。カード上端から画像の上端
+/// まで（余白・見出しの行 + 「2×2 で比較」・画像の見出し行 48・余白）と、画像の下端から選択欄の
+/// 下端まで（`ImageSourcePicker`。サンプルのチップが 3 行ほど折り返す）、選択欄の下の余白 16 の
+/// 合計。実フォントでの実測は日本語で約 324、英語（チップが長く折り返しが 1 行増える）で約 348。
+/// この値は実測に余裕（英語で約 12）を足した値で、実測の最大より大きくしてある。
+/// 画像の一辺は「本体領域の高さ - この値」までに抑えて、既定のウィンドウ（800x600）でも選択欄の
+/// 下端が最初のビューポートに収まるようにする。
+/// 実測を超えてチップが折り返す（文字サイズ拡大など）ときは、選択欄が下にはみ出し、スクロールで届く。
+const double _kPreviewChromeHeight = 360;
+
+/// ウィンドウ（本体領域）の高さ [viewportHeight] に収まる、プレビュー画像の一辺の上限（#130）。
+/// 下限は [kMinPreviewPaneSide]。余裕のある高さでは画像の自然な大きさより大きい値になり、
+/// 実際には効かない。
+double previewPaneSideFor(double viewportHeight) =>
+    (viewportHeight - _kPreviewChromeHeight)
+        .floorToDouble()
+        .clamp(kMinPreviewPaneSide, double.infinity);
+
 /// 狭幅で一覧が使う高さ（一覧は内側でスクロールする）。
 const double _kNarrowBrowserHeight = 560;
 
@@ -205,8 +227,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: LayoutBuilder(
                     builder: (context, constraints) =>
                         constraints.maxWidth >= kWideLayoutBreakpoint
-                            ? _buildWide(constraints.maxWidth)
-                            : _buildNarrow(),
+                            ? _buildWide(constraints.maxWidth,
+                                previewPaneSideFor(constraints.maxHeight))
+                            : _buildNarrow(
+                                previewPaneSideFor(constraints.maxHeight)),
                   ),
                 ),
               ],
@@ -218,7 +242,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// 3 カラム（選ぶ / 見る / 調整）。Tab 順は左 → 中央 → 右（#45）。
-  Widget _buildWide(double width) {
+  Widget _buildWide(double width, double maxPaneSide) {
     final leftWidth = (width * 0.24).clamp(280.0, 340.0);
     final rightWidth = (width * 0.27).clamp(300.0, 380.0);
     return FocusTraversalGroup(
@@ -244,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _previewCard(),
+                        _previewCard(maxPaneSide),
                         WelcomeBanner(onChooseOtherView: _browser.focusSearch),
                       ],
                     ),
@@ -276,7 +300,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 縦積み: 上からプレビュー → 調整 → 選択（#72）。プレビューは最初の
   /// 画面に収める。
-  Widget _buildNarrow() {
+  Widget _buildNarrow(double maxPaneSide) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Center(
@@ -289,7 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: ConstrainedBox(
                   constraints:
                       const BoxConstraints(maxWidth: _kNarrowPreviewMaxWidth),
-                  child: _previewCard(),
+                  child: _previewCard(maxPaneSide),
                 ),
               ),
               WelcomeBanner(onChooseOtherView: _browser.focusSearch),
@@ -337,7 +361,7 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 出す。強さは色覚層の強度を 4 セル共通で使い、他の層（色覚より前の段）は先に 1 回だけ
   /// 適用した土台にする（#122、[colorVisionCompareInputOf]）。原画に戻すホットキー
   /// （bypass）は 2×2 にもそのまま効く（強度 0・土台なし）。
-  Widget _previewCard() {
+  Widget _previewCard(double maxPaneSide) {
     return Consumer2<VisionFilterState, ImageSourceState>(
       builder: (context, visionState, imageSourceState, _) {
         final theme = Theme.of(context);
@@ -433,6 +457,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ? exportLayersOf(visionState)
                               : null,
                           imageSource: imageSourceState.current,
+                          maxPaneSide: maxPaneSide,
                         ),
                 ),
               ],

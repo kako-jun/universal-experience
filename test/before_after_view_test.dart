@@ -323,6 +323,101 @@ void main() {
       });
     });
 
+    // #130: 高さに収めるための一辺の上限（maxPaneSide）。横並び（幅 420 以上）でだけ効く。
+    group('maxPaneSide（#130）', () {
+      setUp(() {
+        CpuVisionRenderer.applier = (source, filter, strength) async => source;
+        previewSourceImageLoader = (source, size) => generateSampleImage(size);
+      });
+      tearDown(() {
+        CpuVisionRenderer.applier = CpuVisionRenderer.apply;
+        previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
+      });
+
+      // 幅 [width] の中に BeforeAfterView を置き、画像（正方形）の矩形を 2 枚返す。
+      Future<({Rect view, List<Rect> panes})> pumpAt(
+        WidgetTester tester, {
+        required double width,
+        double? maxPaneSide,
+      }) async {
+        tester.view.physicalSize = Size(width, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          localized(
+            BeforeAfterView(
+              filter: const VisionFilter.protanopia(),
+              filterId: 'protanopia',
+              strength: 1.0,
+              imageSource: const SamplePreviewImageSource('test'),
+              sampleSize: 32,
+              maxPaneSide: maxPaneSide,
+            ),
+          ),
+        );
+        await pumpUntilText(tester, visionFilterName(en, 'protanopia'));
+        final panes = tester
+            .widgetList<PreviewImageView>(find.byType(PreviewImageView))
+            .length;
+        expect(panes, 2);
+        return (
+          view: tester.getRect(find.byType(BeforeAfterView)),
+          panes: [
+            for (var i = 0; i < 2; i++)
+              tester.getRect(find.byType(PreviewImageView).at(i)),
+          ],
+        );
+      }
+
+      testWidgets('null なら従来どおり幅いっぱい（2 枚 + 間隔）', (tester) async {
+        final r = await pumpAt(tester, width: 800);
+        expect(r.panes[0].width, closeTo(r.panes[0].height, 0.01));
+        expect(
+          r.panes[0].width * 2 + kBeforeAfterPaneGap,
+          closeTo(r.view.width, 0.01),
+        );
+        expect(r.panes[0].left, closeTo(r.view.left, 0.01));
+        expect(r.panes[1].right, closeTo(r.view.right, 0.01));
+      });
+
+      testWidgets('指定すると一辺は maxPaneSide 以下になり、2 枚は中央に寄る', (tester) async {
+        final r = await pumpAt(tester, width: 800, maxPaneSide: 120);
+        for (final pane in r.panes) {
+          expect(pane.width, closeTo(120, 0.01));
+          expect(pane.height, closeTo(120, 0.01));
+        }
+        expect(
+          r.panes[1].left - r.panes[0].right,
+          closeTo(kBeforeAfterPaneGap, 0.01),
+        );
+        // 左右の余白が等しい（中央寄せ）。
+        expect(
+          r.panes[0].left - r.view.left,
+          closeTo(r.view.right - r.panes[1].right, 0.01),
+        );
+        expect(r.panes[0].left, greaterThan(r.view.left));
+      });
+
+      testWidgets('上限が幅に対して大きければ効かない（従来どおり幅いっぱい）', (tester) async {
+        final r = await pumpAt(tester, width: 800, maxPaneSide: 1000);
+        expect(
+          r.panes[0].width * 2 + kBeforeAfterPaneGap,
+          closeTo(r.view.width, 0.01),
+        );
+      });
+
+      testWidgets('幅 420 未満の縦積みでは無視される', (tester) async {
+        final base = await pumpAt(tester, width: 400);
+        // 縦積み（2 枚目は 1 枚目の下で、横に並ばない）。
+        expect(base.panes[1].top, greaterThan(base.panes[0].bottom));
+        await tester.pumpWidget(const SizedBox());
+        final capped = await pumpAt(tester, width: 400, maxPaneSide: 50);
+        expect(capped.panes[0].width, closeTo(base.panes[0].width, 0.01));
+        expect(capped.panes[0].width, greaterThan(50));
+        expect(capped.panes[1].top, greaterThan(capped.panes[0].bottom));
+      });
+    });
+
     // #58: プレビューが GPU 画像をリークする／古い結果で上書きされる／Retina で
     // ぼける、の3点を再現・固定するリグレッションテスト。
     //

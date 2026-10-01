@@ -109,6 +109,10 @@ Future<ui.Image> composeCaptionedExportImage(
 ) =>
     exportImageComposer(base, caption);
 
+/// 横並びのときの Before / After 2 枚の間隔（dp）。[BeforeAfterView.maxPaneSide] が
+/// 幅の上限（2 枚分 + この間隔）を出すのにも使うので、1 か所で持つ。
+const double kBeforeAfterPaneGap = 12;
+
 /// Side-by-side "before / after" preview for the currently selected
 /// `VisionFilterState` selection (#60).
 ///
@@ -145,6 +149,7 @@ class BeforeAfterView extends StatefulWidget {
     this.layerNames,
     this.layerIds,
     this.exportLayers,
+    this.maxPaneSide,
   }) : assert(
           (filter == null) == (filterId == null),
           'filter and filterId must both be null or both be set',
@@ -207,6 +212,13 @@ class BeforeAfterView extends StatefulWidget {
   /// 注記を出すために使う（[filterId] はフォーカス中の層 1 つしか指さない）。`null` なら
   /// 従来どおり [filterId] だけで判定する。
   final List<String>? layerIds;
+
+  /// Before / After を横に並べるとき、画像 1 枚（正方形）の一辺の上限（dp、#130）。
+  /// `null`（既定）なら上限なしで、幅いっぱいに広がる。上限を越える幅のときは、2 枚を
+  /// 中央に寄せて並べる（画像の大きさだけが変わる。見出しの行・書き出しボタンの位置は
+  /// 2 枚の幅に追従する）。縦に積むとき（幅 420dp 未満）は使わない。
+  /// 呼び出し側が、ウィンドウの高さに対して選択欄まで最初のビューポートに収まる大きさを渡す。
+  final double? maxPaneSide;
 
   /// Explicit width/height (in pixels) for the generated square sample
   /// image. When `null` (the default, used by real callers), the resolution
@@ -863,7 +875,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(child: beforePane.buildHeading(context)),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: kBeforeAfterPaneGap),
                       Expanded(child: afterPane.buildHeading(context)),
                     ],
                   ),
@@ -872,11 +884,24 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(child: beforePane.buildImage()),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: kBeforeAfterPaneGap),
                       Expanded(child: afterPane.buildImage()),
                     ],
                   ),
                 ],
+              );
+
+        // 上限（maxPaneSide）を越える幅のときは、2 枚を中央に寄せて画像を小さくする。
+        final maxSide = widget.maxPaneSide;
+        final Widget sizedPanes = stackVertically || maxSide == null
+            ? panes
+            : Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: 2 * maxSide + kBeforeAfterPaneGap,
+                  ),
+                  child: panes,
+                ),
               );
 
         // #60: vertigo / bppv_rotation のような時間依存フィルタは、CPU
@@ -887,7 +912,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              panes,
+              sizedPanes,
               const SizedBox(height: 8),
               Text(
                 l10n.previewStaticFrameNote,
@@ -898,7 +923,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
             ],
           );
         }
-        return panes;
+        return sizedPanes;
       },
     );
   }
