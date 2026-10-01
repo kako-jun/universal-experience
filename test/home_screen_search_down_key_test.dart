@@ -175,7 +175,7 @@ void main() {
       expect(h.visionState.layers, hasLength(5));
     });
 
-    testWidgets('行 0 件（検索語が当たらない）では何も起きず検索欄に残る', (tester) async {
+    testWidgets('行 0 件（検索語が当たらない）では奪わず入力欄に返す（キャレットが末尾へ動く）', (tester) async {
       final h = await pumpHomeScreen(tester, size: wide);
       await typeSearch(tester, 'zzzzqqqq');
       expect(visibleFilterListEntries(query: 'zzzzqqqq'), isEmpty);
@@ -192,7 +192,7 @@ void main() {
       expect(h.visionState.layers, isEmpty);
     });
 
-    testWidgets('体験プリセットだけ表示されている（行は 0 件）ときも何も起きない', (tester) async {
+    testWidgets('体験プリセットだけ表示されている（行は 0 件）ときも奪わず入力欄に返す', (tester) async {
       await pumpHomeScreen(tester, size: wide);
       await typeSearch(tester, 'meniere');
       expect(visibleFilterListEntries(query: 'meniere'), isEmpty,
