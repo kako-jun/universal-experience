@@ -138,6 +138,22 @@ void main() {
       await expectBannerDismissed(tester, h);
     });
 
+    testWidgets('調整パネルの「フィルタを解除」（1 層でも閉じる）', (tester) async {
+      final h = await pumpHomeScreen(
+        tester,
+        size: tall,
+        select: (s) => s.seedInitialLayers(),
+      );
+      await tester.pump();
+      expect(h.visionState.layers, hasLength(1));
+      expectBannerUp(h);
+
+      await tester.tap(find.text(ja.clearFilter));
+      await tester.pump();
+      expect(h.visionState.layers, isEmpty);
+      await expectBannerDismissed(tester, h);
+    });
+
     testWidgets('サンプル画像の切替', (tester) async {
       final h = await pumpHomeScreen(tester, size: tall);
       expectBannerUp(h);
@@ -145,7 +161,8 @@ void main() {
         of: find.byType(ImageSourcePicker),
         matching: find.byType(ChoiceChip),
       );
-      final other = chips.evaluate().map((e) => e.widget as ChoiceChip).toList();
+      final other =
+          chips.evaluate().map((e) => e.widget as ChoiceChip).toList();
       final index = other.indexWhere((c) => !c.selected);
       expect(index, isNonNegative, reason: '選択中でないサンプルチップがある');
       await tester.tap(chips.at(index));
@@ -208,7 +225,9 @@ void main() {
       expect(h.imageSource.isUsingUserImage, isFalse);
       expectBannerUp(h);
 
-      await tester.tap(find.widgetWithText(ChoiceChip, ja.imageSourceYourPhotoChipLabel));
+      await tester.tap(
+        find.widgetWithText(ChoiceChip, ja.imageSourceYourPhotoChipLabel),
+      );
       await tester.pump();
       expect(h.imageSource.isUsingUserImage, isTrue);
       await expectBannerDismissed(tester, h);
@@ -268,7 +287,9 @@ void main() {
       pickImageFile = () async => null;
 
       await tester.runAsync(() async {
-        await tester.tap(find.widgetWithText(FilledButton, ja.welcomeBannerTryPhotoAction));
+        await tester.tap(
+          find.widgetWithText(FilledButton, ja.welcomeBannerTryPhotoAction),
+        );
         await Future<void>.delayed(const Duration(milliseconds: 50));
       });
       await tester.pump();
@@ -276,13 +297,17 @@ void main() {
       expect(banner(), findsOneWidget);
     });
 
-    testWidgets('バナーの「自分の画像で試す」で読み込めたら閉じる（従来どおり）', (tester) async {
+    // 閉じるのは loadUserImageFile 側（バナー側の dismiss を外しても閉じる）。
+    // バナー側 dismiss 自体の検証ではなく、この経路で最終的に閉じる確認。
+    testWidgets('バナーの「自分の画像で試す」で読み込めたら閉じる', (tester) async {
       final h = await pumpHomeScreen(tester, size: tall);
       final bytes = await validPng(tester);
       pickImageFile = () async => XFile.fromData(bytes, name: 'a.png');
 
       await tester.runAsync(() async {
-        await tester.tap(find.widgetWithText(FilledButton, ja.welcomeBannerTryPhotoAction));
+        await tester.tap(
+          find.widgetWithText(FilledButton, ja.welcomeBannerTryPhotoAction),
+        );
         await Future<void>.delayed(const Duration(milliseconds: 200));
       });
       await tester.pump();
@@ -320,7 +345,10 @@ void main() {
   });
 
   group('SettingsService を提供しない分離ウィジェット（例外にならない）', () {
-    Widget isolated(Widget child, {required List<SingleChildWidget> providers}) {
+    Widget isolated(
+      Widget child, {
+      required List<SingleChildWidget> providers,
+    }) {
       return MultiProvider(
         providers: providers,
         child: MaterialApp(
@@ -365,7 +393,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('LayerChipStrip の ✕・すべて解除', (tester) async {
+    testWidgets('LayerChipStrip の ✕', (tester) async {
       final state = VisionFilterState()
         ..toggle('myopia')
         ..toggle('glaucoma');
@@ -380,6 +408,24 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('layer_chip_remove_myopia')));
       await tester.pump();
       expect(state.layers, hasLength(1));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('LayerChipStrip の「すべて解除」', (tester) async {
+      final state = VisionFilterState()
+        ..toggle('myopia')
+        ..toggle('glaucoma');
+      await tester.pumpWidget(isolated(
+        const LayerChipStrip(),
+        providers: [
+          ChangeNotifierProvider<VisionFilterState>.value(value: state),
+        ],
+      ));
+      await tester.pump();
+
+      await tester.tap(find.byKey(const ValueKey('layer_strip_clear_all')));
+      await tester.pump();
+      expect(state.layers, isEmpty);
       expect(tester.takeException(), isNull);
     });
 

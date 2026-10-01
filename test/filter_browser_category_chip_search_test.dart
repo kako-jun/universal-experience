@@ -65,7 +65,8 @@ void main() {
   Finder chips() => find.byType(ChoiceChip);
 
   List<bool> selectedFlags(WidgetTester tester) => [
-        for (final chip in tester.widgetList<ChoiceChip>(chips())) chip.selected,
+        for (final chip in tester.widgetList<ChoiceChip>(chips()))
+          chip.selected,
       ];
 
   Finder chipLabeled(String label) => find.widgetWithText(ChoiceChip, label);
@@ -154,7 +155,27 @@ void main() {
     expect(tester.widget<ChoiceChip>(chipLabeled('すべて')).selected, isTrue);
   });
 
-  // 淡色の文字（onSurface alpha 0.7）が 4 テーマで読めること（DESIGN.md の
+  testWidgets('検索中のチップの文字色は、検索していない時と異なる（淡色化される）',
+      (tester) async {
+    await pumpBrowser(tester);
+    expect(
+      tester.widget<ChoiceChip>(chipLabeled('すべて')).labelStyle,
+      isNull,
+      reason: '検索していない時は文字色を上書きしない',
+    );
+
+    await typeSearch(tester, 'myo');
+    final scheme = Theme.of(tester.element(chipLabeled('すべて'))).colorScheme;
+    for (final chip in tester.widgetList<ChoiceChip>(chips())) {
+      final color = chip.labelStyle?.color;
+      expect(color, scheme.onSurfaceVariant, reason: '検索中は補足ロールの色');
+      expect(color, isNot(scheme.onSurface), reason: '本文色のままではない');
+      expect(color, isNot(scheme.onSecondaryContainer), reason: '選択色のままではない');
+    }
+  });
+
+
+  // 淡色の文字（補足ロール onSurfaceVariant）が 4 テーマで読めること（DESIGN.md の
   // コントラスト 4.5:1 / 大きい文字 3:1）。
   group('検索中の淡色チップの文字コントラスト', () {
     final themes = <String, ThemeData>{

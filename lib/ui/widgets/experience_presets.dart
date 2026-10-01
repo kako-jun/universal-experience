@@ -111,9 +111,9 @@ class ExperiencePresetTile extends StatelessWidget {
           ? null
           : () {
               context.read<VisionFilterState>().selectPreset(
-                experience.id,
-                catalogId,
-              );
+                    experience.id,
+                    catalogId,
+                  );
               dismissWelcomeBannerOnUserChange(context);
             },
       onPointerActivated: onActivated,

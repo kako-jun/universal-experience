@@ -14,7 +14,7 @@ import '../../services/app_shortcuts.dart';
 import '../../services/clipboard_image_reader.dart';
 import '../../services/image_source_state.dart';
 import '../../services/settings_service.dart'
-    show dismissWelcomeBannerOnUserChange;
+    show dismissWelcomeBannerOnUserChange, welcomeBannerDismisserOf;
 import '../../services/vision_filter_state.dart';
 
 /// Opens the OS file picker restricted to common image types and returns the
@@ -90,6 +90,7 @@ class UserImageTooLargeException implements Exception {
 /// (only on an actual successful load, never on cancel/failure).
 Future<bool> loadUserImageFile(BuildContext context, XFile file) async {
   final imageSourceState = context.read<ImageSourceState>();
+  final dismissBanner = welcomeBannerDismisserOf(context);
   ui.Image decoded;
   try {
     final length = await file.length();
@@ -112,7 +113,7 @@ Future<bool> loadUserImageFile(BuildContext context, XFile file) async {
     return false;
   }
   imageSourceState.setUserImage(decoded);
-  if (context.mounted) dismissWelcomeBannerOnUserChange(context);
+  dismissBanner();
   return true;
 }
 
@@ -216,6 +217,7 @@ bool _pasteInFlight = false;
 
 Future<bool> _pasteUserImageFromClipboard(BuildContext context) async {
   final imageSourceState = context.read<ImageSourceState>();
+  final dismissBanner = welcomeBannerDismisserOf(context);
   ui.Image decoded;
   try {
     final content =
@@ -262,7 +264,7 @@ Future<bool> _pasteUserImageFromClipboard(BuildContext context) async {
     return false;
   }
   imageSourceState.setUserImage(decoded);
-  if (context.mounted) dismissWelcomeBannerOnUserChange(context);
+  dismissBanner();
   return true;
 }
 

@@ -131,7 +131,7 @@ test/
 ├── tap_target_size_test.dart       # macOS 指定で操作領域が 48dp 以上（padded + standard・言語ダイアログの選択肢、#72/#82）
 ├── filter_browser_test.dart        # 統合一覧の検索・カテゴリ切替・行の選択（#72）
 ├── filter_browser_multi_select_test.dart # 統合一覧のチェック式・番号バッジが段順・色覚の排他置き換え・上限で未選択の行が無効（色覚置き換え行とプリセットは有効）・プリセット置換と一致時だけ強調・行フォーカス移動（#120）
-├── filter_browser_category_chip_search_test.dart # 検索語があるあいだカテゴリチップを全て非選択（淡色）にし、消すと元の選択へ戻る・内部カテゴリ不変・チップ押下で検索語が消えてカテゴリ選択・淡色文字のコントラスト 4 テーマ（#143）
+├── filter_browser_category_chip_search_test.dart # 検索語があるあいだカテゴリチップを全て非選択（淡色）にし、消すと元の選択へ戻る・内部カテゴリ不変・チップ押下で検索語が消えてカテゴリ選択・淡色文字（onSurfaceVariant）が通常時と異なる色であることとコントラスト 4 テーマ（#143）
 ├── welcome_banner_auto_dismiss_test.dart # ウェルカムバナーの自動 dismiss: 行・プリセット・✕/すべて解除・サンプル切替・写真の読込/貼付/閉じる・おすすめに戻すで閉じ永続化／seed・プログラム変更・起動復元・ピッカーキャンセルでは残る／Provider 無しでも例外なし（#143）
 ├── layer_chip_strip_test.dart      # チップ帯: 2 層以上で出る・チップで調整中が移る・✕ で 1 層除去・すべて解除・状態が形で分かる（#120）
 ├── adjust_panel_layers_test.dart   # 調整パネルの層ごとの節・調整中の層だけ展開・強度スライダー 1 本・1 層は従来の見た目（#120）

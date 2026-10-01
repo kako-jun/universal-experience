@@ -230,10 +230,7 @@ class _CategoryChips extends StatelessWidget {
           // どれも非選択（チェックなし・淡色）に見せる（#143）。内部のカテゴリは保つ。
           final dimStyle = dimmed
               ? TextStyle(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.7),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 )
               : null;
           return Wrap(
