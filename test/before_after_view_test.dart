@@ -372,8 +372,10 @@ void main() {
       testWidgets('null なら従来どおり幅いっぱい（2 枚 + 間隔）', (tester) async {
         final r = await pumpAt(tester, width: 800);
         expect(r.panes[0].width, closeTo(r.panes[0].height, 0.01));
-        expect(r.panes[0].width * 2 + kBeforeAfterPaneGap,
-            closeTo(r.view.width, 0.01));
+        expect(
+          r.panes[0].width * 2 + kBeforeAfterPaneGap,
+          closeTo(r.view.width, 0.01),
+        );
         expect(r.panes[0].left, closeTo(r.view.left, 0.01));
         expect(r.panes[1].right, closeTo(r.view.right, 0.01));
       });
@@ -384,18 +386,24 @@ void main() {
           expect(pane.width, closeTo(120, 0.01));
           expect(pane.height, closeTo(120, 0.01));
         }
-        expect(r.panes[1].left - r.panes[0].right,
-            closeTo(kBeforeAfterPaneGap, 0.01));
+        expect(
+          r.panes[1].left - r.panes[0].right,
+          closeTo(kBeforeAfterPaneGap, 0.01),
+        );
         // 左右の余白が等しい（中央寄せ）。
-        expect(r.panes[0].left - r.view.left,
-            closeTo(r.view.right - r.panes[1].right, 0.01));
+        expect(
+          r.panes[0].left - r.view.left,
+          closeTo(r.view.right - r.panes[1].right, 0.01),
+        );
         expect(r.panes[0].left, greaterThan(r.view.left));
       });
 
       testWidgets('上限が幅に対して大きければ効かない（従来どおり幅いっぱい）', (tester) async {
         final r = await pumpAt(tester, width: 800, maxPaneSide: 1000);
-        expect(r.panes[0].width * 2 + kBeforeAfterPaneGap,
-            closeTo(r.view.width, 0.01));
+        expect(
+          r.panes[0].width * 2 + kBeforeAfterPaneGap,
+          closeTo(r.view.width, 0.01),
+        );
       });
 
       testWidgets('幅 420 未満の縦積みでは無視される', (tester) async {

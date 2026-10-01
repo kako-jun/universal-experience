@@ -12,10 +12,13 @@
 //   {wide|narrow}-{light|dark}-{ja|en}.png        — ウィンドウ 1 枚ぶん
 //                                                    （wide=1280x800、narrow=800x700）
 //   wide-{light|dark}-ja-hc.png                    — ハイコントラストテーマ
-//   default-window-{light|dark}-{ja|en}.png       — 既定ウィンドウ（800x600）に実画像が載った状態。
-//                                                    選択欄が最初のビューポートに収まる（収まりを expect する、#130）
-//   wide-low-light-ja.png                          — 低い広幅（1280x480）に実画像が載った状態。画像は下限
-//                                                    （160dp）で止まり、選択欄の下側はスクロールで届く（#130）
+//   default-window-{light|dark}-{ja|en}.png
+//                                                  — 既定ウィンドウ（800x600）に実画像が載った状態。
+//                                                    選択欄が最初のビューポートに収まる
+//                                                    （収まりを expect する、#130）
+//   wide-low-light-ja.png                          — 低い広幅（1280x480）に実画像が載った状態。
+//                                                    画像は下限（160dp）で止まり、選択欄の下側は
+//                                                    スクロールで届く（#130）
 //   {wide|wide-low|default-window}-light-ja-clickthrough.png
 //                                                  — クリックスルー ON の復帰バナー
 //                                                    （wide-low=1280x480、default-window=800x600）
@@ -606,8 +609,10 @@ void main() {
   }
 
   // 既定ウィンドウ（800x600）と低い広幅（1280x480）に、実画像が載った状態（#130）。
-  // 選択欄（ImageSourcePicker）の下端が最初のビューポートに収まるよう、プレビュー画像の
-  // 高さを配分している（画像が最小の高さを割らない）ことの目視確認用。ファイル名は
+  // 既定ウィンドウ（default-window）では、選択欄（ImageSourcePicker）の下端が
+  // 最初のビューポートに収まるよう、プレビュー画像の高さを配分している。
+  // 低い広幅（wide-low）は画像が下限（160dp）で止まり、選択欄の下側は収まらず
+  // スクロールで届く（目視確認のみ）。ファイル名は
   // default-window-{light|dark}-{ja|en}.png と wide-low-light-ja.png。
   for (final (label, width, height, dark, locale)
       in const <(String, double, double, bool, String)>[
