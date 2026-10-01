@@ -154,7 +154,7 @@ void main() {
     expect(tester.widget<ChoiceChip>(chipLabeled('すべて')).selected, isTrue);
   });
 
-  // 淡色の文字（onSurface alpha 0.6）が 4 テーマで読めること（DESIGN.md の
+  // 淡色の文字（onSurface alpha 0.7）が 4 テーマで読めること（DESIGN.md の
   // コントラスト 4.5:1 / 大きい文字 3:1）。
   group('検索中の淡色チップの文字コントラスト', () {
     final themes = <String, ThemeData>{
@@ -164,8 +164,7 @@ void main() {
       'ハイコントラスト（ダーク）': AppTheme.highContrastDarkTheme,
     };
     for (final entry in themes.entries) {
-      // TODO(#143): ライトは alpha 0.6 だと 4.43:1（< 4.5）で落ちる。alpha 0.7 で通る。実装修正後にこの skip を外す。
-      testWidgets(entry.key, skip: entry.key == 'ライト', (tester) async {
+      testWidgets(entry.key, (tester) async {
         final handle = tester.ensureSemantics();
         await pumpBrowser(tester, theme: entry.value);
         await typeSearch(tester, 'myo');
