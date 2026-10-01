@@ -143,8 +143,11 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: Actions(
         actions: <Type, Action<Intent>>{
+          // テキスト入力中だけ奪わない（`/` 自体が入力文字になる）。ボタン・チップ等の
+          // クリック後（フォーカスが残る）でも検索欄へ移れるよう、↑↓・←→ より狭いガード
+          // （isFocusOnTextInput 参照、#141）。
           FocusFilterSearchIntent:
-              InteractiveFocusAwareCallbackAction<FocusFilterSearchIntent>(
+              TextInputAwareCallbackAction<FocusFilterSearchIntent>(
             onInvoke: (_) {
               _browser.focusSearch();
               return null;

@@ -62,7 +62,7 @@ String pasteShortcutLabel() =>
     defaultTargetPlatform == TargetPlatform.macOS ? '⌘V' : 'Ctrl+V';
 
 /// フォーカス中のウィジェットが「テキスト入力・ボタン・スイッチ等」のとき、
-/// アプリ内ショートカット（`/`・↑↓・←→）を奪うべきでないかを判定する
+/// アプリ内ショートカット（↑↓・←→）を奪うべきでないかを判定する
 /// (#63)。`ReleaseClickThroughIntent`（Esc）はこのガードの対象外
 /// — クリックスルーからの復帰は常に効く必要があるため。
 bool isFocusOnInteractiveControl() => _focusHasAncestor(
@@ -81,12 +81,12 @@ bool isFocusOnInteractiveControl() => _focusHasAncestor(
     );
 
 /// フォーカス中のウィジェットが**テキスト入力**（[EditableText]）かどうか
-/// （#97）。[PasteImageIntent]（Cmd/Ctrl+V）専用のガード。
+/// （#97/#141）。[PasteImageIntent]（Cmd/Ctrl+V）と [FocusFilterSearchIntent]（`/`）のガード。
 ///
-/// [isFocusOnInteractiveControl] よりわざと狭い: `/`・↑↓・←→ はボタンや
-/// スライダー自身も使うキーだが、Cmd/Ctrl+V はテキスト入力以外に固有の意味を
-/// 持たない。貼り付けボタンを押した直後（フォーカスがボタンに残る）でも
-/// キーボードの貼り付けが効くよう、ボタン等では奪う側に回る。
+/// [isFocusOnInteractiveControl] よりわざと狭い: ↑↓・←→ はボタンや
+/// スライダー自身も使うキーだが、Cmd/Ctrl+V と `/` はテキスト入力以外に固有の意味を
+/// 持たない。ボタンやチップを押した直後（フォーカスが残る）でも
+/// キーボードで効くよう、ボタン等では奪う側に回る。
 bool isFocusOnTextInput() =>
     _focusHasAncestor((widget) => widget is EditableText);
 
@@ -105,7 +105,7 @@ bool _focusHasAncestor(bool Function(Widget widget) test) {
 }
 
 /// [isFocusOnInteractiveControl] が true の間は無効化される [CallbackAction]
-/// (#63)。`/`・↑↓・←→ の 3 アクションで使う。
+/// (#63)。↑↓（`_RowAwareCycleAction` 経由）・←→ で使う。
 class InteractiveFocusAwareCallbackAction<T extends Intent>
     extends CallbackAction<T> {
   InteractiveFocusAwareCallbackAction({required super.onInvoke});
@@ -115,7 +115,7 @@ class InteractiveFocusAwareCallbackAction<T extends Intent>
 }
 
 /// [isFocusOnTextInput] が true の間は無効化される [CallbackAction]（#97）。
-/// [PasteImageIntent] 用。無効の間はキーイベントを消費しないので、入力欄自身の
+/// [PasteImageIntent]・[FocusFilterSearchIntent] 用。無効の間はキーイベントを消費しないので、入力欄自身の
 /// 貼り付け（`DefaultTextEditingShortcuts`）がそのまま働く。
 class TextInputAwareCallbackAction<T extends Intent> extends CallbackAction<T> {
   TextInputAwareCallbackAction({required super.onInvoke});
