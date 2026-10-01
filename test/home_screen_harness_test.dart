@@ -1,6 +1,6 @@
 // installHomeScreenFixtures（test/support/home_screen_harness.dart）の契約テスト（#127, #131）。
 //
-// ハーネスは、プレビューの読み込み・フィルタ適用を Rust 非依存のフェイクに固定する。
+// ハーネスは、プレビューの読み込み・フィルタ適用・複数層の合成を Rust 非依存のフェイクに固定する。
 // `flutter test` には native lib も RustLib.init() も無いので、実ローダ/実レンダラが
 // 残ると、フィルタを選んだ状態で実時間が進む（`tester.runAsync`）タイミングに
 // 「FRB 未初期化」の非同期例外が走行中のテストへ漏れる。ここでは
@@ -164,6 +164,8 @@ void main() {
       expect(pipelined, isNotEmpty,
           reason: '複数層の合成の経路を通っていなければ、この回帰テストは何も守れない');
       expect(pipelined.last, hasLength(2));
+      expect(pipelined.last.any((s) => s.strength == 0.4), isTrue,
+          reason: '強度の変更が合成のステップへ届く');
       final panes =
           tester.widgetList<PreviewImageView>(find.byType(PreviewImageView));
       expect(panes.length, 2);
