@@ -14,15 +14,21 @@ import 'package:universal_experience/main.dart';
 import 'package:universal_experience/services/hotkey_service.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/settings_service.dart';
-import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
+
+import 'support/home_screen_harness.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() => experiencesProvider = () => const []);
+  setUp(() {
+    // 体験・メタデータ・プレビューの読み込み/適用をハーネスの fixture（Rust 非依存、
+    // #127/#131）に揃える。体験プリセットの行は不要なので空にする。
+    installHomeScreenFixtures();
+    experiencesProvider = () => const [];
+  });
   tearDown(() async {
-    experiencesProvider = experiences;
+    resetHomeScreenFixtures();
     // トップレベル共有シングルトンをテスト間で汚染しない（#63）。
     await loupeWindow.setClickThrough(false);
     await loupeWindow.setAlwaysOnTop(false);
