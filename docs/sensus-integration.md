@@ -1,7 +1,7 @@
 # sensus 連携 — シェーダ方言調査と統合方針
 
 感覚障害シミュレーションのアルゴリズム正本は別 crate
-[`sensus-core`](https://crates.io/crates/sensus-core)（Rust, crates.io 公開, v0.6.1）に
+[`sensus-core`](https://crates.io/crates/sensus-core)（Rust, crates.io 公開, v0.6.2）に
 一元化する。universal-experience（ue）は GLSL や行列・半径式を**再実装しない**。
 
 このドキュメントは Issue #7（sensus 連携 1/3）のスコープのうち「シェーダ方言の

@@ -5,7 +5,7 @@
 // 検証しているため、「UI に出す urgency が実際に sensus ブリッジの値と一致する
 // こと」自体は検知できない。本テストは実ネイティブライブラリをロードし、
 // カタログ全 30 種について ue が公開する urgency/urgency_escalation/
-// recommended_strength が sensus-core 0.6.1 の値をそのまま透過していることを
+// recommended_strength が sensus-core の値をそのまま透過していることを
 // 確認する。ue 側は緊急度・推奨強度を独自に持たない（#76）ため、この透過が
 // 崩れていない＝「UI の値は常に sensus と一致する」が保証される。
 //

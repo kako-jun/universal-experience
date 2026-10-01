@@ -1,12 +1,12 @@
 // GENERATED FILE - DO NOT EDIT.
 //
 // Source of truth: sensus-core vision filter "presbyopia"
-// (canonical GLSL: sensus shaders/presbyopia.frag, sensus-core v0.6.1).
+// (canonical GLSL: sensus shaders/presbyopia.frag, sensus-core v0.6.2).
 // Filter-specific provenance (e.g. the Machado 2009 matrix and
 // its citation) lives in the sensus source, not here.
 //
 // Regenerate with: dart run tools/generate_shaders.dart
-// (input dump: tools/sensus_shaders.g.json, produced by sensus-core v0.6.1).
+// (input dump: tools/sensus_shaders.g.json, produced by sensus-core v0.6.2).
 //
 // scalar uniform order (setFloat index): uStrength, uRadiusPx, uTexelSize_x, uTexelSize_y, uResolution_x, uResolution_y
 #include <flutter/runtime_effect.glsl>
