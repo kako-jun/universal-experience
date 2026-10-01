@@ -23,7 +23,7 @@ import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 import 'support/color_vision_select.dart';
 import 'support/home_screen_harness.dart';
 
-/// isFocusOnInteractiveControl のテスト専用ダミー Intent（本番の 3 Intent の
+/// isFocusOnInteractiveControl のテスト専用ダミー Intent（本番の Intent の
 /// 代わりに、ガードのロジックだけを最小構成で検証するために使う）。
 class _ProbeIntent extends Intent {
   const _ProbeIntent();

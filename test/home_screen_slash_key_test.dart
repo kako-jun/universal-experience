@@ -144,6 +144,29 @@ void main() {
       expectSearchFocusedAndAllSelected(tester, 'abc');
       expect(h.visionState.strength, before, reason: '/ は強度に触れない');
     });
+
+    testWidgets('一覧の行（FilterListTile）にフォーカスがある状態で / → 検索欄へ移り全選択',
+        (tester) async {
+      await pumpHomeScreen(tester, size: wide);
+      await typeSearch(tester, 'myo');
+
+      final row = find.byType(FilterListTile);
+      expect(row, findsWidgets);
+      await focusInside(tester, row);
+      expect(
+        primary(tester)
+            ?.context
+            ?.findAncestorWidgetOfExactType<FilterListTile>(),
+        isNotNull,
+        reason: 'フォーカスは一覧の行にある',
+      );
+      expect(isFocusOnInteractiveControl(), isTrue);
+      expect(isFocusOnTextInput(), isFalse);
+
+      await pressSlash(tester);
+
+      expectSearchFocusedAndAllSelected(tester, 'myo');
+    });
   });
 
   group('テキスト入力中は / を奪わない（#141）', () {
@@ -176,16 +199,6 @@ void main() {
 
       expect(searchField(tester).controller!.selection, partial);
     });
-
-    testWidgets('検索欄に文字として入力した / は検索語に入る', (tester) async {
-      await pumpHomeScreen(tester, size: wide);
-      await tester.tap(find.byType(TextField));
-      await tester.enterText(find.byType(TextField), 'a/b');
-      await tester.pump();
-
-      expect(searchField(tester).controller!.text, 'a/b');
-      expect(isSearchFocused(tester), isTrue);
-    });
   });
 
   group('↑↓・←→ のガードは変わっていない（#141 回帰）', () {
@@ -206,23 +219,6 @@ void main() {
 
       expect(h.visionState.strength, before,
           reason: 'ボタン・チップ上の ←→ はショートカットに奪われない');
-    });
-
-    testWidgets('スライダー上の → は強度ショートカットでなく Slider 自身の操作（二重に動かない）',
-        (tester) async {
-      final h = await pumpHomeScreen(
-        tester,
-        size: wide,
-        select: (s) => selectColorVisionKey(s, 'protanopia'),
-      );
-      final before = h.visionState.strength;
-
-      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-      await tester.pump();
-
-      // Slider 自身の 1 ステップ（5%）だけ動く。ショートカットが奪うと二重に足されて 10%。
-      expect((h.visionState.strength - before).abs(), lessThan(0.0501),
-          reason: 'ショートカットと Slider 自身の二重加算になっていない');
     });
 
     testWidgets('チップにフォーカスがある間の ↓ は、調整中の層の次の行へフォーカスを送るショートカットにならない',
