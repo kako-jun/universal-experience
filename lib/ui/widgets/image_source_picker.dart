@@ -13,6 +13,8 @@ import '../../rendering/image_fit.dart';
 import '../../services/app_shortcuts.dart';
 import '../../services/clipboard_image_reader.dart';
 import '../../services/image_source_state.dart';
+import '../../services/settings_service.dart'
+    show dismissWelcomeBannerOnUserChange;
 import '../../services/vision_filter_state.dart';
 
 /// Opens the OS file picker restricted to common image types and returns the
@@ -110,6 +112,7 @@ Future<bool> loadUserImageFile(BuildContext context, XFile file) async {
     return false;
   }
   imageSourceState.setUserImage(decoded);
+  if (context.mounted) dismissWelcomeBannerOnUserChange(context);
   return true;
 }
 
@@ -259,6 +262,7 @@ Future<bool> _pasteUserImageFromClipboard(BuildContext context) async {
     return false;
   }
   imageSourceState.setUserImage(decoded);
+  if (context.mounted) dismissWelcomeBannerOnUserChange(context);
   return true;
 }
 
@@ -369,19 +373,28 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
             label: Text(sampleImageName(l10n, entry.id)),
             selected: !imageSourceState.isUsingUserImage &&
                 imageSourceState.selectedSampleId == entry.id,
-            onSelected: (_) => imageSourceState.selectSample(entry.id),
+            onSelected: (_) {
+              imageSourceState.selectSample(entry.id);
+              dismissWelcomeBannerOnUserChange(context);
+            },
           ),
         if (imageSourceState.hasUserImage) ...[
           ChoiceChip(
             label: Text(l10n.imageSourceYourPhotoChipLabel),
             selected: imageSourceState.isUsingUserImage,
-            onSelected: (_) => imageSourceState.useLoadedUserImage(),
+            onSelected: (_) {
+              imageSourceState.useLoadedUserImage();
+              dismissWelcomeBannerOnUserChange(context);
+            },
           ),
           // 読み込んだユーザー画像を閉じる UI。
           IconButton(
             icon: const Icon(Icons.close, size: 18),
             tooltip: l10n.imageSourceClosePhotoTooltip,
-            onPressed: () => imageSourceState.clearUserImage(recommendedId),
+            onPressed: () {
+              imageSourceState.clearUserImage(recommendedId);
+              dismissWelcomeBannerOnUserChange(context);
+            },
           ),
         ],
         OutlinedButton.icon(
@@ -406,7 +419,10 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
         ),
         if (!imageSourceState.isFollowingRecommended)
           TextButton(
-            onPressed: () => imageSourceState.resetToRecommended(recommendedId),
+            onPressed: () {
+              imageSourceState.resetToRecommended(recommendedId);
+              dismissWelcomeBannerOnUserChange(context);
+            },
             child: Text(l10n.imageSourceResetToRecommended),
           ),
       ],

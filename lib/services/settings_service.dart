@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../l10n/locale_resolution.dart';
@@ -114,5 +115,19 @@ class SettingsService extends ChangeNotifier {
       (m) => m.name == name,
       orElse: () => ThemeMode.system,
     );
+  }
+}
+
+/// ユーザー操作でフィルタ選択か原画が変わったとき、ウェルカムバナー（#78）を閉じる（#143）。
+///
+/// **ユーザー操作の入口（タップ・ボタン）でだけ呼ぶ**。起動時の復元・初期選択・推奨サンプルへの
+/// 自動追従（`VisionFilterState` / `ImageSourceState` 側の変更）では呼ばない。バナーが残ったまま
+/// 画面が「推奨の既定」と食い違うのを避けるための入口で、`SettingsService` を提供しない
+/// 分離ウィジェットテストでは何もしない。
+void dismissWelcomeBannerOnUserChange(BuildContext context) {
+  try {
+    context.read<SettingsService>().dismissWelcomeBanner();
+  } on ProviderNotFoundException {
+    // SettingsService が無い文脈（分離テスト）: バナー自体が無いので何もしない。
   }
 }

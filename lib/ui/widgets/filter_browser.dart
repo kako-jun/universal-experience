@@ -6,6 +6,8 @@ import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_catalog.dart';
 import '../../models/vision_filter_stage.dart' show kMaxVisionLayers;
 import '../../services/filter_list_selection.dart';
+import '../../services/settings_service.dart'
+    show dismissWelcomeBannerOnUserChange;
 import '../../services/vision_layer.dart';
 import '../../services/vision_filter_state.dart';
 import 'experience_presets.dart';
@@ -223,19 +225,32 @@ class _CategoryChips extends StatelessWidget {
         listenable: controller,
         builder: (context, _) {
           final current = controller.category;
+          final dimmed = controller.isSearching;
+          // 検索語があるあいだは一覧がカテゴリを無視して全体から探すので、チップは
+          // どれも非選択（チェックなし・淡色）に見せる（#143）。内部のカテゴリは保つ。
+          final dimStyle = dimmed
+              ? TextStyle(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6),
+                )
+              : null;
           return Wrap(
             spacing: 8,
             children: [
               ChoiceChip(
                 label: Text(l10n.filterCategoryAll),
-                selected: current == null,
+                selected: !dimmed && current == null,
+                labelStyle: dimStyle,
                 showCheckmark: true,
                 onSelected: (_) => controller.setCategory(null),
               ),
               for (final category in VisionFilterCategory.values)
                 ChoiceChip(
                   label: Text(visionCategoryName(l10n, category)),
-                  selected: current == category,
+                  selected: !dimmed && current == category,
+                  labelStyle: dimStyle,
                   showCheckmark: true,
                   onSelected: (_) => controller.setCategory(category),
                 ),
@@ -332,7 +347,10 @@ class _FilterList extends StatelessWidget {
                     ? l10n.filterListLimitReached(kMaxVisionLayers)
                     : null,
                 focusNode: controller.rowFocusNode(entry),
-                onTap: () => toggleFilterListEntry(visionState, entry),
+                onTap: () {
+                  toggleFilterListEntry(visionState, entry);
+                  dismissWelcomeBannerOnUserChange(context);
+                },
                 onPointerActivated: onActivated,
                 isExperimental:
                     kVisionFilterCatalogById[entry.catalogId]?.isExperimental ??
