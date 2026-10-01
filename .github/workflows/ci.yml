@@ -170,7 +170,7 @@ jobs:
         run: flutter test integration_test/cpu_preview_all_filters_test.dart -d macos
 
       # urgency/urgency_escalation/recommended_strength（#76/#77）が
-      # kVisionFilterCatalog 全 30 種で実ブリッジ経由で sensus-core 0.6.1 の値を
+      # kVisionFilterCatalog 全 30 種で実ブリッジ経由で sensus-core の値を
       # 一致して返すことを確認する。widget/unit test はフィクスチャ止まりなので
       # ここが実ブリッジとの一致を保証する唯一の場所。
       - name: Flutter integration test (macos, vision_filter_urgency_parity_test)
@@ -272,6 +272,6 @@ jobs:
         run: xvfb-run -a flutter test integration_test/cpu_preview_all_filters_test.dart -d linux
 
       # urgency/urgency_escalation/recommended_strength（#76/#77）が実ブリッジ
-      # 経由で sensus-core 0.6.1 の値と一致することを確認する（macOS 側と対）。
+      # 経由で sensus-core の値と一致することを確認する（macOS 側と対）。
       - name: Flutter integration test (linux, vision_filter_urgency_parity_test)
         run: xvfb-run -a flutter test integration_test/vision_filter_urgency_parity_test.dart -d linux
