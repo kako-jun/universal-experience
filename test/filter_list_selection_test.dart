@@ -1,14 +1,13 @@
 // 統合フィルタ一覧（filter_list_selection.dart、#72）の純粋ロジックのテスト。
 //
 // 色覚 7 型と advanced 30 フィルタが 1 つの一覧になること、検索（日本語・英語・
-// かな/カナ）、選択の書き込み入口（色覚は selectColorVision、それ以外は
-// VisionFilterState.select）、↑↓ の順送り（端で折り返す）を確認する。
+// かな/カナ）、選択の書き込み入口（色覚も advanced も toggleFilterListEntry 経由で
+// VisionFilterState.toggle に入る。別名は variantId 付きの層になる）、↑↓ の順送り
+// （端で折り返す）を確認する。
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/filter_list_selection.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/vision_layer.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 
@@ -33,21 +32,37 @@ void main() {
     });
 
     test('色覚 7 型はすべて一覧に 1 行ずつある', () {
-      final types = kFilterListEntries
-          .map((e) => e.colorVisionType)
-          .whereType<ColorVisionType>()
-          .toSet();
-      expect(
-        types,
-        {
-          for (final t in ColorVisionType.values)
-            if (t != ColorVisionType.none) t,
-        },
-      );
+      final keys = kFilterListEntries
+          .map((e) => e.strengthKey)
+          .where(isColorVisionQuickKey)
+          .toList();
+      expect(keys.toSet(), {
+        'protanopia',
+        'deuteranopia',
+        'tritanopia',
+        'achromatopsia',
+        'protanomaly',
+        'deuteranomaly',
+        'tritanomaly',
+      });
+      expect(keys.length, 7, reason: '1 キー 1 行');
     });
 
-    test('advanced だけの行（tetrachromacy 等）は色覚型を持たない', () {
-      expect(entryByKey('catalog:starbursts').colorVisionType, isNull);
+    test('-omaly の行は対応する -opia のカタログ id + variantId を持つ', () {
+      final omaly = entryByKey('cv:protanomaly');
+      expect(omaly.catalogId, 'protanopia');
+      expect(omaly.variantId, 'protanomaly');
+      expect(omaly.strengthKey, 'protanomaly');
+      final full = entryByKey('cv:protanopia');
+      expect(full.catalogId, 'protanopia');
+      expect(full.variantId, isNull);
+      expect(full.strengthKey, 'protanopia');
+    });
+
+    test('advanced だけの行（starbursts 等）は variantId を持たず、色覚キーでもない', () {
+      final row = entryByKey('catalog:starbursts');
+      expect(row.variantId, isNull);
+      expect(isColorVisionQuickKey(row.strengthKey), isFalse);
     });
   });
 
@@ -103,23 +118,20 @@ void main() {
   });
 
   group('選択の書き込み', () {
-    test('色覚の行は toggleColorVision 経由（色覚クイック選択になる）', () {
+    test('色覚の別名の行は variantId 付きの層になる', () {
       final state = VisionFilterState();
-      final filterService = FilterService(visionState: state);
-      toggleFilterListEntry(
-          filterService, state, entryByKey('cv:deuteranomaly'));
-      expect(state.isColorQuickSelection, isTrue);
-      expect(state.colorVisionType, ColorVisionType.deuteranomaly);
+      toggleFilterListEntry(state, entryByKey('cv:deuteranomaly'));
+      expect(state.selectedId, 'deuteranopia');
+      expect(state.focusedVariantId, 'deuteranomaly');
+      expect(state.focusedLayer!.strengthKey, 'deuteranomaly');
       expect(selectedFilterListEntry(state), entryByKey('cv:deuteranomaly'));
     });
 
-    test('advanced だけの行は VisionFilterState.toggle 経由', () {
+    test('advanced だけの行は variantId の無い層になる', () {
       final state = VisionFilterState();
-      final filterService = FilterService(visionState: state);
-      toggleFilterListEntry(
-          filterService, state, entryByKey('catalog:starbursts'));
+      toggleFilterListEntry(state, entryByKey('catalog:starbursts'));
       expect(state.selectedId, 'starbursts');
-      expect(state.isColorQuickSelection, isFalse);
+      expect(state.focusedVariantId, isNull);
       expect(selectedFilterListEntry(state), entryByKey('catalog:starbursts'));
     });
 
@@ -165,22 +177,19 @@ void main() {
 
   group('多選択の入口（#120）', () {
     late VisionFilterState state;
-    late FilterService service;
     setUp(() {
       state = VisionFilterState();
-      service = FilterService(visionState: state);
     });
 
     test('toggleFilterListEntry は足し引きし、番号は段順', () {
-      toggleFilterListEntry(service, state, entryByKey('catalog:glaucoma'));
-      toggleFilterListEntry(service, state, entryByKey('catalog:myopia'));
+      toggleFilterListEntry(state, entryByKey('catalog:glaucoma'));
+      toggleFilterListEntry(state, entryByKey('catalog:myopia'));
       expect(filterListEntryOrder(state, entryByKey('catalog:myopia')), 1);
       expect(filterListEntryOrder(state, entryByKey('catalog:glaucoma')), 2);
       expect(
           filterListEntryOrder(state, entryByKey('catalog:floaters')), isNull);
 
-      final result =
-          toggleFilterListEntry(service, state, entryByKey('catalog:myopia'));
+      final result = toggleFilterListEntry(state, entryByKey('catalog:myopia'));
       expect(result, VisionLayerResult.removed);
       expect(filterListEntryOrder(state, entryByKey('catalog:glaucoma')), 1);
     });
@@ -188,11 +197,11 @@ void main() {
     test('色覚の行は別名（-omaly）まで区別して対応づく', () {
       final omaly = entryByKey('cv:protanomaly');
       final full = entryByKey('cv:protanopia');
-      toggleFilterListEntry(service, state, omaly);
+      toggleFilterListEntry(state, omaly);
       expect(layerForFilterListEntry(state, omaly), isNotNull);
       expect(layerForFilterListEntry(state, full), isNull);
       expect(filterListEntryForLayer(state.layers.single), omaly);
-      expect(service.currentFilter, ColorVisionType.protanomaly);
+      expect(state.focusedVariantId, 'protanomaly');
     });
 
     test('上限では未選択の行が layerLimit になるが、色覚の行は色覚層があれば選べる', () {
@@ -203,7 +212,7 @@ void main() {
         'catalog:glaucoma',
         'cv:protanopia',
       ]) {
-        toggleFilterListEntry(service, state, entryByKey(k));
+        toggleFilterListEntry(state, entryByKey(k));
       }
       expect(
         filterListEntryBlockReason(state, entryByKey('catalog:hyperopia')),
@@ -214,8 +223,8 @@ void main() {
       // チェック済みの行は外せるので理由なし。
       expect(filterListEntryBlockReason(state, entryByKey('catalog:myopia')),
           isNull);
-      final blocked = toggleFilterListEntry(
-          service, state, entryByKey('catalog:hyperopia'));
+      final blocked =
+          toggleFilterListEntry(state, entryByKey('catalog:hyperopia'));
       expect(blocked.change, VisionLayerChange.blocked);
       expect(state.layers.length, 5);
     });

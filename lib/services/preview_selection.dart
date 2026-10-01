@@ -5,8 +5,7 @@ import 'vision_filter_state.dart';
 ///
 /// 強度の正本は [VisionFilterState] のキーごとの記憶 1 つだけ（#117）。色覚
 /// クイック選択（`FilterBrowser`/トレイ）も advanced カタログ・体験プリセットも、
-/// [VisionFilterState.strength]（フォーカス中の層の強度）を見れば同じ値になる
-/// （かつては色覚クイック選択だけ `FilterService` の別の記憶を見ていた）。
+/// [VisionFilterState.strength]（フォーカス中の層の強度）を見れば同じ値になる。
 /// [previewStrength] はこれに bypass の判定を重ねたもの。原画比較中
 /// （[VisionFilterState.bypassed]）でも「今選んでいるフィルタは何%か」を表示し続けたい
 /// ルーペ HUD（`loupe_hud.dart`）はこちらを使う。

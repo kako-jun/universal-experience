@@ -19,11 +19,9 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/main.dart' show WindowModeUiContext;
 import 'package:universal_experience/models/sample_catalog.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/hotkey_service.dart';
 import 'package:universal_experience/services/image_source_state.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
@@ -192,14 +190,21 @@ void main() {
       }
     });
 
-    test('全 ColorVisionType の有病率が i18n 解決でき、ja に英語が混入しない', () {
+    test('色覚 7 種の有病率が i18n 解決でき、ja に英語が混入しない', () {
       final en = lookupAppLocalizations(const Locale('en'));
       final ja = lookupAppLocalizations(const Locale('ja'));
-      for (final type in ColorVisionType.values) {
-        final enText = colorVisionTypePrevalence(en, type);
-        final jaText = colorVisionTypePrevalence(ja, type);
-        expect(enText.trim(), isNotEmpty, reason: '$type (en)');
-        expect(jaText.trim(), isNotEmpty, reason: '$type (ja)');
+      final keys = [
+        ...kColorVisionQuickCatalogIds,
+        for (final a in kVisionAliases) a.id,
+      ];
+      expect(keys, hasLength(7));
+      for (final type in keys) {
+        final enText = visionFilterPrevalence(en, type);
+        final jaText = visionFilterPrevalence(ja, type);
+        expect(enText, isNotNull, reason: '$type (en)');
+        expect(jaText, isNotNull, reason: '$type (ja)');
+        expect(enText!.trim(), isNotEmpty, reason: '$type (en)');
+        expect(jaText!.trim(), isNotEmpty, reason: '$type (ja)');
         // ja の有病率行に英語の "of males/females" が混入していないこと（退行検出）。
         expect(jaText.toLowerCase(), isNot(contains('of males')),
             reason: '$type の ja に英語が混入');
@@ -207,8 +212,9 @@ void main() {
             reason: '$type の ja に英語が混入');
       }
       // 代表ケース: deuteranomaly の ja 訳が日本語であること。
-      expect(colorVisionTypePrevalence(ja, ColorVisionType.deuteranomaly),
-          contains('男性'));
+      expect(visionFilterPrevalence(ja, 'deuteranomaly'), contains('男性'));
+      // 色覚 7 種以外のキーには有病率が無い。
+      expect(visionFilterPrevalence(ja, 'glaucoma'), isNull);
     });
 
     test('urgency 由来の受診喚起は none 以外でのみ出る（#76: sensus の Urgency が唯一の正本）', () {
@@ -341,8 +347,6 @@ void main() {
           providers: [
             ChangeNotifierProvider<SettingsService>.value(value: settings),
             ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
-            ChangeNotifierProvider<FilterService>(
-                create: (_) => FilterService(visionState: visionState)),
             ChangeNotifierProvider<ImageSourceState>(
                 create: (_) => ImageSourceState()),
             ChangeNotifierProvider<LoupeWindowController>(
@@ -410,7 +414,7 @@ void main() {
 
       final state =
           tester.element(find.byType(HomeScreen)).read<VisionFilterState>();
-      state.select('vestibular_neuritis');
+      state.replaceWith('vestibular_neuritis');
       await tester.pump();
 
       // 右カラム（AdjustPanel → FilterParamPanel）に緊急受診メッセージが 1 件。

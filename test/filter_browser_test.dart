@@ -9,10 +9,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/filter_list_selection.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
@@ -26,7 +24,6 @@ void main() {
   tearDown(resetHomeScreenFixtures);
 
   late FilterBrowserController controller;
-  late FilterService filterService;
   late VisionFilterState state;
   var activated = 0;
 
@@ -38,13 +35,11 @@ void main() {
     controller = FilterBrowserController();
     addTearDown(controller.dispose);
     state = VisionFilterState();
-    filterService = FilterService(visionState: state);
     activated = 0;
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: state),
         ],
         child: MaterialApp(
@@ -208,13 +203,13 @@ void main() {
   });
 
   group('行の選択', () {
-    testWidgets('色覚の行は色覚クイック選択になり、onActivated が呼ばれる', (tester) async {
+    testWidgets('色覚の行は色覚の層（variantId 無し）になり、onActivated が呼ばれる', (tester) async {
       await pumpBrowser(tester);
       await tester.tap(tileOf('cv:protanopia'));
       await tester.pump();
 
-      expect(state.isColorQuickSelection, isTrue);
-      expect(state.colorVisionType, ColorVisionType.protanopia);
+      expect(state.selectedId, 'protanopia');
+      expect(state.focusedVariantId, isNull);
       expect(
         find.descendant(
             of: tileOf('cv:protanopia'),
@@ -224,7 +219,7 @@ void main() {
       expect(activated, 1);
     });
 
-    testWidgets('advanced だけの行は VisionFilterState.select で選ばれる',
+    testWidgets('advanced だけの行は VisionFilterState.toggle で選ばれる',
         (tester) async {
       await pumpBrowser(tester);
       final tile = tileOf('catalog:starbursts');
@@ -233,7 +228,7 @@ void main() {
       await tester.pump();
 
       expect(state.selectedId, 'starbursts');
-      expect(state.isColorQuickSelection, isFalse);
+      expect(state.focusedVariantId, isNull);
       expect(activated, 1);
     });
 

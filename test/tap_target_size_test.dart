@@ -8,14 +8,13 @@
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:universal_experience/services/color_vision_selection.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/ui/theme/app_theme.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
 import 'package:universal_experience/ui/widgets/image_source_picker.dart';
 import 'package:universal_experience/ui/widgets/language_dialog.dart';
 
 import 'support/home_screen_harness.dart';
+import 'support/color_vision_select.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -43,7 +42,7 @@ void main() {
         tester,
         size: const Size(1280, 800),
         theme: AppTheme.lightTheme,
-        select: (f, s) => selectColorVision(f, s, ColorVisionType.protanopia),
+        select: (s) => selectColorVisionKey(s, 'protanopia'),
       );
       await tester.enterText(find.byType(TextField), 'a');
       await tester.pump();

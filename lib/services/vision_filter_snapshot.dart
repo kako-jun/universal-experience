@@ -100,7 +100,7 @@ double _clampToDefinition(VisionParam p, double v) {
 /// [VisionFilterState] の「再起動をまたいで残す部分」の値オブジェクト（#65, #117 で v2）。
 ///
 /// 保持するもの:
-/// - 重ねているレイヤー列 [layers]（適用順。各層は id・payload・別名・起源）と、
+/// - 重ねているレイヤー列 [layers]（適用順。各層は id・payload・別名）と、
 ///   フォーカス中の層 [focusedId]、体験プリセット [presetId]
 /// - キーごとの強度の記憶 [strengthByKey]（キーは別名 id ?? カタログ id。層に強度は
 ///   持たせない）と、カタログ id ごとの payload の記憶 [paramsById]
@@ -165,7 +165,6 @@ class VisionFilterSnapshot {
                 for (final e in l.params.entries) e.key: _paramToJson(e.value),
               },
               if (l.variantId != null) 'variantId': l.variantId,
-              'origin': l.origin.name,
             },
         ],
         'focusedId': focusedId,
@@ -196,13 +195,6 @@ class VisionFilterSnapshot {
     if (version == _kLegacySnapshotVersion) return _fromV1(json);
     return null;
   }
-
-  static const Set<String> _quickCapableIds = {
-    'protanopia',
-    'deuteranopia',
-    'tritanopia',
-    'achromatopsia',
-  };
 
   static Map<String, double> _sanitizeStrengths(Object? raw) {
     final out = <String, double>{};
@@ -237,29 +229,22 @@ class VisionFilterSnapshot {
         final id = raw['id'];
         final entry = id is String ? kVisionFilterCatalogById[id] : null;
         if (entry == null) continue;
-        final origin = raw['origin'] == VisionLayerOrigin.quick.name &&
-                _quickCapableIds.contains(entry.id)
-            ? VisionLayerOrigin.quick
-            : VisionLayerOrigin.advanced;
-        // 別名（-omaly）は quick 層だけが持つ。advanced 層に付いていたら捨てる。
+        // 別名（-omaly）は別名表と合うものだけ採る。合わなければ別名なしの層にする。
+        // v2 の旧形式が持っていた `origin`（quick/advanced）は読まずに捨てる。
         final variant = raw['variantId'];
-        final variantId = origin == VisionLayerOrigin.quick &&
-                variant is String &&
-                isValidVariantFor(entry.id, variant)
-            ? variant
-            : null;
+        final variantId =
+            variant is String && isValidVariantFor(entry.id, variant)
+                ? variant
+                : null;
         // 層の params が無い・壊れているときは、id ごとの記憶 → 既定値の順で補う。
         final params = entry.parameters.isEmpty
             ? const <String, Object>{}
             : raw.containsKey('params')
                 ? sanitizeVisionParams(entry, raw['params'])
                 : (paramsById[entry.id] ?? defaultVisionParams(entry));
-        parsed.add(VisionLayer(
-          id: entry.id,
-          params: params,
-          variantId: variantId,
-          origin: origin,
-        ));
+        parsed.add(
+          VisionLayer(id: entry.id, params: params, variantId: variantId),
+        );
       }
     }
     final layers = normalizeVisionLayers(parsed);
@@ -289,10 +274,10 @@ class VisionFilterSnapshot {
 
   /// 版 1（単一選択）→ v2 の形。
   ///
-  /// 選択は層 1 つに、色覚クイック選択は quick 層（-omaly は別名つき）になる。
+  /// 選択は層 1 つに、色覚クイック選択は色覚の層（-omaly は別名つき）になる。
   /// 版 1 の強度はカタログ id ごとに 1 つだったが、色覚 -opia の強度の正本は
-  /// 旧 `settings.intensityByType` 側（[VisionFilterStore.migrateLegacyStrengths]
-  /// が取り込む）だったため、-opia 4 種（quick/advanced の別を区別できない記憶）は
+  /// 旧 `settings.intensityByType` 側（[VisionFilterStore.migrateLegacySettings]
+  /// が取り込む）だったため、-opia 4 種（色覚クイック選択か否かを区別できない記憶）は
   /// 持ち越さない。tetrachromacy は advanced 専用だったので持ち越す。
   static VisionFilterSnapshot _fromV1(Map json) {
     final strengthByKey = <String, double>{};
@@ -307,7 +292,7 @@ class VisionFilterSnapshot {
         if (entry == null || body is! Map) continue;
         final strength = body['strength'];
         if (strength is num && strength.isFinite) {
-          if (_quickCapableIds.contains(entry.id)) {
+          if (kColorVisionQuickCatalogIds.contains(entry.id)) {
             droppedStrength = true;
           } else {
             strengthByKey[entry.id] = strength.toDouble().clamp(0.0, 1.0);
@@ -326,11 +311,12 @@ class VisionFilterSnapshot {
     String? presetId;
     if (entry != null) {
       final rawType = json['colorVisionType'];
-      final type = rawType is String ? colorVisionTypeByName(rawType) : null;
-      // 旧保存値の colorVisionType は ColorVisionType.id（= name と同じ文字列）。
-      final quick = type == null ? null : quickColorVisionLayer(type);
-      if (quick != null && quick.id == entry.id) {
-        layers = [quick];
+      // 旧保存値の colorVisionType は旧 enum の名前（= 別名 id・カタログ id と同じ文字列）。
+      final type = rawType is String && isColorVisionQuickKey(rawType)
+          ? resolveVisionKey(rawType)
+          : null;
+      if (type != null && type.id == entry.id) {
+        layers = [VisionLayer(id: type.id, variantId: type.variantId)];
       } else {
         layers = [
           VisionLayer(

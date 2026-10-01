@@ -1,7 +1,7 @@
 // 重ねているフィルタのチップ帯（#120）の widget test。
 //
 // 2 層以上のときだけ出る・適用順の番号・チップで「調整中」が移る・✕ で 1 層だけ外れる・
-// 「すべて解除」で全部外れる・FilterService が層の集合に追従する、を確認する。
+// 「すべて解除」で全部外れる・別名（-omaly）のチップが variantId の表示名になる、を確認する。
 
 import 'dart:ui' show Tristate;
 
@@ -10,9 +10,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
-import 'package:universal_experience/models/disability_type.dart';
-import 'package:universal_experience/services/color_vision_selection.dart';
-import 'package:universal_experience/services/filter_service.dart';
+import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/ui/widgets/layer_chip_strip.dart';
 
@@ -24,7 +22,6 @@ void main() {
   setUp(installHomeScreenFixtures);
   tearDown(resetHomeScreenFixtures);
 
-  late FilterService filterService;
   late VisionFilterState state;
 
   Future<void> pumpStrip(WidgetTester tester, {double width = 600}) async {
@@ -32,11 +29,9 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     state = VisionFilterState();
-    filterService = FilterService(visionState: state);
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: state),
         ],
         child: const MaterialApp(
@@ -139,15 +134,40 @@ void main() {
       expect(clearAll, findsNothing);
     });
 
-    testWidgets('色覚の層を ✕ で外すと FilterService も追従する', (tester) async {
+    testWidgets('色覚の層を ✕ で外すと、その層だけが消える', (tester) async {
       await pumpStrip(tester);
-      toggleColorVision(filterService, state, ColorVisionType.protanopia);
+      state.toggle('protanopia');
       state.toggle('myopia');
       await tester.pump();
-      expect(filterService.currentFilter, ColorVisionType.protanopia);
+      // 色覚は適用順（段順）で他の層より後ろに並ぶ。
+      expect(state.layers.map((l) => l.id), ['myopia', 'protanopia']);
       await tester.tap(remove('protanopia'));
       await tester.pump();
-      expect(filterService.currentFilter, ColorVisionType.none);
+      expect(state.layers.map((l) => l.id), ['myopia']);
+      expect(chip('protanopia'), findsNothing);
+    });
+
+    testWidgets('別名（-omaly）の層のチップは variantId の表示名を出し、✕ で外れる', (tester) async {
+      await pumpStrip(tester);
+      final l10n = lookupAppLocalizations(const Locale('ja'));
+      state.toggle('protanopia', variantId: 'protanomaly');
+      state.toggle('myopia');
+      await tester.pump();
+      expect(
+        find.descendant(
+            of: chip('protanopia'),
+            matching: find.text(visionFilterName(l10n, 'protanomaly'))),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+            of: chip('protanopia'),
+            matching: find.text(visionFilterName(l10n, 'protanopia'))),
+        findsNothing,
+        reason: '-opia ではなく -omaly の名前になる',
+      );
+      await tester.tap(remove('protanopia'));
+      await tester.pump();
       expect(state.layers.map((l) => l.id), ['myopia']);
     });
   });

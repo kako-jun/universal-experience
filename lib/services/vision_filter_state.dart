@@ -2,48 +2,49 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
-import '../models/disability_type.dart';
 import '../models/vision_filter_catalog.dart';
 import '../models/vision_filter_stage.dart';
 import '../src/rust/api/sensus_bridge.dart';
-import 'filter_service.dart' show recommendedStrength;
 import 'vision_filter_metadata.dart';
 import 'vision_filter_snapshot.dart';
 import 'vision_layer.dart';
 
+/// 初回起動の層（[VisionFilterState.seedInitialLayers]）にする別名 id（またはカタログ id）。
+/// 初めて起動した利用者に、すぐ「色の見え方が変わる」体験を見せるための既定。
+const String kInitialVisionFilterKey = 'deuteranomaly';
+
 /// フィルタ選択状態を保持する ChangeNotifier。**プレビュー（before/after）の
-/// 描画対象の唯一の正本**（#60）。
+/// 描画対象の唯一の正本であり、選択状態モデルの唯一の系統**（#60, #124）。
 ///
-/// 色覚 7 種のクイック選択（`FilterBrowser`/トレイ、どちらも
-/// `lib/services/color_vision_selection.dart` の `selectColorVision` を経由
-/// して [selectColorVisionType] を呼ぶ）・advanced カタログ全 30 種・体験
-/// プリセットのいずれで選んでも、最終的にここへ書き込まれる
-/// （[selectColorVisionType] / [select] / [selectPreset]。中身は [replaceWith]）。プレビュー
-/// （`before_after_view.dart`）は `FilterService` を直接見ず、常にこの state
-/// の [build] / [strength] / [selectedId] だけを描画対象にする。
+/// 色覚クイック選択（`FilterBrowser`/トレイ）・advanced カタログ・体験プリセットの
+/// どの入口で選んでも、最終的にここへ書き込まれる（[toggle] / [replaceWith] /
+/// [selectPreset]）。プレビュー（`before_after_view.dart`）もトレイも、常にこの state
+/// の層の集合だけを見る。かつて色覚の選択だけを持っていた別系統の状態（サービスと enum）は
+/// #124 で撤去した。
 ///
 /// ## 順序つきレイヤー列（#117）
 ///
 /// 状態の正本は [layers]（[VisionLayer] の適用順の列）。各層は「カタログ id・
-/// payload・別名（-omaly）・起源（quick/advanced）」を持ち、**強度は持たない**。
+/// payload・別名（-omaly）」だけを持ち、**強度は持たない**。-omaly は対応する -opia と
+/// 同じカタログ id に写る別名で、別名の表（`kVisionAliases`）はカタログ層にある。
 /// 強度は「キー（別名 id ?? カタログ id）ごとの記憶」（[strengthForKey]）に 1 つだけ
 /// あり、層の強度は読むときに [strengthOf] が導出する（記憶が無ければ推奨強度。
-/// 導出した既定値は記憶へ書かない）。色覚クイック選択と advanced で同じ色覚を
-/// 選んでも強度が二重にならない。
+/// 導出した既定値は記憶へ書かない）。
 ///
 /// 層の列は [normalizeVisionLayers] の不変条件（id 重複なし・色覚グループ排他・
 /// 上限 [kMaxVisionLayers]・適用順）を満たす。多選択の操作は [toggle] / [remove] /
 /// [setLayerStrength] / [setLayerParams] / [replaceWith] / [clear]（#119）。層・強度・
-/// payload の書き込み入口はこれらと、従来の単一選択 API（[select] / [selectColorVisionType] /
-/// [selectPreset] / [setStrength] / [setStrengthForKey] / [setParam] / [resetToRecommended] /
-/// [randomizeSeed] / [restore]）で、どれも層の列の不変条件を保つ。未知のカタログ id の扱いは
-/// 入口で違う: 層を足す入口（[toggle] / [replaceWith] と、[select] 系）と足せるか確認する
+/// payload の書き込み入口はこれらと、フォーカス中の層に作用する [setStrength] /
+/// [setStrengthForKey] / [setParam] / [resetToRecommended] / [randomizeSeed] /
+/// [selectPreset] / [restore] で、どれも層の列の不変条件を保つ。未知のカタログ id の扱いは
+/// 入口で違う: 層を足す入口（[toggle] / [replaceWith]）と足せるか確認する
 /// 入口（[blockReasonFor]）は [ArgumentError] を投げ、既存の層を操作する入口（[remove] / [setLayerStrength] /
 /// [setLayerParams]）は該当する層が無いものとして何もしない。適用順は
-/// 段（`vision_filter_stage.dart`）で決まり、選んだ順には依存しない。従来の単一選択
-/// API（[selectedId] / [strength] / [params] / [isColorQuickSelection] /
-/// [colorVisionType]）は **フォーカス中の層**（[focusedId]）を指す互換の読み口として
-/// 残している（単一選択 = 1 層の多選択）。複数層の UI は #120 以降。
+/// 段（`vision_filter_stage.dart`）で決まり、選んだ順には依存しない。[selectedId] /
+/// [strength] / [params] は **フォーカス中の層**（[focusedId]）を指す読み口（単一選択 =
+/// 1 層の多選択）。
+///
+/// 初回起動の層は [seedInitialLayers] が持つ（設定側に「最後に選んだ色覚」は無い）。
 ///
 /// アルゴリズムは持たず、層 + パラメータから sensus の [VisionFilter] インスタンスを
 /// 組み立てる [build] / [buildLayer] を提供する。
@@ -105,7 +106,7 @@ class VisionFilterState extends ChangeNotifier {
 
   /// 誰が保持しているかに関わらず、すべての bypass holder を強制的に解除する
   /// （#79）。フィルタ選択・強度変更・非常口など、「原画比較の状態に関わらず
-  /// 必ずフィルタ表示に戻す」操作から呼ぶ。[select] 等の内部呼び出しは
+  /// 必ずフィルタ表示に戻す」操作から呼ぶ。[replaceWith] 等の内部呼び出しは
   /// notifyListeners の二重呼び出しを避けるため直接 [_bypassHolders] を
   /// clear するだけに留め、この公開メソッドは外部（`hotkey_actions.dart` の
   /// 非常口）から明示的に呼ぶ用。
@@ -149,7 +150,7 @@ class VisionFilterState extends ChangeNotifier {
   Map<String, double> get strengthByKey => Map.unmodifiable(_strengthByKey);
 
   /// [key] の強度の記憶を 0.0..1.0 に clamp して書く。選択・bypass・プリセット表示は
-  /// 触らない（`FilterService.setIntensity` が色覚クイック選択の強度スライダーから
+  /// 触らない（強度スライダー・トレイなど、フォーカスと無関係にキーの強度を
   /// 書く入口）。listener へは 1 回通知する。
   void setStrengthForKey(String key, double value) {
     _strengthByKey[key] = value.clamp(0.0, 1.0);
@@ -157,17 +158,17 @@ class VisionFilterState extends ChangeNotifier {
   }
 
   /// [layer] の強度。記憶があればそれ、無ければ推奨強度を**導出**する（記憶へは
-  /// 書かない）。別名（-omaly）と色覚 -opia は [recommendedStrength]、それ以外は
+  /// 書かない）。別名（-omaly）と色覚 -opia は [colorVisionDefaultStrength]、それ以外は
   /// sensus の `recommended_strength()`（[visionFilterRecommendedStrengthProvider]）。
   double strengthOf(VisionLayer layer) =>
       _strengthByKey[layer.strengthKey] ?? _defaultStrength(layer);
 
   double _defaultStrength(VisionLayer layer) {
-    final key = layer.variantId ?? layer.id;
-    final colorType = colorVisionTypeByName(key);
-    if (colorType != null) return recommendedStrength(colorType);
-    return visionFilterRecommendedStrengthProvider(buildLayer(layer))
-        .clamp(0.0, 1.0);
+    final colorDefault = colorVisionDefaultStrength(layer.strengthKey);
+    if (colorDefault != null) return colorDefault;
+    return visionFilterRecommendedStrengthProvider(
+      buildLayer(layer),
+    ).clamp(0.0, 1.0);
   }
 
   // ── 単一選択の互換の読み口（フォーカス中の層を指す）──
@@ -178,17 +179,10 @@ class VisionFilterState extends ChangeNotifier {
   /// 選択中の体験プリセット id。プリセット経由でなければ null（#60）。
   String? get selectedPresetId => _selectedPresetId;
 
-  /// フォーカス中の層が色覚クイック選択（`FilterBrowser`/トレイ）由来か（#60）。
-  /// かつての state 全体のフラグは、層ごとの [VisionLayer.origin] に置き換わった。
-  bool get isColorQuickSelection =>
-      focusedLayer?.origin == VisionLayerOrigin.quick;
-
-  /// 色覚クイック選択で選ばれた実際の [ColorVisionType]。色覚クイック選択で
-  /// なければ null（#60）。-omaly は別名（[VisionLayer.variantId]）から復元する。
-  ColorVisionType? get colorVisionType {
-    final layer = focusedLayer;
-    return layer == null ? null : quickColorVisionTypeOf(layer);
-  }
+  /// フォーカス中の層の別名 id（-omaly）。別名でなければ・未選択なら null。
+  /// -omaly は対応する -opia と同じカタログ id なので、見出し・書き出しの名前を正しく
+  /// 出すために、[selectedId] と併せて見る。
+  String? get focusedVariantId => focusedLayer?.variantId;
 
   /// 選択中のカタログエントリ。未選択なら null。
   VisionFilterEntry? get selectedEntry {
@@ -238,12 +232,8 @@ class VisionFilterState extends ChangeNotifier {
     return params;
   }
 
-  /// [id] を [variantId]・[origin] の層にする。別名は [isValidVariantFor] に合うものだけ。
-  VisionLayer _newLayer(
-    String id,
-    String? variantId,
-    VisionLayerOrigin origin,
-  ) {
+  /// [id] を [variantId] の層にする。別名は [isValidVariantFor] に合うものだけ。
+  VisionLayer _newLayer(String id, String? variantId) {
     final entry = _entryOrThrow(id);
     if (variantId != null && !isValidVariantFor(id, variantId)) {
       throw ArgumentError('Invalid variant "$variantId" for vision filter $id');
@@ -252,7 +242,6 @@ class VisionFilterState extends ChangeNotifier {
       id: entry.id,
       params: _paramsFor(entry),
       variantId: variantId,
-      origin: origin,
     );
   }
 
@@ -308,24 +297,15 @@ class VisionFilterState extends ChangeNotifier {
   ///    [VisionLayerResult.blocked]（理由 [VisionLayerBlockReason.layerLimit]）を返す。
   ///    例外は [blockReasonFor] のとおり。
   ///
-  /// 足す層の [origin] は既定で advanced（色覚クイック選択の層を足すときは
-  /// [VisionLayerOrigin.quick] と、-omaly なら [variantId] を渡す）。
-  ///
-  /// **FilterService との同期**: origin を quick にして色覚を足しても、この state は
-  /// `FilterService` の色覚型（`_currentFilter` / `settings.filterType`）を知らない。UI は
-  /// 直接 [toggle] を呼ばず、`color_vision_selection.dart` の `toggleColorVision` /
-  /// `filter_list_selection.dart` の `toggleFilterListEntry` を通す（呼んだあとに
-  /// `FilterService` を層の集合へ合わせる、#120）。
+  /// -omaly の層は、対応する -opia の [id] と別名 id（[variantId]）で足す（別名の表は
+  /// `kVisionAliases`）。UI の行（統合一覧・トレイ）からは `filter_list_selection.dart` の
+  /// `toggleFilterListEntry` を通る。
   ///
   /// [id] が未知のカタログ id なら [ArgumentError]（[variantId] が [id] の別名として不正なときも）。
   ///
   /// payload は id ごとの記憶から、強度はキーごとの記憶から導出する。体験プリセットの選択は、層の集合がそのフィルタ
   /// 1 つ以外になった時点で外れる（戻さない）。原画比較（bypass）は解除する。
-  VisionLayerResult toggle(
-    String id, {
-    String? variantId,
-    VisionLayerOrigin origin = VisionLayerOrigin.advanced,
-  }) {
+  VisionLayerResult toggle(String id, {String? variantId}) {
     final existing = _layerById(id);
     if (existing != null && existing.variantId == variantId) {
       _removeLayer(existing);
@@ -334,9 +314,8 @@ class VisionFilterState extends ChangeNotifier {
     final blocked = blockReasonFor(id);
     if (blocked != null) return VisionLayerResult.blocked(blocked);
 
-    final layer = _newLayer(id, variantId, origin);
-    final replacing =
-        isVisionColorGroupId(id) &&
+    final layer = _newLayer(id, variantId);
+    final replacing = isVisionColorGroupId(id) &&
         _layers.any((l) => isVisionColorGroupId(l.id));
     _layers = normalizeVisionLayers([
       for (final l in _layers)
@@ -410,58 +389,23 @@ class VisionFilterState extends ChangeNotifier {
   /// 層を全部外して [id] だけにする（従来の単一選択）。上限・排他の判定は要らない
   /// （結果は常に 1 層）。プリセット選択・原画比較は解除する。payload はフィルタ id ごとに
   /// 記憶する（#77）。強度はキーごとの記憶から導出する（初めてなら推奨強度。記憶へは書かない）。
-  void replaceWith(
-    String id, {
-    String? variantId,
-    VisionLayerOrigin origin = VisionLayerOrigin.advanced,
-  }) {
+  void replaceWith(String id, {String? variantId}) {
     _selectedPresetId = null;
     _presetLayerId = null;
     _bypassHolders.clear();
-    _setSingleLayer(_newLayer(id, variantId, origin));
+    _setSingleLayer(_newLayer(id, variantId));
     notifyListeners();
   }
 
-  /// フィルタを選択する（advanced カタログ UI から）。[replaceWith] と同じ
-  /// （従来の単一選択 API の名前。#60: プリセット/色覚クイック選択の記録は解除する）。
-  void select(String id) => replaceWith(id);
-
-  /// 色覚のクイック選択（`FilterBrowser`/トレイ、
-  /// `lib/services/color_vision_selection.dart` の `selectColorVision`/
-  /// `deactivateColorVision` 経由）からフィルタを選択・解除する（#60）。
+  /// 初回起動の層（既定の見え方）にする。設定に保存された選択が無いときの起動で、
+  /// [VisionFilterStore] の復元より**先**に呼ぶ（保存があれば復元がこれを上書きする）。
   ///
-  /// [type] は選択された色覚型そのもの。[ColorVisionType.none] は「何も
-  /// シミュレーションしない」ことを表し、解除（[deactivateColorVision]）と
-  /// 同じ効果になる — この場合 [isColorQuickSelection] は **false** のまま
-  /// になる（[FilterBrowser] 一覧の「正常色覚」行・強度スライダー・
-  /// 解除ボタンのいずれも、[isColorQuickSelection] だけを見て点灯/有効化を
-  /// 決めるため、none を「選択中」扱いにすると強度スライダーだけが宙に浮いて
-  /// 有効化されてしまう。none はカタログにも強度概念にも対応しない）。
-  ///
-  /// [type] が非 none のときは origin=quick の層にし、-omaly は
-  /// [VisionLayer.variantId] に別名を持たせる（-omaly の名前を見出し・export の
-  /// caption・ファイル名に正しく出すため、#60）。[catalogId] は [type] に
-  /// 対応するカタログ id（`visionFilterCatalogId` / `visionFilterForColorVisionType`
-  /// 経由で呼び出し側が解決する）— [type] が [ColorVisionType.none] のときは
-  /// 無視されるので省略できる。
-  ///
-  /// advanced/プリセットの選択中に呼ばれても（＝「別のフィルタを手動で選ぶ」
-  /// 操作として）常に上書きする（[replaceWith]）。プリセットの選択は解除する。
-  void selectColorVisionType(ColorVisionType type, [String? catalogId]) {
-    if (type == ColorVisionType.none) {
-      clear();
-      return;
-    }
-    if (catalogId == null) {
-      throw ArgumentError(
-        'catalogId is required when type != ColorVisionType.none',
-      );
-    }
-    replaceWith(
-      catalogId,
-      variantId: kVisionVariantIds.contains(type.name) ? type.name : null,
-      origin: VisionLayerOrigin.quick,
-    );
+  /// 既定は deuteranomaly（-omaly の別名。推奨強度 [kAnomalyDefaultSeverity]）。強度は
+  /// 記憶へ書かず、他の層と同じく [strengthOf] が導出する。[replaceWith] と同じく、プリセット
+  /// 選択・原画比較は解除する。
+  void seedInitialLayers() {
+    final target = resolveVisionKey(kInitialVisionFilterKey)!;
+    replaceWith(target.id, variantId: target.variantId);
   }
 
   /// 体験プリセット（`ExperiencePresetTile`）からフィルタを選択する（#60）。
@@ -496,7 +440,6 @@ class VisionFilterState extends ChangeNotifier {
               id: l.id,
               params: Map<String, Object>.from(l.params),
               variantId: l.variantId,
-              origin: l.origin,
             ),
         ],
         focusedId: _focusedId,
@@ -519,7 +462,8 @@ class VisionFilterState extends ChangeNotifier {
   ///  * 体験プリセット: 層がちょうど 1 つで、[isValidPreset]（preset id とカタログ
   ///    id の組が今も有効か）が true を返したときだけプリセット選択として戻す。
   ///    null・false ならプリセットの表示なしで advanced の層として戻す。
-  ///  * quick の層: 別名と id が色覚型の対応表と一致するときだけ quick のまま戻す。
+  ///  * 別名（-omaly）の層: 別名と id が別名表（`kVisionAliases`）と一致するときだけ別名のまま
+  ///    戻す（[snapshot] の読み込みが補正済みだが、restore 自身も保証する）。
   ///
   /// snapshot は [VisionFilterSnapshot.fromJson] で補正済みの値を前提とする。
   /// 原画比較（bypass）は復元しない（常に解除）。
@@ -569,7 +513,6 @@ class VisionFilterState extends ChangeNotifier {
           (isValidPreset?.call(presetId, layers.single.id) ?? false)) {
         _selectedPresetId = presetId;
         _presetLayerId = layers.single.id;
-        layers = [layers.single.copyWith(origin: VisionLayerOrigin.advanced)];
       }
 
       _layers = List.unmodifiable(layers);
@@ -598,8 +541,8 @@ class VisionFilterState extends ChangeNotifier {
     }
   }
 
-  /// 復元する層を検証する。payload の無い層は記憶 → 既定値で補い、quick は色覚型の
-  /// 対応表と矛盾しなければそのまま、矛盾すれば別名を外して advanced にする。
+  /// 復元する層を検証する。payload の無い層は記憶 → 既定値で補い、別名は別名表と矛盾
+  /// しなければそのまま、矛盾すれば別名を外す。
   VisionLayer _restoredLayer(VisionLayer layer) {
     final entry = kVisionFilterCatalogById[layer.id]!;
     var out = layer;
@@ -608,12 +551,9 @@ class VisionFilterState extends ChangeNotifier {
         params: _paramsById[entry.id] ?? defaultVisionParams(entry),
       );
     }
-    if (out.origin == VisionLayerOrigin.quick) {
-      final type = quickColorVisionTypeOf(out);
-      if (type == null ||
-          visionFilterForColorVisionTypeCatalogId(type) != out.id) {
-        out = VisionLayer(id: out.id, params: out.params);
-      }
+    final variant = out.variantId;
+    if (variant != null && !isValidVariantFor(out.id, variant)) {
+      out = VisionLayer(id: out.id, params: out.params);
     }
     return out;
   }

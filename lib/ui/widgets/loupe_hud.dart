@@ -191,7 +191,7 @@ class _LoupeHudBar extends StatelessWidget {
               ])
             : visionFilterDisplayName(
                 l10n,
-                visionState.colorVisionType,
+                visionState.focusedVariantId,
                 visionState.selectedId,
               );
         // #79: bypass に関わらない素の強度を表示する（原画比較中も

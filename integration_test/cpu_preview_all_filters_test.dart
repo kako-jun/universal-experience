@@ -39,11 +39,11 @@ void main() {
     for (final entry in kVisionFilterCatalog) {
       testWidgets('${entry.id}: 実ブリッジで例外なく描画でき、strength=1.0 で出力が入力と異なる',
           (tester) async {
-        // VisionFilterState.select() がカタログの defaultValue で payload を
+        // VisionFilterState.replaceWith() がカタログの defaultValue で payload を
         // 埋めるので、payload 付きフィルタも UI と同じ経路で実インスタンス化する
         // （手書きの座標値をここで重複定義しない。
         // experience_presets_smoke_test.dart と同じパターン）。
-        final state = VisionFilterState()..select(entry.id);
+        final state = VisionFilterState()..replaceWith(entry.id);
         final filter = state.build();
         expect(filter, isNotNull, reason: '${entry.id} が build() できなかった');
 

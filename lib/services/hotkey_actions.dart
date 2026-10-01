@@ -1,7 +1,7 @@
 /// 4 つのホットキーアクションの実処理 (#63)。すべて注入されたコールバック経由で
 /// 副作用を起こすため、実 OS のホットキー/window_manager 無しでフェイクにより
 /// 単体テストできる。main.dart はここへ実際の windowManager/trayService/
-/// filterService/visionFilterState/loupeWindow の操作を注入するだけの薄い配線に徹する。
+/// visionFilterState/loupeWindow の操作を注入するだけの薄い配線に徹する。
 class HotkeyActions {
   HotkeyActions({
     required this.deactivateFilters,
@@ -32,7 +32,7 @@ class HotkeyActions {
   /// (#63)。
   static const Duration _repeatDebounce = Duration(milliseconds: 1100);
 
-  /// filterService.deactivate() + visionFilterState.clear() 相当。
+  /// visionFilterState.clear() 相当（重ねている全層を外す）。
   final void Function() deactivateFilters;
   final Future<void> Function(bool value) setClickThrough;
   final Future<void> Function(bool value) setAlwaysOnTop;

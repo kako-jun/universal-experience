@@ -88,9 +88,9 @@ const String kDefaultSampleId = 'route_map';
 
 /// The recommended sample for each of sensus's 30 catalog filter ids (#78).
 ///
-/// Keyed by **catalog id**, not [ColorVisionType] — the colour-vision quick
-/// pick (protanomaly/deuteranomaly/tritanomaly) maps to the same catalog id
-/// as its base -opia (`visionFilterForColorVisionType`'s contract), so one
+/// Keyed by **catalog id**, not alias id — the colour-vision aliases
+/// (protanomaly/deuteranomaly/tritanomaly) map to the same catalog id
+/// as their base -opia (`kVisionAliases`), so one
 /// map keyed by catalog id covers the quick pick, the advanced catalog, and
 /// experience presets uniformly (same reasoning as `VisionFilterState`
 /// tracking selection by catalog id).

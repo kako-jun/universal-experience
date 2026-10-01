@@ -5,6 +5,8 @@
 - **記録日**: 2026-06-21（ADR 化）
 - **ステータス**: Accepted
 
+> **追記（#124）**: `FilterService` / `ColorVisionType` は削除され、選択状態は `VisionFilterState` に一本化された（`docs/adr/2026-09-30-multi-select-filter-state-model.md` 参照）。本 ADR の本文は当時の判断の記録で、Provider 採用の判断自体は有効。
+
 ## 文脈（問題）
 
 ue は Flutter（Dart）アプリで、フィルタの選択状態・強度・有効/無効を UI 全体で

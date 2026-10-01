@@ -6,7 +6,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/preview_image_source.dart';
 import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
 import 'package:universal_experience/services/export_service.dart';
@@ -21,14 +20,13 @@ import 'support/vision_filter_metadata_fixture.dart';
 ///
 /// 静的ヘルパ（generateSampleImage / renderAfter）を直接検証する。
 ///
-/// #60: BeforeAfterView は `VisionFilterState` の選択（[VisionFilter]・payload・
-/// strength）を唯一の正本にするよう配線された（home_screen.dart 側）。この
-/// widget 自身はもう `ColorVisionType` を知らず、[filter]（nullable な
-/// [VisionFilter]）・[filterId]（カタログ id、caption/ラベル解決用）・
-/// [strength] を受け取るだけの presentational widget になった。`ColorVisionType`
-/// → `VisionFilter` のマッピング契約（anomaly は base -opia と同一の
-/// `VisionFilter`、等）は `test/filter_service_test.dart` が検証する
-/// （`visionFilterForColorVisionType`）ので、ここでは重複させない。
+/// BeforeAfterView は `VisionFilterState` の選択（[VisionFilter]・payload・
+/// strength）を唯一の正本にして配線される（home_screen.dart 側）。この widget
+/// 自身は [filter]（nullable な [VisionFilter]）・[filterId]（カタログ id）・
+/// [variantId]（別名 id。-omaly の見出し・ファイル名解決用）・[strength] を
+/// 受け取るだけの presentational widget。別名（-omaly）は base の -opia と同一の
+/// [VisionFilter] に写る（`visionFilterForCatalogId`）契約はカタログ側の責務なので、
+/// ここでは検証しない。
 ///
 /// `renderAfter` は実ブリッジ（`applyVisionCpuRgba8`）を必要とする
 /// [CpuVisionRenderer.applier] へ委譲するため（#85）、`flutter test`（native lib
@@ -251,25 +249,24 @@ void main() {
       });
 
       testWidgets(
-          'colorVisionType=deuteranomaly なら filterId=deuteranopia でも '
+          'variantId=deuteranomaly なら filterId=deuteranopia でも '
           '見出しは Deuteranomaly になる（#60）', (tester) async {
-        // カタログは色覚を 5 種しか持たず、-omaly は base の -opia と同じ
-        // catalog id（deuteranopia）に写る（visionFilterForColorVisionType の
-        // 対応表）。filterId だけで見出しを解決すると常に "Deuteranopia" に
-        // なってしまうため、colorVisionType を優先する契約を確認する。
+        // -omaly は base の -opia と同じ catalog id（deuteranopia）に写る
+        // （別名表 kVisionAliases）。filterId だけで見出しを解決すると常に
+        // "Deuteranopia" になってしまうため、variantId を優先する契約を確認する。
         await tester.pumpWidget(
           localized(
             const BeforeAfterView(
               filter: VisionFilter.deuteranopia(),
               filterId: 'deuteranopia',
-              colorVisionType: ColorVisionType.deuteranomaly,
+              variantId: 'deuteranomaly',
               strength: 0.6,
               imageSource: SamplePreviewImageSource('test'),
               sampleSize: 32,
             ),
           ),
         );
-        final deuteranomalyName = colorVisionTypeName(en, ColorVisionType.deuteranomaly);
+        final deuteranomalyName = visionFilterName(en, 'deuteranomaly');
         await pumpUntilText(tester, deuteranomalyName);
 
         expect(find.text(en.previewPaneOriginal), findsOneWidget);
@@ -277,7 +274,7 @@ void main() {
         expect(
           find.text(visionFilterName(en, 'deuteranopia')),
           findsNothing,
-          reason: 'colorVisionType があるときは filterId 由来の "Deuteranopia" '
+          reason: 'variantId があるときは filterId 由来の "Deuteranopia" '
               'を出してはいけない',
         );
       });
@@ -1360,7 +1357,7 @@ void main() {
       });
 
       testWidgets(
-          'colorVisionType=deuteranomaly で export すると symptomLabel・'
+          'variantId=deuteranomaly で export すると symptomLabel・'
           'ファイル名とも deuteranomaly になる（#60）', (tester) async {
         late ui.Image before1, after1, composedStub;
         await tester.runAsync(() async {
@@ -1384,14 +1381,13 @@ void main() {
 
         final en = lookupAppLocalizations(const Locale('en'));
 
-        // filterId は deuteranopia（カタログの色覚 5 種は -omaly を持たず、
-        // base の -opia に写るため）だが、colorVisionType=deuteranomaly を
-        // 渡す（home_screen.dart が VisionFilterState.colorVisionType から
-        // 渡すのと同じ形）。
+        // filterId は deuteranopia（-omaly は base の -opia に写るため）だが、
+        // variantId=deuteranomaly を渡す（home_screen.dart が
+        // VisionFilterState.focusedVariantId から渡すのと同じ形）。
         await tester.pumpWidget(localized(const BeforeAfterView(
           filter: VisionFilter.deuteranopia(),
           filterId: 'deuteranopia',
-          colorVisionType: ColorVisionType.deuteranomaly,
+          variantId: 'deuteranomaly',
           strength: 0.6,
           imageSource: SamplePreviewImageSource('test'),
           sampleSize: 16,
@@ -1412,7 +1408,7 @@ void main() {
         expect(capturedCaption, isNotNull);
         expect(
           capturedCaption!.symptomLabel,
-          colorVisionTypeName(en, ColorVisionType.deuteranomaly),
+          visionFilterName(en, 'deuteranomaly'),
         );
         expect(savedFilename, contains('-deuteranomaly-'));
         expect(savedFilename, isNot(contains('deuteranopia')));

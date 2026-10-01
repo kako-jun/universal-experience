@@ -2,9 +2,9 @@
 // 入力元ごとの保持（holder）に変更）の単体テスト。
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 
+import 'support/color_vision_select.dart';
 import 'support/vision_filter_metadata_fixture.dart';
 
 void main() {
@@ -61,7 +61,7 @@ void main() {
 
     test('選択状態・パラメータ・strength は一切変更しない', () {
       final state = VisionFilterState()
-        ..select('cataract')
+        ..replaceWith('cataract')
         ..setStrength(0.42);
 
       state.acquireBypass('a');
@@ -135,21 +135,21 @@ void main() {
   });
 
   group('明示的な選択操作は全 holder を解除する (#63/#79)', () {
-    test('select() は bypassed を false にする', () {
+    test('replaceWith() は bypassed を false にする', () {
       final state = VisionFilterState()..acquireBypass('a');
-      state.select('cataract');
+      state.replaceWith('cataract');
       expect(state.bypassed, isFalse);
     });
 
-    test('selectColorVisionType() (非 none) は bypassed を false にする', () {
+    test('色覚キーの選択は bypassed を false にする', () {
       final state = VisionFilterState()..acquireBypass('a');
-      state.selectColorVisionType(ColorVisionType.protanopia, 'protanopia');
+      selectColorVisionKey(state, 'protanopia');
       expect(state.bypassed, isFalse);
     });
 
-    test('selectColorVisionType(none) は bypassed を false にする', () {
+    test('clear() は bypassed を false にする', () {
       final state = VisionFilterState()..acquireBypass('a');
-      state.selectColorVisionType(ColorVisionType.none);
+      state.clear();
       expect(state.bypassed, isFalse);
     });
 
@@ -161,7 +161,7 @@ void main() {
 
     test('clear() は bypassed を false にする', () {
       final state = VisionFilterState()
-        ..select('cataract')
+        ..replaceWith('cataract')
         ..acquireBypass('a');
       state.clear();
       expect(state.bypassed, isFalse);
@@ -169,7 +169,7 @@ void main() {
 
     test('setStrength() は bypassed を false にする', () {
       final state = VisionFilterState()
-        ..select('cataract')
+        ..replaceWith('cataract')
         ..acquireBypass('a');
       state.setStrength(0.5);
       expect(state.bypassed, isFalse);
@@ -177,7 +177,7 @@ void main() {
 
     test('setParam() は bypassed を false にする', () {
       final state = VisionFilterState()
-        ..select('cataract')
+        ..replaceWith('cataract')
         ..acquireBypass('a');
       state.setParam('seed', BigInt.from(42));
       expect(state.bypassed, isFalse);
@@ -185,7 +185,7 @@ void main() {
 
     test('randomizeSeed() は bypassed を false にする', () {
       final state = VisionFilterState()
-        ..select('cataract')
+        ..replaceWith('cataract')
         ..acquireBypass('a');
       state.randomizeSeed('seed');
       expect(state.bypassed, isFalse);
@@ -197,7 +197,7 @@ void main() {
         ..acquireBypass('hud');
       expect(state.bypassed, isTrue);
 
-      state.select('cataract');
+      state.replaceWith('cataract');
 
       expect(state.bypassed, isFalse);
     });

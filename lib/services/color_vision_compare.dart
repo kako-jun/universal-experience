@@ -1,8 +1,6 @@
-import '../models/disability_type.dart';
 import '../models/vision_filter_catalog.dart';
 import '../src/rust/api/sensus_bridge.dart';
 import 'export_layers.dart';
-import 'filter_service.dart' show visionFilterForColorVisionType;
 import 'vision_filter_state.dart';
 import 'vision_layer.dart';
 
@@ -90,16 +88,15 @@ ColorVisionCompareInput? colorVisionCompareInputOf(VisionFilterState state) {
 
 /// 2×2 比較のセル [entry] を描くフィルタ。
 ///
-/// 色覚クイック選択（`FilterService`）と同じ対応表
-/// （[visionFilterForColorVisionType]）を引くので、1 型を単独で選んだときの
-/// プレビューと同じフィルタになる。比較用の別フィルタ・別レンダラは持たない。
-/// 色覚型に対応しない id は [StateError]（カタログを増やしたときに気付けるよう
-/// 黙って別物へ落とさない）。
+/// 色覚クイック選択と同じ対応表（カタログ id → 固定インスタンス、
+/// [visionFilterForCatalogId]）を引くので、1 型を単独で選んだときのプレビューと同じ
+/// フィルタになる。比較用の別フィルタ・別レンダラは持たない。
+/// 固定インスタンスを持つカタログ id（色覚 4 種に限らない）はそのフィルタを返し、
+/// 持たない id（payload を持つフィルタなど）は [StateError]（カタログを増やしたときに
+/// 気付けるよう黙って別物へ落とさない）。呼び出しは [kColorVisionCompareEntries] の
+/// 行だけ。
 VisionFilter colorVisionCompareFilter(VisionFilterEntry entry) {
-  for (final type in ColorVisionType.values) {
-    if (type.id != entry.id) continue;
-    final filter = visionFilterForColorVisionType(type);
-    if (filter != null) return filter;
-  }
+  final filter = visionFilterForCatalogId(entry.id);
+  if (filter != null) return filter;
   throw StateError('No color-vision filter for catalog id: ${entry.id}');
 }

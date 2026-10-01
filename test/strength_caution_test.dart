@@ -81,7 +81,7 @@ void main() {
     AppLocalizations ja() => lookupAppLocalizations(const Locale('ja'));
 
     testWidgets('tunnel_vision の中程度の強さでは、印の説明だけが出て警告は出ない', (tester) async {
-      state.select('tunnel_vision');
+      state.replaceWith('tunnel_vision');
       state.setStrength(0.5);
       await pumpPanel(tester);
 
@@ -92,7 +92,7 @@ void main() {
     });
 
     testWidgets('閾値の直前（75%）は警告にならず、閾値ちょうど（80%）から警告になる', (tester) async {
-      state.select('tunnel_vision');
+      state.replaceWith('tunnel_vision');
       state.setStrength(0.75);
       await pumpPanel(tester);
       expect(find.text(en().strengthCautionNearLimit), findsNothing);
@@ -106,7 +106,7 @@ void main() {
     });
 
     testWidgets('100% では警告。スライダを動かして閾値をまたぐと表示が切り替わる', (tester) async {
-      state.select('tunnel_vision');
+      state.replaceWith('tunnel_vision');
       state.setStrength(1.0);
       await pumpPanel(tester);
       expect(find.text(en().strengthCautionNearLimit), findsOneWidget);
@@ -118,7 +118,7 @@ void main() {
     });
 
     testWidgets('警告は太字（w600）・onSurface で、印の説明の補足表現と区別できる', (tester) async {
-      state.select('tunnel_vision');
+      state.replaceWith('tunnel_vision');
       state.setStrength(0.5);
       await pumpPanel(tester);
       final theme = Theme.of(tester.element(find.byType(FilterParamPanel)));
@@ -139,7 +139,7 @@ void main() {
     });
 
     testWidgets('日本語ロケールでは日本語の文言が出る', (tester) async {
-      state.select('tunnel_vision');
+      state.replaceWith('tunnel_vision');
       state.setStrength(1.0);
       await pumpPanel(tester, locale: const Locale('ja'));
       expect(find.text(ja().strengthCautionNearLimit), findsOneWidget);
@@ -150,7 +150,7 @@ void main() {
     testWidgets('注意の定義が無いフィルタでは注記も印も出ない', (tester) async {
       for (final id in ['protanopia', 'glaucoma', 'hemianopia']) {
         expect(kStrengthCautionByFilterId.containsKey(id), isFalse);
-        state.select(id);
+        state.replaceWith(id);
         state.setStrength(1.0);
         await pumpPanel(tester);
         expect(find.byType(StrengthCautionNote), findsNothing, reason: id);
@@ -165,7 +165,7 @@ void main() {
     testWidgets('印は閾値（80%）のつまみ・目盛りと同じ x に描かれる', (tester) async {
       // 強度 0.8（= 閾値）のとき、つまみの中心が印の x と一致する。実装と同じ式を
       // 使わず、Slider が実際に描いたつまみ・目盛りの位置と直接比べる。
-      state.select('tunnel_vision');
+      state.replaceWith('tunnel_vision');
       state.setStrength(0.8);
       await pumpPanel(tester);
 
@@ -280,7 +280,7 @@ void main() {
 
     testWidgets('強さの % 表示と警告判定が同じ丸めで一致する（0.7999… / 0.795 / 0.79）',
         (tester) async {
-      state.select('tunnel_vision');
+      state.replaceWith('tunnel_vision');
       // 表示された % が閾値（80%）以上のときだけ警告が出る。
       for (final (value, shown, warns) in [
         (0.1 + 0.7, 80, true),
@@ -304,7 +304,7 @@ void main() {
 
     testWidgets('受診喚起ブロックは強度（スライダと注記）のすぐ下に出続ける（位置・内容を動かさない）', (tester) async {
       visionFilterUrgencyProvider = (_) => Urgency.earlyConsultation;
-      state.select('tunnel_vision');
+      state.replaceWith('tunnel_vision');
       state.setStrength(1.0);
       await pumpPanel(tester);
 

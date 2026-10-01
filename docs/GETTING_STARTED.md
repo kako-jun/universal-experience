@@ -123,7 +123,7 @@ universal-experience/
 │   ├── main.dart          # アプリエントリーポイント
 │   ├── l10n/              # 多言語化（ARB: app_en.arb / app_ja.arb と生成物。ja/en）
 │   ├── models/            # データモデル
-│   ├── services/          # ビジネスロジック（FilterService = sensus への薄いブリッジ、export_service.dart 等）
+│   ├── services/          # ビジネスロジック（VisionFilterState = 選択状態の唯一の正本、export_service.dart 等）
 │   ├── rendering/         # GPU シェーダ描画（sensus 由来の FragmentProgram）
 │   ├── src/rust/          # flutter_rust_bridge 生成コード（sensus-core 連携、experiences() 等）
 │   └── ui/                # UIコンポーネント
@@ -161,7 +161,7 @@ flutter analyze
 flutter test
 
 # 特定のテスト実行
-flutter test test/filter_service_test.dart
+flutter test test/vision_filter_state_test.dart
 ```
 
 ### FRB 生成物のドリフト検証

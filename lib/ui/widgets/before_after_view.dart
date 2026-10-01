@@ -7,7 +7,6 @@ import 'package:flutter/services.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
-import '../../models/disability_type.dart';
 import '../../models/preview_image_source.dart';
 import '../../models/sample_catalog.dart';
 import '../../models/vision_filter_catalog.dart';
@@ -17,7 +16,6 @@ import '../../rendering/image_fit.dart';
 import '../../services/export_layers.dart';
 import '../../services/export_service.dart';
 import '../../services/vision_filter_metadata.dart';
-import '../../services/vision_layer.dart' show quickColorVisionTypeOf;
 import '../../src/rust/api/sensus_bridge.dart';
 
 /// [_BeforeAfterViewState] が内部で使う「before 画像を [PreviewImageSource]
@@ -119,8 +117,8 @@ Future<ui.Image> composeCaptionedExportImage(
 /// `home_screen.dart` resolves this from `ImageSourceState`). The *after*
 /// pane shows the same image with [filter] applied at [strength].
 ///
-/// This widget is presentational: it doesn't read `VisionFilterState` or
-/// `FilterService` itself. The caller (`home_screen.dart`) resolves the
+/// This widget is presentational: it doesn't read `VisionFilterState`
+/// itself. The caller (`home_screen.dart`) resolves the
 /// current selection — whichever of the color-vision quick pick, the advanced
 /// catalog, or an experience preset was used last — into a single
 /// `(filter, filterId, strength)` triple via `VisionFilterState.build` and
@@ -141,7 +139,7 @@ class BeforeAfterView extends StatefulWidget {
     required this.filterId,
     required this.strength,
     required this.imageSource,
-    this.colorVisionType,
+    this.variantId,
     this.sampleSize,
     this.steps,
     this.layerNames,
@@ -166,21 +164,19 @@ class BeforeAfterView extends StatefulWidget {
   /// Filter strength 0.0..1.0, forwarded to the renderer.
   final double strength;
 
-  /// The actual [ColorVisionType] behind the current selection, when it came
-  /// from the color-vision quick pick (`FilterBrowser`/tray via
-  /// `lib/services/color_vision_selection.dart`). `null` for advanced-catalog
-  /// or preset selections (and for the quick pick's own "none"/original).
+  /// The alias id (`kVisionAliases`: protanomaly / deuteranomaly / tritanomaly)
+  /// behind the current selection, or `null` when the selection is not an
+  /// alias (plain catalog filter, preset, or nothing selected).
   ///
   /// The catalog (and therefore [filterId]) only has 5 color-vision entries
   /// (protanopia/deuteranopia/tritanopia/achromatopsia/tetrachromacy) —
-  /// -omaly (anomaly) types map to the same catalog id as their base -opia
-  /// (`visionFilterForColorVisionType`'s contract). Without this field, the
-  /// after-pane label / export caption / filename would always say
-  /// "Protanopia" even when the user picked "Protanomaly" (#60). When
-  /// non-null, this overrides [filterId]-based name resolution for display
-  /// purposes only — it never affects what's rendered (that's entirely
-  /// [filter]/[strength]).
-  final ColorVisionType? colorVisionType;
+  /// the -omaly (anomaly) aliases map to the same catalog id as their base
+  /// -opia. Without this field, the after-pane label / export caption /
+  /// filename would always say "Protanopia" even when the user picked
+  /// "Protanomaly" (#60). When non-null, this overrides [filterId]-based name
+  /// resolution for display purposes only — it never affects what's rendered
+  /// (that's entirely [filter]/[strength]).
+  final String? variantId;
 
   /// 複数層のときの合成ステップ列（適用順、強度 0 の層は除外済み。#119）。
   ///
@@ -193,13 +189,13 @@ class BeforeAfterView extends StatefulWidget {
   final List<VisionStep>? steps;
 
   /// 重ねている層の表示名（適用順、#120）。2 つ以上のときだけ複数層として扱う（それ以外は従来どおり
-  /// [filterId]/[colorVisionType] の名前）。複数層のときは、after 側の見出しを
+  /// [filterId]/[variantId] の名前）。複数層のときは、after 側の見出しを
   /// 「名前 + 名前 …（+N）」（[layerNamesSummary]）にする（切らずに折り返す）。PNG 書き出しの
   /// キャプションは [exportLayers] から作る（#121）。
   final List<String>? layerNames;
 
   /// PNG 書き出しが描画時点で控える、重ねている全層の値（適用順、強度 0 の層を含む、#121）。
-  /// 複数層のときだけ渡す（`null` なら従来どおり [filter]・[filterId]・[colorVisionType]・
+  /// 複数層のときだけ渡す（`null` なら従来どおり [filter]・[filterId]・[variantId]・
   /// [strength] の 1 層として書き出す）。キャプションには**強度が 0 より大きい層だけ**が
   /// 載る（[effectiveExportLayers]）。それが 2 つ以上ならその全層の行・合成した受診喚起、
   /// 1 つならその層だけ（1 層のときと同じ見た目）、0 なら [filter] 側の 1 層（フォーカス中の層。
@@ -360,12 +356,12 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// [_rebuild]'s doc).
   PreviewImageSource? _currentImageSource;
 
-  /// The `(filterId, colorVisionType, strength)` that actually produced the
+  /// The `(filterId, variantId, strength)` that actually produced the
   /// currently-held [_after] (#60). `null` until the
   /// first successful render.
   ///
   /// [_export] must build its [ExportCaption] from these, **not** from
-  /// `widget.filterId`/`widget.colorVisionType`/`widget.strength`: those
+  /// `widget.filterId`/`widget.variantId`/`widget.strength`: those
   /// reflect the *live* widget props, which can already have moved on (e.g.
   /// the user dragged the intensity slider again) while `_after` still shows
   /// the previous render — [_scheduleRebuild] coalesces the
@@ -374,7 +370,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// caption matching the pixels actually being exported, not the slider's
   /// current position.
   String? _afterFilterId;
-  ColorVisionType? _afterColorVisionType;
+  String? _afterVariantId;
   double? _afterStrength;
 
   /// The actual [VisionFilter] that produced the currently-held [_after]
@@ -430,7 +426,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.filter != widget.filter ||
         oldWidget.filterId != widget.filterId ||
-        oldWidget.colorVisionType != widget.colorVisionType ||
+        oldWidget.variantId != widget.variantId ||
         oldWidget.strength != widget.strength ||
         !listEquals(oldWidget.steps, widget.steps) ||
         oldWidget.sampleSize != widget.sampleSize ||
@@ -571,7 +567,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     final renderFilter = widget.filter;
     final renderStrength = widget.strength;
     final renderFilterId = widget.filterId;
-    final renderColorVisionType = widget.colorVisionType;
+    final renderVariantId = widget.variantId;
     final renderExportLayers = widget.exportLayers;
 
     ui.Image? after;
@@ -641,7 +637,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       _before = before;
       _after = after;
       _afterFilterId = renderFilterId; // #60
-      _afterColorVisionType = renderColorVisionType; // #60
+      _afterVariantId = renderVariantId; // #60
       _afterStrength = renderStrength;
       _afterFilter = renderFilter; // #76
       _afterExportLayers = renderExportLayers; // #121
@@ -686,9 +682,9 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// クリップボードへコピーし、SnackBar で結果を知らせる。画像そのものの
   /// クリップボード書き込みはプラグインを要し環境変更になるため非スコープ。
   ///
-  /// caption は [_afterFilterId]/[_afterColorVisionType]/
+  /// caption は [_afterFilterId]/[_afterVariantId]/
   /// [_afterStrength]（`_after` を描画した時点の値）から作る。
-  /// `widget.filterId`/`widget.colorVisionType`/`widget.strength`
+  /// `widget.filterId`/`widget.variantId`/`widget.strength`
   /// （呼び出し時点の *現在* の値）を使うと、export をタップした瞬間までに
   /// スライダー操作で widget の props が先に進んでいた場合、表示中（＝実際に
   /// エクスポートされる）画像とは異なる caption を焼き込んでしまう。
@@ -703,7 +699,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       return;
     }
     final filterId = _afterFilterId;
-    final colorVisionType = _afterColorVisionType;
+    final variantId = _afterVariantId;
     final afterFilter = _afterFilter;
     final exportLayers = _afterExportLayers;
     setState(() => _exporting = true);
@@ -716,7 +712,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         l10n,
         layers: exportLayers,
         filterId: filterId,
-        colorVisionType: colorVisionType,
+        variantId: variantId,
         filter: afterFilter,
         strength: strength,
         isoDate: date,
@@ -804,8 +800,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         // 十分（「描画は近日対応」プレースホルダは #86 で YAGNI と判断して撤去）。
         final afterName = multiLayer
             ? layerNamesSummary(l10n, layerNames)
-            : visionFilterDisplayName(
-                l10n, widget.colorVisionType, widget.filterId);
+            : visionFilterDisplayName(l10n, widget.variantId, widget.filterId);
         final Widget afterChild = _failed
             ? PreviewErrorPlaceholder(theme: theme, label: l10n.previewFailed)
             : PreviewImageView(
@@ -816,14 +811,14 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                 // 場合も `_rebuild` が失敗として扱い `_failed` 分岐に入るので、
                 // ここで画像が無いことはない。）
                 semanticLabel:
-                    widget.filterId == null && widget.colorVisionType == null
+                    widget.filterId == null && widget.variantId == null
                         ? null
                         // 複数層の代替テキストは、まとめずに全部の名前を読ませる。
                         : l10n.previewImageFilteredSemantics(
                             multiLayer ? layerNames.join(' + ') : afterName),
               );
         // #60: 時間依存の注記は widget.filterId（カタログ id）からカタログを
-        // 引いて解決する。after ペインの見出しは widget.colorVisionType が
+        // 引いて解決する。after ペインの見出しは widget.variantId が
         // あればそちらを優先する（#60: -omaly の名前を正しく出すため、
         // [visionFilterDisplayName] 参照）。
         // 複数層のときは、どれか 1 層でも時間依存なら出す（フォーカス中の層だけでは判らない）。
@@ -926,7 +921,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
 ExportCaption buildExportCaption(
   AppLocalizations l10n, {
   required String? filterId,
-  required ColorVisionType? colorVisionType,
+  required String? variantId,
   required VisionFilter? filter,
   required double strength,
   required String isoDate,
@@ -939,7 +934,7 @@ ExportCaption buildExportCaption(
           visionFilterUrgencyEscalationProvider(filter),
         );
   return ExportCaption(
-    symptomLabel: visionFilterDisplayName(l10n, colorVisionType, filterId),
+    symptomLabel: visionFilterDisplayName(l10n, variantId, filterId),
     strengthLabel: l10n.strengthLabel(contract_notes.strengthPercent(strength)),
     isoDate: isoDate,
     simulationNotice: l10n.exportSimulationNotice,
@@ -973,13 +968,13 @@ typedef ExportPlan = ({
 ///   層の id を適用順につないだもの（[exportSymptomId]）で、強度の % は付けない。
 /// - 1 層: その層だけを、単一層の書き出し（[buildExportCaption]）と同じ見た目・同じ名前にする。
 /// - 0 層（単一層、原画比較中、表示強度（整数パーセント）が 0 の層しかない）: 引数の
-///   [filterId]/[colorVisionType]/[filter]/[strength]（フォーカス中の層の値）で、従来どおりの
+///   [filterId]/[variantId]/[filter]/[strength]（フォーカス中の層の値）で、従来どおりの
 ///   単一層の書き出し。
 ExportPlan planExport(
   AppLocalizations l10n, {
   required List<ExportLayer>? layers,
   required String? filterId,
-  required ColorVisionType? colorVisionType,
+  required String? variantId,
   required VisionFilter? filter,
   required double strength,
   required String isoDate,
@@ -996,7 +991,7 @@ ExportPlan planExport(
   if (effective.length == 1) {
     final only = effective.single;
     filterId = only.layer.id;
-    colorVisionType = quickColorVisionTypeOf(only.layer);
+    variantId = only.layer.variantId;
     filter = only.filter;
     strength = only.strength;
   }
@@ -1004,14 +999,14 @@ ExportPlan planExport(
     caption: buildExportCaption(
       l10n,
       filterId: filterId,
-      colorVisionType: colorVisionType,
+      variantId: variantId,
       filter: filter,
       strength: strength,
       isoDate: isoDate,
     ),
-    // colorVisionType があればその id（-omaly を含む）を使う（#60）。
+    // variantId があればその id（-omaly を含む）を使う（#60）。
     // filterId は -omaly を base の -opia と区別できないため。
-    symptomId: exportSymptomId([colorVisionType?.id ?? filterId ?? 'none']),
+    symptomId: exportSymptomId([variantId ?? filterId ?? 'none']),
     strengthPercent: contract_notes.strengthPercent(strength),
   );
 }

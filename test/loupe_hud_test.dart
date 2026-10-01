@@ -24,9 +24,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
-import 'package:universal_experience/models/disability_type.dart';
-import 'package:universal_experience/services/color_vision_selection.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/hotkey_actions.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/vision_filter_metadata.dart';
@@ -35,19 +32,18 @@ import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/loupe_hud.dart';
 
 import 'support/vision_filter_metadata_fixture.dart';
+import 'support/color_vision_select.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late VisionFilterState visionState;
-  late FilterService filterService;
   late LoupeWindowController loupeWindow;
 
   setUp(() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     installVisionFilterMetadataFixture();
     visionState = VisionFilterState();
-    filterService = FilterService(visionState: visionState);
     loupeWindow = LoupeWindowController();
   });
 
@@ -62,7 +58,6 @@ void main() {
       MultiProvider(
         providers: [
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
-          ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<LoupeWindowController>.value(
             value: loupeWindow,
           ),
@@ -102,7 +97,7 @@ void main() {
   group('症状名・強度の表示', () {
     testWidgets('advanced カタログ選択の症状名と強度を表示する', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      visionState.select('protanopia');
+      visionState.replaceWith('protanopia');
 
       await pumpHud(tester);
 
@@ -112,22 +107,20 @@ void main() {
 
     testWidgets('色覚クイック選択は -omaly の名前を表示する', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      selectColorVision(
-          filterService, visionState, ColorVisionType.protanomaly);
+      selectColorVisionKey(visionState, 'protanomaly');
 
       await pumpHud(tester);
 
       // protanomaly はカタログでは protanopia (id) に写るが、HUD の見出しは
-      // colorVisionType を優先するので -omaly の名前が出る（#60 と同じ規約）。
+      // 層の variantId を優先するので -omaly の名前が出る（#60 と同じ規約）。
       expect(find.text('Protanomaly'), findsOneWidget);
-      // FilterService の recommendedStrength(protanomaly) は
-      // kAnomalyDefaultSeverity = 0.6（60%）。
+      // protanomaly の既定強度は kAnomalyDefaultSeverity = 0.6（60%）。
       expect(find.text('Strength: 60%'), findsOneWidget);
     });
 
     testWidgets('原画比較中でも強度は素の値のまま表示する (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      visionState.select('protanopia');
+      visionState.replaceWith('protanopia');
       visionState.setStrength(0.42);
 
       await pumpHud(tester);
@@ -146,7 +139,7 @@ void main() {
 
     testWidgets('原画比較中は原画比較ボタンのアイコン色が変わる (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      visionState.select('protanopia');
+      visionState.replaceWith('protanopia');
       await pumpHud(tester);
 
       final iconFinder = find.byIcon(Icons.visibility_outlined);
@@ -216,7 +209,7 @@ void main() {
   group('受診喚起アイコン', () {
     testWidgets('喚起が無ければアイコンを出さない', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      visionState.select('protanopia'); // urgency=none フィクスチャのまま
+      visionState.replaceWith('protanopia'); // urgency=none フィクスチャのまま
 
       await pumpHud(tester);
 
@@ -228,7 +221,7 @@ void main() {
       visionFilterUrgencyProvider = (_) => Urgency.emergency;
       visionFilterUrgencyEscalationProvider = (_) => const [];
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      visionState.select('photophobia');
+      visionState.replaceWith('photophobia');
 
       await pumpHud(tester);
 
@@ -256,7 +249,7 @@ void main() {
   group('原画比較ボタン', () {
     testWidgets('押している間だけ bypass が ON、離すと OFF', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      visionState.select('protanopia');
+      visionState.replaceWith('protanopia');
       await pumpHud(tester);
 
       expect(visionState.bypassed, isFalse);
@@ -273,7 +266,7 @@ void main() {
 
     testWidgets('タッチ入力（hover の無い経路）でも押す/離すが機能する (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      visionState.select('protanopia');
+      visionState.replaceWith('protanopia');
       await pumpHud(tester);
 
       final center = tester.getCenter(find.byIcon(Icons.visibility_outlined));
@@ -291,7 +284,7 @@ void main() {
 
     testWidgets('タッチ入力で押したまま領域外に出たら OFF に戻る (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      visionState.select('protanopia');
+      visionState.replaceWith('protanopia');
       await pumpHud(tester);
 
       final center = tester.getCenter(find.byIcon(Icons.visibility_outlined));
@@ -313,7 +306,7 @@ void main() {
 
     testWidgets('キャンセルされたら OFF に戻る', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      visionState.select('protanopia');
+      visionState.replaceWith('protanopia');
       await pumpHud(tester);
 
       final center = tester.getCenter(find.byIcon(Icons.visibility_outlined));
@@ -328,7 +321,7 @@ void main() {
 
     testWidgets('押したまま領域外に出たら OFF に戻る', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      visionState.select('protanopia');
+      visionState.replaceWith('protanopia');
       await pumpHud(tester);
 
       final center = tester.getCenter(find.byIcon(Icons.visibility_outlined));
@@ -350,7 +343,7 @@ void main() {
 
     testWidgets('dispose 時点で押下中なら holder を解放する (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      visionState.select('protanopia');
+      visionState.replaceWith('protanopia');
       await pumpHud(tester);
 
       final center = tester.getCenter(find.byIcon(Icons.visibility_outlined));
@@ -371,7 +364,7 @@ void main() {
 
     testWidgets('フォーカスを失ったら holder を解放する (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      visionState.select('protanopia');
+      visionState.replaceWith('protanopia');
       await pumpHud(tester);
 
       final iconFinder = find.byIcon(Icons.visibility_outlined);
@@ -397,7 +390,7 @@ void main() {
         'Enter/Space の押下・解放で bypass が切り替わり、KeyRepeat は無視する'
         ' (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      visionState.select('protanopia');
+      visionState.replaceWith('protanopia');
       await pumpHud(tester);
 
       final focusNode =
@@ -450,7 +443,7 @@ void main() {
         (tester) async {
       final hotkeyActions = buildHotkeyActions();
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      visionState.select('protanopia');
+      visionState.replaceWith('protanopia');
       await pumpHud(tester);
 
       hotkeyActions.holdOriginalKeyDown();
@@ -474,7 +467,7 @@ void main() {
         '（逆順）', (tester) async {
       final hotkeyActions = buildHotkeyActions();
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      visionState.select('protanopia');
+      visionState.replaceWith('protanopia');
       await pumpHud(tester);
 
       final center = tester.getCenter(find.byIcon(Icons.visibility_outlined));
@@ -585,7 +578,7 @@ void main() {
       await tester.runAsync(
         () => loupeWindow.applyAction(LoupeWindowAction.toggleFullscreen),
       );
-      visionState.select('protanopia');
+      visionState.replaceWith('protanopia');
       await pumpHud(tester);
 
       final topLeft = tester.getTopLeft(find.byType(LoupeHud));
@@ -719,7 +712,6 @@ void main() {
             ChangeNotifierProvider<VisionFilterState>.value(
               value: visionState,
             ),
-            ChangeNotifierProvider<FilterService>.value(value: filterService),
             ChangeNotifierProvider<LoupeWindowController>.value(
               value: loupeWindow,
             ),
@@ -823,7 +815,7 @@ void main() {
       final handle = tester.ensureSemantics();
 
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      visionState.select('protanopia');
+      visionState.replaceWith('protanopia');
       await pumpHud(tester);
 
       final semanticsFinder = find.semantics.byLabel(
@@ -858,7 +850,7 @@ void main() {
       final handle = tester.ensureSemantics();
 
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      visionState.select('protanopia');
+      visionState.replaceWith('protanopia');
       await pumpHud(tester);
 
       final semanticsFinder = find.semantics.byLabel(
@@ -871,7 +863,7 @@ void main() {
 
       // 別のフィルタを選ぶと、select() が全 holder（トグル用も含む）を
       // まとめて解除する。
-      visionState.select('cataract');
+      visionState.replaceWith('cataract');
       expect(visionState.bypassed, isFalse);
 
       tester.semantics.tap(semanticsFinder);
@@ -886,7 +878,7 @@ void main() {
 
     testWidgets('フォーカスが当たると 2px の枠が表示される (#79)', (tester) async {
       await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-      visionState.select('protanopia');
+      visionState.replaceWith('protanopia');
       await pumpHud(tester);
 
       final containerFinder =

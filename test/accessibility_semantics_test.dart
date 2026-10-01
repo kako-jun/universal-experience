@@ -18,19 +18,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
-import 'package:universal_experience/models/disability_type.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart'
     show Urgency;
-import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 import 'package:universal_experience/ui/widgets/image_source_picker.dart';
 import 'package:universal_experience/ui/widgets/loupe_hud.dart';
 
+import 'support/color_vision_select.dart';
 import 'support/home_screen_harness.dart';
 import 'support/sample_image_generator.dart';
 
@@ -71,8 +69,7 @@ void main() {
       final handle = tester.ensureSemantics();
       await installFakes(tester);
       final h = await pumpHomeScreen(tester, size: wide);
-      selectColorVision(
-          h.filterService, h.visionState, ColorVisionType.protanopia);
+      selectColorVisionKey(h.visionState, 'protanopia');
       await settle(tester);
 
       final slider = find.byType(Slider);
@@ -89,8 +86,7 @@ void main() {
       await installFakes(tester);
       final h =
           await pumpHomeScreen(tester, size: wide, locale: const Locale('en'));
-      selectColorVision(
-          h.filterService, h.visionState, ColorVisionType.protanopia);
+      selectColorVisionKey(h.visionState, 'protanopia');
       await settle(tester);
 
       expect(dataOf(tester, find.byType(Slider)).label, startsWith('Strength'));
@@ -101,7 +97,7 @@ void main() {
       final handle = tester.ensureSemantics();
       await installFakes(tester);
       final h = await pumpHomeScreen(tester, size: wide);
-      h.visionState.select('glaucoma');
+      h.visionState.replaceWith('glaucoma');
       await settle(tester);
 
       final strength = dataOf(tester, find.byType(Slider));
@@ -116,7 +112,7 @@ void main() {
       final handle = tester.ensureSemantics();
       await installFakes(tester);
       final h = await pumpHomeScreen(tester, size: wide);
-      h.visionState.select('floaters');
+      h.visionState.replaceWith('floaters');
       await settle(tester);
 
       final count = tester.widgetList<Slider>(find.byType(Slider)).length;
@@ -138,7 +134,7 @@ void main() {
       final handle = tester.ensureSemantics();
       await installFakes(tester);
       final h = await pumpHomeScreen(tester, size: wide);
-      h.visionState.select('starbursts');
+      h.visionState.replaceWith('starbursts');
       await settle(tester);
 
       final count = tester.widgetList<Slider>(find.byType(Slider)).length;
@@ -193,7 +189,7 @@ void main() {
       final handle = tester.ensureSemantics();
       await installFakes(tester);
       final h = await pumpHomeScreen(tester, size: wide);
-      h.visionState.select('glaucoma');
+      h.visionState.replaceWith('glaucoma');
       await settle(tester);
 
       final tiles = find.byType(FilterListTile);
@@ -212,7 +208,7 @@ void main() {
       final handle = tester.ensureSemantics();
       await installFakes(tester);
       final h = await pumpHomeScreen(tester, size: wide);
-      h.visionState.select('glaucoma');
+      h.visionState.replaceWith('glaucoma');
       await settle(tester);
 
       final checks = find.descendant(
@@ -262,8 +258,7 @@ void main() {
       final handle = tester.ensureSemantics();
       await installFakes(tester);
       final h = await pumpHomeScreen(tester, size: wide);
-      selectColorVision(
-          h.filterService, h.visionState, ColorVisionType.protanopia);
+      selectColorVisionKey(h.visionState, 'protanopia');
       await settle(tester);
 
       final lines = readLines(tester);
@@ -277,8 +272,7 @@ void main() {
       final handle = tester.ensureSemantics();
       await installFakes(tester);
       final h = await pumpHomeScreen(tester, size: wide);
-      selectColorVision(
-          h.filterService, h.visionState, ColorVisionType.protanopia);
+      selectColorVisionKey(h.visionState, 'protanopia');
       await settle(tester);
 
       expect(readoutCount(tester, '元の画像'), 1,
@@ -291,8 +285,7 @@ void main() {
       await installFakes(tester);
       final h =
           await pumpHomeScreen(tester, size: wide, locale: const Locale('en'));
-      selectColorVision(
-          h.filterService, h.visionState, ColorVisionType.protanopia);
+      selectColorVisionKey(h.visionState, 'protanopia');
       await settle(tester);
 
       expect(
@@ -326,8 +319,7 @@ void main() {
       addTearDown(rendered.dispose);
       afterImageRenderer = (source, filter, strength) => pending.future;
       final h = await pumpHomeScreen(tester, size: wide);
-      selectColorVision(
-          h.filterService, h.visionState, ColorVisionType.protanopia);
+      selectColorVisionKey(h.visionState, 'protanopia');
       await settle(tester);
 
       expect(find.text('プレビューを準備中…'), findsOneWidget);
@@ -361,8 +353,7 @@ void main() {
       afterImageRenderer =
           (source, filter, strength) async => throw StateError('render failed');
       final h = await pumpHomeScreen(tester, size: wide);
-      selectColorVision(
-          h.filterService, h.visionState, ColorVisionType.protanopia);
+      selectColorVisionKey(h.visionState, 'protanopia');
       await settle(tester);
 
       // 失敗は FlutterError.reportError に流れるので、ここで受け取って消費する。
@@ -381,8 +372,7 @@ void main() {
           filter == null ? succeed(source, filter, strength) : null;
       final h = await pumpHomeScreen(tester, size: wide);
       await settle(tester);
-      selectColorVision(
-          h.filterService, h.visionState, ColorVisionType.protanopia);
+      selectColorVisionKey(h.visionState, 'protanopia');
       await settle(tester);
 
       expect(tester.takeException(), isNotNull);
@@ -429,8 +419,7 @@ void main() {
       visionFilterUrgencyProvider = (_) => Urgency.none;
       visionFilterUrgencyEscalationProvider = (_) => const [];
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      final visionState = VisionFilterState()..select('photophobia');
-      final filterService = FilterService(visionState: visionState);
+      final visionState = VisionFilterState()..replaceWith('photophobia');
       final loupe = LoupeWindowController();
       await tester.runAsync(() => loupe.setAppMode(AppMode.loupe));
       tester.view.physicalSize = const Size(900, 300);
@@ -440,7 +429,6 @@ void main() {
         MultiProvider(
           providers: [
             ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
-            ChangeNotifierProvider<FilterService>.value(value: filterService),
             ChangeNotifierProvider<LoupeWindowController>.value(value: loupe),
           ],
           child: const MaterialApp(

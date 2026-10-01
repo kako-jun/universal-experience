@@ -260,6 +260,8 @@ golden path（実機 1 フィルタ表示）を通し、変換ルールが安定
 
 ## 5. 重複ロジック撤去（3/3）— #13 で完了
 
+> **追記（#124）**: この節の `FilterService` / `ColorVisionType` は #124 で削除され、状態モデルは `VisionFilterState` 1 系統になった（色覚 7 種はカタログ id + 別名 id。`docs/adr/2026-09-30-multi-select-filter-state-model.md` 参照）。以下は当時の経緯の記録。
+
 > → ADR: この一元化判断は `docs/adr/2026-05-31-sensus-core-consolidation.md` に昇格。
 
 ue が二重に持っていた色覚ロジックを撤去し、アルゴリズム正本を sensus に一本化した。
@@ -382,6 +384,8 @@ ue が二重に持っていた色覚ロジックを撤去し、アルゴリズ�
 
 ## 8. 色覚 3 型の Machado テーブル一元化・プレビュー UI 配線（#59、#34 解消）
 
+> **追記（#124）**: この節の `ColorVisionType` / `recommendedStrength`（後継は `colorVisionDefaultStrength`）は #124 で削除され、状態モデルは `VisionFilterState` 1 系統になった（色覚 7 種はカタログ id + 別名 id。`docs/adr/2026-09-30-multi-select-filter-state-model.md` 参照）。以下は当時の経緯の記録。
+
 §7 が見送った項目（ブリッジ経由の解決値取得、中間 strength 用 golden、
 deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の severity
 反映）
@@ -456,6 +460,8 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
   で改めて必要な形（コード自体が変わっているはず）で作る。
 
 ## 9. プレビューを CPU `apply()` に統一（#85）
+
+> **追記（#124）**: この節の `FilterService` / `ColorVisionType` / `visionFilterForColorVisionType` / `selectColorVision` は #124 で削除され、状態モデルは `VisionFilterState` 1 系統になった（色覚 7 種はカタログ id + 別名 id。`docs/adr/2026-09-30-multi-select-filter-state-model.md` 参照）。以下は当時の経緯の記録。
 
 - **背景**: ブリッジには `apply_vision_cpu_rgba8`（sensus の `apply()`）が #10
   時点から存在していたが、UI からは一度も呼ばれておらず、テストでしか使われて
@@ -580,6 +586,8 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
 ---
 
 ## 10. フィルタ単位のメタデータ API — 受診喚起・推奨強度の単一正本化（#76 / #77）
+
+> **追記（#124）**: この節の `FilterService` / `recommendedStrength(ColorVisionType)` は #124 で削除され、後継は `colorVisionDefaultStrength`（`lib/models/vision_filter_catalog.dart`）。強度の記憶は `variantId ?? id` をキーに `VisionFilterState` が持つ（`docs/adr/2026-09-30-multi-select-filter-state-model.md` 参照）。以下は当時の経緯の記録。
 
 `sensus-core` を 0.6.0 → 0.6.1 に上げた。追加された `Filter::urgency()` /
 `Filter::urgency_escalation()` / `Filter::recommended_strength()` /

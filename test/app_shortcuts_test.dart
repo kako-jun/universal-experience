@@ -2,7 +2,7 @@
 //
 // `/`・↑↓・←→ が home_screen.dart の Shortcuts/Actions 経由で
 // preview_selection.dart のロジックへ正しく配線されていることを検証する。
-// UniversalExperienceApp はトップレベル共有の filterService/visionFilterState/
+// UniversalExperienceApp はトップレベル共有の visionFilterState/
 // loupeWindow シングルトンを使うため（main.dart 参照）、各テストの前後で
 // 状態をリセットする。
 
@@ -11,9 +11,7 @@ import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/main.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/services/app_shortcuts.dart';
-import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/vision_filter_snapshot.dart';
 import 'package:universal_experience/services/filter_list_selection.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
@@ -24,6 +22,7 @@ import 'package:universal_experience/ui/widgets/filter_browser.dart';
 import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 
 import 'support/vision_filter_metadata_fixture.dart';
+import 'support/color_vision_select.dart';
 
 /// isFocusOnInteractiveControl のテスト専用ダミー Intent（本番の 3 Intent の
 /// 代わりに、ガードのロジックだけを最小構成で検証するために使う）。
@@ -45,7 +44,6 @@ void main() {
     // 記憶を消さない（同じフィルタを選び直したときに戻すため）ので、空の snapshot で
     // 記憶ごと初期状態へ戻す。
     visionFilterState.restore(const VisionFilterSnapshot());
-    filterService.deactivate();
     await loupeWindow.setClickThrough(false);
     await loupeWindow.setAppMode(AppMode.settings);
   });
@@ -119,7 +117,7 @@ void main() {
   testWidgets('← → で advanced 選択中は VisionFilterState.strength が ±5% 動く',
       (WidgetTester tester) async {
     await pumpApp(tester);
-    visionFilterState.select('cataract');
+    visionFilterState.replaceWith('cataract');
     visionFilterState.setStrength(0.5);
     await tester.pump();
 
@@ -134,19 +132,32 @@ void main() {
     expect(visionFilterState.strength, closeTo(0.45, 1e-9));
   });
 
-  testWidgets('← → で色覚クイック選択中は FilterService.intensity が ±5% 動く',
+  testWidgets('← → で色覚（別名 -omaly）選択中も別名キーの強度が ±5% 動く',
       (WidgetTester tester) async {
     await pumpApp(tester);
-    selectColorVision(
-        filterService, visionFilterState, ColorVisionType.protanopia);
-    filterService.setIntensity(0.5);
+    selectColorVisionKey(visionFilterState, 'protanomaly');
+    visionFilterState.setStrength(0.5);
     await tester.pump();
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.pump();
-    expect(filterService.intensity, closeTo(0.55, 1e-9));
-    // #117: 強度の正本は VisionFilterState のキーごとの記憶 1 つなので、
-    // 色覚クイック選択でも state.strength が同じ値を指す。
+    // 強度の正本は VisionFilterState のキーごとの記憶 1 つ。別名の層は別名 id をキーにする。
+    expect(visionFilterState.strength, closeTo(0.55, 1e-9));
+    expect(
+        visionFilterState.strengthForKey('protanomaly'), closeTo(0.55, 1e-9));
+    expect(visionFilterState.strengthForKey('protanopia'), isNull,
+        reason: '別名の強度は対応する -opia の記憶と混ざらない');
+  });
+
+  testWidgets('← → で色覚 -opia 選択中は カタログ id キーの強度が ±5% 動く',
+      (WidgetTester tester) async {
+    await pumpApp(tester);
+    selectColorVisionKey(visionFilterState, 'protanopia');
+    visionFilterState.setStrength(0.5);
+    await tester.pump();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
     expect(visionFilterState.strength, closeTo(0.55, 1e-9));
     expect(visionFilterState.strengthForKey('protanopia'), closeTo(0.55, 1e-9));
   });

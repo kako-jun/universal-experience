@@ -4,6 +4,8 @@
 - **記録日**: 2026-09-30（ADR 化）
 - **ステータス**: Accepted（実機 macOS / Windows のトレイ操作は確認待ち。「結果・トレードオフ」参照）
 
+> **追記（#124）**: `FilterService` / `ColorVisionType` / `isColorQuickSelection` は削除され、`settings.filterType` は `settings.visionFilter`（v2）へ統合された（旧キーは起動時に `VisionFilterStore.migrateLegacySettings` が一度だけ取り込んで削除。`docs/adr/2026-09-30-multi-select-filter-state-model.md` 参照）。以下の `FilterService` / `filterType` の記述は #65 当時の経緯。
+
 ## 文脈（問題）
 
 - advanced フィルタ（sensus 30 種）の選択・強度・payload パラメータは `VisionFilterState`

@@ -4,9 +4,7 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_catalog.dart';
-import '../../services/color_vision_selection.dart';
 import '../../services/experience_source.dart';
-import '../../services/filter_service.dart';
 import '../../services/vision_filter_metadata.dart';
 import '../../services/vision_filter_state.dart';
 import '../../src/rust/api/sensus_bridge.dart';
@@ -66,9 +64,8 @@ Experience? selectedExperience(VisionFilterState state) {
 ///
 /// - 視覚: `Experience.vision`（bridge の [VisionFilter]）を [visionFilterCatalogId]
 ///   でカタログ id（snake_case）へ写し、[VisionFilterState.selectPreset] に渡す
-///   （#60: `FilterService.deactivate()` は呼ばない — 色覚クイック選択の状態は
-///   このプリセット適用と無関係に残る。プレビューは [VisionFilterState] の
-///   選択だけを見るため、干渉しない）。id をハードコードせずカタログを正本に引く。
+///   （層の集合はそのプリセット単体へ置き換わる。プレビューもトレイも
+///   [VisionFilterState] の選択だけを見る）。id をハードコードせずカタログを正本に引く。
 /// - 選択表示: meniere と labyrinthitis はどちらもカタログ id `vertigo` に写る
 ///   ため、選択表示はカタログ id ではなく [VisionFilterState.selectedPresetId]
 ///   （`Experience.id`）で比較する（#60: 2 行同時点灯バグの修正）。
@@ -110,9 +107,7 @@ class ExperiencePresetTile extends StatelessWidget {
       // 視覚フィルタを持つ体験のみ適用可能（4 体験はすべて vision を持つ）。
       onTap: catalogId == null
           ? null
-          : () => selectExperiencePreset(
-                context.read<FilterService>(),
-                context.read<VisionFilterState>(),
+          : () => context.read<VisionFilterState>().selectPreset(
                 experience.id,
                 catalogId,
               ),

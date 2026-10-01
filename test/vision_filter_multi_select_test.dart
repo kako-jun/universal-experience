@@ -20,7 +20,6 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/vision_filter_stage.dart';
 import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
@@ -28,6 +27,7 @@ import 'package:universal_experience/services/vision_filter_store.dart';
 import 'package:universal_experience/services/vision_layer.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 
+import 'support/color_vision_select.dart';
 import 'support/vision_filter_metadata_fixture.dart';
 
 /// 色覚以外で、段がすべて違う 6 フィルタ（motion → optics → media → retina →
@@ -123,25 +123,17 @@ void main() {
     });
 
     test('-opia ⇄ -omaly（同じカタログ id の別名）も置換になる', () {
-      state.toggle('protanopia', origin: VisionLayerOrigin.quick);
+      state.toggle('protanopia');
       expect(
-        state.toggle(
-          'protanopia',
-          variantId: 'protanomaly',
-          origin: VisionLayerOrigin.quick,
-        ),
+        state.toggle('protanopia', variantId: 'protanomaly'),
         VisionLayerResult.replaced,
       );
       expect(state.layers.single.variantId, 'protanomaly');
-      expect(state.colorVisionType, ColorVisionType.protanomaly);
+      expect(state.focusedVariantId, 'protanomaly');
 
       // 同じ別名をもう一度 toggle すると外れる。
       expect(
-        state.toggle(
-          'protanopia',
-          variantId: 'protanomaly',
-          origin: VisionLayerOrigin.quick,
-        ),
+        state.toggle('protanopia', variantId: 'protanomaly'),
         VisionLayerResult.removed,
       );
       expect(state.layers, isEmpty);
@@ -383,30 +375,28 @@ void main() {
       expect(_ids(state), ['vertigo']);
       expect(state.focusedId, 'vertigo');
 
-      state.select('glaucoma');
+      state.replaceWith('glaucoma');
       expect(_ids(state), ['glaucoma']);
     });
 
-    test('selectColorVisionType は層を 1 つの quick 層にする（-omaly は別名付き）', () {
+    test('色覚キーの選択は層を 1 つの色覚層にする（-omaly は別名付き）', () {
       state.toggle('myopia');
-      state.selectColorVisionType(
-          ColorVisionType.deuteranomaly, 'deuteranopia');
+      selectColorVisionKey(state, 'deuteranomaly');
 
       expect(state.layers, hasLength(1));
       expect(state.layers.single.id, 'deuteranopia');
       expect(state.layers.single.variantId, 'deuteranomaly');
-      expect(state.isColorQuickSelection, isTrue);
-      expect(state.colorVisionType, ColorVisionType.deuteranomaly);
+      expect(state.focusedVariantId, 'deuteranomaly');
     });
 
-    test('selectColorVisionType(none) は全層を解除する', () {
+    test('clear() は全層を解除する', () {
       state.toggle('myopia');
-      state.selectColorVisionType(ColorVisionType.none);
+      state.clear();
       expect(state.layers, isEmpty);
     });
 
     test('単一選択のとき selectedId / build / strength は従来と同じ（フォーカス中の層）', () {
-      state.select('starbursts');
+      state.replaceWith('starbursts');
       state.setStrength(0.4);
       expect(state.selectedId, 'starbursts');
       expect(state.focusedId, 'starbursts');
@@ -573,8 +563,7 @@ void main() {
     });
 
     test('色覚層は列の末尾で、-omaly も同じ VisionFilter になる', () {
-      state.toggle('protanopia',
-          variantId: 'protanomaly', origin: VisionLayerOrigin.quick);
+      state.toggle('protanopia', variantId: 'protanomaly');
       state.toggle('vertigo');
       final steps = state.pipelineSteps();
       expect(steps.last.filter, const VisionFilter.protanopia());
@@ -592,8 +581,7 @@ void main() {
       state.toggle('vertigo');
       state.toggle('astigmatism');
       state.toggle('glaucoma');
-      state.toggle('protanopia',
-          variantId: 'protanomaly', origin: VisionLayerOrigin.quick);
+      state.toggle('protanopia', variantId: 'protanomaly');
       state.setLayerStrength('astigmatism', 0.35);
       state.setLayerParams('astigmatism', const {'axisDeg': 45.0});
       state.setLayerStrength('glaucoma', 0.0);

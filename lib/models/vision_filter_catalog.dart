@@ -9,9 +9,10 @@
 /// を `lib/services/vision_filter_metadata.dart` の provider 経由で唯一の正本
 /// として参照する。旧 `VisionFilterUrgency`（ue 独自・初版・要医療監修）は撤去した。
 ///
-/// 既存の色覚 7 種 UI（`ColorVisionType` ベースの `FilterService`）とは別系統。
+/// 色覚 7 種のクイック選択（別名 [kVisionAliases]・[kColorVisionQuickCatalogIds]）も
+/// このカタログの id に写る（選択状態は `VisionFilterState` 1 系統、#124）。
 /// こちらは sensus が公開する **全** vision フィルタを破綻なく選べるようにする
-/// 「Advanced」UI 用のメタデータである。
+/// メタデータである。
 ///
 /// - `id` は snake_case（sensus shaders 名と一致。例: `bppv_rotation`）。
 /// - `displayName` は英語フォールバック（i18n 実翻訳は #18）。
@@ -733,3 +734,89 @@ final Map<VisionFilter, String> _kCatalogIdByFixedVisionInstance = {
 /// するのに使う。payload を持つフィルタ（体験プリセットでは未使用）は null を返す。
 String? visionFilterCatalogId(VisionFilter filter) =>
     _kCatalogIdByFixedVisionInstance[filter];
+
+// ── 別名（-omaly）と色覚のクイック選択の対象 ──
+//
+// 状態モデルは「カタログ id + 強度 + 別名 id」だけを持つ（`VisionFilterState`）。
+// 3 色覚（-omaly）は独立したフィルタではなく、対応する -opia と同じカタログ id に
+// 写る**別名**で、違いは既定の強度（弱め）だけ。この表がその対応の唯一の正本。
+
+/// -omaly の既定の強度（推奨強度）。
+///
+/// 旧 `color_vision_simulator.dart`（#13 で撤去）が anomaly を表現していた severity と同じ値。
+/// anomaly は対応する -opia と同じ [VisionFilter] に写るので、見え方の違いはこの値を
+/// strength（1.0 未満）として渡すことでだけ表す。
+const double kAnomalyDefaultSeverity = 0.6;
+
+/// カタログ id の別名 1 件（例: protanomaly = protanopia を強度 0.6 で）。
+class VisionAlias {
+  const VisionAlias({
+    required this.id,
+    required this.catalogId,
+    this.strength = kAnomalyDefaultSeverity,
+  });
+
+  /// 別名 id（`VisionLayer.variantId` ・強度の記憶のキー・永続化に使う安定識別子）。
+  final String id;
+
+  /// 写り先のカタログ id（-opia）。
+  final String catalogId;
+
+  /// 別名を選んだときの既定の強度（推奨強度）。
+  final double strength;
+}
+
+/// -omaly の別名表（宣言順 = 一覧で対応する -opia の直後に並べる順）。
+const List<VisionAlias> kVisionAliases = [
+  VisionAlias(id: 'protanomaly', catalogId: 'protanopia'),
+  VisionAlias(id: 'deuteranomaly', catalogId: 'deuteranopia'),
+  VisionAlias(id: 'tritanomaly', catalogId: 'tritanopia'),
+];
+
+/// 別名 id → 別名。
+final Map<String, VisionAlias> kVisionAliasById = {
+  for (final a in kVisionAliases) a.id: a,
+};
+
+/// 色覚のクイック選択（トレイの最上段・強度 1.0 の既定）の対象カタログ id。
+/// 実験的な tetrachromacy は含まない。
+const List<String> kColorVisionQuickCatalogIds = [
+  'protanopia',
+  'deuteranopia',
+  'tritanopia',
+  'achromatopsia',
+];
+
+/// [key]（カタログ id または別名 id）が、色覚クイック選択の 7 種（-opia 4 + -omaly 3）か。
+bool isColorVisionQuickKey(String key) =>
+    kColorVisionQuickCatalogIds.contains(key) ||
+    kVisionAliasById.containsKey(key);
+
+/// [key]（カタログ id または別名 id）を「カタログ id と別名 id」へ解く。別名でなければ
+/// `variantId` は null。カタログにも別名表にも無い [key] は null。
+({String id, String? variantId})? resolveVisionKey(String key) {
+  final alias = kVisionAliasById[key];
+  if (alias != null) return (id: alias.catalogId, variantId: alias.id);
+  if (kVisionFilterCatalogById.containsKey(key)) {
+    return (id: key, variantId: null);
+  }
+  return null;
+}
+
+/// [key]（別名 id ?? カタログ id）の色覚クイック選択としての既定の強度。別名は
+/// [VisionAlias.strength]、-opia 4 種は 1.0、それ以外は null（sensus の推奨強度を使う）。
+double? colorVisionDefaultStrength(String key) {
+  final alias = kVisionAliasById[key];
+  if (alias != null) return alias.strength;
+  return kColorVisionQuickCatalogIds.contains(key) ? 1.0 : null;
+}
+
+/// カタログ id → sensus の固定 [VisionFilter]（[visionFilterCatalogId] の逆引き）。
+/// payload を持つフィルタ・未知の id は null。別名は -opia と同じ id に写るので、
+/// 別名のフィルタは対応する -opia のもの（強度の差は strength で表す）。
+VisionFilter? visionFilterForCatalogId(String id) {
+  for (final e in _kCatalogIdByFixedVisionInstance.entries) {
+    if (e.value == id) return e.key;
+  }
+  return null;
+}

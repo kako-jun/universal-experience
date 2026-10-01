@@ -1,5 +1,7 @@
 # Platform-Specific APIs Research
 
+> **追記（#124）**: 本文のサンプルコードの `ColorVisionType` は当時の調査時点の型名で、#124 で削除された（現行は色覚 7 種をカタログ id + 別名 id で表す）。
+
 > **現状（#13 反映）**: 以下は「システム全体（他アプリ含む全画面）への色覚フィルタ
 > 適用」を実現するためのネイティブ API 調査の歴史的記録。この system-wide 経路を
 > 実装していた `color_vision_filter` プラグインは撤去済みで、現状の ue は sensus-core

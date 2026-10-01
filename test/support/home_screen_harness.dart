@@ -15,7 +15,6 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/main.dart' show WindowModeUiContext;
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/hotkey_service.dart';
 import 'package:universal_experience/services/image_source_state.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
@@ -107,14 +106,12 @@ ui.Image fixturePreviewImage() {
 /// [pumpHomeScreen] が組んだ状態の束。
 class HomeScreenHarness {
   HomeScreenHarness({
-    required this.filterService,
     required this.visionState,
     required this.loupe,
     required this.imageSource,
     required this.settings,
   });
 
-  final FilterService filterService;
   final VisionFilterState visionState;
   final LoupeWindowController loupe;
   final ImageSourceState imageSource;
@@ -131,7 +128,7 @@ Future<HomeScreenHarness> pumpHomeScreen(
     trayAvailable: false,
     hotkeyStatus: HotkeyStatus(),
   ),
-  void Function(FilterService filterService, VisionFilterState state)? select,
+  void Function(VisionFilterState state)? select,
   ThemeData? theme,
 }) async {
   tester.view.physicalSize = size;
@@ -142,16 +139,14 @@ Future<HomeScreenHarness> pumpHomeScreen(
   final settings = SettingsService();
   await settings.load();
   final visionState = VisionFilterState();
-  final filterService = FilterService(visionState: visionState);
   final loupe = LoupeWindowController();
   final imageSource = ImageSourceState();
-  select?.call(filterService, visionState);
+  select?.call(visionState);
 
   await tester.pumpWidget(
     MultiProvider(
       providers: [
         ChangeNotifierProvider<SettingsService>.value(value: settings),
-        ChangeNotifierProvider<FilterService>.value(value: filterService),
         ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
         ChangeNotifierProvider<ImageSourceState>.value(value: imageSource),
         ChangeNotifierProvider<LoupeWindowController>.value(value: loupe),
@@ -174,7 +169,6 @@ Future<HomeScreenHarness> pumpHomeScreen(
   await tester.pump();
 
   return HomeScreenHarness(
-    filterService: filterService,
     visionState: visionState,
     loupe: loupe,
     imageSource: imageSource,

@@ -18,8 +18,6 @@ import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/main.dart' show WindowModeUiContext;
-import 'package:universal_experience/models/disability_type.dart';
-import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/filter_list_selection.dart';
 import 'package:universal_experience/services/hotkey_service.dart';
 import 'package:universal_experience/services/vision_filter_metadata.dart';
@@ -37,6 +35,7 @@ import 'package:universal_experience/ui/widgets/language_dialog.dart';
 import 'package:universal_experience/ui/widgets/window_mode_panel.dart';
 
 import 'support/home_screen_harness.dart';
+import 'support/color_vision_select.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -121,7 +120,7 @@ void main() {
       await tester.pump();
       await tester.tap(tile);
       await tester.pump();
-      expect(h.visionState.colorVisionType, ColorVisionType.protanopia);
+      expect(h.visionState.focusedId, 'protanopia');
       expect(tester.takeException(), isNull);
 
       await tester.runAsync(() => h.loupe.setClickThrough(false));
@@ -154,7 +153,7 @@ void main() {
     await pumpHomeScreen(
       tester,
       size: wide,
-      select: (f, s) => selectColorVision(f, s, ColorVisionType.protanopia),
+      select: (s) => selectColorVisionKey(s, 'protanopia'),
     );
     for (var i = 0; i < 3; i++) {
       await tester.runAsync(
@@ -186,7 +185,7 @@ void main() {
     await pumpHomeScreen(
       tester,
       size: wide,
-      select: (f, s) => selectColorVision(f, s, ColorVisionType.protanopia),
+      select: (s) => selectColorVisionKey(s, 'protanopia'),
     );
     final browser = tester.getRect(find.byType(FilterBrowser));
     final adjust = tester.getRect(find.byType(AdjustPanel));
@@ -257,7 +256,7 @@ void main() {
       final h = await pumpHomeScreen(
         tester,
         size: wide,
-        select: (f, s) => selectColorVision(f, s, ColorVisionType.protanopia),
+        select: (s) => selectColorVisionKey(s, 'protanopia'),
       );
       expect(find.text('何も選択されていません'), findsNothing);
 
@@ -278,7 +277,7 @@ void main() {
       await tester.tap(tile);
       await tester.pump();
 
-      expect(h.visionState.colorVisionType, ColorVisionType.protanopia);
+      expect(h.visionState.focusedId, 'protanopia');
       final adjust = find.byType(AdjustPanel);
       expect(
         find.descendant(of: adjust, matching: find.byType(Slider)),
@@ -421,12 +420,12 @@ void main() {
       await tester.ensureVisible(tile);
       await tester.tap(tile);
       await tester.pump();
-      h.filterService.setIntensity(0.5);
+      h.visionState.setStrength(0.5);
       await tester.pump();
 
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pump();
-      expect(h.filterService.intensity, closeTo(0.55, 1e-9));
+      expect(h.visionState.strength, closeTo(0.55, 1e-9));
     });
 
     testWidgets('検索で絞ったあとの ↑↓ は、見えている行だけでフォーカスを送り、選択は変えない', (tester) async {
@@ -560,12 +559,12 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pump();
       expect(selectedFilterListEntry(h.visionState), protan);
-      final before = h.filterService.intensity;
+      final before = h.visionState.strength;
 
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pump();
 
-      expect(h.filterService.intensity, before,
+      expect(h.visionState.strength, before,
           reason: '行にフォーカスがある間は ←→ を奪わない（強度は動かない）');
       expect(focusedTile(tester), isNull, reason: '代わりにフォーカスは行の外へ出る');
 
@@ -575,7 +574,7 @@ void main() {
           'homeShortcuts');
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
       await tester.pump();
-      expect(h.filterService.intensity, lessThan(before));
+      expect(h.visionState.strength, lessThan(before));
     });
 
     for (final (layoutLabel, size) in [('広幅', wide), ('狭幅', narrow)]) {
@@ -594,12 +593,12 @@ void main() {
             await tester.tap(find.byType(TextField));
             await tester.pump();
             await tabUntilTile(tester, rowKey);
-            final before = h.filterService.intensity;
+            final before = h.visionState.strength;
 
             await tester.sendKeyEvent(key);
             await tester.pump();
 
-            expect(h.filterService.intensity, before);
+            expect(h.visionState.strength, before);
             expect(focusedTile(tester), isNull);
             expect(tester.binding.focusManager.primaryFocus?.debugLabel,
                 'homeShortcuts');

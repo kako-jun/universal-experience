@@ -4,11 +4,8 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:tray_manager/tray_manager.dart';
 
-import '../models/disability_type.dart';
 import '../models/vision_filter_catalog.dart';
-import 'color_vision_selection.dart';
 import 'filter_list_selection.dart';
-import 'filter_service.dart';
 import 'loupe_window_controller.dart';
 import 'tray_menu_labels.dart';
 import 'vision_filter_state.dart';
@@ -26,7 +23,7 @@ export 'tray_menu_labels.dart';
 ///    (`test/tray_service_test.dart`)。
 ///  * **[TrayService]** — `tray_manager` を叩く副作用層。上記スペックを実際の
 ///    [Menu] / [MenuItem] に変換し、クリックを「ウィンドウ表示/非表示コールバック」
-///    と [FilterService] に橋渡しする。
+///    と [VisionFilterState] に橋渡しする。
 ///
 /// ## ウィンドウ表示 (ルーペ窓) の扱い
 ///
@@ -117,7 +114,7 @@ class TrayMenuEntry {
     required this.kind,
     this.key,
     this.label,
-    this.colorVisionType,
+    this.colorVisionKey,
     this.listEntryKey,
     this.children = const [],
     this.checked = false,
@@ -129,7 +126,7 @@ class TrayMenuEntry {
       : kind = TrayMenuKind.separator,
         key = null,
         label = null,
-        colorVisionType = null,
+        colorVisionKey = null,
         listEntryKey = null,
         children = const [],
         checked = false,
@@ -143,9 +140,9 @@ class TrayMenuEntry {
   /// 表示ラベル。区切り線では null。
   final String? label;
 
-  /// [kind] が [TrayMenuKind.applyColorVisionFilter] のとき適用する色覚タイプ。
+  /// [kind] が [TrayMenuKind.applyColorVisionFilter] のとき適用する色覚のカタログ id。
   /// それ以外は null。
-  final ColorVisionType? colorVisionType;
+  final String? colorVisionKey;
 
   /// [kind] が [TrayMenuKind.applyListEntry] のとき選ぶ統合一覧の行
   /// （[FilterListEntry.key]）。それ以外は null。
@@ -167,32 +164,40 @@ class TrayMenuEntry {
       other.kind == kind &&
       other.key == key &&
       other.label == label &&
-      other.colorVisionType == colorVisionType &&
+      other.colorVisionKey == colorVisionKey &&
       other.listEntryKey == listEntryKey &&
       listEquals(other.children, children) &&
       other.checked == checked &&
       other.enabled == enabled;
 
   @override
-  int get hashCode => Object.hash(kind, key, label, colorVisionType,
-      listEntryKey, Object.hashAll(children), checked, enabled);
+  int get hashCode => Object.hash(
+        kind,
+        key,
+        label,
+        colorVisionKey,
+        listEntryKey,
+        Object.hashAll(children),
+        checked,
+        enabled,
+      );
 
   @override
   String toString() => 'TrayMenuEntry(kind: $kind, key: $key, label: $label, '
-      'colorVisionType: $colorVisionType, listEntryKey: $listEntryKey, '
+      'colorVisionKey: $colorVisionKey, listEntryKey: $listEntryKey, '
       'children: $children, checked: $checked, enabled: $enabled)';
 }
 
-/// 色覚フィルタ項目の安定キー (フィルタ id から導出)。
-String colorVisionEntryKey(ColorVisionType type) => 'filter_${type.id}';
+/// 色覚フィルタ項目の安定キー (カタログ id から導出)。
+String colorVisionEntryKey(String catalogId) => 'filter_$catalogId';
 
 /// 「高度なフィルタ」サブメニュー（#65）のカテゴリ項目・一覧項目の安定キー。
 String categorySubmenuKey(VisionFilterCategory category) =>
     'category_${category.name}';
 String listEntryMenuKey(FilterListEntry entry) => 'list_${entry.key}';
 
-/// 色覚のクイック項目 [type] に対応する統合一覧の行のキー（[FilterListEntry.key]）。
-String colorVisionListEntryKey(ColorVisionType type) => 'cv:${type.id}';
+/// 色覚のクイック項目 [catalogId] に対応する統合一覧の行のキー（[FilterListEntry.key]）。
+String colorVisionListEntryKey(String catalogId) => 'cv:$catalogId';
 
 /// 「高度なフィルタ」サブメニュー（#65）を純粋データとして組み立てる。
 ///
@@ -223,7 +228,7 @@ TrayMenuEntry buildAdvancedFiltersSubmenu({
                   key: listEntryMenuKey(e),
                   label: labels.listEntryLabel(
                     catalogId: e.catalogId,
-                    colorVisionType: e.colorVisionType,
+                    variantId: e.variantId,
                   ),
                   listEntryKey: e.key,
                   checked: checkedListEntryKeys.contains(e.key),
@@ -299,7 +304,7 @@ List<TrayMenuEntry> buildTrayMenuSpec({
         kind: TrayMenuKind.applyColorVisionFilter,
         key: colorVisionEntryKey(f),
         label: labels.filterLabel(f),
-        colorVisionType: f,
+        colorVisionKey: f,
         listEntryKey: colorVisionListEntryKey(f),
         checked: checkedListEntryKeys.contains(colorVisionListEntryKey(f)),
         enabled: !disabledListEntryKeys.contains(colorVisionListEntryKey(f)),
@@ -349,7 +354,6 @@ CloseAction resolveCloseAction({required bool trayAvailable}) =>
 /// `tray_manager` を叩くトレイラッパ (副作用層)。
 class TrayService with TrayListener {
   TrayService({
-    required this.filterService,
     required this.visionFilterState,
     required this.loupeWindow,
     required this.iconPath,
@@ -364,18 +368,14 @@ class TrayService with TrayListener {
         _tooltip = tooltip,
         _loupeVisible = loupeVisible;
 
-  /// アクティブな色覚フィルタの選択状態 (#14)。
-  final FilterService filterService;
-
   /// プレビューの選択の唯一の正本（#60）。トレイの項目は、メイン画面の一覧と同じ入口
-  /// （`toggleColorVision` / `toggleFilterListEntry` / `deactivateColorVision`、#121）
-  /// を経由してこれを更新する。チェックと灰色はこれの層の集合から決める。
+  /// （`toggleFilterListEntry` / `clear`、#121）を経由してこれを更新する。チェックと灰色はこれの層の集合から決める。
   final VisionFilterState visionFilterState;
 
   /// ルーペ窓のモード/最前面/クリックスルー (#63)。トレイからもこれらを
   /// 切り替えられるようにする（UI とトレイの両方から操作できる、という受け入れ
   /// 条件）。listener を付けてウィンドウ内 UI（`WindowModePanel`）での変更も
-  /// トレイのチェックマークへ反映する（[filterService]/[visionFilterState] と
+  /// トレイのチェックマークへ反映する（[visionFilterState] と
   /// 同じ理由、#60 に倣う）。
   final LoupeWindowController loupeWindow;
 
@@ -426,7 +426,7 @@ class TrayService with TrayListener {
   /// (GNOME で AppIndicator 拡張無し / ヘッドレス CI / アイコン欠落など) は
   /// 握り潰してアプリはウィンドウのみで動き続ける。
   ///
-  /// [filterService]/[visionFilterState]/[loupeWindow] に listener を付け、
+  /// [visionFilterState]/[loupeWindow] に listener を付け、
   /// ウィンドウ内 UI（[FilterBrowser]・advanced カタログ・体験プリセット・
   /// `WindowModePanel`）での選択・切替もトレイのチェックマークに反映される
   /// ようにする（#60/#63。トレイのチェックマークは [_rebuildMenu] が
@@ -438,7 +438,6 @@ class TrayService with TrayListener {
     if (!isTraySupportedPlatform) {
       return;
     }
-    filterService.addListener(_onSelectionChanged);
     visionFilterState.addListener(_onSelectionChanged);
     loupeWindow.addListener(_onSelectionChanged);
     try {
@@ -461,7 +460,7 @@ class TrayService with TrayListener {
   @visibleForTesting
   int selectionChangedCallCount = 0;
 
-  /// [filterService]/[visionFilterState] のどちらかが変化したときに呼ばれる
+  /// [visionFilterState]/[loupeWindow] のどちらかが変化したときに呼ばれる
   /// （#60）。トレイのメニュー自体は非同期（`trayManager.setContextMenu`）
   /// だが listener コールバックは同期なので `unawaited` で発火だけさせる。
   void _onSelectionChanged() {
@@ -499,7 +498,7 @@ class TrayService with TrayListener {
   Future<void> _rebuildMenu() async {
     // チェックと灰色は、すべて VisionFilterState の層の集合から決める（ウィンドウ内 UI の
     // 選択がそのままトレイに出る、#65/#121）。一覧の行との対応はメイン画面の一覧と同じ
-    // 判定（[layerForFilterListEntry]。層の origin は問わない）なので、色覚 base 型を高度な
+    // 判定（[layerForFilterListEntry]）なので、色覚 base 型を高度な
     // フィルタ側から足した場合も、トップレベルの同名項目と一覧の行の両方に点灯する。
     // 体験プリセットは、その層（例: 近視）の行に点灯する。
     // 灰色は上限（5 層）で新しく足せない行。色覚は置き換えになるので対象外
@@ -603,14 +602,14 @@ class TrayService with TrayListener {
         break;
       case TrayMenuKind.applyColorVisionFilter:
         // メイン画面の色覚の行と同じ入口（足し引き。色覚は他の層を残したまま置き換わる、#121）。
-        final type = entry.colorVisionType;
-        if (type != null) {
-          toggleColorVision(filterService, visionFilterState, type);
+        final colorEntry = _listEntryByKey(entry.listEntryKey);
+        if (colorEntry != null) {
+          toggleFilterListEntry(visionFilterState, colorEntry);
           await refresh();
         }
         break;
       case TrayMenuKind.clearFilter:
-        deactivateColorVision(filterService, visionFilterState);
+        visionFilterState.clear();
         await refresh();
         break;
       case TrayMenuKind.applyListEntry:
@@ -618,7 +617,7 @@ class TrayService with TrayListener {
         // loupeWindow（クリックスルー等、#63）に一切触れない。
         final listEntry = _listEntryByKey(entry.listEntryKey);
         if (listEntry != null) {
-          toggleFilterListEntry(filterService, visionFilterState, listEntry);
+          toggleFilterListEntry(visionFilterState, listEntry);
           await refresh();
         }
         break;
@@ -680,10 +679,9 @@ class TrayService with TrayListener {
   }
 
   /// トレイアイコン・リスナを後始末する。[init] で付けた
-  /// [filterService]/[visionFilterState]/[loupeWindow] の listener も外す
+  /// [visionFilterState]/[loupeWindow] の listener も外す
   /// （#60/#63）。
   Future<void> dispose() async {
-    filterService.removeListener(_onSelectionChanged);
     visionFilterState.removeListener(_onSelectionChanged);
     loupeWindow.removeListener(_onSelectionChanged);
     // 破棄後の再 init で、同じ構造でも必ず送り直させる。

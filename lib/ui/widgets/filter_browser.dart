@@ -6,7 +6,6 @@ import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_catalog.dart';
 import '../../models/vision_filter_stage.dart' show kMaxVisionLayers;
 import '../../services/filter_list_selection.dart';
-import '../../services/filter_service.dart';
 import '../../services/vision_layer.dart';
 import '../../services/vision_filter_state.dart';
 import 'experience_presets.dart';
@@ -300,8 +299,8 @@ class _FilterList extends StatelessWidget {
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
         ),
-      Consumer2<FilterService, VisionFilterState>(
-        builder: (context, filterService, visionState, _) {
+      Consumer<VisionFilterState>(
+        builder: (context, visionState, _) {
           final rows = <Widget>[];
           VisionFilterCategory? previous;
           for (final entry in entries) {
@@ -320,25 +319,26 @@ class _FilterList extends StatelessWidget {
             previous = entry.category;
             final order = filterListEntryOrder(visionState, entry);
             final blocked = filterListEntryBlockReason(visionState, entry);
-            rows.add(FilterListTile(
-              key: filterListTileKey(entry),
-              title: filterListEntryName(l10n, entry),
-              selected: order != null,
-              kind: isExclusiveFilterListEntry(entry)
-                  ? FilterListTileKind.radio
-                  : FilterListTileKind.check,
-              orderNumber: order,
-              disabledReason: blocked == VisionLayerBlockReason.layerLimit
-                  ? l10n.filterListLimitReached(kMaxVisionLayers)
-                  : null,
-              focusNode: controller.rowFocusNode(entry),
-              onTap: () =>
-                  toggleFilterListEntry(filterService, visionState, entry),
-              onPointerActivated: onActivated,
-              isExperimental:
-                  kVisionFilterCatalogById[entry.catalogId]?.isExperimental ??
-                      false,
-            ));
+            rows.add(
+              FilterListTile(
+                key: filterListTileKey(entry),
+                title: filterListEntryName(l10n, entry),
+                selected: order != null,
+                kind: isExclusiveFilterListEntry(entry)
+                    ? FilterListTileKind.radio
+                    : FilterListTileKind.check,
+                orderNumber: order,
+                disabledReason: blocked == VisionLayerBlockReason.layerLimit
+                    ? l10n.filterListLimitReached(kMaxVisionLayers)
+                    : null,
+                focusNode: controller.rowFocusNode(entry),
+                onTap: () => toggleFilterListEntry(visionState, entry),
+                onPointerActivated: onActivated,
+                isExperimental:
+                    kVisionFilterCatalogById[entry.catalogId]?.isExperimental ??
+                        false,
+              ),
+            );
           }
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

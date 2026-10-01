@@ -1,14 +1,5 @@
-import '../models/disability_type.dart';
 import '../models/vision_filter_catalog.dart';
 import '../models/vision_filter_stage.dart';
-import 'filter_service.dart' show visionFilterForColorVisionType;
-
-/// レイヤーの選択の起源。
-///
-/// [quick] は色覚クイック選択（`FilterBrowser`/トレイ、[selectColorVision] 経由）、
-/// [advanced] は advanced カタログ・体験プリセット・復元。かつて state 全体が持っていた
-/// `isColorQuickSelection` は、レイヤーごとのこの値に置き換わった（ADR）。
-enum VisionLayerOrigin { quick, advanced }
 
 /// 重ねる 1 枚のフィルタ層。カタログ id ごとに高々 1 つ。
 ///
@@ -21,7 +12,6 @@ class VisionLayer {
     required this.id,
     Map<String, Object> params = const {},
     this.variantId,
-    this.origin = VisionLayerOrigin.advanced,
   }) : params = Map.unmodifiable(params);
 
   /// カタログ id（snake_case）。
@@ -35,25 +25,15 @@ class VisionLayer {
   /// 別名でなければ null。
   final String? variantId;
 
-  final VisionLayerOrigin origin;
-
   /// 強度の記憶のキー。別名があればそれ、無ければカタログ id。
   String get strengthKey => variantId ?? id;
 
-  VisionLayer copyWith({
-    Map<String, Object>? params,
-    VisionLayerOrigin? origin,
-  }) =>
-      VisionLayer(
-        id: id,
-        params: params ?? this.params,
-        variantId: variantId,
-        origin: origin ?? this.origin,
-      );
+  VisionLayer copyWith({Map<String, Object>? params}) =>
+      VisionLayer(id: id, params: params ?? this.params, variantId: variantId);
 
   @override
   String toString() =>
-      'VisionLayer($id${variantId == null ? '' : '/$variantId'}, $origin)';
+      'VisionLayer($id${variantId == null ? '' : '/$variantId'})';
 }
 
 /// 多選択の操作（[VisionFilterState.toggle]）が層の集合に何をしたか。
@@ -119,56 +99,19 @@ class VisionLayerResult {
       'VisionLayerResult($change${blockedBy == null ? '' : ', $blockedBy'})';
 }
 
-/// -omaly の別名 id 一覧（[ColorVisionType.name]）。
-const List<String> kVisionVariantIds = [
-  'protanomaly',
-  'deuteranomaly',
-  'tritanomaly',
-];
+/// -omaly の別名 id 一覧（[kVisionAliases] の id）。
+final List<String> kVisionVariantIds = List.unmodifiable([
+  for (final a in kVisionAliases) a.id,
+]);
 
 /// 強度の記憶のキーとして有効な文字列か（カタログ id か -omaly の別名 id）。
 bool isValidStrengthKey(String key) =>
     kVisionFilterCatalogById.containsKey(key) ||
-    kVisionVariantIds.contains(key);
+    kVisionAliasById.containsKey(key);
 
 /// [variantId] が [id] の正しい別名か（protanomaly は protanopia にだけ付く）。
-bool isValidVariantFor(String id, String variantId) {
-  final type = colorVisionTypeByName(variantId);
-  if (type == null || !kVisionVariantIds.contains(variantId)) return false;
-  return visionFilterForColorVisionTypeCatalogId(type) == id;
-}
-
-/// [ColorVisionType.name] から型を引く。none は含めない。
-ColorVisionType? colorVisionTypeByName(String name) {
-  for (final t in ColorVisionType.values) {
-    if (t != ColorVisionType.none && t.name == name) return t;
-  }
-  return null;
-}
-
-/// 色覚型 → カタログ id。none は null。
-String? visionFilterForColorVisionTypeCatalogId(ColorVisionType type) {
-  final filter = visionFilterForColorVisionType(type);
-  return filter == null ? null : visionFilterCatalogId(filter);
-}
-
-/// 色覚クイック選択の層。-omaly は [VisionLayer.variantId] を持つ。
-/// none は層を作らない（null）。
-VisionLayer? quickColorVisionLayer(ColorVisionType type) {
-  final id = visionFilterForColorVisionTypeCatalogId(type);
-  if (id == null) return null;
-  return VisionLayer(
-    id: id,
-    variantId: kVisionVariantIds.contains(type.name) ? type.name : null,
-    origin: VisionLayerOrigin.quick,
-  );
-}
-
-/// レイヤーが quick 層のときの色覚型（`variantId ?? id` から）。quick でなければ null。
-ColorVisionType? quickColorVisionTypeOf(VisionLayer layer) {
-  if (layer.origin != VisionLayerOrigin.quick) return null;
-  return colorVisionTypeByName(layer.strengthKey);
-}
+bool isValidVariantFor(String id, String variantId) =>
+    kVisionAliasById[variantId]?.catalogId == id;
 
 /// 層の列を不変条件に合わせて整える（純粋関数）。
 ///

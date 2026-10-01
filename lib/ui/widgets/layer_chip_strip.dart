@@ -3,8 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
-import '../../services/color_vision_selection.dart';
-import '../../services/filter_service.dart';
 import '../../services/vision_filter_state.dart';
 import 'filter_list_tile.dart' show LayerOrderBadge;
 
@@ -24,8 +22,8 @@ class LayerChipStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Consumer2<VisionFilterState, FilterService>(
-      builder: (context, state, filterService, _) {
+    return Consumer<VisionFilterState>(
+      builder: (context, state, _) {
         final layers = state.layers;
         if (layers.length < 2) return const SizedBox.shrink();
         return Semantics(
@@ -44,14 +42,11 @@ class LayerChipStrip extends StatelessWidget {
                   name: visionLayerDisplayName(l10n, layers[i]),
                   focused: layers[i].id == state.focusedId,
                   onFocus: () => state.focusLayer(layers[i].id),
-                  onRemove: () {
-                    state.remove(layers[i].id);
-                    syncFilterServiceWithLayers(filterService, state);
-                  },
+                  onRemove: () => state.remove(layers[i].id),
                 ),
               TextButton.icon(
                 key: const ValueKey('layer_strip_clear_all'),
-                onPressed: () => deactivateColorVision(filterService, state),
+                onPressed: state.clear,
                 icon: const Icon(Icons.clear, size: 18),
                 label: Text(l10n.layerStripClearAll),
               ),

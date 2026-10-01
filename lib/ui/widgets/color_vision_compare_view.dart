@@ -393,7 +393,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
             ? buildExportCaption(
                 l10n,
                 filterId: entry.id,
-                colorVisionType: null,
+                variantId: null,
                 filter: filter,
                 strength: strength,
                 isoDate: date,

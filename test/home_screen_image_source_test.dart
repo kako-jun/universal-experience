@@ -15,10 +15,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/main.dart' show WindowModeUiContext;
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/sample_catalog.dart';
-import 'package:universal_experience/services/color_vision_selection.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/hotkey_service.dart';
 import 'package:universal_experience/services/image_source_state.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
@@ -30,6 +27,7 @@ import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
 import 'support/sample_image_generator.dart';
 import 'support/vision_filter_metadata_fixture.dart';
+import 'support/color_vision_select.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -45,7 +43,6 @@ void main() {
 
   Future<ImageSourceState> pumpHome(
     WidgetTester tester, {
-    required FilterService filterService,
     required VisionFilterState visionState,
   }) async {
     tester.view.physicalSize = const Size(1200, 4000);
@@ -61,7 +58,6 @@ void main() {
       MultiProvider(
         providers: [
           ChangeNotifierProvider<SettingsService>.value(value: settings),
-          ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
           ChangeNotifierProvider<ImageSourceState>.value(
             value: imageSourceState,
@@ -95,21 +91,19 @@ void main() {
   testWidgets('色覚クイック選択でフィルタを切り替えると selectedSampleId が推奨サンプルに追従する',
       (tester) async {
     final visionState = VisionFilterState();
-    final filterService = FilterService(visionState: visionState);
     final imageSourceState = await pumpHome(
       tester,
-      filterService: filterService,
       visionState: visionState,
     );
 
-    selectColorVision(filterService, visionState, ColorVisionType.protanopia);
+    selectColorVisionKey(visionState, 'protanopia');
     await tester.pump();
 
     expect(imageSourceState.selectedSampleId,
         recommendedSampleIdForFilter('protanopia'));
     expect(imageSourceState.isFollowingRecommended, isTrue);
 
-    selectColorVision(filterService, visionState, ColorVisionType.deuteranopia);
+    selectColorVisionKey(visionState, 'deuteranopia');
     await tester.pump();
 
     expect(imageSourceState.selectedSampleId,
@@ -119,14 +113,12 @@ void main() {
   testWidgets('advanced カタログでフィルタを切り替えても selectedSampleId が追従する',
       (tester) async {
     final visionState = VisionFilterState();
-    final filterService = FilterService(visionState: visionState);
     final imageSourceState = await pumpHome(
       tester,
-      filterService: filterService,
       visionState: visionState,
     );
 
-    visionState.select('night_blindness');
+    visionState.replaceWith('night_blindness');
     await tester.pump();
 
     expect(imageSourceState.selectedSampleId,
@@ -137,10 +129,8 @@ void main() {
       'ユーザー画像を選んでいる間はフィルタを切り替えても自動切り替えが働かない'
       '（#78）', (tester) async {
     final visionState = VisionFilterState();
-    final filterService = FilterService(visionState: visionState);
     final imageSourceState = await pumpHome(
       tester,
-      filterService: filterService,
       visionState: visionState,
     );
 
@@ -151,7 +141,7 @@ void main() {
     await tester.pump();
     expect(imageSourceState.isUsingUserImage, isTrue);
 
-    selectColorVision(filterService, visionState, ColorVisionType.protanopia);
+    selectColorVisionKey(visionState, 'protanopia');
     await tester.pump();
 
     // ユーザー画像を見ている間は HomeScreen 側のリスナーが

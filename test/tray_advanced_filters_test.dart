@@ -18,10 +18,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/filter_list_selection.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/tray_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
@@ -137,8 +135,8 @@ void main() {
           .where((e) => e.kind == TrayMenuKind.applyColorVisionFilter)
           .toList();
       expect(
-          quick.where((e) => !e.enabled).map((e) => e.colorVisionType).toList(),
-          [ColorVisionType.protanopia]);
+          quick.where((e) => !e.enabled).map((e) => e.colorVisionKey).toList(),
+          ['protanopia']);
       expect(_leaves(_spec()).every((e) => e.enabled), isTrue);
     });
 
@@ -160,9 +158,13 @@ void main() {
         for (final entry in kVisionFilterCatalog) {
           expect(labels.catalogNames[entry.id], isNotEmpty);
         }
-        for (final type in ColorVisionType.values) {
-          if (type == ColorVisionType.none) continue;
-          expect(labels.filterLabels[type], isNotEmpty);
+        // 色覚 7 種（-opia 4 + -omaly 3）すべてに表示名がある。
+        for (final key in [
+          ...kColorVisionQuickCatalogIds,
+          for (final a in kVisionAliases) a.id,
+        ]) {
+          expect(labels.filterLabels[key], isNotEmpty);
+          expect(labels.filterLabels[key], visionFilterName(l10n, key));
         }
       }
       expect(_ja.trayAdvancedFilters, isNot(_en.trayAdvancedFilters));
@@ -179,7 +181,6 @@ void main() {
 
   group('TrayService ⇔ ウィンドウ内 UI の同期（MethodChannel モック）', () {
     late List<MethodCall> calls;
-    late FilterService filterService;
     late VisionFilterState visionState;
     late LoupeWindowController loupeWindow;
     late TrayService tray;
@@ -207,12 +208,10 @@ void main() {
           const MethodChannel('tray_manager'), null));
 
       visionState = VisionFilterState();
-      filterService = FilterService(visionState: visionState);
       loupeWindow = LoupeWindowController();
       loupeNotifications = 0;
       loupeWindow.addListener(() => loupeNotifications++);
       tray = TrayService(
-        filterService: filterService,
         visionFilterState: visionState,
         loupeWindow: loupeWindow,
         iconPath: 'assets/tray/tray_icon.png',
@@ -314,12 +313,14 @@ void main() {
       expect(checked(kClearFilterKey), isTrue);
     });
 
-    test('トレイで色覚（-omaly 含む）を選ぶと FilterService も同じ入口で更新される', () async {
+    test('トレイで色覚（-omaly 含む）を選ぶと、variantId 付きの層が足される', () async {
       await click('list_cv:tritanomaly');
-      expect(visionState.isColorQuickSelection, isTrue);
-      expect(visionState.colorVisionType, ColorVisionType.tritanomaly);
-      expect(filterService.currentFilter, ColorVisionType.tritanomaly);
+      expect(layerIds(), ['tritanopia']);
+      expect(visionState.focusedLayer!.variantId, 'tritanomaly');
+      expect(visionState.focusedVariantId, 'tritanomaly');
       expect(checked('list_cv:tritanomaly'), isTrue);
+      expect(checked('list_cv:tritanopia'), isFalse,
+          reason: '別名の行だけが点灯し、同じカタログ id の -opia 行は点灯しない');
       // クイック 4 項目に tritanomaly は無いので、トップレベルでは何も点灯しない。
       expect([
         for (final f in quickColorVisionFilters())
@@ -329,31 +330,44 @@ void main() {
 
     test('色覚は排他: 別の色覚を選ぶと置き換わり、他の層は残る', () async {
       await click('list_catalog:myopia');
-      await click(colorVisionEntryKey(ColorVisionType.protanopia));
+      await click(colorVisionEntryKey('protanopia'));
       expect(layerIds().toSet(), {'myopia', 'protanopia'});
-      expect(filterService.currentFilter, ColorVisionType.protanopia);
       // トップレベルのクイック項目とサブメニュー内の色覚行は同じ層を指す。
-      expect(checked(colorVisionEntryKey(ColorVisionType.protanopia)), isTrue);
+      expect(checked(colorVisionEntryKey('protanopia')), isTrue);
       expect(checked('list_cv:protanopia'), isTrue);
 
-      await click(colorVisionEntryKey(ColorVisionType.deuteranopia));
+      await click(colorVisionEntryKey('deuteranopia'));
       expect(layerIds().toSet(), {'myopia', 'deuteranopia'});
-      expect(checked(colorVisionEntryKey(ColorVisionType.protanopia)), isFalse);
+      expect(checked(colorVisionEntryKey('protanopia')), isFalse);
       expect(checked('list_cv:protanopia'), isFalse);
-      expect(
-          checked(colorVisionEntryKey(ColorVisionType.deuteranopia)), isTrue);
+      expect(checked(colorVisionEntryKey('deuteranopia')), isTrue);
       expect(checked('list_catalog:myopia'), isTrue);
-      expect(filterService.currentFilter, ColorVisionType.deuteranopia);
+    });
+
+    test('色覚は排他: -omaly と -opia も互いに置き換わる', () async {
+      await click('list_cv:protanomaly');
+      expect(checked('list_cv:protanomaly'), isTrue);
+
+      await click(colorVisionEntryKey('deuteranopia'));
+      expect(layerIds(), ['deuteranopia']);
+      expect(visionState.focusedLayer!.variantId, isNull);
+      expect(checked('list_cv:protanomaly'), isFalse);
+
+      await click('list_cv:deuteranomaly');
+      expect(layerIds(), ['deuteranopia']);
+      expect(visionState.focusedLayer!.variantId, 'deuteranomaly');
+      expect(checked('list_cv:deuteranomaly'), isTrue);
+      expect(checked(colorVisionEntryKey('deuteranopia')), isFalse,
+          reason: '同じカタログ id でも variantId が違う行は別の行');
     });
 
     test('色覚のクイック項目をもう一度押すと、その色覚だけが外れる', () async {
       await click('list_catalog:myopia');
-      await click(colorVisionEntryKey(ColorVisionType.protanopia));
-      await click(colorVisionEntryKey(ColorVisionType.protanopia));
+      await click(colorVisionEntryKey('protanopia'));
+      await click(colorVisionEntryKey('protanopia'));
 
       expect(layerIds(), ['myopia']);
-      expect(filterService.currentFilter, ColorVisionType.none);
-      expect(checked(colorVisionEntryKey(ColorVisionType.protanopia)), isFalse);
+      expect(checked(colorVisionEntryKey('protanopia')), isFalse);
     });
 
     test('ウィンドウ内 UI での足し引きがトレイのチェックに反映される（UI → トレイ）', () async {
@@ -383,12 +397,11 @@ void main() {
     test('解除はすべての層を外し、解除項目にチェックが付く', () async {
       await click('list_catalog:starbursts');
       await click('list_catalog:myopia');
-      await click(colorVisionEntryKey(ColorVisionType.protanopia));
+      await click(colorVisionEntryKey('protanopia'));
       expect(visionState.layers.length, 3);
 
       await click(kClearFilterKey);
       expect(visionState.layers, isEmpty);
-      expect(filterService.currentFilter, ColorVisionType.none);
       expect(checkedRows(), isEmpty);
       expect(checked(kClearFilterKey), isTrue);
     });
@@ -411,8 +424,7 @@ void main() {
       test('足せない行は灰色になり、チェック済みの行は外せる', () async {
         expect(disabled('list_catalog:floaters'), isTrue);
         // 色覚も、色覚の層が無いので足せない。
-        expect(
-            disabled(colorVisionEntryKey(ColorVisionType.protanopia)), isTrue);
+        expect(disabled(colorVisionEntryKey('protanopia')), isTrue);
         expect(disabled('list_cv:tritanomaly'), isTrue);
         // チェック済みの行は灰色にしない。
         expect(disabled('list_catalog:starbursts'), isFalse);
@@ -435,21 +447,19 @@ void main() {
 
       test('色覚の層があるときは、上限でも別の色覚へ置き換えられる（灰色にしない）', () async {
         visionState.remove('glaucoma');
-        await click(colorVisionEntryKey(ColorVisionType.protanopia));
+        await click(colorVisionEntryKey('protanopia'));
         await settle();
         expect(visionState.layers.length, 5);
 
         // 色覚以外の足せない行は灰色、色覚の行は置き換えになるので灰色にしない。
         expect(disabled('list_catalog:floaters'), isTrue);
-        expect(disabled(colorVisionEntryKey(ColorVisionType.deuteranopia)),
-            isFalse);
+        expect(disabled(colorVisionEntryKey('deuteranopia')), isFalse);
         expect(disabled('list_cv:tritanomaly'), isFalse);
 
-        await click(colorVisionEntryKey(ColorVisionType.deuteranopia));
+        await click(colorVisionEntryKey('deuteranopia'));
         expect(visionState.layers.length, 5);
         expect(layerIds(), contains('deuteranopia'));
         expect(layerIds(), isNot(contains('protanopia')));
-        expect(filterService.currentFilter, ColorVisionType.deuteranopia);
       });
     });
 
@@ -489,7 +499,7 @@ void main() {
       expect(menuSends(), sends);
 
       // 選択が変わればちゃんと送る。
-      visionState.select('myopia');
+      visionState.replaceWith('myopia');
       await settle();
       expect(menuSends(), sends + 1);
     });
@@ -529,7 +539,7 @@ void main() {
       visionState.toggle('protanopia');
       await settle();
 
-      expect(checked(colorVisionEntryKey(ColorVisionType.protanopia)), isTrue);
+      expect(checked(colorVisionEntryKey('protanopia')), isTrue);
       expect(checked('list_cv:protanopia'), isTrue);
       expect(checked(kClearFilterKey), isFalse);
 
@@ -540,7 +550,7 @@ void main() {
         for (final f in quickColorVisionFilters())
           if (checked(colorVisionEntryKey(f))) f
       ], [
-        ColorVisionType.protanopia
+        'protanopia'
       ]);
     });
 

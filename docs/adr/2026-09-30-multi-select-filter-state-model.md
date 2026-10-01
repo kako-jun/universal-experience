@@ -28,6 +28,9 @@ ADR で設計する。
 
 ### 現状の正確な把握（2026-09-30、main 621286e 時点）
 
+> **#124 で解消済み**: 以下は設計時点の旧構造の記録で、`FilterService` / `ColorVisionType` / `selectColorVision` /
+> `isColorQuickSelection` は削除された。現状は「決定」と末尾の「#124 完了記録」を参照。
+
 状態は 2 系統ある。
 
 | 系統 | 単位 | 役割 |
@@ -98,6 +101,11 @@ achromatopsia / protanomaly / deuteranomaly / tritanomaly。）
   protanopia 約 25ms。残り 27 フィルタは未測定で、最悪値はこれより重い可能性がある。
 
 ## 決定
+
+> **#124 で変更**: `origin`・単一選択の互換 API（`select` / `selectColorVisionType`）・`FilterService` は
+> #124 で削除した。旧状態の移行は `VisionFilterStore.migrateLegacySettings` になり、起動順は
+> seed → migrate → restore に変わった。以下の決定 1〜2 の該当記述は設計・各段の時点のもので、
+> 詳細は末尾の「#124 完了記録」（移行規則の最終形を含む）を参照。
 
 ### 1. 選択の単位は「カタログ id ごとに 1 つのレイヤー」の順序つき列
 
@@ -365,6 +373,9 @@ optics に置く。）
 
 **実装状況**
 
+> 第 1〜6 段の記述は各段の完了時点の記録で、#124 で削除された名前（旧強度サービス・`origin`・
+> 互換 getter など）を含む。現状は「決定」と末尾の「#124 完了記録」が正。
+
 - **第 1 段（#117）実装済み**: 層列化・段の表（`lib/models/vision_filter_stage.dart`、metamorphopsia は retina）・記憶鍵
   `variantId ?? id`・`FilterService` の強度記憶の統合（`VisionFilterStore.migrateLegacyStrengths`）・`origin` の層属性化・
   永続化 v2（v1 は読んで変換）を 1 PR で入れた。選択は常に 1 層のまま（複数層の API は #119）。決定どおりの実装で、
@@ -552,6 +563,62 @@ grep で確認する。
   割るかは、実装時に PR の大きさで判断してよい（割る場合は「層列化と永続化 v2」→「強度統合」の順）。
 - 実機（macOS / Windows）での操作感・性能・トレイの複数チェックの表示は、各実装 Issue の
   「kako-jun 実機」項目で確認する。この ADR 時点では未確認。
+
+### #124 完了記録（状態モデルの一本化）
+
+- **`FilterService` と `ColorVisionType` を削除し、状態モデルは `VisionFilterState` だけになった**。層は
+  `id` / `params` / `variantId` のみで、`origin`・`isColorQuickSelection`・単一選択の互換 API
+  （`select` / `selectColorVisionType`）・`syncFilterServiceWithLayers` も無い。
+- **-omaly の別名はカタログ層の別名表**（`kVisionAliases`）に置き、色覚は 7 つのキー
+  （`resolveVisionKey(key)` が `(id, variantId)` に解く）で扱う。別名は対応する -opia のカタログ id に
+  `variantId` を付けた層で、既定強度は 0.6（`colorVisionDefaultStrength`）。
+- **`settings.filterType` は `settings.visionFilter`（v2）に統合**した。旧キー（`filterType` /
+  `intensityByType` / 版 1 の保存）は `VisionFilterStore.migrateLegacySettings` が起動時に一度だけ v2 へ
+  取り込み、書き込みに成功してから削除する。`SettingsService` から `filterType` / `isFirstRun` も消えた。
+- **初回起動の層は `VisionFilterState` の責務**（`seedInitialLayers()`: deuteranomaly・強度 0.6）。保存が
+  あればそちらが優先される。
+- **v2 の保存形式は互換**（版は 2 のまま）。`origin` は書かず、読むときは無視する。
+- トレイ・ホットキー・一覧・2×2 比較・書き出しは、すべて `VisionFilterState` の層の集合だけを読む。
+
+#### 移行規則の最終形（#124 で変更）
+
+決定 2 の「旧状態 → v2 の移行」は、#124 で旧 `FilterService` を消したことに伴い次の形に変わった（設計時点の
+記述は決定 2 のとおり。こちらが現行）。入力は `settings.filterType`・`settings.intensityByType`・
+版 1 の `settings.visionFilter` で、`VisionFilterStore.migrateLegacySettings` が起動時に一度だけ取り込む。
+起動順は **seed（`seedInitialLayers`）→ migrate → restore（`restoreAndBind`）** になった。
+
+- **きっかけは「旧キーが残っているか」**: 保存 JSON が無いと `load()` は null を返し、色覚クイックの
+  スライダーだけを動かした状態では `settings.visionFilter` が作られず `intensityByType` だけが
+  書かれていた。この状態は実在するので、「版 1 JSON の初回読み込み」をきっかけにすると強度記憶が
+  推奨値に戻ってしまう。旧キー（`filterType` / `intensityByType`）の存在か、保存が版 1 であることを
+  きっかけにする。どれも無ければ何もしない（新規インストールは初回起動の層のまま）。
+- **読める v2 があるときは v2 が新しい**（移行後の編集は v2 にだけ書かれる）。v2 の選択・記憶を正本にし、
+  旧 `intensityByType` のうち v2 の `strengthByKey` に無い鍵だけを足す（書き込み失敗のまま状態が
+  変わって v2 が書かれた場合の取りこぼしを防ぐ）。`filterType` は読まずに捨てる。未知の版・壊れた
+  JSON は「読める v2 が無い」として扱う。
+- **読める v2 が無いとき**: 版 1 に選択があればそれを層に写し、`intensityByType`（有効な色覚キーだけ・
+  0..1 に丸める）を強度記憶に**上書き**で重ねる。旧 -opia の advanced 側の強度ではなく、利用者が実際に
+  見ていた `intensityByType` を正とする。版 1 が無い・壊れている・空のときは、層を旧 `filterType` の
+  色覚 1 つにする（`none` なら層なし。キー自体が無ければ初回起動と同じ deuteranomaly）。
+- **空の v2 で初回起動の層を消さない**: `restore` は選択が無いと層を全部外すので、`strengthByKey`
+  だけを持つ空の選択の v2 を書くと、起動のたびに初回起動の層が消える。そのため読める v2 が無いときの
+  移行結果は次のように書く。版 1 が無い・壊れている・空のときは、旧 `filterType` 由来の層（なければ
+  初回起動の層）を入れる。`filterType` が `none` のときと、選択なしで強度だけの版 1 は、利用者が
+  未選択だった状態として層なしで書く（この 2 つは初回起動の層を入れない）。
+- **書き込みの順序と失敗**: 取り込んだ結果は書き込みの成否に関係なく、戻り値の snapshot として
+  `restoreAndBind(snapshot:)` へ渡し、メモリ上の状態に入れる。v2 への書き込み（`settings.visionFilter`）に
+  **成功してから**旧キーを消す。書けなければ旧キーを残して起動を続け（次回もう一度取り込む）、強度記憶は
+  どちらの経路でも失われない。移行中の例外は null を返し、その後の `restoreAndBind` が `load()` し直すので、ディスク上に
+  読める保存があればそれが復元され、なければ先に入れた初回起動の層のまま起動する。
+- 旧バージョンへ戻すことは非対応（旧版は v2 を捨てて推奨強度で起動する。新版の再起動時に旧版で動かした
+  `intensityByType` は「v2 に無い鍵」として取り込まれて消える）。
+- 旧 -opia 4 種の advanced 側の強度（版 1 の `strengthById` のうち色覚 id の鍵）は持ち越さない。色覚行は
+  一覧でもトレイでも常にクイック選択を通っていたので、実際に見ていた強度は `intensityByType` 側にあり、
+  advanced 側の値は #72 以前の保存値など実害の小さい残骸だから。`tetrachromacy` は旧 `ColorVisionType`
+  に無く advanced 側だけなので、版 1 の `strengthById` をそのまま移行する。
+- **restore が例外を投げたとき**: v2 の保存があっても `restore` が例外を投げたら、seed した初回起動の層
+  （deuteranomaly）から始まる。保存は変更操作があるまで上書きされないので、次回起動で復元を再試行できる。
+- 決定 8 の表の #124 行は設計時点の内容のまま。実装の範囲は上の完了記録のとおり。
 
 ## 未解決の問い（推奨の既定で進める）
 

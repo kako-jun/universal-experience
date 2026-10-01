@@ -4,15 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
-import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart'
     show VisionStep;
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/color_vision_compare_view.dart';
 import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 
+import 'support/color_vision_select.dart';
 import 'support/home_screen_harness.dart';
 import 'support/sample_image_generator.dart';
 
@@ -73,7 +72,7 @@ void main() {
   testWidgets('色覚以外（advanced カタログ）を選んでいるときは切替が出ない', (tester) async {
     await installFakes(tester);
     final h = await pumpHomeScreen(tester, size: wide);
-    h.visionState.select('myopia');
+    h.visionState.replaceWith('myopia');
     await tester.pump();
     expect(toggle(), findsNothing);
     expect(find.byType(BeforeAfterView), findsOneWidget);
@@ -82,14 +81,10 @@ void main() {
   testWidgets('色覚クイック選択（-opia / -omaly）では切替が出る', (tester) async {
     await installFakes(tester);
     final h = await pumpHomeScreen(tester, size: wide);
-    for (final type in [
-      ColorVisionType.protanopia,
-      ColorVisionType.deuteranomaly,
-      ColorVisionType.achromatopsia,
-    ]) {
-      selectColorVision(h.filterService, h.visionState, type);
+    for (final key in ['protanopia', 'deuteranomaly', 'achromatopsia']) {
+      selectColorVisionKey(h.visionState, key);
       await tester.pump();
-      expect(toggle(), findsOneWidget, reason: type.id);
+      expect(toggle(), findsOneWidget, reason: key);
     }
   });
 
@@ -97,7 +92,7 @@ void main() {
     await installFakes(tester);
     final h = await pumpHomeScreen(tester, size: wide);
     for (final id in ['tritanopia', 'tetrachromacy']) {
-      h.visionState.select(id);
+      h.visionState.replaceWith(id);
       await tester.pump();
       expect(toggle(), findsOneWidget, reason: id);
     }
@@ -107,8 +102,7 @@ void main() {
       (tester) async {
     await installFakes(tester);
     final h = await pumpHomeScreen(tester, size: wide);
-    selectColorVision(
-        h.filterService, h.visionState, ColorVisionType.protanopia);
+    selectColorVisionKey(h.visionState, 'protanopia');
     await tester.pump();
 
     expect(find.byType(BeforeAfterView), findsOneWidget);
@@ -133,21 +127,19 @@ void main() {
   testWidgets('色覚以外に切り替えると Before / After に戻り、色覚に戻ると 2×2 に戻る', (tester) async {
     await installFakes(tester);
     final h = await pumpHomeScreen(tester, size: wide);
-    selectColorVision(
-        h.filterService, h.visionState, ColorVisionType.protanopia);
+    selectColorVisionKey(h.visionState, 'protanopia');
     await tester.pump();
     await tester.tap(toggle());
     await tester.pump();
     expect(find.byType(ColorVisionCompareView), findsOneWidget);
 
-    h.visionState.select('myopia');
+    h.visionState.replaceWith('myopia');
     await tester.pump();
     expect(find.byType(ColorVisionCompareView), findsNothing);
     expect(find.byType(BeforeAfterView), findsOneWidget);
     expect(toggle(), findsNothing);
 
-    selectColorVision(
-        h.filterService, h.visionState, ColorVisionType.deuteranopia);
+    selectColorVisionKey(h.visionState, 'deuteranopia');
     await tester.pump();
     expect(find.byType(ColorVisionCompareView), findsOneWidget);
   });
@@ -307,9 +299,8 @@ void main() {
   testWidgets('2×2 の強さは、現在の強さ（色覚の強度スライダー）が 4 セル共通で使われる', (tester) async {
     await installFakes(tester);
     final h = await pumpHomeScreen(tester, size: wide);
-    selectColorVision(
-        h.filterService, h.visionState, ColorVisionType.protanopia);
-    h.filterService.setIntensity(0.4);
+    selectColorVisionKey(h.visionState, 'protanopia');
+    h.visionState.setStrength(0.4);
     await tester.pump();
     await tester.tap(toggle());
     await tester.pump();
@@ -320,16 +311,13 @@ void main() {
         .widget<ColorVisionCompareView>(find.byType(ColorVisionCompareView));
     expect(view.strength, 0.4);
     expect(find.text(l10n.compareSharedStrengthNote(40)), findsOneWidget);
-    // setIntensity の永続化デバウンス（300ms）を流す。
-    await tester.pump(const Duration(milliseconds: 400));
   });
 
   testWidgets('2×2 の間は見出しが「色覚 4 型の比較」になり、OFF で「ビフォー / アフター」に戻る',
       (tester) async {
     await installFakes(tester);
     final h = await pumpHomeScreen(tester, size: wide);
-    selectColorVision(
-        h.filterService, h.visionState, ColorVisionType.protanopia);
+    selectColorVisionKey(h.visionState, 'protanopia');
     await tester.pump();
     expect(find.text(l10n.previewSectionTitle), findsOneWidget);
     expect(find.text(l10n.compareSectionTitle), findsNothing);
@@ -350,9 +338,8 @@ void main() {
       (tester) async {
     await installFakes(tester);
     final h = await pumpHomeScreen(tester, size: wide);
-    selectColorVision(
-        h.filterService, h.visionState, ColorVisionType.protanopia);
-    h.filterService.setIntensity(0.6);
+    selectColorVisionKey(h.visionState, 'protanopia');
+    h.visionState.setStrength(0.6);
     await tester.pump();
     await tester.tap(toggle());
     await tester.pump();
@@ -393,14 +380,12 @@ void main() {
     }
     expect(renderedStrengths.length, 4, reason: '解除で 4 セルとも描き直す');
     expect(renderedStrengths, everyElement(0.6));
-    await tester.pump(const Duration(milliseconds: 400));
   });
 
   testWidgets('切替は Tab で入れて、Space で 2×2 に切り替わる（キーボードで操作できる）', (tester) async {
     await installFakes(tester);
     final h = await pumpHomeScreen(tester, size: wide);
-    selectColorVision(
-        h.filterService, h.visionState, ColorVisionType.protanopia);
+    selectColorVisionKey(h.visionState, 'protanopia');
     await tester.pump();
     final chipRect = tester.getRect(toggle());
 
@@ -423,7 +408,6 @@ void main() {
     }
     expect(find.byType(ColorVisionCompareView), findsOneWidget);
     expect(tester.widget<FilterChip>(toggle()).selected, isTrue);
-    await tester.pump(const Duration(milliseconds: 400));
   });
 
   for (final height in [640.0, 800.0, 1000.0]) {
@@ -432,10 +416,9 @@ void main() {
         '次の ←→ から強度が動く', (tester) async {
       await installFakes(tester);
       final h = await pumpHomeScreen(tester, size: Size(1280, height));
-      selectColorVision(
-          h.filterService, h.visionState, ColorVisionType.protanopia);
+      selectColorVisionKey(h.visionState, 'protanopia');
       await tester.pump();
-      final before = h.filterService.intensity;
+      final before = h.visionState.strength;
 
       FilterListTile? focusedTile() =>
           tester.binding.focusManager.primaryFocus?.context
@@ -450,16 +433,14 @@ void main() {
 
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pump();
-      expect(h.filterService.intensity, before,
-          reason: '行から出る 1 回目の → は強度を動かさない');
+      expect(h.visionState.strength, before, reason: '行から出る 1 回目の → は強度を動かさない');
       expect(focusedTile(), isNull);
       expect(tester.binding.focusManager.primaryFocus?.debugLabel,
           'homeShortcuts');
 
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
       await tester.pump();
-      expect(h.filterService.intensity, lessThan(before),
-          reason: '次の ← から強度が動く');
+      expect(h.visionState.strength, lessThan(before), reason: '次の ← から強度が動く');
     });
   }
 }

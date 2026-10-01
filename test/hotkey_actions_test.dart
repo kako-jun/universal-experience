@@ -11,12 +11,10 @@
 // VisionFilterState を使う 1 本がある。
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:universal_experience/models/disability_type.dart';
-import 'package:universal_experience/services/color_vision_selection.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/hotkey_actions.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 
+import 'support/color_vision_select.dart';
 import 'support/vision_filter_metadata_fixture.dart';
 
 void main() {
@@ -267,21 +265,20 @@ void main() {
 
   group('HotkeyActions.emergencyExit', () {
     // #121: 「フィルタ解除」のホットキーは、重ねている全層を外す（新しいホットキーは足さない）。
-    // main.dart が HotkeyActions へ渡す配線（hotkeyDeactivateFilters）そのものを使って確かめる。
-    test('重ねている全層（色覚を含む）を外し、FilterService も none に戻す', () async {
+    // main.dart が HotkeyActions へ渡す配線（`deactivateFilters: visionFilterState.clear`）と
+    // 同じく、VisionFilterState.clear をそのまま渡して確かめる。
+    test('重ねている全層（色覚を含む）を clear で外す', () async {
       installVisionFilterMetadataFixture();
       addTearDown(resetVisionFilterMetadataProviders);
       final visionState = VisionFilterState();
-      final filterService = FilterService(visionState: visionState);
-      toggleColorVision(filterService, visionState, ColorVisionType.protanopia);
+      selectColorVisionKey(visionState, 'protanopia');
       visionState
         ..toggle('myopia')
         ..toggle('starbursts');
       expect(visionState.layers.length, 3);
-      expect(filterService.currentFilter, ColorVisionType.protanopia);
 
       final actions = HotkeyActions(
-        deactivateFilters: hotkeyDeactivateFilters(filterService, visionState),
+        deactivateFilters: visionState.clear,
         setClickThrough: (value) async {},
         setAlwaysOnTop: (value) async {},
         getClickThrough: () => false,
@@ -298,7 +295,6 @@ void main() {
 
       expect(visionState.layers, isEmpty);
       expect(visionState.selectedId, isNull);
-      expect(filterService.currentFilter, ColorVisionType.none);
     });
 
     test(

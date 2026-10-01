@@ -12,7 +12,7 @@ import 'support/vision_filter_metadata_fixture.dart';
 /// フィルタの parameters 数が sensus payload と一致すること、build() が選択 +
 /// パラメータから正しい VisionFilter を構築することを保証する。
 ///
-/// `VisionFilterState.select()` は選択のたびに sensus ブリッジの
+/// `VisionFilterState.replaceWith()` は選択のたびに sensus ブリッジの
 /// recommended_strength（#77）を呼ぶため、実ブリッジ非対応の `flutter test` では
 /// フィクスチャに差し替える（`test/support/vision_filter_metadata_fixture.dart`）。
 void main() {
@@ -219,7 +219,7 @@ void main() {
       final state = VisionFilterState();
       var notified = 0;
       state.addListener(() => notified++);
-      state.select('protanopia');
+      state.replaceWith('protanopia');
       expect(state.selectedId, 'protanopia');
       expect(notified, 1);
       state.clear();
@@ -230,23 +230,23 @@ void main() {
 
     test('未知 id の select は ArgumentError', () {
       final state = VisionFilterState();
-      expect(() => state.select('nope'), throwsArgumentError);
+      expect(() => state.replaceWith('nope'), throwsArgumentError);
     });
 
     test('payload なし: protanopia を構築', () {
-      final state = VisionFilterState()..select('protanopia');
+      final state = VisionFilterState()..replaceWith('protanopia');
       expect(state.build(), const VisionFilter.protanopia());
     });
 
     test('payload なし全種が例外なく構築できる', () {
       for (final entry in kVisionFilterCatalog) {
-        final state = VisionFilterState()..select(entry.id);
+        final state = VisionFilterState()..replaceWith(entry.id);
         expect(state.build(), isNotNull, reason: entry.id);
       }
     });
 
     test('float payload: astigmatism の axisDeg を反映', () {
-      final state = VisionFilterState()..select('astigmatism');
+      final state = VisionFilterState()..replaceWith('astigmatism');
       // デフォルト 90.0
       expect(state.build(), const VisionFilter.astigmatism(axisDeg: 90.0));
       state.setParam('axisDeg', 45.0);
@@ -254,7 +254,7 @@ void main() {
     });
 
     test('enum payload: glaucoma の mode を反映', () {
-      final state = VisionFilterState()..select('glaucoma');
+      final state = VisionFilterState()..replaceWith('glaucoma');
       // デフォルト vignette / darken
       expect(
         state.build(),
@@ -274,7 +274,7 @@ void main() {
     });
 
     test('未知の mode 文字列は vignette にフォールバックする', () {
-      final state = VisionFilterState()..select('glaucoma');
+      final state = VisionFilterState()..replaceWith('glaucoma');
       state.setParam('mode', 'not-a-real-mode');
       expect(
         state.build(),
@@ -286,7 +286,7 @@ void main() {
     });
 
     test('glaucoma の fieldLossMode は常に darken で構築される（カタログに公開しない、#56）', () {
-      final state = VisionFilterState()..select('glaucoma');
+      final state = VisionFilterState()..replaceWith('glaucoma');
       // fieldLossMode はカタログにパラメータが無いため setParam しても build() の
       // switch は _raw() ではなく VisionFieldLossMode.darken を直接使う。
       state.setParam('fieldLossMode', 'blur');
@@ -301,7 +301,7 @@ void main() {
     });
 
     test('seed + float payload: floaters を全パラメータで構築', () {
-      final state = VisionFilterState()..select('floaters');
+      final state = VisionFilterState()..replaceWith('floaters');
       state.setParam('seed', 7);
       state.setParam('density', 0.3);
       state.setParam('size', 0.4);
@@ -320,7 +320,7 @@ void main() {
     });
 
     test('enum payload: hemianopia の side が left=0.0 / right=1.0', () {
-      final state = VisionFilterState()..select('hemianopia');
+      final state = VisionFilterState()..replaceWith('hemianopia');
       // デフォルト left / darken
       expect(
         state.build(),
@@ -340,7 +340,7 @@ void main() {
     });
 
     test('未知の side 文字列は left（0.0）にフォールバックする', () {
-      final state = VisionFilterState()..select('hemianopia');
+      final state = VisionFilterState()..replaceWith('hemianopia');
       state.setParam('side', 'not-a-real-side');
       expect(
         state.build(),
@@ -354,7 +354,7 @@ void main() {
     test(
         'macular_degeneration / tunnel_vision は fieldLossMode 常に darken で構築される'
         '（カタログに公開しない、#56）', () {
-      final macular = VisionFilterState()..select('macular_degeneration');
+      final macular = VisionFilterState()..replaceWith('macular_degeneration');
       expect(
         macular.build(),
         const VisionFilter.macularDegeneration(
@@ -362,7 +362,7 @@ void main() {
         ),
       );
 
-      final tunnel = VisionFilterState()..select('tunnel_vision');
+      final tunnel = VisionFilterState()..replaceWith('tunnel_vision');
       expect(
         tunnel.build(),
         const VisionFilter.tunnelVision(
@@ -372,23 +372,23 @@ void main() {
     });
 
     test('int payload: detail_loss の cellSize を反映', () {
-      final state = VisionFilterState()..select('detail_loss');
+      final state = VisionFilterState()..replaceWith('detail_loss');
       state.setParam('cellSize', 16);
       expect(state.build(), const VisionFilter.detailLoss(cellSize: 16));
     });
 
     test('select でパラメータが当該フィルタの default に初期化される', () {
-      final state = VisionFilterState()..select('floaters');
+      final state = VisionFilterState()..replaceWith('floaters');
       // floaters の default を保持
       expect(state.params['density'], 0.5);
       // 別フィルタへ切替えると floaters の param は消える
-      state.select('astigmatism');
+      state.replaceWith('astigmatism');
       expect(state.params.containsKey('density'), isFalse);
       expect(state.params['axisDeg'], 90.0);
     });
 
     test('strength は 0..1 に clamp して notify', () {
-      final state = VisionFilterState()..select('cataract');
+      final state = VisionFilterState()..replaceWith('cataract');
       var notified = 0;
       state.addListener(() => notified++);
       state.setStrength(0.5);
@@ -401,13 +401,13 @@ void main() {
     });
 
     test('select で seed param の既定値が BigInt.zero（int/double を経由しない）', () {
-      final state = VisionFilterState()..select('cataract');
+      final state = VisionFilterState()..replaceWith('cataract');
       expect(state.params['seed'], isA<BigInt>());
       expect(state.params['seed'], BigInt.zero);
     });
 
     test('randomizeSeed は seed param を 0..u64max の BigInt に更新', () {
-      final state = VisionFilterState()..select('cataract');
+      final state = VisionFilterState()..replaceWith('cataract');
       state.randomizeSeed('seed');
       final v = state.params['seed'];
       expect(v, isA<BigInt>());
@@ -418,7 +418,7 @@ void main() {
     });
 
     test('randomizeSeed は 2^53 超の値にも到達できる（BigInt 経路の証跡）', () {
-      final state = VisionFilterState()..select('cataract');
+      final state = VisionFilterState()..replaceWith('cataract');
       final threshold = BigInt.one << 53;
       var sawLarge = false;
       // u64 範囲では 1 回の生成が 2^53 を超える確率が 99.9% 超。数十回試せば
@@ -431,7 +431,7 @@ void main() {
     });
 
     test('seed は 2^53 超の BigInt を精度欠落なく往復できる', () {
-      final state = VisionFilterState()..select('floaters');
+      final state = VisionFilterState()..replaceWith('floaters');
       // double 経由なら丸められてしまう値。
       final big = (BigInt.one << 63) + BigInt.from(123456789);
       state.setParam('seed', big);

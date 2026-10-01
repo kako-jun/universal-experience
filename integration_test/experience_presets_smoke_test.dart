@@ -19,12 +19,9 @@ import 'package:integration_test/integration_test.dart';
 import 'package:provider/provider.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/preview_image_source.dart';
 import 'package:universal_experience/models/sample_catalog.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
-import 'package:universal_experience/services/color_vision_selection.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/native_bridge_service.dart';
 import 'package:universal_experience/services/preview_selection.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
@@ -33,6 +30,7 @@ import 'package:universal_experience/src/rust/frb_generated.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
+import '../test/support/color_vision_select.dart';
 
 /// 統合フィルタ一覧（#72）を固定高さで置くヘルパ。体験プリセットは一覧の最上段に
 /// 並ぶので、4 行とも初期表示で見える高さにしてある。
@@ -64,8 +62,6 @@ Widget _presetsApp() {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider.value(value: visionState),
-      ChangeNotifierProvider(
-          create: (_) => FilterService(visionState: visionState)),
     ],
     child: const MaterialApp(
       // システムロケールに追従させると、実行環境（このリポの開発機は ja）次第で
@@ -93,8 +89,6 @@ Widget _previewWithPresetsApp(ScrollController scrollController) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider.value(value: visionState),
-      ChangeNotifierProvider(
-          create: (_) => FilterService(visionState: visionState)),
     ],
     // ConstrainedBox に const コンストラクタが無いため MaterialApp 以下は
     // const にできない。
@@ -214,23 +208,19 @@ void main() {
       expect(find.byType(ExperiencePresetTile), findsNWidgets(4));
     });
 
-    testWidgets(
-        '行をタップすると層がそのプリセット 1 つに置き換わり、色覚 FilterService も層から導かれて none になる（#120）',
+    testWidgets('行をタップすると層がそのプリセット 1 つに置き換わり、色覚クイック選択の層は無くなる（#120）',
         (tester) async {
       await tester.pumpWidget(_presetsApp());
       await tester.pumpAndSettle();
 
       final context = tester.element(find.byType(FilterBrowser));
       final visionState = context.read<VisionFilterState>();
-      final filterService = context.read<FilterService>();
 
       // タップ前に色覚クイック選択（protanopia の層）を入れておく。体験プリセットは層を
-      // そのプリセット 1 つに置き換えるので、色覚の層は無くなり、FilterService の色覚型も
-      // 層の集合（色覚クイック選択の層が無い）から none に導かれる（#120。かつては
+      // そのプリセット 1 つに置き換えるので、色覚の層は無くなる（#120。かつては
       // プリセット適用が色覚の状態に干渉しない契約だった、#60）。
-      selectColorVision(filterService, visionState, ColorVisionType.protanopia);
+      selectColorVisionKey(visionState, 'protanopia');
       expect(visionState.layers.map((l) => l.id), ['protanopia']);
-      expect(filterService.currentFilter, ColorVisionType.protanopia);
 
       final en = lookupAppLocalizations(const Locale('en'));
       await tester.tap(find.text(en.experienceMeniere));
@@ -241,8 +231,7 @@ void main() {
           reason: 'プリセット選択は層を全部そのプリセット 1 つに置き換える');
       expect(visionState.selectedId, 'vertigo');
       expect(visionState.selectedPresetId, 'meniere');
-      expect(filterService.currentFilter, ColorVisionType.none,
-          reason: '色覚クイック選択の層が無くなったので、FilterService も none に導かれる');
+      expect(visionState.focusedVariantId, isNull);
     });
   });
 
@@ -402,10 +391,10 @@ void main() {
     for (final entry in kVisionFilterCatalog) {
       testWidgets('${entry.id}: visionShaderGlsl / visionUniformLayout が例外なく返る',
           (tester) async {
-        // VisionFilterState.select() がカタログの defaultValue で payload を
+        // VisionFilterState.replaceWith() がカタログの defaultValue で payload を
         // 埋めるので、payload 付きフィルタも UI と同じ経路で実インスタンス化する
         // （手書きの座標値をここで重複定義しない）。
-        final state = VisionFilterState()..select(entry.id);
+        final state = VisionFilterState()..replaceWith(entry.id);
         final filter = state.build();
         expect(filter, isNotNull, reason: '${entry.id} が build() できなかった');
 

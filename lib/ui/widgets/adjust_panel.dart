@@ -4,8 +4,6 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_contract_notes.dart';
-import '../../services/color_vision_selection.dart';
-import '../../services/filter_service.dart';
 import '../../services/layer_consult_notice.dart';
 import '../../services/vision_filter_state.dart';
 import '../../services/vision_layer.dart';
@@ -43,8 +41,8 @@ class AdjustPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    return Consumer2<VisionFilterState, FilterService>(
-      builder: (context, state, filterService, _) {
+    return Consumer<VisionFilterState>(
+      builder: (context, state, _) {
         final hasSelection = state.selectedId != null;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -63,11 +61,8 @@ class AdjustPanel extends StatelessWidget {
                 ),
                 TextButton.icon(
                   // 色覚・advanced・プリセットのどの選択でも、選択を丸ごと
-                  // 外す唯一の入口（`color_vision_selection.dart` 経由で
-                  // FilterService と VisionFilterState の両方を更新する）。
-                  onPressed: hasSelection
-                      ? () => deactivateColorVision(filterService, state)
-                      : null,
+                  // 外す唯一の入口（`VisionFilterState.clear`）。
+                  onPressed: hasSelection ? state.clear : null,
                   icon: const Icon(Icons.clear, size: 18),
                   label: Text(l10n.clearFilter),
                 ),
@@ -239,7 +234,7 @@ class _FocusedSection extends StatelessWidget {
     final theme = Theme.of(context);
     final secondary = theme.colorScheme.onSurfaceVariant;
     final experience = selectedExperience(state);
-    final colorType = state.colorVisionType;
+    final focusKey = state.focusedLayer?.strengthKey;
     final entry = state.selectedEntry;
     final provenanceFilter = state.build();
 
@@ -249,7 +244,11 @@ class _FocusedSection extends StatelessWidget {
       name = experienceName(l10n, experience.id);
       categoryLabel = l10n.experienceSectionTitle;
     } else {
-      name = visionFilterDisplayName(l10n, colorType, state.selectedId);
+      name = visionFilterDisplayName(
+        l10n,
+        state.focusedVariantId,
+        state.selectedId,
+      );
       categoryLabel =
           entry == null ? null : visionCategoryName(l10n, entry.category);
     }
@@ -261,10 +260,12 @@ class _FocusedSection extends StatelessWidget {
     if (experience != null) {
       description = experienceDescription(l10n, experience.id);
       prevalence = null;
-    } else if (colorType != null) {
-      description = colorVisionTypeDescription(l10n, colorType);
-      prevalence =
-          l10n.prevalenceLabel(colorVisionTypePrevalence(l10n, colorType));
+    } else if (focusKey != null &&
+        visionFilterDescription(l10n, focusKey) != null) {
+      description = visionFilterDescription(l10n, focusKey);
+      prevalence = l10n.prevalenceLabel(
+        visionFilterPrevalence(l10n, focusKey)!,
+      );
     } else {
       description = null;
       prevalence = null;

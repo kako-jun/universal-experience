@@ -1,11 +1,10 @@
-// HomeScreen のプレビュー（_buildPreviewSection の Consumer2<VisionFilterState,
-// FilterService> → BeforeAfterView）が、FilterService.setIntensity に追従する
-// ことの回帰テスト（#57）。
+// HomeScreen のプレビュー（_buildPreviewSection の Consumer<VisionFilterState>
+// → BeforeAfterView）が、VisionFilterState.setStrength（強度の唯一の正本）に
+// 追従することの回帰テスト（#57）。
 //
-// #57 修正の要点は「intensity の通知経路を FilterService 自身に閉じ込め、
-// SettingsService（延いては MaterialApp）には伝播させない」こと
-// （intensity_rebuild_test.dart 参照）。その副作用で「Consumer2 を使う場所には
-// 従来通り正しく伝わる」ことを別途確認しておく。
+// #57 の要点は「強度の通知が SettingsService（延いては MaterialApp）には伝播せず、
+// Consumer を使う場所には正しく伝わる」こと（intensity_rebuild_test.dart 参照）。
+// その「正しく伝わる」側を、状態 1 系統になった今も画面で確認しておく。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -13,10 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/main.dart' show WindowModeUiContext;
-import 'package:universal_experience/services/color_vision_selection.dart';
-import 'package:universal_experience/services/filter_service.dart';
 import 'package:universal_experience/services/hotkey_service.dart';
 import 'package:universal_experience/services/image_source_state.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
@@ -28,6 +24,7 @@ import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
 import 'support/vision_filter_metadata_fixture.dart';
+import 'support/color_vision_select.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -46,7 +43,7 @@ void main() {
   });
 
   testWidgets(
-      'FilterService.setIntensity のあと、プレビューの BeforeAfterView.intensity が追従する',
+      'VisionFilterState.setStrength のあと、プレビューの BeforeAfterView.strength が追従する',
       (WidgetTester tester) async {
     // HomeScreen は縦に長い ListView。全セクションが一度に Element 化されるよう
     // 十分に高いビューポートにする（i18n_test.dart と同じ手法。scroll 不要）。
@@ -58,16 +55,12 @@ void main() {
     final settings = SettingsService();
     await settings.load();
     final visionState = VisionFilterState();
-    final filterService = FilterService(visionState: visionState);
-    // #60: home_screen はもう FilterService の変化を VisionFilterState へ
-    // ミラーしない。selectColorVision が両方を明示的に更新する唯一の入口。
-    selectColorVision(filterService, visionState, ColorVisionType.protanopia);
+    selectColorVisionKey(visionState, 'protanopia');
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider<SettingsService>.value(value: settings),
-          ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
           ChangeNotifierProvider<ImageSourceState>(
             create: (_) => ImageSourceState(),
@@ -99,17 +92,14 @@ void main() {
     BeforeAfterView currentPreview() =>
         tester.widget<BeforeAfterView>(find.byType(BeforeAfterView));
 
-    expect(currentPreview().strength, filterService.intensity);
-    expect(currentPreview().strength, 1.0); // protanopia の recommendedStrength
+    expect(currentPreview().strength, visionState.strength);
+    expect(currentPreview().strength, 1.0); // protanopia の既定強度
 
-    filterService.setIntensity(0.33);
+    visionState.setStrength(0.33);
     await tester.pump();
 
     expect(currentPreview().strength, 0.33);
-    expect(currentPreview().strength, filterService.intensity);
-
-    // setIntensity が予約したデバウンス書き込みが pending timer のまま残ると
-    // テストバインディングが失敗させる。確定させておく。
+    expect(currentPreview().strength, visionState.strength);
   });
 
   testWidgets('強度スライダーをドラッグすると VisionFilterState.bypassed が解除される（#63）',
@@ -122,8 +112,7 @@ void main() {
     final settings = SettingsService();
     await settings.load();
     final visionState = VisionFilterState();
-    final filterService = FilterService(visionState: visionState);
-    selectColorVision(filterService, visionState, ColorVisionType.protanopia);
+    selectColorVisionKey(visionState, 'protanopia');
     visionState.acquireBypass('test');
     expect(visionState.bypassed, isTrue);
 
@@ -131,7 +120,6 @@ void main() {
       MultiProvider(
         providers: [
           ChangeNotifierProvider<SettingsService>.value(value: settings),
-          ChangeNotifierProvider<FilterService>.value(value: filterService),
           ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
           ChangeNotifierProvider<ImageSourceState>(
             create: (_) => ImageSourceState(),

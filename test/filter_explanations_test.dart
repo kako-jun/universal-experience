@@ -11,9 +11,7 @@ import 'package:flutter/semantics.dart' show LocaleStringAttribute;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
-import 'package:universal_experience/models/disability_type.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
-import 'package:universal_experience/services/color_vision_selection.dart';
 import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/theme/app_theme.dart';
@@ -24,6 +22,7 @@ import 'package:universal_experience/ui/widgets/filter_provenance.dart';
 
 import 'support/home_screen_harness.dart';
 import 'support/vision_filter_metadata_fixture.dart';
+import 'support/color_vision_select.dart';
 
 const _wide = Size(1280, 1000);
 const _citation =
@@ -53,7 +52,7 @@ void main() {
       await pumpHomeScreen(
         tester,
         size: _wide,
-        select: (f, s) => selectColorVision(f, s, ColorVisionType.protanopia),
+        select: (s) => selectColorVisionKey(s, 'protanopia'),
       );
 
       expect(find.text('モデルと出典'), findsOneWidget);
@@ -67,7 +66,7 @@ void main() {
       await pumpHomeScreen(
         tester,
         size: _wide,
-        select: (f, s) => selectColorVision(f, s, ColorVisionType.protanopia),
+        select: (s) => selectColorVisionKey(s, 'protanopia'),
       );
 
       await expand(tester, 'provenance-model');
@@ -87,7 +86,7 @@ void main() {
       await pumpHomeScreen(
         tester,
         size: _wide,
-        select: (f, s) => selectColorVision(f, s, ColorVisionType.protanopia),
+        select: (s) => selectColorVisionKey(s, 'protanopia'),
       );
       final note = find.byKey(const Key('provenance-source-note'));
 
@@ -118,7 +117,7 @@ void main() {
         tester,
         size: _wide,
         locale: const Locale('en'),
-        select: (f, s) => selectColorVision(f, s, ColorVisionType.protanopia),
+        select: (s) => selectColorVisionKey(s, 'protanopia'),
       );
 
       await expand(tester, 'provenance-limitations');
@@ -138,7 +137,7 @@ void main() {
       await pumpHomeScreen(
         tester,
         size: _wide,
-        select: (f, s) => s.select('tetrachromacy'),
+        select: (s) => s.replaceWith('tetrachromacy'),
       );
 
       await expand(tester, 'provenance-model');
@@ -155,7 +154,7 @@ void main() {
       await pumpHomeScreen(
         tester,
         size: _wide,
-        select: (f, s) => s.select('tetrachromacy'),
+        select: (s) => s.replaceWith('tetrachromacy'),
       );
 
       await expand(tester, 'provenance-limitations');
@@ -172,7 +171,7 @@ void main() {
       await pumpHomeScreen(
         tester,
         size: _wide,
-        select: (f, s) => s.select('tetrachromacy'),
+        select: (s) => s.replaceWith('tetrachromacy'),
       );
 
       await expand(tester, 'provenance-model');
@@ -187,14 +186,14 @@ void main() {
       final h = await pumpHomeScreen(
         tester,
         size: _wide,
-        select: (f, s) => s.selectPreset('meniere', 'vertigo'),
+        select: (s) => s.selectPreset('meniere', 'vertigo'),
       );
       expect(
         find.text(ja.provenanceAboutFilter(visionFilterName(ja, 'vertigo'))),
         findsOneWidget,
       );
 
-      h.visionState.select('vertigo');
+      h.visionState.replaceWith('vertigo');
       await tester.pumpAndSettle();
       expect(find.textContaining('についての情報です'), findsNothing);
     });
@@ -208,7 +207,7 @@ void main() {
         await pumpHomeScreen(
           tester,
           size: _wide,
-          select: (f, s) => selectColorVision(f, s, ColorVisionType.protanopia),
+          select: (s) => selectColorVisionKey(s, 'protanopia'),
         );
         await expand(tester, 'provenance-model');
 
@@ -236,7 +235,7 @@ void main() {
           tester,
           size: _wide,
           locale: const Locale('en'),
-          select: (f, s) => selectColorVision(f, s, ColorVisionType.protanopia),
+          select: (s) => selectColorVisionKey(s, 'protanopia'),
         );
         await expand(tester, 'provenance-model');
 
@@ -269,7 +268,7 @@ void main() {
         tester,
         size: _wide,
         theme: AppTheme.lightTheme,
-        select: (f, s) => selectColorVision(f, s, ColorVisionType.protanopia),
+        select: (s) => selectColorVisionKey(s, 'protanopia'),
       );
 
       for (final key in ['provenance-model', 'provenance-limitations']) {
@@ -286,7 +285,7 @@ void main() {
       await pumpHomeScreen(
         tester,
         size: _wide,
-        select: (f, s) => s.select('cataract'),
+        select: (s) => s.replaceWith('cataract'),
       );
 
       final provenanceTop =
@@ -303,7 +302,7 @@ void main() {
         tester,
         size: _wide,
         theme: AppTheme.lightTheme,
-        select: (f, s) => s.select('floaters'),
+        select: (s) => s.replaceWith('floaters'),
       );
       final before = h.visionState.params['seed'];
       expect(before, BigInt.zero);
@@ -332,7 +331,7 @@ void main() {
         await pumpHomeScreen(
           tester,
           size: _wide,
-          select: (f, s) => s.select('cataract'),
+          select: (s) => s.replaceWith('cataract'),
         );
 
         final data = tester.getSemantics(
@@ -351,7 +350,7 @@ void main() {
       await pumpHomeScreen(
         tester,
         size: _wide,
-        select: (f, s) => s.select('floaters'),
+        select: (s) => s.replaceWith('floaters'),
       );
       final icon = tester.widget<Icon>(find.descendant(
         of: find.widgetWithText(OutlinedButton, 'パターンを変える'),
@@ -365,7 +364,7 @@ void main() {
         tester,
         size: _wide,
         locale: const Locale('en'),
-        select: (f, s) => s.select('flickering_stars'),
+        select: (s) => s.replaceWith('flickering_stars'),
       );
       expect(find.widgetWithText(OutlinedButton, 'Change pattern'),
           findsOneWidget);
@@ -470,7 +469,7 @@ void main() {
       await pumpHomeScreen(
         tester,
         size: _wide,
-        select: (f, s) => s.select('tetrachromacy'),
+        select: (s) => s.replaceWith('tetrachromacy'),
       );
 
       expect(
@@ -486,7 +485,7 @@ void main() {
       await pumpHomeScreen(
         tester,
         size: _wide,
-        select: (f, s) => selectColorVision(f, s, ColorVisionType.protanopia),
+        select: (s) => selectColorVisionKey(s, 'protanopia'),
       );
 
       // 一覧の四色覚の行のバッジは残る。右カラム（調整）には出ない。
@@ -522,7 +521,7 @@ void main() {
       await pumpHomeScreen(
         tester,
         size: _wide,
-        select: (f, s) => s.select('tetrachromacy'),
+        select: (s) => s.replaceWith('tetrachromacy'),
       );
       final badge = find.descendant(
         of: find.byType(AdjustPanel),
