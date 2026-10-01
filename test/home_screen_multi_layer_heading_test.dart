@@ -25,10 +25,7 @@ void main() {
   late ui.Image master;
 
   setUp(installHomeScreenFixtures);
-  tearDown(() {
-    resetHomeScreenFixtures();
-    CpuVisionRenderer.pipelineApplier = CpuVisionRenderer.applyPipeline;
-  });
+  tearDown(resetHomeScreenFixtures);
 
   Future<void> installFakes(WidgetTester tester) async {
     await tester.runAsync(() async {
