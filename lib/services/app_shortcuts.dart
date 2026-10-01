@@ -105,7 +105,8 @@ bool _focusHasAncestor(bool Function(Widget widget) test) {
 }
 
 /// [isFocusOnInteractiveControl] が true の間は無効化される [CallbackAction]
-/// (#63)。↑↓（`_RowAwareCycleAction` 経由）・←→ で使う。
+/// (#63)。←→（[AdjustStrengthIntent]）で使う。↑↓ の `_RowAwareCycleAction`
+/// （`home_screen.dart`）は [CallbackAction] を直接継承し、[isFocusOnInteractiveControl] を自前で呼ぶ。
 class InteractiveFocusAwareCallbackAction<T extends Intent>
     extends CallbackAction<T> {
   InteractiveFocusAwareCallbackAction({required super.onInvoke});

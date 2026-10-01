@@ -563,8 +563,8 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
 ## アプリ内キー操作 (#63)
 
 ウィンドウにフォーカスがある間だけ効くショートカット 5 種（貼り付けは #97 で追加）。実装は
-`lib/services/app_shortcuts.dart`（`Intent` 定義 + `isFocusOnInteractiveControl()` /
-`InteractiveFocusAwareCallbackAction`）+ `lib/services/preview_selection.dart`
+`lib/services/app_shortcuts.dart`（`Intent` 定義 + `isFocusOnInteractiveControl()` / `isFocusOnTextInput()` /
+`InteractiveFocusAwareCallbackAction` / `TextInputAwareCallbackAction`）+ `lib/services/preview_selection.dart`
 （実処理: `adjustPreviewStrength()`）+ `lib/services/filter_list_selection.dart`
 （↑↓ の順送り `nextFilterListEntry()`）+
 `lib/ui/screens/home_screen.dart`（標準 Flutter `Shortcuts`/`Actions`/`Focus` で配線。
@@ -628,9 +628,10 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
   受け口へ戻る。
   キーボード起点かポインタ起点かは、タップ処理の中で `HardwareKeyboard` の Enter/Space の
   押下状態を見て判定する。
-- **`/`・↑↓・←→ はテキスト入力・ボタン・スイッチ等にフォーカスがある間は無効化される**
-  （`isFocusOnInteractiveControl()` による `isEnabled` ガード、#63）。`Esc` だけは
-  このガードの対象外 — クリックスルーからの復帰は常に効く必要があるため。
+- **↑↓・←→ はテキスト入力・ボタン・スイッチ等にフォーカスがある間は無効化される**
+  （`isFocusOnInteractiveControl()` による `isEnabled` ガード、#63）。`/` と `Cmd/Ctrl+V` は
+  上記の狭いガード（テキスト入力中のみ、#97/#141）。`Esc` だけはこのガードの対象外 —
+  クリックスルーからの復帰は常に効く必要があるため。
 - ←→ の強度調整は `adjustPreviewStrength(visionState, delta)` が、フォーカス中の層の
   強度の記憶（`VisionFilterState.strength`）を動かす。色覚でも advanced でも
   同じ記憶（#117）。
