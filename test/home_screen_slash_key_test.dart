@@ -208,17 +208,22 @@ void main() {
         size: wide,
         select: (s) => selectColorVisionKey(s, 'protanopia'),
       );
-      final before = h.visionState.strength;
+      // 初期強度は上限 1.0 で → が効かないため、両方向が実効的になる値にしておく。
+      h.visionState.setStrength(0.5);
+      await tester.pump();
       final chip = find.widgetWithText(ChoiceChip, '色覚');
       await focusInside(tester, chip);
 
-      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-      await tester.pump();
-      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
-      await tester.pump();
-
-      expect(h.visionState.strength, before,
-          reason: 'ボタン・チップ上の ←→ はショートカットに奪われない');
+      for (final key in [
+        LogicalKeyboardKey.arrowRight,
+        LogicalKeyboardKey.arrowLeft,
+      ]) {
+        final before = h.visionState.strength;
+        await tester.sendKeyEvent(key);
+        await tester.pump();
+        expect(h.visionState.strength, before,
+            reason: 'ボタン・チップ上の ${key.keyLabel} はショートカットに奪われない');
+      }
     });
 
     testWidgets('チップにフォーカスがある間の ↓ は、調整中の層の次の行へフォーカスを送るショートカットにならない',
