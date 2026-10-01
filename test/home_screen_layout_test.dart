@@ -768,7 +768,7 @@ void main() {
       }
     });
 
-    testWidgets('末尾で ↓ すると先頭へ折り返し、先頭で ↑ すると末尾へ折り返しても見える', (tester) async {
+    testWidgets('末尾で ↓ すると先頭へ折り返しても見える。先頭で ↑ は検索欄へ戻る', (tester) async {
       final h = await pumpHomeScreen(tester, size: wide);
       final last = kFilterListEntries.last;
 
@@ -785,12 +785,11 @@ void main() {
       expect(rect.top, greaterThanOrEqualTo(listViewport(tester).top - 1),
           reason: '末尾→先頭');
 
+      // 先頭で ↑ は末尾へ折り返さず検索欄へ戻る（#141）。
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
       await tester.pumpAndSettle();
-      expect(focusedRowKey(tester), filterListTileKey(last));
-      rect = tester.getRect(focusedRow(tester));
-      expect(rect.bottom, lessThanOrEqualTo(listViewport(tester).bottom + 1),
-          reason: '先頭→末尾');
+      expect(
+          tester.binding.focusManager.primaryFocus?.debugLabel, 'filterSearch');
       expect(h.visionState.layers, isEmpty, reason: '↑↓ では選ばない');
     });
   });
