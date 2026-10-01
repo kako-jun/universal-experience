@@ -16,13 +16,12 @@ import 'package:universal_experience/services/vision_filter_snapshot.dart';
 import 'package:universal_experience/services/filter_list_selection.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/settings_service.dart';
-import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
 import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 
-import 'support/vision_filter_metadata_fixture.dart';
 import 'support/color_vision_select.dart';
+import 'support/home_screen_harness.dart';
 
 /// isFocusOnInteractiveControl のテスト専用ダミー Intent（本番の 3 Intent の
 /// 代わりに、ガードのロジックだけを最小構成で検証するために使う）。
@@ -34,12 +33,13 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
+    // 体験・メタデータ・プレビューの読み込み/適用をハーネスの fixture（Rust 非依存、
+    // #127/#131）に揃える。体験プリセットの行はキー移動の対象に混ざらないよう空にする。
+    installHomeScreenFixtures();
     experiencesProvider = () => const [];
-    installVisionFilterMetadataFixture();
   });
   tearDown(() async {
-    experiencesProvider = experiences;
-    resetVisionFilterMetadataProviders();
+    resetHomeScreenFixtures();
     // トップレベル共有シングルトンをテスト間で汚染しない（#63）。clear() は強度の
     // 記憶を消さない（同じフィルタを選び直したときに戻すため）ので、空の snapshot で
     // 記憶ごと初期状態へ戻す。

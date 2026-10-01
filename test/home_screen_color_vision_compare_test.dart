@@ -25,12 +25,7 @@ void main() {
   late ui.Image master;
 
   setUp(installHomeScreenFixtures);
-  tearDown(() {
-    resetHomeScreenFixtures();
-    previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
-    afterImageRenderer = BeforeAfterView.renderAfter;
-    CpuVisionRenderer.pipelineApplier = CpuVisionRenderer.applyPipeline;
-  });
+  tearDown(resetHomeScreenFixtures);
 
   /// afterImageRenderer に渡された強さの記録（[installFakes] が積む）。
   final renderedStrengths = <double>[];

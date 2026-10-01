@@ -73,6 +73,16 @@
 > との一致・escalation 条件文の訳漏れ検知は
 > `integration_test/vision_filter_urgency_parity_test.dart` が検証する。
 >
+> `HomeScreen` / `UniversalExperienceApp` を pump する widget test は、このメタデータ
+> に加えて体験プリセットとプレビューの読み込み/適用（`previewSourceImageLoader` /
+> `afterImageRenderer`）・2 層以上の合成（`CpuVisionRenderer.pipelineApplier`）も
+> 実ブリッジに届くため、`setUp` で
+> `test/support/home_screen_harness.dart` の `installHomeScreenFixtures()`、
+> `tearDown` で `resetHomeScreenFixtures()` を呼んで一括で Rust 非依存に固定する
+> （実レンダラが残ると、`tester.runAsync` で実時間が進んだときに RustLib 未初期化の
+> 非同期例外が走行中の別テストへ漏れる、#127/#131。契約は
+> `test/home_screen_harness_test.dart`）。
+>
 > escalation は UI（`ConsultNoticeBlock`）だけでなく PNG
 > （`ExportCaption.escalationGroups`）でも emergency/earlyConsultation の
 > 見出しで段を分ける。PNG 用の短い免責文は「診断ではない旨」と「根拠」

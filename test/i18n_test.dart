@@ -13,26 +13,17 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
-import 'package:universal_experience/main.dart' show WindowModeUiContext;
 import 'package:universal_experience/models/sample_catalog.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
-import 'package:universal_experience/services/hotkey_service.dart';
-import 'package:universal_experience/services/image_source_state.dart';
-import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/settings_service.dart';
-import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/services/vision_filter_metadata.dart';
-import 'package:universal_experience/ui/screens/home_screen.dart';
-import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
-import 'support/vision_filter_metadata_fixture.dart';
+import 'support/home_screen_harness.dart';
 
 Map<String, dynamic> _readArb(String name) {
   final file = File('lib/l10n/$name');
@@ -292,87 +283,18 @@ void main() {
   });
 
   group('HomeScreen ロケール別描画', () {
-    // HomeScreen は体験プリセット集 (#19) が bridge の experiences() を呼ぶ。FFI 未
-    // ロードの flutter test では native を叩けないため、fixture で seam を差し替える。
-    // VisionFilterState の選択も urgency/recommended_strength（#76/#77）で実
-    // ブリッジを要求するため、既定は installVisionFilterMetadataFixture()
-    // （urgency=none 一律）にする。urgency を検証するテストだけ個別に上書きする。
-    setUp(() {
-      installVisionFilterMetadataFixture();
-      experiencesProvider = () => const [
-            Experience(
-              id: 'meniere',
-              vision: VisionFilter.vertigo(),
-              hearing: HearingFilter.meniere(),
-              urgency: Urgency.earlyConsultation,
-            ),
-            Experience(
-              id: 'bppv',
-              vision: VisionFilter.bppvRotation(),
-              urgency: Urgency.none,
-            ),
-            Experience(
-              id: 'vestibular_neuritis',
-              vision: VisionFilter.vestibularNeuritis(),
-              urgency: Urgency.emergency,
-            ),
-            Experience(
-              id: 'labyrinthitis',
-              vision: VisionFilter.vertigo(),
-              hearing: HearingFilter.labyrinthitis(),
-              urgency: Urgency.earlyConsultation,
-            ),
-          ];
-    });
-    tearDown(() {
-      experiencesProvider = experiences;
-      resetVisionFilterMetadataProviders();
-    });
+    // HomeScreen は体験プリセット集 (#19) が bridge の experiences() を呼び、選択は
+    // urgency/recommended_strength（#76/#77）で実ブリッジを要求する。FFI 未ロードの
+    // flutter test では native を叩けないため、ハーネスの fixture（Rust 非依存。
+    // プレビューの読み込み/適用も含む、#127/#131）で seam を差し替える。urgency を
+    // 検証するテストだけ個別に上書きする。
+    setUp(installHomeScreenFixtures);
+    tearDown(resetHomeScreenFixtures);
 
-    Future<void> pumpHome(WidgetTester tester, Locale locale) async {
-      // HomeScreen は ListView で縦に長いため、全セクションが lazy build されるよう
-      // 十分に高いビューポートにする（小さいと下のセクションが未生成で見つからない）。
-      tester.view.physicalSize = const Size(1200, 4000);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.reset);
-
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final settings = SettingsService();
-      await settings.load();
-      await settings.setLocale(locale);
-      final visionState = VisionFilterState();
-
-      await tester.pumpWidget(
-        MultiProvider(
-          providers: [
-            ChangeNotifierProvider<SettingsService>.value(value: settings),
-            ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
-            ChangeNotifierProvider<ImageSourceState>(
-                create: (_) => ImageSourceState()),
-            ChangeNotifierProvider<LoupeWindowController>(
-                create: (_) => LoupeWindowController()),
-            Provider<WindowModeUiContext>.value(
-              value: const WindowModeUiContext(
-                trayAvailable: false,
-                hotkeyStatus: HotkeyStatus(),
-              ),
-            ),
-          ],
-          child: MaterialApp(
-            locale: locale,
-            localizationsDelegates: const [
-              AppLocalizations.delegate,
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: const HomeScreen(),
-          ),
-        ),
-      );
-      await tester.pump();
-    }
+    // HomeScreen は ListView で縦に長いため、全セクションが lazy build されるよう
+    // 十分に高いビューポートにする（小さいと下のセクションが未生成で見つからない）。
+    Future<HomeScreenHarness> pumpHome(WidgetTester tester, Locale locale) =>
+        pumpHomeScreen(tester, size: const Size(1200, 4000), locale: locale);
 
     testWidgets('ja では日本語の見出し・空状態・検索欄が出る', (tester) async {
       await pumpHome(tester, const Locale('ja'));
@@ -409,12 +331,10 @@ void main() {
               ? Urgency.emergency
               : Urgency.none;
 
-      await pumpHome(tester, const Locale('en'));
+      final h = await pumpHome(tester, const Locale('en'));
       final en = lookupAppLocalizations(const Locale('en'));
 
-      final state =
-          tester.element(find.byType(HomeScreen)).read<VisionFilterState>();
-      state.replaceWith('vestibular_neuritis');
+      h.visionState.replaceWith('vestibular_neuritis');
       await tester.pump();
 
       // 右カラム（AdjustPanel → FilterParamPanel）に緊急受診メッセージが 1 件。
