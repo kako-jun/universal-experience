@@ -15,6 +15,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/main.dart' show WindowModeUiContext;
+import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
 import 'package:universal_experience/services/hotkey_service.dart';
 import 'package:universal_experience/services/image_source_state.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
@@ -69,11 +70,15 @@ List<Experience> fixtureExperiences() => const [
 ///   実時間次第で、`runAsync` の有無で揺れていた）。画像が載った状態を見たい
 ///   テストは、`setUp` のあとで [fixturePreviewImage] を返すローダに差し替える。
 /// - 適用: フィルタを掛けず入力の複製を返す（Rust に触れない）。
+/// - 複数層の合成（[CpuVisionRenderer.pipelineApplier]、#119）: 同じく入力の複製を
+///   返す。2 層以上を選んだプレビューも [afterImageRenderer] ではなくこちらを通るため、
+///   差し替えないと実 Rust に届く。
 void installHomeScreenFixtures() {
   experiencesProvider = fixtureExperiences;
   installVisionFilterMetadataFixture();
   previewSourceImageLoader = (source, size) => Completer<ui.Image>().future;
   afterImageRenderer = (source, filter, strength) async => source.clone();
+  CpuVisionRenderer.pipelineApplier = (source, steps) async => source.clone();
 }
 
 /// [installHomeScreenFixtures] を元に戻す。
@@ -82,6 +87,7 @@ void resetHomeScreenFixtures() {
   resetVisionFilterMetadataProviders();
   previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
   afterImageRenderer = BeforeAfterView.renderAfter;
+  CpuVisionRenderer.pipelineApplier = CpuVisionRenderer.applyPipeline;
 }
 
 /// 画像のエンコード/デコードを待たずに作れる、単色の小さな [ui.Image]。
