@@ -7,8 +7,11 @@ import 'image_source_picker.dart' show pickAndLoadUserImage;
 
 /// First-run empty-state banner (#78): shown once, points at the two things
 /// a first-time visitor can do next — pick a different way of seeing, or try
-/// it with their own photo. Dismissing it (the close button, or a
-/// successful action) persists via `SettingsService.dismissWelcomeBanner`
+/// it with their own photo. Dismissing it (the close button, a successful
+/// action here, or any user-driven change of the filter selection or the
+/// preview image elsewhere on the screen, #143 — see
+/// `dismissWelcomeBannerOnUserChange`) persists via
+/// `SettingsService.dismissWelcomeBanner`
 /// and it never reappears (`SettingsService.welcomeBannerDismissed`).
 ///
 /// - "Choose another way of seeing" moves focus to the search field of the

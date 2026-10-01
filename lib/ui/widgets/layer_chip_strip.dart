@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
+import '../../services/settings_service.dart'
+    show dismissWelcomeBannerOnUserChange;
 import '../../services/vision_filter_state.dart';
 import 'filter_list_tile.dart' show LayerOrderBadge;
 
@@ -42,11 +44,17 @@ class LayerChipStrip extends StatelessWidget {
                   name: visionLayerDisplayName(l10n, layers[i]),
                   focused: layers[i].id == state.focusedId,
                   onFocus: () => state.focusLayer(layers[i].id),
-                  onRemove: () => state.remove(layers[i].id),
+                  onRemove: () {
+                    state.remove(layers[i].id);
+                    dismissWelcomeBannerOnUserChange(context);
+                  },
                 ),
               TextButton.icon(
                 key: const ValueKey('layer_strip_clear_all'),
-                onPressed: state.clear,
+                onPressed: () {
+                  state.clear();
+                  dismissWelcomeBannerOnUserChange(context);
+                },
                 icon: const Icon(Icons.clear, size: 18),
                 label: Text(l10n.layerStripClearAll),
               ),

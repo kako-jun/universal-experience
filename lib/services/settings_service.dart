@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../l10n/locale_resolution.dart';
@@ -114,5 +115,32 @@ class SettingsService extends ChangeNotifier {
       (m) => m.name == name,
       orElse: () => ThemeMode.system,
     );
+  }
+}
+
+/// ユーザー操作でフィルタ選択か原画が変わったとき、ウェルカムバナー（#78）を閉じる（#143）。
+///
+/// **ユーザー操作の入口（タップ・ボタン）でだけ呼ぶ**。起動時の復元・初期選択・推奨サンプルへの
+/// 自動追従（`VisionFilterState` / `ImageSourceState` 側の変更）では呼ばない。バナーが残ったまま
+/// 画面が「推奨の既定」と食い違うのを避けるための入口で、`SettingsService` を提供しない
+/// 分離ウィジェットテストでは何もしない。
+void dismissWelcomeBannerOnUserChange(BuildContext context) {
+  welcomeBannerDismisserOf(context)();
+}
+
+/// [dismissWelcomeBannerOnUserChange] の「参照を先に取る」版。`await` をまたいで
+/// 閉じたいとき（画像の読み込みなど）、頭で呼んでおき、await 後はこの戻り値を呼ぶ。
+/// await 後に `context` が外れていても取りこぼさない。
+///
+/// `SettingsService` が無い文脈（分離ウィジェットテスト）では何もしない関数を返す。
+/// `ProviderNotFoundException` を握りつぶすのはそのため。トレードオフとして、本番の
+/// ツリーで Provider が抜けるバグがあっても例外にならず、静かにバナーが閉じなくなる
+/// （本番では `main.dart` が必ず提供する）。
+VoidCallback welcomeBannerDismisserOf(BuildContext context) {
+  try {
+    final settings = context.read<SettingsService>();
+    return () => settings.dismissWelcomeBanner();
+  } on ProviderNotFoundException {
+    return () {};
   }
 }

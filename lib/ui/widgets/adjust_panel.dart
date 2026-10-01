@@ -5,6 +5,8 @@ import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_contract_notes.dart';
 import '../../services/layer_consult_notice.dart';
+import '../../services/settings_service.dart'
+    show dismissWelcomeBannerOnUserChange;
 import '../../services/vision_filter_state.dart';
 import '../../services/vision_layer.dart';
 import 'consult_notice_block.dart';
@@ -62,7 +64,12 @@ class AdjustPanel extends StatelessWidget {
                 TextButton.icon(
                   // 色覚・advanced・プリセットのどの選択でも、選択を丸ごと
                   // 外す唯一の入口（`VisionFilterState.clear`）。
-                  onPressed: hasSelection ? state.clear : null,
+                  onPressed: hasSelection
+                      ? () {
+                          state.clear();
+                          dismissWelcomeBannerOnUserChange(context);
+                        }
+                      : null,
                   icon: const Icon(Icons.clear, size: 18),
                   label: Text(l10n.clearFilter),
                 ),

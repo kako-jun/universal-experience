@@ -1131,7 +1131,14 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   `requestFocus()` してから dismiss する（#78）。「自分の画像で
   試す」は `pickAndLoadUserImage` の成否（`bool`）を見て、キャンセル/失敗では
   dismiss しない（#78。ピッカーをキャンセルしただけなのにバナーが
-  消えると再度の呼び出し手段を失うため）
+  消えると再度の呼び出し手段を失うため）。さらに #143 で、ユーザー操作の入口（一覧の行・
+  体験プリセット・`LayerChipStrip` の ✕/すべて解除・調整パネルの「フィルタを解除」・`ImageSourcePicker` のサンプル切替/画像読込/解除/推奨へ戻す）
+  から `dismissWelcomeBannerOnUserChange(context)`（`settings_service.dart`）で閉じる。
+  `VisionFilterState`/`ImageSourceState` 自体の変更は監視しない（起動時の復元・
+  `seedInitialLayers`・推奨サンプルへの自動追従と区別するため）。トレイ・ホットキー経由の
+  選択では閉じない
+- カテゴリチップ（`FilterBrowser`）: 検索語があるあいだ（`isSearching`）は全チップを非選択表示（チェック・選択色なし。通常の非選択チップと同じ見た目）にする。
+  `FilterBrowserController.category` は保持し、検索語を消すと元の選択表示に戻る（#143）
 
 ### 過去の設計: system-wide プラグイン（#13 で撤去）
 
