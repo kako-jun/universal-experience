@@ -70,9 +70,16 @@ class FilterBrowserController extends ChangeNotifier {
   /// Space/Enter）。行にフォーカスが無いときは、[from]（調整中の層の行）の次・前の行へ入る。
   /// [from] が無い・見えている行に無いときは、順送りは先頭・逆送りは末尾の行へ入る。
   /// 選べない行（上限で無効）は飛ばす。末尾の次は先頭へ折り返す。
+  ///
+  /// 先頭の行（フォーカスできる最初の行）で逆送りすると、折り返さず検索欄へ戻る（#141）。
   void moveRowFocus({required bool forward, FilterListEntry? from}) {
     final visible = visibleEntries;
-    var current = focusedRowEntry ?? from;
+    final onRow = focusedRowEntry;
+    if (!forward && onRow != null && identical(onRow, _firstFocusableRow())) {
+      searchFocus.requestFocus();
+      return;
+    }
+    var current = onRow ?? from;
     for (var i = 0; i < visible.length; i++) {
       final next = nextFilterListEntry(visible, current, forward: forward);
       if (next == null) return;
@@ -83,6 +90,34 @@ class FilterBrowserController extends ChangeNotifier {
       }
       current = next;
     }
+  }
+
+  /// 今見えている行のうち、フォーカスできる最初の行（無ければ null）。
+  FilterListEntry? _firstFocusableRow() {
+    for (final e in visibleEntries) {
+      final node = rowFocusNode(e);
+      if (node.canRequestFocus && node.context != null) return e;
+    }
+    return null;
+  }
+
+  /// 検索欄にフォーカスがあるか（検索欄の ↓ を奪うかの判定に使う、#141）。
+  bool get isSearchFocused => searchFocus.hasPrimaryFocus;
+
+  /// 検索欄の ↓（#141）: 今見えている先頭の行へフォーカスを移す。選択は変えない。
+  /// 見えている行が 0 件なら何もしない。IME 変換中（未確定文字がある間）は奪わない
+  /// ので呼ばれない側（[isSearchDownEnabled]）で弾く。
+  void focusFirstRow() {
+    final first = _firstFocusableRow();
+    if (first != null) rowFocusNode(first).requestFocus();
+  }
+
+  /// 検索欄の ↓ を「先頭の行へ移す」に割り当てるか: 検索欄にフォーカスがあり、IME の
+  /// 未確定文字（変換中）が無いとき。
+  bool get isSearchDownEnabled {
+    if (!isSearchFocused) return false;
+    final composing = search.value.composing;
+    return !composing.isValid || composing.isCollapsed;
   }
 
   /// 検索語が空か。

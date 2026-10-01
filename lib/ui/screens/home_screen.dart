@@ -157,9 +157,17 @@ class _HomeScreenState extends State<HomeScreen> {
           // Space/Enter、#120）。行にフォーカスがある間も受ける（ListTile の標準の移動だと、
           // 上限で無効の行や絞り込みの外へ出てしまうため）。ボタン・入力欄など行以外の
           // 操作部品の上では奪わない。
+          //
+          // 例外として、検索欄にフォーカスがある間の ↓ だけは奪い、今見えている先頭の行へ
+          // フォーカスを移す（行の先頭での ↑ は検索欄へ戻る。#141）。
           CycleFilterIntent: _RowAwareCycleAction(
             isRowFocused: () => _browser.isRowFocused,
+            isSearchDown: () => _browser.isSearchDownEnabled,
             onInvoke: (intent) {
+              if (_browser.isSearchFocused) {
+                _browser.focusFirstRow();
+                return null;
+              }
               // 行にフォーカスが無いときは、調整中の層の行から送る（先頭からではなく）。
               final focused = context.read<VisionFilterState>().focusedLayer;
               _browser.moveRowFocus(
@@ -525,13 +533,22 @@ class _ThemeModeButton extends StatelessWidget {
 /// 無効（[InteractiveFocusAwareCallbackAction] と同じ）だが、フォーカスが一覧の行
 /// （[FilterBrowserController.isRowFocused]）にあるときは例外として有効にする。
 class _RowAwareCycleAction extends CallbackAction<CycleFilterIntent> {
-  _RowAwareCycleAction({required this.isRowFocused, required super.onInvoke});
+  _RowAwareCycleAction({
+    required this.isRowFocused,
+    required this.isSearchDown,
+    required super.onInvoke,
+  });
 
   final bool Function() isRowFocused;
 
+  /// 検索欄の ↓ を先頭行への移動として受けてよいか（#141）。
+  final bool Function() isSearchDown;
+
   @override
   bool isEnabled(CycleFilterIntent intent) =>
-      isRowFocused() || !isFocusOnInteractiveControl();
+      isRowFocused() ||
+      (intent.forward && isSearchDown()) ||
+      !isFocusOnInteractiveControl();
 }
 
 /// 「選ぶ」カード（広幅は左カラム、狭幅は末尾）用のフォーカス走査。標準（読み順）と同じだが、**一覧の行にフォーカスが
