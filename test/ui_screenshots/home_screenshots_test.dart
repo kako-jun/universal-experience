@@ -12,6 +12,9 @@
 //   {wide|narrow}-{light|dark}-{ja|en}.png        — ウィンドウ 1 枚ぶん
 //                                                    （wide=1280x800、narrow=800x700）
 //   wide-{light|dark}-ja-hc.png                    — ハイコントラストテーマ
+//   {default-window|wide-low}-{light|dark}-{ja|en}.png
+//                                                  — 既定ウィンドウ（800x600）・低い広幅（1280x480）に実画像が
+//                                                    載った状態。選択欄が最初のビューポートに収まる（#130）
 //   {wide|wide-low|default-window}-light-ja-clickthrough.png
 //                                                  — クリックスルー ON の復帰バナー
 //                                                    （wide-low=1280x480、default-window=800x600）
@@ -64,6 +67,7 @@ import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart';
 import 'package:universal_experience/ui/theme/app_theme.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
+import 'package:universal_experience/ui/widgets/image_source_picker.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
 import '../support/screenshot_harness.dart';
@@ -251,6 +255,8 @@ void main() {
     // 指定すると、一覧のこの行（[FilterListEntry.key]）が見える位置までスクロールして撮る
     // （上限で無効の行と、その理由の確認用）。
     String? revealEntryKey,
+    // true なら、選択欄（ImageSourcePicker）の下端がウィンドウの高さ以内であることも確かめる（#130）。
+    bool expectPickerFits = false,
   }) async {
     if (compare) CpuVisionRenderer.applier = _tintedApplier;
     tester.view.physicalSize = Size(width, height);
@@ -331,6 +337,14 @@ void main() {
       await tester.pump();
     }
 
+    if (expectPickerFits) {
+      // 実フォント・実画像で、選択欄の下端が最初のビューポート（ウィンドウの高さ）に収まる（#130）。
+      expect(
+        tester.getRect(find.byType(ImageSourcePicker)).bottom,
+        lessThanOrEqualTo(height),
+        reason: '$widthLabel/$locale: 選択欄が最初のビューポートに収まる',
+      );
+    }
     final base = '$widthLabel-${dark ? 'dark' : 'light'}-$locale';
     if (revealEntryKey != null) {
       final tile = find.byKey(ValueKey('filter_tile_$revealEntryKey'));
@@ -586,6 +600,35 @@ void main() {
           expandProvenance: true,
         );
       },
+      skip: !screenshotsEnabled,
+    );
+  }
+
+  // 既定ウィンドウ（800x600）と低い広幅（1280x480）に、実画像が載った状態（#130）。
+  // 選択欄（ImageSourcePicker）の下端が最初のビューポートに収まるよう、プレビュー画像の
+  // 高さを配分している（画像が最小の高さを割らない）ことの目視確認用。ファイル名は
+  // {default-window|wide-low}-{light|dark}-{ja|en}.png。
+  for (final (label, width, height, dark, locale)
+      in const <(String, double, double, bool, String)>[
+    ('default-window', 800, 600, false, 'ja'),
+    ('default-window', 800, 600, true, 'ja'),
+    ('default-window', 800, 600, false, 'en'),
+    ('default-window', 800, 600, true, 'en'),
+    ('wide-low', 1280, 480, false, 'ja'),
+  ]) {
+    testWidgets(
+      'screenshot $label/${dark ? 'dark' : 'light'}/$locale',
+      (tester) => shoot(
+        tester,
+        widthLabel: label,
+        width: width,
+        height: height,
+        dark: dark,
+        locale: locale,
+        suffix: '',
+        // 既定ウィンドウは収まる。低い広幅（1280x480）は最小の高さを守るので、スクロールで届く。
+        expectPickerFits: label == 'default-window',
+      ),
       skip: !screenshotsEnabled,
     );
   }
