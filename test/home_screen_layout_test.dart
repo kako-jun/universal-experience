@@ -19,12 +19,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/main.dart' show WindowModeUiContext;
 import 'package:universal_experience/services/filter_list_selection.dart';
-import 'package:universal_experience/ui/screens/home_screen.dart'
-    show kMinPreviewPaneSide;
 import 'package:universal_experience/services/hotkey_service.dart';
-import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/services/loupe_window_controller.dart';
+import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
+import 'package:universal_experience/ui/screens/home_screen.dart'
+    show kMinPreviewPaneSide, previewPaneSideFor;
 import 'package:universal_experience/ui/widgets/adjust_panel.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/consult_notice_block.dart';
@@ -95,6 +95,30 @@ void main() {
       }
     });
   }
+
+  group('previewPaneSideFor（#130）', () {
+    // 画像以外の高さ 360 を引いた残りが一辺。下限は kMinPreviewPaneSide。
+    test('下限 + 画像以外の高さ（520）ちょうどで下限、1 足すと 1 増える', () {
+      expect(previewPaneSideFor(520), kMinPreviewPaneSide);
+      expect(previewPaneSideFor(521), kMinPreviewPaneSide + 1);
+      expect(previewPaneSideFor(519), kMinPreviewPaneSide);
+    });
+
+    test('小数の高さは切り捨てる', () {
+      expect(previewPaneSideFor(544), 184);
+      expect(previewPaneSideFor(544.9), 184);
+    });
+
+    test('負・0・極端に小さい高さは下限になる', () {
+      expect(previewPaneSideFor(-100), kMinPreviewPaneSide);
+      expect(previewPaneSideFor(0), kMinPreviewPaneSide);
+      expect(previewPaneSideFor(1), kMinPreviewPaneSide);
+    });
+
+    test('高さが無制限（double.infinity）なら上限なし', () {
+      expect(previewPaneSideFor(double.infinity), double.infinity);
+    });
+  });
 
   group('プレビュー画像の高さ配分（読み込み済み）', () {
     // 画像 1 枚（正方形）の一辺。
@@ -242,7 +266,7 @@ void main() {
     // 進む `runAsync` をまたいで確かめる。
     // 画像が載った状態にする（既定のハーネスは「準備中」で止める）。フィルタ適用は
     // ハーネスの既定（Rust 非依存）のまま。
-    previewSourceImageLoader = (source, size) async => fixturePreviewImage();
+    loadPreviewImages();
     await pumpHomeScreen(
       tester,
       size: wide,
