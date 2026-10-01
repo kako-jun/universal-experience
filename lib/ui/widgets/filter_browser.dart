@@ -105,17 +105,19 @@ class FilterBrowserController extends ChangeNotifier {
   bool get isSearchFocused => searchFocus.hasPrimaryFocus;
 
   /// 検索欄の ↓（#141）: 今見えている先頭の行へフォーカスを移す。選択は変えない。
-  /// 見えている行が 0 件なら何もしない。IME 変換中（未確定文字がある間）は奪わない
-  /// ので呼ばれない側（[isSearchDownEnabled]）で弾く。
+  /// フォーカスできる行が 0 件なら何もしない（その場合は [isSearchDownEnabled] が false で
+  /// 呼ばれず、↓ は入力欄に返る）。IME 変換中（未確定文字がある間）も同じく呼ばれない。
   void focusFirstRow() {
     final first = _firstFocusableRow();
     if (first != null) rowFocusNode(first).requestFocus();
   }
 
   /// 検索欄の ↓ を「先頭の行へ移す」に割り当てるか: 検索欄にフォーカスがあり、IME の
-  /// 未確定文字（変換中）が無いとき。
+  /// 未確定文字（変換中）が無く、フォーカスできる行が 1 件以上あるとき。行が 0 件
+  /// （体験プリセットだけ見えている場合も含む）なら奪わず、入力欄に返す。
   bool get isSearchDownEnabled {
     if (!isSearchFocused) return false;
+    if (_firstFocusableRow() == null) return false;
     final composing = search.value.composing;
     return !composing.isValid || composing.isCollapsed;
   }

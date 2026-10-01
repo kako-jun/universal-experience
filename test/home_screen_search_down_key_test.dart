@@ -84,7 +84,6 @@ void main() {
     await tester.pump();
   }
 
-
   final firstEntry = kFilterListEntries.first;
   final lastEntry = kFilterListEntries.last;
 
@@ -137,8 +136,7 @@ void main() {
       expect(h.visionState.layers, hasLength(5));
       final firstEnabled = kFilterListEntries.firstWhere(
           (e) => filterListEntryBlockReason(h.visionState, e) == null);
-      expect(
-          filterListEntryBlockReason(h.visionState, firstEntry), isNotNull,
+      expect(filterListEntryBlockReason(h.visionState, firstEntry), isNotNull,
           reason: '先頭の行は上限で無効');
       expect(firstEnabled, isNot(firstEntry));
 
@@ -150,14 +148,46 @@ void main() {
       expect(h.visionState.layers, hasLength(5));
     });
 
+    testWidgets('上限で先頭行が無効でも、最初の有効行の ↑ は検索欄へ戻る', (tester) async {
+      final h = await pumpHomeScreen(tester, size: wide);
+      for (final id in [
+        'myopia',
+        'vertigo',
+        'glaucoma',
+        'cataract',
+        'floaters'
+      ]) {
+        h.visionState.toggle(id);
+      }
+      await tester.pump();
+      final firstEnabled = kFilterListEntries.firstWhere(
+          (e) => filterListEntryBlockReason(h.visionState, e) == null);
+      expect(firstEnabled, isNot(firstEntry), reason: '前提: 先頭の行は無効');
+
+      await focusSearch(tester);
+      await press(tester, LogicalKeyboardKey.arrowDown);
+      expect(focusedRowKey(tester), filterListTileKey(firstEnabled));
+
+      await press(tester, LogicalKeyboardKey.arrowUp);
+
+      expect(isSearchFocused(tester), isTrue,
+          reason: '最初の有効行の ↑ は末尾へ折り返さず検索欄へ戻る');
+      expect(h.visionState.layers, hasLength(5));
+    });
+
     testWidgets('行 0 件（検索語が当たらない）では何も起きず検索欄に残る', (tester) async {
       final h = await pumpHomeScreen(tester, size: wide);
       await typeSearch(tester, 'zzzzqqqq');
       expect(visibleFilterListEntries(query: 'zzzzqqqq'), isEmpty);
+      searchController(tester).selection =
+          const TextSelection.collapsed(offset: 2);
+      await tester.pump();
 
       await press(tester, LogicalKeyboardKey.arrowDown);
 
       expect(isSearchFocused(tester), isTrue);
+      expect(searchController(tester).selection.baseOffset, 8,
+          reason: '奪われず、入力欄がキャレットを末尾へ動かす');
       expect(tester.takeException(), isNull);
       expect(h.visionState.layers, isEmpty);
     });
@@ -169,11 +199,16 @@ void main() {
           reason: '前提: 絞り込みの行は 0 件');
       expect(find.byType(FilterListTile), findsWidgets,
           reason: '前提: 体験プリセットの行は見えている');
+      searchController(tester).selection =
+          const TextSelection.collapsed(offset: 2);
+      await tester.pump();
 
       await press(tester, LogicalKeyboardKey.arrowDown);
 
       expect(isSearchFocused(tester), isTrue,
           reason: 'プリセット行へは移さない（フォーカスは検索欄のまま）');
+      expect(searchController(tester).selection.baseOffset, 7,
+          reason: '奪われず、入力欄がキャレットを末尾へ動かす');
       expect(tester.takeException(), isNull);
     });
 
@@ -197,7 +232,8 @@ void main() {
       expect(text, 'o');
       final visible = visibleFilterListEntries(query: text);
       expect(visible.length, greaterThan(1));
-      searchController(tester).selection = const TextSelection.collapsed(offset: 1);
+      searchController(tester).selection =
+          const TextSelection.collapsed(offset: 1);
       await tester.pump();
 
       await press(tester, LogicalKeyboardKey.arrowDown);
@@ -238,7 +274,8 @@ void main() {
           reason: '2 行目の ↑ は先頭へ（検索欄ではない）');
 
       // 末尾の ↓ は先頭へ折り返す。
-      await focusInside(tester, find.byKey(filterListTileKey(lastEntry), skipOffstage: false));
+      await focusInside(tester,
+          find.byKey(filterListTileKey(lastEntry), skipOffstage: false));
       await tester.pumpAndSettle();
       expect(focusedRowKey(tester), filterListTileKey(lastEntry));
       await press(tester, LogicalKeyboardKey.arrowDown);
@@ -366,20 +403,19 @@ void main() {
 
   group('行・ボタン・スライダー上の ↓ は従来どおり（#141 回帰）', () {
     testWidgets('チップにフォーカスがある間の ↓ は先頭行へ送るショートカットにならない', (tester) async {
-      await pumpHomeScreen(
-        tester,
-        size: wide,
-        select: (s) => selectColorVisionKey(s, 'protanopia'),
-      );
+      await pumpHomeScreen(tester, size: wide);
       await focusInside(tester, find.widgetWithText(ChoiceChip, '色覚'));
 
       await press(tester, LogicalKeyboardKey.arrowDown);
 
-      expect(focusedRowKey(tester), isNot(filterListTileKey(firstEntry)),
-          reason: 'CycleFilterIntent には奪われない');
+      // ガードが壊れて moveRowFocus が走ると、調整中の層が無いので先頭行へ入る。
+      expect(focusedRowKey(tester), isNull,
+          reason: 'CycleFilterIntent には奪われない（行へは移らない）');
     });
 
-    testWidgets('Slider にフォーカスがある間の ↓ は行へ移さない', (tester) async {
+    // Slider 自身の矢印 Shortcuts が先に処理するため、このガードの検出力は無い。
+    // 実挙動の確認（ガードの検出力はチップ上の ↓ のテストが担う）。
+    testWidgets('実挙動の確認: Slider にフォーカスがある間の ↓ は行へ移さない', (tester) async {
       final h = await pumpHomeScreen(
         tester,
         size: wide,
@@ -402,8 +438,7 @@ void main() {
 
       await press(tester, LogicalKeyboardKey.arrowDown);
 
-      expect(
-          focusedRowKey(tester), filterListTileKey(kFilterListEntries[1]));
+      expect(focusedRowKey(tester), filterListTileKey(kFilterListEntries[1]));
     });
   });
 }

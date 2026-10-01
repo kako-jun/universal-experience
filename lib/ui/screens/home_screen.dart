@@ -532,6 +532,8 @@ class _ThemeModeButton extends StatelessWidget {
 /// ↑↓ の行移動（[CycleFilterIntent]）。[isFocusOnInteractiveControl] が true の間は
 /// 無効（[InteractiveFocusAwareCallbackAction] と同じ）だが、フォーカスが一覧の行
 /// （[FilterBrowserController.isRowFocused]）にあるときは例外として有効にする。
+/// もう 1 つの例外が検索欄の ↓（#141）: 検索欄にフォーカスがあり、IME 変換中でなく、
+/// フォーカスできる行があるときだけ有効にして先頭の行へ送る（[isSearchDown]）。
 class _RowAwareCycleAction extends CallbackAction<CycleFilterIntent> {
   _RowAwareCycleAction({
     required this.isRowFocused,
