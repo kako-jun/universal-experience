@@ -132,6 +132,10 @@ Future<ui.Image> composeCaptionedExportImage(
 /// just the 7 color-vision types. The GPU `ShaderFilter` path (#59) is kept
 /// for a future *live* screen-capture display (#1/#3/#4) but isn't called
 /// from any production code today.
+/// 横並びのときの Before / After 2 枚の間隔（dp）。[BeforeAfterView.maxPaneSide] が
+/// 幅の上限（2 枚分 + この間隔）を出すのにも使うので、1 か所で持つ。
+const double kBeforeAfterPaneGap = 12;
+
 class BeforeAfterView extends StatefulWidget {
   const BeforeAfterView({
     super.key,
@@ -871,7 +875,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(child: beforePane.buildHeading(context)),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: kBeforeAfterPaneGap),
                       Expanded(child: afterPane.buildHeading(context)),
                     ],
                   ),
@@ -880,7 +884,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(child: beforePane.buildImage()),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: kBeforeAfterPaneGap),
                       Expanded(child: afterPane.buildImage()),
                     ],
                   ),
@@ -893,7 +897,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
             ? panes
             : Center(
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: 2 * maxSide + 12),
+                  constraints: BoxConstraints(maxWidth: 2 * maxSide + kBeforeAfterPaneGap),
                   child: panes,
                 ),
               );

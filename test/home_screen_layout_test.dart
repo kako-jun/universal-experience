@@ -113,6 +113,8 @@ void main() {
     testWidgets('既定 800x600: 画像は下限より大きく、選択欄の下に余白が残る', (tester) async {
       final side = await sideAt(tester, defaultWindow);
       expect(side, greaterThan(kMinPreviewPaneSide));
+      // 本体領域の高さ 544（600 - AppBar 56）から、画像以外の高さ 360 を引いた値。
+      expect(side, closeTo(184, 0.01));
       final picker = tester.getRect(find.byType(ImageSourcePicker));
       expect(picker.bottom, lessThanOrEqualTo(defaultWindow.height - 8),
           reason: '選択欄の下端がウィンドウの縁に貼り付かない');
