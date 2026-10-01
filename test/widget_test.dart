@@ -22,16 +22,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/main.dart';
 import 'package:universal_experience/services/settings_service.dart';
-import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
-import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart';
 
+import 'support/home_screen_harness.dart';
+
 void main() {
-  // 統合フィルタ一覧（#72）は起動直後から体験プリセットの行を組むため、実 FRB
-  // ブリッジ（experiences()、FFI 未ロードの flutter test では呼べない）を
-  // fixture に差し替える。
-  setUp(() => experiencesProvider = () => const <Experience>[]);
-  tearDown(() => experiencesProvider = experiences);
+  // 統合フィルタ一覧（#72）は起動直後から体験プリセットの行を組み、プレビューは
+  // 画像の読み込み・適用を行う。いずれも実 FRB ブリッジ（FFI 未ロードの flutter test
+  // では呼べない）に届くので、ハーネスの fixture（Rust 非依存、#127/#131）に差し替える。
+  setUp(installHomeScreenFixtures);
+  tearDown(resetHomeScreenFixtures);
 
   testWidgets('UniversalExperienceApp が例外なく起動し HomeScreen を表示する',
       (WidgetTester tester) async {

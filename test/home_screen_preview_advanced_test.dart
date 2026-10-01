@@ -10,87 +10,30 @@
 // インスタンス（payload 込みの値等価）として反映されることを確認する。
 
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/filter_list_selection.dart';
-import 'package:universal_experience/main.dart' show WindowModeUiContext;
-import 'package:universal_experience/services/hotkey_service.dart';
-import 'package:universal_experience/services/image_source_state.dart';
-import 'package:universal_experience/services/loupe_window_controller.dart';
-import 'package:universal_experience/services/settings_service.dart';
-import 'package:universal_experience/services/vision_filter_state.dart';
-import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
-import 'package:universal_experience/ui/screens/home_screen.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
-import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
 
-import 'support/vision_filter_metadata_fixture.dart';
 import 'support/color_vision_select.dart';
+import 'support/home_screen_harness.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  // 体験プリセットの行は実 FRB ブリッジ（experiences()）を要求し、プレーンな
-  // `flutter test` では呼べない。widget test 用の fixture に差し替える
-  // （i18n_test.dart / home_screen_preview_intensity_test.dart と同じ手法）。
-  // VisionFilterState の選択も同様に urgency/recommended_strength（#76/#77）で
-  // 実ブリッジを要求するため、同じフィクスチャで差し替える。
-  setUp(() {
-    experiencesProvider = () => const [];
-    installVisionFilterMetadataFixture();
-  });
-  tearDown(() {
-    experiencesProvider = experiences;
-    resetVisionFilterMetadataProviders();
-  });
+  // 体験プリセット・メタデータ・プレビューの読み込み/適用は、ハーネスの fixture
+  // （Rust 非依存）に揃える（#127, #131）。
+  setUp(installHomeScreenFixtures);
+  tearDown(resetHomeScreenFixtures);
+
+  const size = Size(1200, 4000);
 
   testWidgets('advanced カタログでフィルタを選ぶと、プレビューの filter/filterId が追従する（#60）',
       (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(1200, 4000);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-
-    SharedPreferences.setMockInitialValues(<String, Object>{});
-    final settings = SettingsService();
-    await settings.load();
-    final visionState = VisionFilterState();
-
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider<SettingsService>.value(value: settings),
-          ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
-          ChangeNotifierProvider<ImageSourceState>(
-            create: (_) => ImageSourceState(),
-          ),
-          ChangeNotifierProvider<LoupeWindowController>.value(
-            value: LoupeWindowController(),
-          ),
-          Provider<WindowModeUiContext>.value(
-            value: const WindowModeUiContext(
-              trayAvailable: false,
-              hotkeyStatus: HotkeyStatus(),
-            ),
-          ),
-        ],
-        child: const MaterialApp(
-          localizationsDelegates: [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: HomeScreen(),
-        ),
-      ),
-    );
-    await tester.pump();
+    final h = await pumpHomeScreen(tester, size: size);
+    final visionState = h.visionState;
 
     BeforeAfterView currentPreview() =>
         tester.widget<BeforeAfterView>(find.byType(BeforeAfterView));
@@ -124,46 +67,12 @@ void main() {
 
   testWidgets('VisionFilterState.setStrength のあと、プレビューの strength が追従する（#60）',
       (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(1200, 4000);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-
-    SharedPreferences.setMockInitialValues(<String, Object>{});
-    final settings = SettingsService();
-    await settings.load();
-    final visionState = VisionFilterState()..replaceWith('cataract');
-
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider<SettingsService>.value(value: settings),
-          ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
-          ChangeNotifierProvider<ImageSourceState>(
-            create: (_) => ImageSourceState(),
-          ),
-          ChangeNotifierProvider<LoupeWindowController>.value(
-            value: LoupeWindowController(),
-          ),
-          Provider<WindowModeUiContext>.value(
-            value: const WindowModeUiContext(
-              trayAvailable: false,
-              hotkeyStatus: HotkeyStatus(),
-            ),
-          ),
-        ],
-        child: const MaterialApp(
-          localizationsDelegates: [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: HomeScreen(),
-        ),
-      ),
+    final h = await pumpHomeScreen(
+      tester,
+      size: size,
+      select: (s) => s.replaceWith('cataract'),
     );
-    await tester.pump();
+    final visionState = h.visionState;
 
     BeforeAfterView currentPreview() =>
         tester.widget<BeforeAfterView>(find.byType(BeforeAfterView));
@@ -179,46 +88,8 @@ void main() {
   testWidgets(
       '色覚クイック選択 → advanced → 別の色覚クイック選択、と切り替えても '
       '#57 のキー別強度記憶は壊れない（#60）', (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(1200, 4000);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-
-    SharedPreferences.setMockInitialValues(<String, Object>{});
-    final settings = SettingsService();
-    await settings.load();
-    final visionState = VisionFilterState();
-
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider<SettingsService>.value(value: settings),
-          ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
-          ChangeNotifierProvider<ImageSourceState>(
-            create: (_) => ImageSourceState(),
-          ),
-          ChangeNotifierProvider<LoupeWindowController>.value(
-            value: LoupeWindowController(),
-          ),
-          Provider<WindowModeUiContext>.value(
-            value: const WindowModeUiContext(
-              trayAvailable: false,
-              hotkeyStatus: HotkeyStatus(),
-            ),
-          ),
-        ],
-        child: const MaterialApp(
-          localizationsDelegates: [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: HomeScreen(),
-        ),
-      ),
-    );
-    await tester.pump();
+    final h = await pumpHomeScreen(tester, size: size);
+    final visionState = h.visionState;
 
     BeforeAfterView currentPreview() =>
         tester.widget<BeforeAfterView>(find.byType(BeforeAfterView));
@@ -262,56 +133,13 @@ void main() {
   testWidgets(
       'protanopia → プリセット → protanopia に戻すと、プレビューに反映され行も正しく点灯する '
       '（#60 回帰テスト）', (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(1200, 4000);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-
-    // meniere（vision=vertigo）を含む fixture に差し替える（実ブリッジ不要）。
-    experiencesProvider = () => const [
-          Experience(
-            id: 'meniere',
-            vision: VisionFilter.vertigo(),
-            urgency: Urgency.earlyConsultation,
-          ),
-        ];
-
-    SharedPreferences.setMockInitialValues(<String, Object>{});
-    final settings = SettingsService();
-    await settings.load();
-    final visionState = VisionFilterState();
-
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider<SettingsService>.value(value: settings),
-          ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
-          ChangeNotifierProvider<ImageSourceState>(
-            create: (_) => ImageSourceState(),
-          ),
-          ChangeNotifierProvider<LoupeWindowController>.value(
-            value: LoupeWindowController(),
-          ),
-          Provider<WindowModeUiContext>.value(
-            value: const WindowModeUiContext(
-              trayAvailable: false,
-              hotkeyStatus: HotkeyStatus(),
-            ),
-          ),
-        ],
-        child: const MaterialApp(
-          locale: Locale('en'),
-          localizationsDelegates: [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: HomeScreen(),
-        ),
-      ),
+    // ハーネスの体験 fixture に meniere（vision=vertigo）が含まれる（実ブリッジ不要）。
+    final h = await pumpHomeScreen(
+      tester,
+      size: size,
+      locale: const Locale('en'),
     );
-    await tester.pump();
+    final visionState = h.visionState;
 
     final protanopiaEntry =
         kFilterListEntries.firstWhere((e) => e.key == 'cv:protanopia');
@@ -361,46 +189,13 @@ void main() {
 
   testWidgets('VisionFilterState.bypassed が true の間、プレビューに「原画表示中」バッジが出る (#63)',
       (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(1200, 4000);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
-
-    SharedPreferences.setMockInitialValues(<String, Object>{});
-    final settings = SettingsService();
-    await settings.load();
-    final visionState = VisionFilterState();
-
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider<SettingsService>.value(value: settings),
-          ChangeNotifierProvider<VisionFilterState>.value(value: visionState),
-          ChangeNotifierProvider<ImageSourceState>(
-            create: (_) => ImageSourceState(),
-          ),
-          ChangeNotifierProvider<LoupeWindowController>.value(
-            value: LoupeWindowController(),
-          ),
-          Provider<WindowModeUiContext>.value(
-            value: const WindowModeUiContext(
-              trayAvailable: false,
-              hotkeyStatus: HotkeyStatus(),
-            ),
-          ),
-        ],
-        child: const MaterialApp(
-          localizationsDelegates: [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: HomeScreen(),
-        ),
-      ),
+    // ハーネスの既定ロケールは ja。英語のバッジ文言を見るので en を明示する。
+    final h = await pumpHomeScreen(
+      tester,
+      size: size,
+      locale: const Locale('en'),
     );
-    await tester.pump();
+    final visionState = h.visionState;
 
     expect(find.text('Showing original'), findsNothing);
 

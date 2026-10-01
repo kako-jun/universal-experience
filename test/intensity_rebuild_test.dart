@@ -18,23 +18,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/main.dart';
 import 'package:universal_experience/services/settings_service.dart';
-import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
-import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
-import 'support/vision_filter_metadata_fixture.dart';
 import 'support/color_vision_select.dart';
+import 'support/home_screen_harness.dart';
 
 void main() {
-  setUp(() {
-    installVisionFilterMetadataFixture();
-    // 統合フィルタ一覧（#72）が体験プリセットの行を組むため、実ブリッジ
-    // （experiences()）を fixture に差し替える。
-    experiencesProvider = () => const <Experience>[];
-  });
-  tearDown(() {
-    experiencesProvider = experiences;
-    resetVisionFilterMetadataProviders();
-  });
+  // 統合フィルタ一覧（#72）が体験プリセットの行を組み、フィルタ選択はメタデータを
+  // 引き、プレビューは読み込み・適用を行う。いずれも実ブリッジ（native lib）が要る
+  // ため、ハーネスの fixture（Rust 非依存、#127/#131）に差し替える。
+  setUp(installHomeScreenFixtures);
+  tearDown(resetHomeScreenFixtures);
 
   testWidgets(
       'スライダーをドラッグしている間、SettingsService は notifyListeners されない（MaterialApp 再構築なし、#57）',
