@@ -1,6 +1,6 @@
 // GENERATED FILE - DO NOT EDIT BY HAND.
 //
-// Source: tools/color_matrices.g.json (sensus_core 0.6.1).
+// Source: tools/color_matrices.g.json (sensus_core 0.6.2).
 // Regenerate:
 //   1. cd rust && cargo test -- --ignored gen_color_matrices
 //   2. dart run tools/generate_color_matrices.dart
