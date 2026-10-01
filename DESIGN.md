@@ -176,6 +176,13 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
   調整中のチップは塗り + 太い枠、それ以外は細い枠で、状態を形で示す。チップ・✕ とも 48dp。1 層のときは出さない
   （従来どおり調整パネルの「フィルタを解除」が入口）。その下に `BeforeAfterView` と、それに隣接する `ImageSourcePicker`（サンプル画像の切替）。
   その下に `WelcomeBanner`（プレビューを最初のビューポートから押し出さない位置）。
+  **プレビュー画像の大きさは本体領域の高さに追従する**（#130）。画像（Before / After 各 1 枚の正方形）の
+  一辺は「本体領域の高さ - 352dp（画像以外のカードの高さの見積り `_kPreviewChromeHeight`）」までに抑え
+  （`previewPaneSideFor`）、既定ウィンドウ（800x600）でも `ImageSourcePicker` の下端が最初の
+  ビューポートに収まるようにする（実画像が載った状態で測る。日本語・英語とも）。下限は 160dp
+  （`kMinPreviewPaneSide`。低い画面ではこれより縮めず、選択欄はスクロールで届く）。高さに余裕のある
+  1280x800・800x700 では縮まない。縮めるときは 2 枚を中央に寄せ、見出しの行・書き出しボタンは 2 枚の幅に追従する
+  （`BeforeAfterView.maxPaneSide`。縦積み（幅 420dp 未満）と 2×2 比較には効かない）。
   層の集合に色覚の層があるときに限り（#120 で色覚 1 層のみ、#122 で他の層と重ねていても出す。色覚が無ければ出さない）、見出しの行に `FilterChip`「2×2 で比較」（`compareToggleLabel`。
   補助の説明は tooltip の `compareToggleTooltip`）を出す。ON の間は見出しが「ビフォー / アフター」から
   「色覚 4 型の比較」（`compareSectionTitle`）に切り替わり、OFF で戻る。ON の間は
@@ -221,8 +228,13 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 - カテゴリ切替は `NavigationRail` ではなく `ChoiceChip` の `Wrap`（広幅の左カラム幅が 280〜340dp と
   狭く、Rail を置くと一覧の幅が足りなくなるため）。
 - 狭幅の選択は `NavigationBar` + ボトムシートではなく、縦積みの最下段に固定高（560dp）の一覧を置く（上の暫定状態の項を参照）。
-- 狭幅（800x600 の既定ウィンドウ）でクリックスルーの案内（約 115dp）が出ている間は、`ImageSourcePicker` の
-  選択欄が最初のビューポートに収まりきらず、画像（`BeforeAfterView`）と選択欄の先頭の行までが見える。
+- 狭幅（800x600 の既定ウィンドウ）でクリックスルーの案内（約 115dp）が出ている間は、画像が下限
+  （160dp）まで縮んでも `ImageSourcePicker` の選択欄が最初のビューポートに収まりきらず、画像
+  （`BeforeAfterView`）と選択欄の先頭の行までが見える（案内が出ていないときは選択欄まで収まる、#130）。
+- 画像以外の高さ（`_kPreviewChromeHeight`）は実フォントでの実測に基づく見積りで、層を 2 つ以上重ねて
+  層のチップ帯が出る・文字サイズを大きくするなどでチップの折り返しが増えると、選択欄は最初のビューポートの
+  下にはみ出してスクロールで届く（画像は下限を割らない）。2×2 比較（`ColorVisionCompareView`）は
+  高さの調整の対象外。
 - advanced の各フィルタには説明文の文字列と有病率が無い（sensus に無く、ue は数値を作らない）ため、右カラムの
   説明・有病率は色覚 7 型と体験プリセットだけ。advanced は名前・カテゴリと、折りたたみの出典・限界（#80）が出る。
 - 「モデルと出典」「表現できないこと」は sensus の英文をそのまま出す（英語以外の UI では原文である旨を添え、
@@ -338,6 +350,8 @@ UE_SCREENSHOTS=1 UE_SCREENSHOT_DIR=/path/to/out \
 - 出力: `wide-{light|dark}-{ja|en}.png`（広幅 1280×800）、`narrow-light-ja.png` / `narrow-dark-en.png`
   （狭幅 800×700。どちらもウィンドウ 1 枚ぶん）、狭幅だけ同名に `-full` を付けた縦長の全体像（縦積みの
   スクロール量の確認用）、`wide-{light|dark}-ja-hc.png`（ハイコントラスト）、
+  `{default-window|wide-low}-{light|dark}-{ja|en}.png`（既定ウィンドウ 800×600・低い広幅 1280×480 に実画像が載った状態。
+  選択欄が最初のビューポートに収まる。既定ウィンドウのケースは実フォントで下端がウィンドウ内に収まることも `expect` する。#130）、
   `{wide|wide-low|default-window}-light-ja-clickthrough.png`（クリックスルー ON の案内。`wide-low` は 1280×480、
   `default-window` は 800×600）、`wide-light-ja-dialog.png`（起動モードのダイアログ）と
   `wide-{light|dark}-{ja|en}-languagedialog.png`（言語ダイアログ。light/ja と dark/en の 2 枚）、

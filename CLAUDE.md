@@ -125,7 +125,7 @@ DESIGN.md                    # UI 設計原則（カラートークン・タイ�
 test/
 ├── no_hardcoded_colors_test.dart   # lib/ の色ハードコードを検出（例外は DESIGN.md の例外表と一致させる、#72）
 ├── app_theme_test.dart             # ハイコントラストテーマの生成と MaterialApp での切替（#72）
-├── home_screen_layout_test.dart    # 3 カラム/縦積み・プレビューの初回ビューポート（準備中状態で測定・読み込み済みは #130）・空状態・キー操作（#72）
+├── home_screen_layout_test.dart    # 3 カラム/縦積み・プレビューの初回ビューポート（準備中・読み込み済みの両方で測定）と画像の高さ配分（#130）・空状態・キー操作（#72）
 ├── accessibility_guidelines_test.dart # Flutter 標準ガイドライン（タップ領域・ラベル・コントラスト）を主画面・選択別パネル・ダイアログ・HUD に 4 テーマ × ja/en で当てる（#45）
 ├── accessibility_semantics_test.dart  # スライダー/ドロップダウンの名前と値・見出し・選択状態・画像の代替テキスト・liveRegion・視差効果・Esc で閉じてフォーカスが戻る（#45）
 ├── tap_target_size_test.dart       # macOS 指定で操作領域が 48dp 以上（padded + standard・言語ダイアログの選択肢、#72/#82）
