@@ -5,9 +5,10 @@
 // 残ると、フィルタを選んだ状態で実時間が進む（`tester.runAsync`）タイミングに
 // 「FRB 未初期化」の非同期例外が走行中のテストへ漏れる。ここでは
 //
-// - 差し替えと復元そのもの（install / reset）
+// - 差し替えと復元そのもの（install / reset。読み込み・適用・複数層の合成・体験）
 // - アプリ本体（UniversalExperienceApp）経路でも、フィルタ選択・強度変更・画像読み込み完了を
-//   `runAsync` で実時間を進めながら行っても、実レンダラに届かず例外が出ないこと
+//   `runAsync` で実時間を進めながら行っても（単一層は afterImageRenderer、2 層以上は
+//   pipelineApplier の経路）、実レンダラに届かず例外が出ないこと
 //
 // を確かめる。画面構成（HomeScreen 単体）側の同種の回帰は home_screen_layout_test.dart。
 
@@ -17,7 +18,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_experience/main.dart';
 import 'package:universal_experience/models/preview_image_source.dart';
 import 'package:universal_experience/models/sample_catalog.dart';
+import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
 import 'package:universal_experience/services/settings_service.dart';
+import 'package:universal_experience/services/vision_filter_snapshot.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
@@ -31,15 +34,20 @@ void main() {
   setUp(installHomeScreenFixtures);
   tearDown(() {
     resetHomeScreenFixtures();
-    // UniversalExperienceApp が読む共有 singleton を、他のテストへ残さない。
-    visionFilterState.clear();
+    // UniversalExperienceApp が読む共有 singleton を、他のテストへ残さない。clear() は
+    // 強度の記憶を消さないので、空の snapshot で記憶ごと初期状態へ戻す。
+    visionFilterState.restore(const VisionFilterSnapshot());
     imageSourceState.resetToRecommended(kDefaultSampleId);
   });
 
-  test('install は実ローダ・実レンダラ・実ブリッジを fixture に差し替え、reset で戻す', () async {
+  test('install は実ローダ・実レンダラ・実合成・実ブリッジを fixture に差し替え、reset で戻す', () async {
+    // 外れたことを同一性で決定論的に確かめる（実時間に頼らない）。以降の runAsync を
+    // 使う回帰テストは、ここで差し替えが効いていることを前提にしている。
     expect(previewSourceImageLoader,
         isNot(BeforeAfterView.loadPreviewSourceImage));
     expect(afterImageRenderer, isNot(BeforeAfterView.renderAfter));
+    expect(CpuVisionRenderer.pipelineApplier,
+        isNot(CpuVisionRenderer.applyPipeline));
     expect(experiencesProvider, isNot(experiences));
     expect(experiencesProvider().map((e) => e.id),
         ['meniere', 'bppv', 'vestibular_neuritis', 'labyrinthitis']);
@@ -62,7 +70,18 @@ void main() {
     expect(out.width, source.width);
     expect(out.height, source.height);
 
+    // 複数層の合成も同様に、Rust に触れず入力の複製を返す。
+    final pipelined = await CpuVisionRenderer.pipelineApplier(source, const [
+      VisionStep(filter: VisionFilter.protanopia(), strength: 1.0),
+      VisionStep(filter: VisionFilter.vertigo(), strength: 0.5),
+    ]);
+    addTearDown(pipelined.dispose);
+    expect(identical(pipelined, source), isFalse);
+    expect(pipelined.width, source.width);
+    expect(pipelined.height, source.height);
+
     resetHomeScreenFixtures();
+    expect(CpuVisionRenderer.pipelineApplier, CpuVisionRenderer.applyPipeline);
     expect(previewSourceImageLoader, BeforeAfterView.loadPreviewSourceImage);
     expect(afterImageRenderer, BeforeAfterView.renderAfter);
     expect(experiencesProvider, experiences);
@@ -118,18 +137,37 @@ void main() {
       expect(panes.every((p) => p.image != null), isTrue);
     });
 
-    testWidgets('読み込みが完了しないままでも、フィルタを選んで実時間を進めて例外が出ない', (tester) async {
-      // 既定のハーネス（読み込みは完了しない）のまま。
+    testWidgets('2 層を選び、画像が読み込み済みでも、runAsync で実時間を進めて例外が出ない（複数層の合成）',
+        (tester) async {
+      // 2 層以上は afterImageRenderer ではなく CpuVisionRenderer.pipelineApplier を通る。
+      // ハーネスの既定（Rust 非依存）を、呼び出しを数えるラッパーで包む。
+      final pipelined = <List<VisionStep>>[];
+      previewSourceImageLoader = (source, size) async => fixturePreviewImage();
+      final fakePipeline = CpuVisionRenderer.pipelineApplier;
+      CpuVisionRenderer.pipelineApplier = (source, steps) {
+        pipelined.add(List.of(steps));
+        return fakePipeline(source, steps);
+      };
+
       await pumpApp(tester);
-      visionFilterState.replaceWith('cataract');
+      visionFilterState.toggle('protanopia');
+      visionFilterState.toggle('cataract');
+      await tester.pump();
+      await advanceRealTime(tester);
+      visionFilterState.setStrength(0.4);
       await tester.pump();
       await advanceRealTime(tester);
 
+      expect(visionFilterState.layers, hasLength(2));
       expect(tester.takeException(), isNull);
+      expect(find.byType(PreviewErrorPlaceholder), findsNothing);
+      expect(pipelined, isNotEmpty,
+          reason: '複数層の合成の経路を通っていなければ、この回帰テストは何も守れない');
+      expect(pipelined.last, hasLength(2));
       final panes =
           tester.widgetList<PreviewImageView>(find.byType(PreviewImageView));
-      expect(panes.every((p) => p.image == null), isTrue,
-          reason: '読み込みが完了しない間はプレビューは準備中のまま');
+      expect(panes.length, 2);
+      expect(panes.every((p) => p.image != null), isTrue);
     });
   });
 }
