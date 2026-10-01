@@ -153,8 +153,8 @@ test/
 ├── vision_filter_multi_select_test.dart # 多選択 API: toggle/remove・色覚の排他と置き換え・上限 5 と例外・プリセット置換と破棄・強度/パラメータ・単一選択の互換・pipelineSteps・上限ちょうど 5 層・同段 3 層の pipelineSteps 列のリテラル固定・永続化 v2 の往復（#119）
 ├── home_screen_multi_layer_preview_test.dart # 複数層のプレビュー: pipelineApplier をフェイクにして段順・強度・payload・強度 0 除外・単一層の従来経路・bypass・steps だけ変わる更新での再合成・合成失敗の表示と旧結果の dispose を確認、推奨サンプルの focusedId 追従（#119）
 ├── consult_input_merge_test.dart   # 複数層の相談喚起入力の統合: urgency は最大・escalation は段ごとに重複除去（#119）
-├── home_screen_harness_test.dart   # ハーネス（installHomeScreenFixtures）の契約: 差し替えと復元・アプリ本体経路でもフィルタ選択/強度変更/画像読み込みを実時間（runAsync）で進めて RustLib 未初期化の例外が漏れない（#127/#131）
-├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品。HomeScreen / UniversalExperienceApp を pump するテストは setUp で installHomeScreenFixtures（体験・メタデータ・プレビューの読み込み/適用を Rust 非依存のフェイクに固定）、tearDown で resetHomeScreenFixtures を呼ぶ（独自 pump で実ローダ/実レンダラを残さない、#131）
+├── home_screen_harness_test.dart   # ハーネス（installHomeScreenFixtures）の契約: 差し替えと復元（読み込み・適用・複数層の合成）・アプリ本体経路で単一層/2 層のフィルタ選択・強度変更・画像読み込みを実時間（runAsync）で進めても RustLib 未初期化の例外が漏れない（#127/#131）
+├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品。HomeScreen / UniversalExperienceApp を pump するテストは setUp で installHomeScreenFixtures（体験・メタデータ・プレビューの読み込み/適用・複数層の合成 pipelineApplier を Rust 非依存のフェイクに固定）、tearDown で resetHomeScreenFixtures を呼ぶ（独自 pump で実ローダ/実レンダラを残さない、#131）
 ├── support/color_vision_select.dart # 色覚 7 種のキーで単一選択するテスト用ヘルパ（別名を解いて replaceWith へ渡す）
 ├── support/screenshot_harness.dart # スクリーンショット用フォント読込・PNG 書出し（フォントはコミットしない）
 └── ui_screenshots/                 # HomeScreen の PNG 書出し。`UE_SCREENSHOTS=1` のときだけ実行（DESIGN.md §8）

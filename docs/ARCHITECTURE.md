@@ -75,7 +75,8 @@
 >
 > `HomeScreen` / `UniversalExperienceApp` を pump する widget test は、このメタデータ
 > に加えて体験プリセットとプレビューの読み込み/適用（`previewSourceImageLoader` /
-> `afterImageRenderer`）も実ブリッジに届くため、`setUp` で
+> `afterImageRenderer`）・2 層以上の合成（`CpuVisionRenderer.pipelineApplier`）も
+> 実ブリッジに届くため、`setUp` で
 > `test/support/home_screen_harness.dart` の `installHomeScreenFixtures()`、
 > `tearDown` で `resetHomeScreenFixtures()` を呼んで一括で Rust 非依存に固定する
 > （実レンダラが残ると、`tester.runAsync` で実時間が進んだときに RustLib 未初期化の
