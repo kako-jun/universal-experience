@@ -563,8 +563,8 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
 ## アプリ内キー操作 (#63)
 
 ウィンドウにフォーカスがある間だけ効くショートカット 5 種（貼り付けは #97 で追加）。実装は
-`lib/services/app_shortcuts.dart`（`Intent` 定義 + `isFocusOnInteractiveControl()` /
-`InteractiveFocusAwareCallbackAction`）+ `lib/services/preview_selection.dart`
+`lib/services/app_shortcuts.dart`（`Intent` 定義 + `isFocusOnInteractiveControl()` / `isFocusOnTextInput()` /
+`InteractiveFocusAwareCallbackAction` / `TextInputAwareCallbackAction`）+ `lib/services/preview_selection.dart`
 （実処理: `adjustPreviewStrength()`）+ `lib/services/filter_list_selection.dart`
 （↑↓ の順送り `nextFilterListEntry()`）+
 `lib/ui/screens/home_screen.dart`（標準 Flutter `Shortcuts`/`Actions`/`Focus` で配線。
@@ -579,19 +579,20 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
 | `Esc` | クリックスルーが ON のとき解除する（クリックスルーの復帰経路。上記「クリックスルーの復帰経路」参照） |
 | `Cmd+V`（macOS）/ `Ctrl+V` | クリップボードの画像をプレビューの原画として貼り付ける（#97。下記） |
 
-- **`Cmd/Ctrl+V` のガードだけは狭い**（#97）: `/`・↑↓・←→ は `isFocusOnInteractiveControl()`
-  （テキスト入力・ボタン・スライダー等）で奪わないが、貼り付けは
+- **`Cmd/Ctrl+V` と `/` のガードは狭い**（#97/#141）: ↑↓・←→ は `isFocusOnInteractiveControl()`
+  （テキスト入力・ボタン・スライダー等）で奪わないが、貼り付けと `/` は
   `isFocusOnTextInput()`（`EditableText` のみ）でしか奪わない
-  （`TextInputAwareCallbackAction`）。ボタンやスライダーは貼り付けに固有の意味を
-  持たず、「貼り付け」ボタンを押した直後（フォーカスがボタンに残る）でもキーボードの
-  貼り付けが効くべきため。テキスト入力中は `isEnabled` が false になってキーイベントを
+  （`TextInputAwareCallbackAction`）。ボタンやスライダーは貼り付けにも `/` にも固有の意味を
+  持たず、「貼り付け」ボタンやチップを押した直後（フォーカスがボタン等に残る）でもキーボードの
+  貼り付け・`/` が効くべきため。テキスト入力中は `isEnabled` が false になってキーイベントを
   消費しないので、`MaterialApp` 直下の `DefaultTextEditingShortcuts` が入力欄自身の
   貼り付けとして処理する。割り当てはプラットフォームで変わる（macOS は Cmd、それ以外は
   Ctrl）ので `home_screen.dart` の `Shortcuts` マップには実行時に足す
   （`pasteShortcutActivator()`）。
 - **`/` は検索欄へフォーカスする**（#72 で左カラムに検索欄が入った。それ以前は
   advanced カタログへフォーカスしていた）。検索欄は `TextField` なので、フォーカス
-  中は `/` 自体を含むキー入力が本来の文字入力として通る（上記ガード）。
+  中は `/` 自体を含むキー入力が本来の文字入力として通る（上記ガード）。ボタン・チップ等に
+  フォーカスが残っていても `/` は効く（#141）。
 - **↑↓ は行フォーカスの移動だけで、選択は変えない**（#120）。多選択にしたので、移動のたびに層が
   増減しないよう、足し引きは行にフォーカスがあるときの `Space` / `Enter` に分けた。`CycleFilterIntent` は
   `_RowAwareCycleAction`（`home_screen.dart`）が受け、行にフォーカスがあるとき、または操作部品にフォーカスが
@@ -627,9 +628,10 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
   受け口へ戻る。
   キーボード起点かポインタ起点かは、タップ処理の中で `HardwareKeyboard` の Enter/Space の
   押下状態を見て判定する。
-- **`/`・↑↓・←→ はテキスト入力・ボタン・スイッチ等にフォーカスがある間は無効化される**
-  （`isFocusOnInteractiveControl()` による `isEnabled` ガード、#63）。`Esc` だけは
-  このガードの対象外 — クリックスルーからの復帰は常に効く必要があるため。
+- **↑↓・←→ はテキスト入力・ボタン・スイッチ等にフォーカスがある間は無効化される**
+  （`isFocusOnInteractiveControl()` による `isEnabled` ガード、#63）。`/` と `Cmd/Ctrl+V` は
+  上記の狭いガード（テキスト入力中のみ、#97/#141）。`Esc` だけはこのガードの対象外 —
+  クリックスルーからの復帰は常に効く必要があるため。
 - ←→ の強度調整は `adjustPreviewStrength(visionState, delta)` が、フォーカス中の層の
   強度の記憶（`VisionFilterState.strength`）を動かす。色覚でも advanced でも
   同じ記憶（#117）。

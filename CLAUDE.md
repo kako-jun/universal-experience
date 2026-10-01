@@ -136,6 +136,7 @@ test/
 ├── home_screen_multi_layer_heading_test.dart # 複数層の見出し（名前の要約）・書き出しボタンが複数層でも有効・2×2 スイッチが色覚層のあるときだけ（#120/#121/#122）
 ├── export_multi_layer_test.dart    # 複数層の書き出し: 層ごとの行・最大の緊急度と併合した escalation・実験的の注記・強度 0 の層を数えない・ファイル名・描画時点の控え・単一層の従来どおり（#121）
 ├── home_screen_multi_select_keys_test.dart # ↑↓ は選択を変えず Space/Enter で足し引き・←→ は調整中の層の強度（#120）
+├── home_screen_slash_key_test.dart # `/` のガードはテキスト入力中だけ: チップ・ボタン・スライダー・一覧の行にフォーカスがあっても検索欄へ移り全選択・検索欄の中では奪わない・↑↓←→ のガードは不変（#141）
 ├── filter_list_selection_test.dart # 統合一覧の純粋ロジック（#72）
 ├── color_vision_compare_test.dart  # 2×2 比較で並べる型の順・色覚層の検出・土台と強度（colorVisionCompareInputOf）・フィルタの対応表（#84/#122）
 ├── color_vision_compare_view_test.dart # 2×2 の描画・Semantics（失敗文言・描画済みの強さ）・直列最新優先・失敗（控えがある間は出さない）・書き出し PNG の実画素・土台（1 回だけ合成・色覚の強度だけ動かしても再合成しない・4 セルが土台 + 各型とバイト一致・層の名前つきキャプション／ファイル名）（#84/#122）
