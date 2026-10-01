@@ -227,19 +227,13 @@ class _CategoryChips extends StatelessWidget {
           final current = controller.category;
           final dimmed = controller.isSearching;
           // 検索語があるあいだは一覧がカテゴリを無視して全体から探すので、チップは
-          // どれも非選択（チェックなし・淡色）に見せる（#143）。内部のカテゴリは保つ。
-          final dimStyle = dimmed
-              ? TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                )
-              : null;
+          // どれも非選択表示（チェック・選択色なし。通常の非選択チップと同じ見た目）にする（#143）。内部のカテゴリは保つ。
           return Wrap(
             spacing: 8,
             children: [
               ChoiceChip(
                 label: Text(l10n.filterCategoryAll),
                 selected: !dimmed && current == null,
-                labelStyle: dimStyle,
                 showCheckmark: true,
                 onSelected: (_) => controller.setCategory(null),
               ),
@@ -247,7 +241,6 @@ class _CategoryChips extends StatelessWidget {
                 ChoiceChip(
                   label: Text(visionCategoryName(l10n, category)),
                   selected: !dimmed && current == category,
-                  labelStyle: dimStyle,
                   showCheckmark: true,
                   onSelected: (_) => controller.setCategory(category),
                 ),

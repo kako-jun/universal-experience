@@ -1140,8 +1140,8 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   `VisionFilterState`/`ImageSourceState` 自体の変更は監視しない（起動時の復元・
   `seedInitialLayers`・推奨サンプルへの自動追従と区別するため）。トレイ・ホットキー経由の
   選択では閉じない
-- カテゴリチップ（`FilterBrowser`）: 検索語があるあいだ（`isSearching`）は全チップを非選択・
-  淡色（`onSurfaceVariant`）で描く。`FilterBrowserController.category` は保持し、検索語を消すと元の選択表示に戻る（#143）
+- カテゴリチップ（`FilterBrowser`）: 検索語があるあいだ（`isSearching`）は全チップを非選択表示（チェック・選択色なし。通常の非選択チップと同じ見た目）にする。
+  `FilterBrowserController.category` は保持し、検索語を消すと元の選択表示に戻る（#143）
 
 ### 過去の設計: system-wide プラグイン（#13 で撤去）
 

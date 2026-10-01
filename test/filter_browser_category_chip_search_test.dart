@@ -1,7 +1,7 @@
 // FilterBrowser のカテゴリチップと検索語の表示の食い違い（#143）のテスト。
 //
 // 検索語があるあいだ一覧はカテゴリを無視して全体から探すので、チップは全て
-// 非選択（selected: false・チェックなし・淡色の文字）に見せる。内部のカテゴリ
+// 非選択表示（selected: false・チェック・選択色なし。通常の非選択チップと同じ見た目）に見せる。内部のカテゴリ
 // （FilterBrowserController.category）は変えず、検索語を消すと元の選択表示に戻る。
 // チップを押すと従来どおり検索語が消えてそのカテゴリが選ばれる。
 
@@ -155,29 +155,33 @@ void main() {
     expect(tester.widget<ChoiceChip>(chipLabeled('すべて')).selected, isTrue);
   });
 
-  testWidgets('検索中のチップの文字色は、検索していない時と異なる（淡色化される）',
+  testWidgets('検索中のチップは、検索していない時の非選択チップと同じ見た目（文字色を上書きしない）',
       (tester) async {
+    Color? labelColor(String label) => tester
+        .widget<RichText>(find.descendant(
+            of: chipLabeled(label), matching: find.byType(RichText)))
+        .text
+        .style
+        ?.color;
+
     await pumpBrowser(tester);
-    expect(
-      tester.widget<ChoiceChip>(chipLabeled('すべて')).labelStyle,
-      isNull,
-      reason: '検索していない時は文字色を上書きしない',
-    );
+    // 検索していない時の非選択チップ（「すべて」が選択中なので「色覚」を基準にする）。
+    expect(tester.widget<ChoiceChip>(chipLabeled('色覚')).selected, isFalse);
+    final plainUnselected = labelColor('色覚');
 
     await typeSearch(tester, 'myo');
-    final scheme = Theme.of(tester.element(chipLabeled('すべて'))).colorScheme;
     for (final chip in tester.widgetList<ChoiceChip>(chips())) {
-      final color = chip.labelStyle?.color;
-      expect(color, scheme.onSurfaceVariant, reason: '検索中は補足ロールの色');
-      expect(color, isNot(scheme.onSurface), reason: '本文色のままではない');
-      expect(color, isNot(scheme.onSecondaryContainer), reason: '選択色のままではない');
+      expect(chip.selected, isFalse, reason: 'チェック・選択色が出ない');
+      expect(chip.labelStyle, isNull, reason: '文字色の上書きはしない');
     }
+    expect(labelColor('色覚'), plainUnselected);
+    expect(labelColor('すべて'), plainUnselected,
+        reason: '選択中だった「すべて」も通常の非選択と同じ文字色');
   });
 
-
-  // 淡色の文字（補足ロール onSurfaceVariant）が 4 テーマで読めること（DESIGN.md の
+  // 検索中の文字（通常の非選択チップと同じ）が 4 テーマで読めること（DESIGN.md の
   // コントラスト 4.5:1 / 大きい文字 3:1）。
-  group('検索中の淡色チップの文字コントラスト', () {
+  group('検索中のチップの文字コントラスト', () {
     final themes = <String, ThemeData>{
       'ライト': AppTheme.lightTheme,
       'ダーク': AppTheme.darkTheme,

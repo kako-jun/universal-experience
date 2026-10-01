@@ -51,7 +51,7 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 | 画面背景 | `surface` |
 | カード背景（`CardTheme` が設定済み） | `surfaceContainerHighest` |
 | 本文 | `onSurface` |
-| 補足・注記・ラベル（検索中に非選択へ見せるカテゴリチップの文字も同じ。押せる。無効 0.38 とは別物） | `onSurfaceVariant` |
+| 補足・注記・ラベル | `onSurfaceVariant` |
 | 見出しアイコン・強調テキスト・スライダー・選択中 | `primary` |
 | 選択中チップ・バナー（入口の案内） | `secondaryContainer` / `onSecondaryContainer` |
 | 選んだフィルタの説明（右カラム） | カード背景の上に `onSurface`（名前・説明）/ `onSurfaceVariant`（カテゴリ・有病率などの注記）。専用のコンテナ色は使わない |
@@ -134,7 +134,7 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 | 排他的な少数の選択（2〜4 個）: 起動モード・言語など | `SegmentedButton` | チップの並べ置き |
 | 多数の選択肢から 1 つ選ぶ（フィルタ選択・サンプル画像） | `ChoiceChip`（選択中がひと目で分かる） | 選択状態を色だけで示すボタン |
 | ON/OFF の切り替えが状態として残るもの（「2×2 で比較」など） | `FilterChip` / `Switch` | |
-| 大分類の切り替え（フィルタのカテゴリ） | `ChoiceChip` の `Wrap`（広幅・狭幅とも。「すべて」+ 7 カテゴリ、選択中はチェックと色。検索語があるあいだは一覧がカテゴリを無視するので、全チップを非選択（チェックなし・文字は補足ロール `onSurfaceVariant`）にし、検索語を消すと元の選択表示に戻る、#143） | ボタンで独自に作る |
+| 大分類の切り替え（フィルタのカテゴリ） | `ChoiceChip` の `Wrap`（広幅・狭幅とも。「すべて」+ 7 カテゴリ、選択中はチェックと色。検索語があるあいだは一覧がカテゴリを無視するので、全チップを通常の非選択チップと同じ見た目（チェック・選択色なし。文字色は上書きしない）にし、検索語を消すと元の選択表示に戻る、#143） | ボタンで独自に作る |
 | 強度・パラメータ | `Slider`（`divisions` で刻む、値を必ずラベル表示） | 値が見えないスライダー |
 | 強度の上限付近に注意が要るフィルタ（`tunnel_vision`）の強度 | `Slider` の閾値位置に縦線の印（`StrengthCautionTrackShape`、`onSurface`）+ 下に注記（`StrengthCautionNote`）。閾値未満はアイコン `info_outline`・文字 `onSurfaceVariant` の補足、閾値以上はアイコン `warning_amber_rounded`（`primary`）・文字 `onSurface`/`w600` の警告に切り替える | 警告にコンテナ色（`tertiaryContainer`/`errorContainer`）を使う（受診喚起と混同する）、色だけで切り替える |
 | 補足・免責 | `bodySmall` の `Text`（`onSurfaceVariant`） | 小さくして目立たなくする |
