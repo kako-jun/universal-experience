@@ -6,8 +6,8 @@
 
 ### 必須ツール
 
-- **Flutter SDK**: 3.38.4以上（`pubspec.lock` の `sdks` 準拠。`pubspec.yaml` の
-  `sdk: '>=3.3.0 <4.0.0'` は flutter_rust_bridge の生成物が要求する下限にすぎない）
+- **Flutter SDK**: **3.41.4**。`pubspec.yaml` の `environment.flutter` がローカル開発と
+  CI の唯一の定義元です。インストール済み SDK が一致することを確認してください。
   ```bash
   flutter --version
   ```
@@ -74,6 +74,13 @@ cd universal-experience
 # メインアプリの依存関係
 flutter pub get
 ```
+
+### Flutter SDK を更新する場合
+
+`pubspec.yaml` の `environment.flutter` だけを変更します。CI は全ワークフローでこの値を
+読むため、ワークフローごとのバージョン更新は不要です。更新後は `flutter pub get`、
+`flutter analyze`、`flutter test` と対象プラットフォームのビルドを実行し、必要なら
+`pubspec.lock` と生成物を同じ変更に含めてください。
 
 > 旧バージョンには `plugins/color_vision_filter` という自作プラグインがあり、
 > ここで別途 `flutter pub get` が必要でしたが、#13 でプラグインを撤去し色変換

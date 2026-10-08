@@ -24,7 +24,8 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          # pubspec.yaml の environment.flutter を唯一の SDK 定義にする。
+          flutter-version-file: pubspec.yaml
           cache: true
 
       # cargokit 統合 (#55) により `flutter build macos` が rust/ crate を
@@ -207,7 +208,8 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          # pubspec.yaml の environment.flutter を唯一の SDK 定義にする。
+          flutter-version-file: pubspec.yaml
           cache: true
 
       # cargokit が rustup を直接呼ぶため、rustup 経由でインストールする

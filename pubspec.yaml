@@ -4,6 +4,9 @@ publish_to: 'none'
 version: 0.1.0+1
 
 environment:
+  # CI とローカルを同じ SDK で再現する。GitHub Actions はこの厳密な値を
+  # flutter-version-file として参照する（更新手順は docs/GETTING_STARTED.md）。
+  flutter: 3.41.4
   # flutter_rust_bridge 生成の frb_generated.web.dart が inline-class
   # (extension type) を使うため Dart 3.3+ が必要。
   sdk: '>=3.3.0 <4.0.0'
