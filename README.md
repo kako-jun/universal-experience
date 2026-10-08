@@ -368,6 +368,7 @@ ue 自身の UI も、スクリーンリーダー・キーボード・低視力�
 ```bash
 git clone https://github.com/kako-jun/universal-experience.git
 cd universal-experience
+# pubspec.yaml の environment.flutter と同じ Flutter SDK を使う
 flutter pub get
 flutter run
 ```
@@ -384,8 +385,8 @@ Rust は `rust/` の `cargo test` / clippy、flutter_rust_bridge の codegen に
 
 ## 技術スタック
 
-- Flutter 3.38.4+（`pubspec.lock` の `sdks` 準拠。`pubspec.yaml` の
-  `sdk: '>=3.3.0 <4.0.0'` は flutter_rust_bridge の生成物が要求する下限にすぎない）
+- Flutter 3.41.4（`pubspec.yaml` の `environment.flutter` がローカル開発と CI の
+  唯一の定義元。更新手順は `docs/GETTING_STARTED.md`）
 - Provider (状態管理)
 - Material Design 3（色は `colorScheme` のロールのみ。OS のハイコントラスト設定に追従するテーマあり。
   UI 設計原則は [`DESIGN.md`](DESIGN.md)）
