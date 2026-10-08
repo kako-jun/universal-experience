@@ -8,6 +8,7 @@
 
 - **Flutter SDK**: **3.41.4**。`pubspec.yaml` の `environment.flutter` がローカル開発と
   CI の唯一の定義元です。インストール済み SDK が一致することを確認してください。
+  この指定は SDK を自動でインストール・切替しないため、ローカルでは自分で同じ版を選びます。
   ```bash
   flutter --version
   ```
@@ -80,7 +81,8 @@ flutter pub get
 `pubspec.yaml` の `environment.flutter` だけを変更します。CI は全ワークフローでこの値を
 読むため、ワークフローごとのバージョン更新は不要です。更新後は `flutter pub get`、
 `flutter analyze`、`flutter test` と対象プラットフォームのビルドを実行し、必要なら
-`pubspec.lock` と生成物を同じ変更に含めてください。
+`pubspec.lock` と生成物を同じ変更に含めてください。FRB の生成物も
+`tools/check_frb_drift.sh` で検証します。
 
 > 旧バージョンには `plugins/color_vision_filter` という自作プラグインがあり、
 > ここで別途 `flutter pub get` が必要でしたが、#13 でプラグインを撤去し色変換
