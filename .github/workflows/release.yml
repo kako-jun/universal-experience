@@ -1,0 +1,58 @@
+name: Release
+
+# 配布物は Actions artifact ではなく GitHub Releases から取得する。
+# vX.Y.Z タグを main の検証済みコミットに打つと、Windows の実行可能 bundle を
+# release asset として公開する。
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  windows-release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: pubspec.yaml
+          cache: true
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build Windows release bundle
+        run: flutter build windows --release
+
+      - name: Verify executable and Rust DLL are bundled
+        shell: pwsh
+        run: |
+          $bundle = 'build/windows/x64/runner/Release'
+          foreach ($file in @('universal_experience.exe', 'universal_experience_rust.dll')) {
+            if (!(Test-Path -Path "$bundle/$file" -PathType Leaf)) {
+              throw "Missing Windows release bundle file: $file"
+            }
+          }
+
+      - name: Package Windows release bundle
+        shell: pwsh
+        run: |
+          Compress-Archive -Path build\windows\x64\runner\Release\* `
+            -DestinationPath universal-experience-windows-x64.zip
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: universal-experience-windows-x64.zip
