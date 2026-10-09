@@ -104,7 +104,7 @@ rust/                        # sensus-core を FRB で公開する Rust crate
     ├── frb_generated.rs
     └── golden_gen.rs        # GPU golden 参照生成（#[cfg(test)] のみ）
 rust_builder/                 # cargokit 統合（#55）。flutter build/run 時に rust/ をビルドし
-                               # macOS/Linux アプリへ同梱する FFI plugin（生成物、直接編集しない）
+                               # macOS/Linux/Windows アプリへ同梱する FFI plugin（テンプレート由来）
 
 tools/                       # シェーダ codegen（sensus の .frag → Impeller サブセットへ機械変換）
                               # + generate_samples.dart（サンプル画像集の生成、#78）
@@ -118,7 +118,8 @@ assets/samples/              # サンプル画像集（図形は自作・手続�
 
 macos/                       # macOS ランナー（現行対応）
 linux/                       # Linux ランナー（現行対応）
-# Android / Windows ランナーは計画中（未作成）
+windows/                     # Windows ランナー（x64 debug / CI artifact、#149。実機確認は残る）
+# Android ランナーは計画中（未作成）
 
 DESIGN.md                    # UI 設計原則（カラートークン・タイポ・余白・コンポーネント・画面構成・検証方法、#72）
 
@@ -329,7 +330,8 @@ UI を変える場合は先に `DESIGN.md` を読む（色は `colorScheme` の�
 
 ## CI
 
-`.github/workflows/ci.yml` は2ジョブ構成。`check`（runs-on: macos-latest。
+`.github/workflows/ci.yml` は3ジョブ構成。`windows-build` は x64 debug の exe/DLL 同梱を
+確認し、実機確認用 artifact を保存する（#149）。`check`（runs-on: macos-latest。
 Flutter golden を生成プラットフォームと揃えるため）が push/PR（main）で
 flutter analyze / flutter test / `rust/` の cargo fmt --check /
 clippy --all-targets -D warnings / cargo test / flutter build macos --debug /

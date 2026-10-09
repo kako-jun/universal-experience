@@ -11,6 +11,53 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Windows bundle を実機確認用に取得できるようにする（#149）。
+  windows-build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: pubspec.yaml
+          cache: true
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Flutter build windows
+        env:
+          # cargokit otherwise collapses a Rust build failure into MSB8066.
+          # Keep its invoked command visible on hosted Windows runners.
+          CARGOKIT_VERBOSE: "1"
+        run: flutter build windows --debug
+
+      - name: Verify executable and Rust DLL are bundled
+        shell: pwsh
+        run: |
+          $bundle = 'build/windows/x64/runner/Debug'
+          Get-ChildItem $bundle
+          foreach ($file in @('universal_experience.exe', 'universal_experience_rust.dll')) {
+            if (!(Test-Path -Path "$bundle/$file" -PathType Leaf)) {
+              throw "Missing Windows bundle file: $file"
+            }
+          }
+
+      - name: Upload Windows debug bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: universal-experience-windows-x64-debug
+          path: build/windows/x64/runner/Debug/
+          if-no-files-found: error
+          retention-days: 14
+
   check:
     env:
       # FRB codegen が cargo expand で使う（CI 実績のある版に固定）。

@@ -525,7 +525,7 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
 > バックする必要がある。
 
 > **実機未検証の注意**: Windows で `Ctrl+Alt+Shift+Esc`（`emergencyExit` の既定キー）が
-> OS 標準や他アプリのショートカットと衝突しないかは、Windows ランナー未着手のため実機
+> OS 標準や他アプリのショートカットと衝突しないかは、Windows 実機でまだ
 > 確認できていない。Windows 対応時に確認が必要。
 
 ### クリックスルーの復帰経路
@@ -848,7 +848,11 @@ ShaderFilter    (lib/rendering/) — Impeller FragmentProgram。将来のライ�
 `docs/adr/2026-09-30-multi-select-filter-state-model.md`。
 
 `rust/` crate は `rust_builder/`（cargokit 統合、#55）経由でビルドされ、
-macOS / Linux アプリに同梱される。`lib/main.dart` の `buildRootApp()`（#55 で `main()` から
+macOS / Linux / Windows アプリに同梱される。Windows は FFI plugin の CMake が
+`apply_cargokit` で Rust DLL を作り、標準 runner が exe と同じ場所へ同梱する（#149）。
+CI は x64 debug bundle の DLL 存在確認と artifact 保存を行う。画面・トレイ・
+ホットキー・クリップボード・PNG書き出しの実機確認は残る。
+`lib/main.dart` の `buildRootApp()`（#55 で `main()` から
 切り出したルート Widget 組み立て関数）が `runApp`
 前に `services/native_bridge_service.dart` の `initNativeBridge()` を呼んで
 同梱された native lib をロードする（呼ばないと `RustLib.instance` が未初期化の

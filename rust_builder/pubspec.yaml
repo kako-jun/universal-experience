@@ -22,9 +22,10 @@ dev_dependencies:
 flutter:
   plugin:
     platforms:
-      # ue が現行で対応するのは macOS / Linux のみ（android/ios/windows は
-      # ランナー自体が未作成のため対象外。#55）。
+      # デスクトップ runner の Rust ライブラリを cargokit でビルド・同梱する。
       linux:
         ffiPlugin: true
       macos:
+        ffiPlugin: true
+      windows:
         ffiPlugin: true

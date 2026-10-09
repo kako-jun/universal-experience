@@ -33,10 +33,18 @@ function(apply_cargokit target manifest_dir lib_name any_symbol_name)
         set(CARGOKIT_TARGET_PLATFORM "windows-x64")
     endif()
 
+    # Flutter invokes desktop plugins from an ephemeral symlink directory.
+    # `CMAKE_CURRENT_SOURCE_DIR/${manifest_dir}` works on Unix where CMake
+    # resolves it physically, but points under `.plugin_symlinks` on Windows.
+    # The app's platform directory is always directly below the repository,
+    # so resolve the crate from CMAKE_SOURCE_DIR instead.
+    get_filename_component(CARGOKIT_MANIFEST_PATH
+        "${CMAKE_SOURCE_DIR}/../rust" REALPATH)
+
     set(CARGOKIT_ENV
         "CARGOKIT_CMAKE=${CMAKE_COMMAND}"
         "CARGOKIT_CONFIGURATION=$<CONFIG>"
-        "CARGOKIT_MANIFEST_DIR=${CMAKE_CURRENT_SOURCE_DIR}/${manifest_dir}"
+        "CARGOKIT_MANIFEST_DIR=${CARGOKIT_MANIFEST_PATH}"
         "CARGOKIT_TARGET_TEMP_DIR=${CARGOKIT_TEMP_DIR}"
         "CARGOKIT_OUTPUT_DIR=${CARGOKIT_OUTPUT_DIR}"
         "CARGOKIT_TARGET_PLATFORM=${CARGOKIT_TARGET_PLATFORM}"
