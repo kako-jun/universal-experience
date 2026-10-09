@@ -352,16 +352,21 @@ ue 自身の UI も、スクリーンリーダー・キーボード・低視力�
 
 - macOS 13+（deployment target 13.0。Flutter の native assets が macOS 13 を要求する）
 - Linux (Ubuntu 20.04+ 目安、GTK 3 ベース)
+- Windows 10/11 x64（debug runner / CI artifact。実機の操作確認は未完了）
 
 計画中（ランナー未作成）:
 
 - Android
-- Windows
 
 ※ iOS は技術的制約により非対応（`docs/adr/2025-11-17-no-ios-support.md`）
 
 ※ Linux ではタスクトレイ・グローバルホットキーに追加の system パッケージが要ります
 （`docs/GETTING_STARTED.md` の Linux 開発要件を参照）。
+
+Windows の実機確認には CI の `universal-experience-windows-x64-debug` artifact を
+展開し、フォルダ全体を保ったまま `universal_experience.exe` を起動します。
+画面表示・フィルタ選択・サンプル切替・トレイ・ホットキー・クリップボード・PNG書き出しは
+実機での確認が残っています。署名・インストーラ・Release 公開は対象外です。
 
 ## セットアップ
 

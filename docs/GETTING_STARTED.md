@@ -31,8 +31,8 @@
 
 ### プラットフォーム別要件
 
-現行でランナーがあり実際にビルド・実行できるのは macOS / Linux のみです。
-Android / Windows は計画中で、ランナーディレクトリ自体がまだありません。
+現行のランナーは macOS / Linux / Windows です。Windows は x64 debug bundle の
+CI ビルドを対象とし、実機の操作確認が残っています。Android はランナー未作成です。
 
 #### macOS開発（現行対応）
 - 最新の安定版 Xcode（macOS 13 以上をターゲットにできるもの。Flutter の native assets が
@@ -56,9 +56,11 @@ Android / Windows は計画中で、ランナーディレクトリ自体がま�
 - Android SDK (API 23以上)
 - Java Development Kit (JDK) 11以上
 
-#### Windows開発（計画中）
+#### Windows開発（debug runner）
 - Visual Studio 2022 (C++ desktop development)
 - Windows 10/11 SDK
+- Visual Studio の「C++ によるデスクトップ開発」ワークロード
+- Rust は `x86_64-pc-windows-msvc` ターゲットを使用（rustup 経由）
 
 ## セットアップ手順
 
@@ -108,8 +110,7 @@ flutter run
 flutter run -d <device-id>
 ```
 
-Windows / Android 向けの `-d windows` / `-d <android-device-id>` は、対応する
-ランナーディレクトリ自体がまだ無いため現状使えません（計画中）。
+Windows では `flutter run -d windows` を使います。Android はランナー未作成です。
 
 ### リリースビルド
 
@@ -121,8 +122,13 @@ flutter build macos --release
 flutter build linux --release
 ```
 
-Windows / Android のビルド（`flutter build windows` / `flutter build apk`）は
-ランナー未作成のため現状動きません（計画中）。
+Windows x64 ホストでは `flutter build windows --debug` でビルドします。
+CI の `windows-build` job は実行ファイルと `universal_experience_rust.dll` の同梱を
+検証し、`universal-experience-windows-x64-debug` artifact としてフォルダ全体を保存します。
+展開後は DLL と `data/` を同じ場所に保ち、`universal_experience.exe` を起動してください。
+実機では画面表示・フィルタ選択・サンプル切替・トレイ・ホットキー・クリップボード・
+PNG書き出しを確認します。debug版には Visual Studio の debug runtime が必要です。
+署名・インストーラ・Release 公開は扱いません。Android はランナー未作成です。
 
 ## プロジェクト構造
 
@@ -142,12 +148,12 @@ universal-experience/
 ├── shaders/               # 変換済み .frag（ビルド時 impellerc がコンパイル）
 ├── macos/                 # macOS固有コード（現行対応）
 ├── linux/                 # Linux固有コード（現行対応）
+├── windows/               # Windows固有コード（x64 debug runner）
 ├── docs/                  # ドキュメント
 └── test/                  # テスト
 ```
 
-Android / Windows 固有ディレクトリ（`android/` / `windows/`）はランナー自体が
-まだ無いため存在しません（計画中）。
+Android 固有ディレクトリ（`android/`）はランナー未作成のため存在しません。
 
 ## 開発ワークフロー
 
