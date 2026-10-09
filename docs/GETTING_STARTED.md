@@ -122,13 +122,14 @@ flutter build macos --release
 flutter build linux --release
 ```
 
-Windows x64 ホストでは `flutter build windows --debug` でビルドします。
-CI の `windows-build` job は実行ファイルと `universal_experience_rust.dll` の同梱を
-検証し、`universal-experience-windows-x64-debug` artifact としてフォルダ全体を保存します。
-展開後は DLL と `data/` を同じ場所に保ち、`universal_experience.exe` を起動してください。
+Windows x64 ホストでは `flutter build windows --release` で配布用 bundle をビルドします。
+`vX.Y.Z` タグを push すると Release workflow が実行ファイルと
+`universal_experience_rust.dll` の同梱を検証し、GitHub Releases に
+`universal-experience-windows-x64.zip` を公開します。展開後は DLL と `data/` を
+同じ場所に保ち、`universal_experience.exe` を起動してください。
 実機では画面表示・フィルタ選択・サンプル切替・トレイ・ホットキー・クリップボード・
-PNG書き出しを確認します。debug版には Visual Studio の debug runtime が必要です。
-署名・インストーラ・Release 公開は扱いません。Android はランナー未作成です。
+PNG書き出しを確認します。アプリは未署名で、インストーラ形式ではありません。
+Android はランナー未作成です。
 
 ## プロジェクト構造
 
