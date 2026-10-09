@@ -122,11 +122,19 @@ flutter build macos --release
 flutter build linux --release
 ```
 
-Windows x64 ホストでは `flutter build windows --release` で配布用 bundle をビルドします。
-`vX.Y.Z` タグを push すると Release workflow が実行ファイルと
-`universal_experience_rust.dll` の同梱を検証し、GitHub Releases に
-`universal-experience-windows-x64.zip` を公開します。展開後は DLL と `data/` を
-同じ場所に保ち、`universal_experience.exe` を起動してください。
+`vX.Y.Z` タグを push すると Release workflow が既存のデスクトップ対応 OS の
+配布物を検証し、同じ GitHub Release に公開します。
+
+- Windows x64: `universal-experience-windows-x64.zip`。展開後は DLL と `data/` を
+  同じ場所に保ち、`universal_experience.exe` を起動します。
+- macOS: `universal-experience-macos.dmg`。アプリを Applications へ
+  ドラッグします（未署名）。
+- Linux x64: `universal-experience-linux-x64.tar.gz`。展開後は `lib/` と `data/` を
+  同じ場所に保ち、`universal_experience` を起動します。
+
+Windows x64 ホストでは `flutter build windows --release`、macOS では
+`flutter build macos --release`、Linux では `flutter build linux --release` で
+各配布用 bundle をビルドできます。
 実機では画面表示・フィルタ選択・サンプル切替・トレイ・ホットキー・クリップボード・
 PNG書き出しを確認します。アプリは未署名で、インストーラ形式ではありません。
 Android はランナー未作成です。
