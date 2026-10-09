@@ -1,7 +1,7 @@
 name: universal_experience
 description: Universal accessibility experience simulator for multiple sensory disabilities
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.1.1+2
 
 environment:
   # CI とローカルを同じ SDK で再現する。GitHub Actions はこの厳密な値を
