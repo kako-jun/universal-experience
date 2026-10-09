@@ -1,8 +1,8 @@
 name: Release
 
 # 配布物は Actions artifact ではなく GitHub Releases から取得する。
-# vX.Y.Z タグを main の検証済みコミットに打つと、Windows の実行可能 bundle を
-# release asset として公開する。
+# main の検証済みコミットに vX.Y.Z タグを打つと、既存の全デスクトップ対応 OS
+# （macOS / Linux / Windows）の配布 bundle を同じ Release に公開する。
 on:
   push:
     tags:
@@ -12,29 +12,99 @@ permissions:
   contents: write
 
 jobs:
-  windows-release:
-    runs-on: windows-latest
+  build-macos:
+    runs-on: macos-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version-file: pubspec.yaml
           cache: true
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Flutter pub get
+        run: flutter pub get
+      - name: Build macOS release bundle
+        run: flutter build macos --release
+      # macOS は cargokit が Rust static library をアプリ本体にリンクするため、
+      # Windows/Linux のような別 DLL/SO は存在しない。CI の macOS integration
+      # test が実ブリッジのロードまで検証済みであることを Release の前提にする。
+      - name: Verify macOS application bundle
+        run: |
+          test -d build/macos/Build/Products/Release/universal_experience.app
+          test -f build/macos/Build/Products/Release/universal_experience.app/Contents/MacOS/universal_experience
+      - name: Package macOS release bundle
+        run: |
+          staging=$(mktemp -d)
+          cp -R build/macos/Build/Products/Release/universal_experience.app "$staging/"
+          ln -s /Applications "$staging/Applications"
+          hdiutil create -volname "Universal Experience" -srcfolder "$staging" \
+            -ov -format UDZO "$GITHUB_WORKSPACE/universal-experience-macos.dmg"
+      - name: Upload macOS release asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: universal-experience-macos
+          path: universal-experience-macos.dmg
+          if-no-files-found: error
 
+  build-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux desktop build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config libgtk-3-dev \
+            libayatana-appindicator3-dev libkeybinder-3.0-dev
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Flutter pub get
+        run: flutter pub get
+      - name: Build Linux release bundle
+        run: flutter build linux --release
+      - name: Verify executable and Rust library are bundled
+        run: |
+          bundle=build/linux/x64/release/bundle
+          test -f "$bundle/universal_experience"
+          test -f "$bundle/lib/libuniversal_experience_rust.so"
+      - name: Package Linux release bundle
+        run: |
+          tar -C build/linux/x64/release/bundle -czf \
+            universal-experience-linux-x64.tar.gz .
+      - name: Upload Linux release asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: universal-experience-linux-x64
+          path: universal-experience-linux-x64.tar.gz
+          if-no-files-found: error
+
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: pubspec.yaml
+          cache: true
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
-
       - name: Flutter pub get
         run: flutter pub get
-
       - name: Build Windows release bundle
         run: flutter build windows --release
-
       - name: Verify executable and Rust DLL are bundled
         shell: pwsh
         run: |
@@ -44,15 +114,31 @@ jobs:
               throw "Missing Windows release bundle file: $file"
             }
           }
-
       - name: Package Windows release bundle
         shell: pwsh
         run: |
           Compress-Archive -Path build\windows\x64\runner\Release\* `
             -DestinationPath universal-experience-windows-x64.zip
+      - name: Upload Windows release asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: universal-experience-windows-x64
+          path: universal-experience-windows-x64.zip
+          if-no-files-found: error
 
+  publish:
+    needs: [build-macos, build-linux, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: universal-experience-windows-x64.zip
+          files: |
+            artifacts/universal-experience-macos/universal-experience-macos.dmg
+            artifacts/universal-experience-linux-x64/universal-experience-linux-x64.tar.gz
+            artifacts/universal-experience-windows-x64/universal-experience-windows-x64.zip

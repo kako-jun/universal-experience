@@ -4,12 +4,18 @@
 
 **「すべての感覚を、すべての人に。」**
 
-## Windows 版の入手
+## デスクトップ版の入手
 
 [GitHub Releases](https://github.com/kako-jun/universal-experience/releases) から
-`universal-experience-windows-x64.zip` をダウンロードして展開し、
-`universal_experience.exe` を起動してください。Release は `vX.Y.Z` タグで
-Windows release bundle（Rust DLL を含む）を検証してから公開されます。
+OS に対応する配布物を選んでください。`vX.Y.Z` タグは、各 OS の release bundle を
+検証してから同じ Release に公開します。
+
+- **Windows x64**: `universal-experience-windows-x64.zip` を展開し、
+  `universal_experience.exe` を起動します。DLL と `data/` は同じフォルダに保ちます。
+- **macOS**: `universal-experience-macos.dmg` を開き、アプリを
+  Applications へドラッグします。未署名です。
+- **Linux x64**: `universal-experience-linux-x64.tar.gz` を展開し、
+  `universal_experience` を起動します。`lib/` と `data/` は同じフォルダに保ちます。
 
 ## 機能
 
