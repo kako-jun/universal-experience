@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:tray_manager/tray_manager.dart';
 
 import '../models/vision_filter_catalog.dart';
@@ -351,6 +352,42 @@ enum CloseAction {
 CloseAction resolveCloseAction({required bool trayAvailable}) =>
     trayAvailable ? CloseAction.hideToTray : CloseAction.exitApp;
 
+/// トレイアイコンのアセットパス (#150)。
+///
+/// Windows のネイティブ側 (tray_manager) は `LoadImage(IMAGE_ICON, LR_LOADFROMFILE)`
+/// で読むため ICO 以外 (PNG) だとアイコンが読めない。macOS / Linux は PNG のまま。
+const String kTrayIconPng = 'assets/tray/tray_icon.png';
+const String kTrayIconIco = 'assets/tray/tray_icon.ico';
+
+/// OS ごとのトレイアイコンのアセットパスを選ぶ純粋関数。Windows だけ ICO。
+String trayIconAssetFor({required bool isWindows}) =>
+    isWindows ? kTrayIconIco : kTrayIconPng;
+
+/// [bytes] が [assetPath] の拡張子に見合うアイコン画像かを見る純粋関数 (#150)。
+///
+/// Windows の `setIcon` は画像を読めなくても成功 (`true`) を返してしまい、
+/// アイコン無しのトレイ項目が残る。Dart 側から観測できるのは「アセットが読めるか」
+/// と「中身が期待する形式か」だけなので、これで読み込み失敗を検出する。
+/// ICO は先頭 4 バイトが `00 00 01 00`、PNG はシグネチャ `89 50 4E 47`。
+bool isValidTrayIconBytes(String assetPath, Uint8List bytes) {
+  final lower = assetPath.toLowerCase();
+  if (lower.endsWith('.ico')) {
+    return bytes.length >= 6 &&
+        bytes[0] == 0 &&
+        bytes[1] == 0 &&
+        bytes[2] == 1 &&
+        bytes[3] == 0;
+  }
+  if (lower.endsWith('.png')) {
+    return bytes.length >= 8 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47;
+  }
+  return bytes.isNotEmpty;
+}
+
 /// `tray_manager` を叩くトレイラッパ (副作用層)。
 class TrayService with TrayListener {
   TrayService({
@@ -364,7 +401,9 @@ class TrayService with TrayListener {
     required this.onOpenSettings,
     required this.onQuit,
     bool loupeVisible = true,
+    Future<Uint8List> Function(String assetPath)? iconBytesLoader,
   })  : _labels = labels,
+        _iconBytesLoader = iconBytesLoader ?? _loadIconFromBundle,
         _tooltip = tooltip,
         _loupeVisible = loupeVisible;
 
@@ -381,6 +420,12 @@ class TrayService with TrayListener {
 
   /// トレイアイコンのアセットパス (PNG)。`assets/tray/` 参照。
   final String iconPath;
+
+  /// アイコンのアセットを読む seam (#150)。テストで差し替える。
+  final Future<Uint8List> Function(String assetPath) _iconBytesLoader;
+
+  static Future<Uint8List> _loadIconFromBundle(String path) async =>
+      (await rootBundle.load(path)).buffer.asUint8List();
 
   /// トレイメニューの i18n 解決済み文言 (#18)。起動時ロケールで解決して渡し、
   /// 言語が変わったら [updateLocalization] で差し替える (#82)。
@@ -406,6 +451,15 @@ class TrayService with TrayListener {
 
   bool _loupeVisible;
   bool _initialised = false;
+
+  /// 実行中の OS が Windows か（アイコン形式の選択用、#150）。
+  static bool get isWindowsPlatform {
+    try {
+      return Platform.isWindows;
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// 現在のプラットフォームにトレイ概念があるか。
   static bool get isTraySupportedPlatform {
@@ -442,6 +496,12 @@ class TrayService with TrayListener {
     loupeWindow.addListener(_onSelectionChanged);
     try {
       trayManager.addListener(this);
+      // Windows の setIcon は画像が読めなくても成功を返すため、事前に中身を確かめる。
+      // 不正ならトレイ無し扱い (isAvailable=false → ✕ で終了) に倒す (#150)。
+      final bytes = await _iconBytesLoader(iconPath);
+      if (!isValidTrayIconBytes(iconPath, bytes)) {
+        throw StateError('tray icon is not a valid image: $iconPath');
+      }
       await trayManager.setIcon(iconPath);
       await trayManager.setToolTip(_tooltip);
       await _rebuildMenu();

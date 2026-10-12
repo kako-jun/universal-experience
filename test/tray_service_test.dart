@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -629,6 +631,103 @@ void main() {
       expect(menu, contains('Protanopia'));
       expect(menu, isNot(contains('終了')));
       expect(menu, isNot(contains('1型2色覚（赤）')));
+    });
+  });
+
+  group('トレイアイコンの選択と読み込み失敗のフォールバック (#150)', () {
+    final icoBytes = Uint8List.fromList([0, 0, 1, 0, 1, 0, 16, 16]);
+    final pngBytes =
+        Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+
+    test('Windows は ICO、それ以外の OS は PNG を選ぶ', () {
+      expect(trayIconAssetFor(isWindows: true), 'assets/tray/tray_icon.ico');
+      expect(trayIconAssetFor(isWindows: false), 'assets/tray/tray_icon.png');
+    });
+
+    test('同梱の ICO / PNG が実在し、拡張子どおりの形式である', () {
+      final ico = File(kTrayIconIco).readAsBytesSync();
+      final png = File(kTrayIconPng).readAsBytesSync();
+      expect(isValidTrayIconBytes(kTrayIconIco, ico), isTrue);
+      expect(isValidTrayIconBytes(kTrayIconPng, png), isTrue);
+    });
+
+    test('形式の判定: 拡張子と中身が食い違う・空は不正', () {
+      expect(isValidTrayIconBytes('a.ico', icoBytes), isTrue);
+      expect(isValidTrayIconBytes('a.ico', pngBytes), isFalse);
+      expect(isValidTrayIconBytes('a.png', pngBytes), isTrue);
+      expect(isValidTrayIconBytes('a.png', icoBytes), isFalse);
+      expect(isValidTrayIconBytes('a.ico', Uint8List(0)), isFalse);
+    });
+
+    TrayService build(Future<Uint8List> Function(String) loader, String icon) =>
+        TrayService(
+          visionFilterState: VisionFilterState(),
+          loupeWindow: LoupeWindowController(),
+          iconPath: icon,
+          labels: _labels,
+          tooltip: 'Universal Experience',
+          onShowLoupe: () async {},
+          onHideLoupe: () async {},
+          onOpenSettings: () async {},
+          onQuit: () async {},
+          iconBytesLoader: loader,
+        );
+
+    void mockChannel(List<MethodCall> calls, {bool setIconThrows = false}) {
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(const MethodChannel('tray_manager'),
+          (call) async {
+        calls.add(call);
+        if (setIconThrows && call.method == 'setIcon') {
+          throw PlatformException(code: 'x');
+        }
+        return null;
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(
+          const MethodChannel('tray_manager'), null));
+    }
+
+    test('アイコンが読めれば isAvailable=true で ✕ はトレイへ隠す', () async {
+      mockChannel(<MethodCall>[]);
+      final tray = build((_) async => icoBytes, kTrayIconIco);
+      await tray.init();
+      addTearDown(tray.dispose);
+      expect(tray.isAvailable, isTrue);
+      expect(resolveCloseAction(trayAvailable: tray.isAvailable),
+          CloseAction.hideToTray);
+    });
+
+    test('アイコン不正 (形式違い) → setIcon を呼ばず isAvailable=false → ✕ で終了', () async {
+      final calls = <MethodCall>[];
+      mockChannel(calls);
+      final tray = build((_) async => pngBytes, kTrayIconIco);
+      await tray.init();
+      addTearDown(tray.dispose);
+      expect(tray.isAvailable, isFalse);
+      expect(calls.where((c) => c.method == 'setIcon'), isEmpty);
+      expect(resolveCloseAction(trayAvailable: tray.isAvailable),
+          CloseAction.exitApp);
+    });
+
+    test('アセットが読めない → isAvailable=false → ✕ で終了', () async {
+      mockChannel(<MethodCall>[]);
+      final tray = build((_) async => throw Exception('missing'), kTrayIconIco);
+      await tray.init();
+      addTearDown(tray.dispose);
+      expect(tray.isAvailable, isFalse);
+      expect(resolveCloseAction(trayAvailable: tray.isAvailable),
+          CloseAction.exitApp);
+    });
+
+    test('setIcon が例外を投げる → isAvailable=false → ✕ で終了', () async {
+      mockChannel(<MethodCall>[], setIconThrows: true);
+      final tray = build((_) async => icoBytes, kTrayIconIco);
+      await tray.init();
+      addTearDown(tray.dispose);
+      expect(tray.isAvailable, isFalse);
+      expect(resolveCloseAction(trayAvailable: tray.isAvailable),
+          CloseAction.exitApp);
     });
   });
 }

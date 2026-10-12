@@ -57,10 +57,11 @@ final Object _hotkeyBypassSource = Object();
 final ImageSourceState imageSourceState = ImageSourceState();
 
 /// トレイアイコンの Flutter アセットパス。`tray_manager` の `setIcon` が
-/// `data/flutter_assets/` 配下のこのパスを解決する。Windows でより精細に
-/// するなら `assets/tray/tray_icon.ico` を追加して分岐すればよい。
+/// `data/flutter_assets/` 配下のこのパスを解決する。Windows だけ ICO
+/// （ネイティブが ICO しか読めないため、#150）、macOS / Linux は PNG。
 /// 詳細は docs/ARCHITECTURE.md「タスクトレイ (#15)」参照。
-const String _trayIconPath = 'assets/tray/tray_icon.png';
+final String _trayIconPath =
+    trayIconAssetFor(isWindows: TrayService.isWindowsPlatform);
 
 /// OS からの終了要求（macOS の Cmd+Q / メニューバーの「終了」/ ログアウト等）を
 /// 捕捉し、[VisionFilterStore.flush] を挟んでから終了を許可する（#57, #65）。
