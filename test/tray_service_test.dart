@@ -657,6 +657,14 @@ void main() {
       expect(isValidTrayIconBytes('a.png', pngBytes), isTrue);
       expect(isValidTrayIconBytes('a.png', icoBytes), isFalse);
       expect(isValidTrayIconBytes('a.ico', Uint8List(0)), isFalse);
+      // 画像数 0 の ICO は不正。
+      expect(isValidTrayIconBytes('a.ico',
+          Uint8List.fromList([0, 0, 1, 0, 0, 0, 16, 16])), isFalse);
+      // PNG は署名 8 バイト全部を見る。
+      expect(
+          isValidTrayIconBytes('a.png',
+              Uint8List.fromList([0x89, 0x50, 0x4E, 0x47, 0, 0, 0, 0])),
+          isFalse);
     });
 
     TrayService build(Future<Uint8List> Function(String) loader, String icon) =>

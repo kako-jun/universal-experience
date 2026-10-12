@@ -339,7 +339,7 @@ macOS の Cmd+Q やログアウトなど、window_manager のクローズイベ�
 され、`trayManager.setIcon('assets/tray/tray_icon.png')` がこのバンドル相対パスを
 解決する。
 
-Windows 用に同じ絵から作った `assets/tray/tray_icon.ico` (16/24/32/48px の
+Windows 用に同じ絵から作った `assets/tray/tray_icon.ico` (16/20/24/32/40/48px の
 マルチサイズ) も同梱し、`trayIconAssetFor()` が Windows のときだけ選ぶ
 (macOS / Linux は PNG のまま、#150)。
 
@@ -347,12 +347,15 @@ Windows 用に同じ絵から作った `assets/tray/tray_icon.ico` (16/24/32/48p
 
 tray_manager 0.2.4 の Windows 実装は、画像を読めなくても `setIcon` が成功
 (`true`) を返し、アイコン無しのトレイ項目が残る。そのまま `isAvailable` が true
-だと ✕ で「トレイへ隠す」になり、戻す手段の無いプロセスが残る。Dart 側から観測できる
-のは「アセットが読めるか」「中身が拡張子どおりの形式か」だけなので、`TrayService.init()`
-は `setIcon` の前にアセットを読み、`isValidTrayIconBytes()` (ICO は `00 00 01 00`、
-PNG はシグネチャ) で確かめる。読めない・形式違い・`setIcon` の例外はいずれも
-`isAvailable=false` になり、`resolveCloseAction` が ✕ での終了へ倒す。テストは
-`test/tray_service_test.dart`。Windows 実機での表示・✕ の挙動の確認は未了。
+だと ✕ で「トレイへ隠す」になり、戻す手段の無いプロセスが残る。Dart 側から検出できるのは次だけ: (1) アセットが無い (`rootBundle` は `LoadImage` と同じ
+`data/flutter_assets` を読む)、(2) 拡張子と中身の形式の食い違い (ICO は `00 00 01 00` +
+画像数 >= 1、PNG は 8 バイトの署名)、(3) `setIcon` の例外。`TrayService.init()` は
+`setIcon` の前にアセットを読んで `isValidTrayIconBytes()` で確かめ、いずれかなら
+`isAvailable=false` になり、`resolveCloseAction` が ✕ での終了へ倒す。
+**検出できないもの**: 形式は正しいのに壊れていて `LoadImage` が NULL を返す場合と、
+`Shell_NotifyIcon(NIM_ADD)` の失敗 (Explorer 未起動など)。tray_manager がどちらの戻り値も
+無視するため。最終的な防御は Windows 実機確認。テストは `test/tray_service_test.dart`。
+Windows 実機での表示・✕ の挙動の確認は未了。
 
 ### 実機目視について (正直な明記)
 
