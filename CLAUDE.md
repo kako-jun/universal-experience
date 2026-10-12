@@ -53,7 +53,7 @@ lib/
 │   ├── settings_service.dart        # テーマ・言語・welcomeBannerDismissed（#78）。選択状態は持たない（VisionFilterStore が正本、#124）
 │   ├── tray_menu_labels.dart        # トレイの i18n 解決済み文言 TrayMenuLabels・クイック色覚一覧 quickColorVisionFilters（#65）
 │   ├── tray_service.dart            # タスクトレイ（updateLocalization で文言を差し替える #82・
-│   │                                 # カテゴリ別「高度なフィルタ」サブメニューで UI と双方向同期 #65。チェック式の多選択 #121）
+│   │                                 # カテゴリ別「高度なフィルタ」サブメニューで UI と双方向同期 #65。チェック式の多選択 #121。Windows は ICO・アイコン読み込み失敗は isAvailable=false で ✕ 終了へ #150）
 │   ├── tray_locale_sync.dart        # 言語の選択/OS ロケール変更をトレイの文言へ橋渡し（#82）
 │   ├── vision_filter_snapshot.dart  # 層・強度の記憶・payload の永続 JSON（v2。v1 も読む）と、
 │   │                                 # カタログ定義に照らした補正 sanitizeVisionParams（#65/#117）

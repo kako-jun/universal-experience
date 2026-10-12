@@ -318,8 +318,10 @@ macOS の Cmd+Q やログアウトなど、window_manager のクローズイベ�
 
 ### プラットフォーム差
 
-- **Windows / macOS**: トレイは常に利用可能。PNG アイコンが動作する
-  (Windows は内部で 16px へリサイズ)。
+- **Windows**: ネイティブ側が `LoadImage(IMAGE_ICON)` で読むため **ICO 必須**
+  (PNG だとアイコンが出ない。#150)。`trayIconAssetFor(isWindows: true)` が
+  `assets/tray/tray_icon.ico` を選ぶ。
+- **macOS**: PNG アイコンを使う。
 - **Linux**: 単一のトレイ標準が無い。KDE/XFCE は StatusNotifierItem を標準提供
   するが、**GNOME は AppIndicator/KStatusNotifierItem シェル拡張が必要**で、無いと
   アイコンが黙って出ない。検出が困難なため tray_manager 呼び出しは全て try/catch
@@ -335,7 +337,25 @@ macOS の Cmd+Q やログアウトなど、window_manager のクローズイベ�
 `zlib` だけで生成したプレースホルダ) を `pubspec.yaml` の `flutter > assets` に
 登録した。ビルド時 `data/flutter_assets/assets/tray/tray_icon.png` にバンドル
 され、`trayManager.setIcon('assets/tray/tray_icon.png')` がこのバンドル相対パスを
-解決する。**より洗練したアイコン (特に Windows 用 `.ico`) は要追加。**
+解決する。
+
+Windows 用に同じ絵から作った `assets/tray/tray_icon.ico` (16/20/24/32/40/48px の
+マルチサイズ) も同梱し、`trayIconAssetFor()` が Windows のときだけ選ぶ
+(macOS / Linux は PNG のまま、#150)。
+
+### アイコン読み込み失敗の検出 (#150)
+
+tray_manager 0.2.4 の Windows 実装は、画像を読めなくても `setIcon` が成功
+(`true`) を返し、アイコン無しのトレイ項目が残る。そのまま `isAvailable` が true
+だと ✕ で「トレイへ隠す」になり、戻す手段の無いプロセスが残る。Dart 側から検出できるのは次だけ: (1) アセットが無い (`rootBundle` は `LoadImage` と同じ
+`data/flutter_assets` を読む)、(2) 拡張子と中身の形式の食い違い (ICO は `00 00 01 00` +
+画像数 >= 1、PNG は 8 バイトの署名)、(3) `setIcon` の例外。`TrayService.init()` は
+`setIcon` の前にアセットを読んで `isValidTrayIconBytes()` で確かめ、いずれかなら
+`isAvailable=false` になり、`resolveCloseAction` が ✕ での終了へ倒す。
+**検出できないもの**: 形式は正しいのに壊れていて `LoadImage` が NULL を返す場合と、
+`Shell_NotifyIcon(NIM_ADD)` の失敗 (Explorer 未起動など)。tray_manager がどちらの戻り値も
+無視するため。最終的な防御は Windows 実機確認。テストは `test/tray_service_test.dart`。
+Windows 実機での表示・✕ の挙動の確認は未了。
 
 ### 実機目視について (正直な明記)
 
