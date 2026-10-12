@@ -62,6 +62,10 @@ double previewPaneSideFor(double viewportHeight) =>
 /// 狭幅で一覧が使う高さ（一覧は内側でスクロールする）。
 const double _kNarrowBrowserHeight = 560;
 
+/// 「このアプリについて」に出す版の供給源。test は差し替える（#158）。
+Future<String> Function() appVersionLoader =
+    () async => (await PackageInfo.fromPlatform()).version;
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -484,12 +488,16 @@ class _HomeScreenState extends State<HomeScreen> {
     final l10n = AppLocalizations.of(context)!;
     // 版は pubspec.yaml の version を実行時に読む（ハードコードしない、#158）。
     // +build 番号は表示に含めない。
-    final info = await PackageInfo.fromPlatform();
+    // 取得に失敗しても About 自体は開く（版は空のまま）。
+    String version = '';
+    try {
+      version = await appVersionLoader();
+    } catch (_) {}
     if (!context.mounted) return;
     showAboutDialog(
       context: context,
       applicationName: l10n.appTitle,
-      applicationVersion: info.version,
+      applicationVersion: version,
       applicationIcon: const Icon(Icons.accessibility_new, size: 48),
       children: [
         Text(l10n.aboutBody),

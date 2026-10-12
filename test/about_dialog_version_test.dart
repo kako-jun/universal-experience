@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'package:universal_experience/ui/screens/home_screen.dart';
+
 import 'support/home_screen_harness.dart';
 
 void main() {
@@ -33,5 +35,17 @@ void main() {
     expect(find.text('9.8.7'), findsOneWidget);
     expect(find.textContaining('0.1.0'), findsNothing);
     expect(find.textContaining('42'), findsNothing);
+  });
+
+  testWidgets('版の取得に失敗しても About ダイアログは開く', (tester) async {
+    final saved = appVersionLoader;
+    addTearDown(() => appVersionLoader = saved);
+    appVersionLoader = () async => throw StateError('unavailable');
+    await pumpHomeScreen(tester, size: const Size(1280, 800));
+
+    await tester.tap(find.byIcon(Icons.info_outline));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AboutDialog), findsOneWidget);
   });
 }

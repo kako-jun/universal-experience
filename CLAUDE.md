@@ -355,6 +355,9 @@ build より前に置く。rust 依存は crates.io のみ（sensus-core）な�
 3. `.github/workflows/release.yml` が (a) ci.yml を呼んで全 OS の CI（Windows の実ブリッジ
    integration test を含む）を通し、(b) タグと pubspec / Cargo.toml の版の一致を検査する。
    どちらかが赤なら build 系 job は走らず、Release は公開されない。
+   Cargo.toml も揃えるのは版の出所を 1 つにするため（検査は Cargo.lock も見る）。
+   理由は `docs/adr/2026-10-13-release-gate-and-version-source.md`。`v0.1.1` は導入前に
+   タグ済みなので、ゲート付きの最初のリリースは `v0.1.2` 以降。
 4. 「このアプリについて」の版は `package_info_plus` で pubspec の version から実行時に読む
    （build 番号は出さない）。ハードコードしない。
 
