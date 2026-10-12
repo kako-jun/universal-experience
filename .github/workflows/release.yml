@@ -12,7 +12,31 @@ permissions:
   contents: write
 
 jobs:
+  # 赤い CI のタグを公開しないための関門（#158）。ci.yml（workflow_call）が全 OS の
+  # 実ブリッジ integration test まで回す。ビルド系 job はすべてこれに依存する。
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  # タグ vX.Y.Z が pubspec.yaml の version（+build は無視）と rust/Cargo.toml の
+  # version に一致しなければ公開しない。
+  version-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify tag matches pubspec.yaml and rust/Cargo.toml
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pubspec=$(sed -nE 's/^version: *([0-9]+\.[0-9]+\.[0-9]+)(\+.*)?$/\1/p' pubspec.yaml | head -n1)
+          cargo=$(sed -nE 's/^version = "([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p' rust/Cargo.toml | head -n1)
+          echo "tag=$tag pubspec=$pubspec cargo=$cargo"
+          test -n "$pubspec" && test -n "$cargo"
+          if [ "$tag" != "$pubspec" ] || [ "$tag" != "$cargo" ]; then
+            echo "::error::tag v$tag, pubspec.yaml $pubspec, rust/Cargo.toml $cargo must all match"
+            exit 1
+          fi
+
   build-macos:
+    needs: [ci, version-check]
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
@@ -50,6 +74,7 @@ jobs:
           if-no-files-found: error
 
   build-linux:
+    needs: [ci, version-check]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -88,6 +113,7 @@ jobs:
           if-no-files-found: error
 
   build-windows:
+    needs: [ci, version-check]
     runs-on: windows-latest
     timeout-minutes: 30
     steps:

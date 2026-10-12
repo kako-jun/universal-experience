@@ -31,6 +31,8 @@ dependencies:
   # Platform Integration
   path_provider: ^2.1.1
   shared_preferences: ^2.2.2
+  # 「このアプリについて」の版を pubspec.yaml の version から実行時に読む（#158）。
+  package_info_plus: ^8.0.0
   window_manager: ^0.3.7
   hotkey_manager: ^0.2.3
   tray_manager: ^0.2.1

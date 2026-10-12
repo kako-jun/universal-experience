@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
@@ -479,12 +480,16 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showAboutDialog(BuildContext context) {
+  Future<void> _showAboutDialog(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
+    // 版は pubspec.yaml の version を実行時に読む（ハードコードしない、#158）。
+    // +build 番号は表示に含めない。
+    final info = await PackageInfo.fromPlatform();
+    if (!context.mounted) return;
     showAboutDialog(
       context: context,
       applicationName: l10n.appTitle,
-      applicationVersion: '0.1.0',
+      applicationVersion: info.version,
       applicationIcon: const Icon(Icons.accessibility_new, size: 48),
       children: [
         Text(l10n.aboutBody),

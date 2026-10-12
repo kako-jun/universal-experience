@@ -343,6 +343,21 @@ clippy --all-targets -D warnings / cargo test / flutter build macos --debug /
 build より前に置く。rust 依存は crates.io のみ（sensus-core）なので、private
 依存を git 経由で引く場合に要る deploy key / ssh-agent 設定は不要。
 
+`windows-build` も実ブリッジ integration test（macOS / Linux と同じ4ファイルを
+`-d windows` でファイルごとに実行、#158）を回す。ci.yml は `workflow_call` でも
+呼べる（release.yml が使う）。
+
+### リリース手順（#158）
+
+1. `pubspec.yaml` の `version`（`X.Y.Z+build`）と `rust/Cargo.toml` の `version`（`X.Y.Z`）
+   を同じ X.Y.Z に揃え、`rust/Cargo.lock` の `universal_experience_rust` も更新して main へ入れる。
+2. main の検証済みコミットに `vX.Y.Z` タグを打って push する。
+3. `.github/workflows/release.yml` が (a) ci.yml を呼んで全 OS の CI（Windows の実ブリッジ
+   integration test を含む）を通し、(b) タグと pubspec / Cargo.toml の版の一致を検査する。
+   どちらかが赤なら build 系 job は走らず、Release は公開されない。
+4. 「このアプリについて」の版は `package_info_plus` で pubspec の version から実行時に読む
+   （build 番号は出さない）。ハードコードしない。
+
 `linux-build`（runs-on: ubuntu-latest、#55）は Linux 側の cargokit 同梱経路
 （`flutter build linux --debug`、`.so` がバンドルされることを ls/test -f で
 確認）と、xvfb 上での実ブリッジ integration test を検証する。`Swatinem/rust-cache`
