@@ -49,7 +49,8 @@ CI ビルドを対象とし、実機の操作確認が残っています。Andro
 
 ビルド時は `-dev` パッケージ、実行時はそれぞれの共有ライブラリ本体が必要。Ubuntu では
 `sudo apt-get install libayatana-appindicator3-dev libkeybinder-3.0-dev`。実行時の共有
-ライブラリは通常 `-dev` パッケージの依存で一緒に入る。
+ライブラリは通常 `-dev` パッケージの依存で一緒に入る。配布物だけを動かす場合の実行時パッケージは
+（Ubuntu 24.04）`libgtk-3-0t64 libayatana-appindicator3-1 libkeybinder-3.0-0`。
 
 #### Android開発（計画中）
 - Android Studio
