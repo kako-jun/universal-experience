@@ -12,6 +12,7 @@ void main() {
 
   setUp(() {
     installHomeScreenFixtures();
+    // fixture の既定値を、この test 用の値で上書きする。
     PackageInfo.setMockInitialValues(
       appName: 'universal_experience',
       packageName: 'universal_experience',

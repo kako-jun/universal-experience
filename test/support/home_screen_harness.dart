@@ -10,6 +10,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -79,6 +80,15 @@ void installHomeScreenFixtures() {
   previewSourceImageLoader = (source, size) => Completer<ui.Image>().future;
   afterImageRenderer = (source, filter, strength) async => source.clone();
   CpuVisionRenderer.pipelineApplier = (source, steps) async => source.clone();
+  // 「このアプリについて」の版は PackageInfo から読む（#158）。実プラットフォーム
+  // 呼び出しは widget test では返らないので、固定値に差し替える。
+  PackageInfo.setMockInitialValues(
+    appName: 'universal_experience',
+    packageName: 'universal_experience',
+    version: '0.0.0-test',
+    buildNumber: '1',
+    buildSignature: '',
+  );
 }
 
 /// [installHomeScreenFixtures] を元に戻す。
