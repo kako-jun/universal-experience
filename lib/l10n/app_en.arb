@@ -294,6 +294,10 @@
   "@exportFailureNotWritable": {
     "description": "SnackBar when PNG export fails because the save folder isn't writable (permissions, read-only) (#162)."
   },
+  "exportFailureDiskFull": "Export failed: there isn't enough free disk space.",
+  "@exportFailureDiskFull": {
+    "description": "SnackBar when PNG export fails because the disk is full (#162)."
+  },
   "exportFailureEncode": "Export failed: couldn't create the PNG image.",
   "@exportFailureEncode": {
     "description": "SnackBar when encoding the exported image to PNG fails (#162)."

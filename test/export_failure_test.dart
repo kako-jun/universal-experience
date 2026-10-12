@@ -24,22 +24,53 @@ void main() {
       FileSystemException('x', '/p', OSError('os', code));
 
   group('classifyExportError', () {
-    test('保存先が無い', () {
-      expect(classifyExportError(const ExportNoTargetDirectoryException()),
-          ExportFailureKind.noTargetDirectory);
-      expect(classifyExportError(MissingPlatformDirectoryException('none')),
-          ExportFailureKind.noTargetDirectory);
-      expect(classifyExportError(fsError(2)),
-          ExportFailureKind.noTargetDirectory); // ENOENT
-      expect(classifyExportError(fsError(3)),
-          ExportFailureKind.noTargetDirectory); // Windows PATH_NOT_FOUND
+    ExportFailureKind posix(Object e) => classifyExportError(e, isWindows: false);
+    ExportFailureKind win(Object e) => classifyExportError(e, isWindows: true);
+
+    test('保存先が無い（OS 共通の型）', () {
+      for (final w in [false, true]) {
+        expect(
+            classifyExportError(const ExportNoTargetDirectoryException(),
+                isWindows: w),
+            ExportFailureKind.noTargetDirectory);
+        expect(
+            classifyExportError(MissingPlatformDirectoryException('none'),
+                isWindows: w),
+            ExportFailureKind.noTargetDirectory);
+      }
     });
 
-    test('書き込めない', () {
-      for (final code in [1, 13, 30, 5, 19]) {
-        expect(classifyExportError(fsError(code)),
-            ExportFailureKind.notWritable,
+    test('POSIX の errno', () {
+      expect(posix(fsError(2)), ExportFailureKind.noTargetDirectory);
+      for (final code in [1, 13, 30]) {
+        expect(posix(fsError(code)), ExportFailureKind.notWritable,
             reason: 'errno $code');
+      }
+      expect(posix(fsError(28)), ExportFailureKind.diskFull);
+      // Windows 専用の番号は POSIX では別物（5 = EIO, 3 = ESRCH など）。
+      for (final code in [3, 5, 19, 39, 112]) {
+        expect(posix(fsError(code)), ExportFailureKind.other,
+            reason: 'errno $code');
+      }
+    });
+
+    test('Windows のエラーコード', () {
+      for (final code in [2, 3]) {
+        expect(win(fsError(code)), ExportFailureKind.noTargetDirectory,
+            reason: 'code $code');
+      }
+      for (final code in [5, 19]) {
+        expect(win(fsError(code)), ExportFailureKind.notWritable,
+            reason: 'code $code');
+      }
+      for (final code in [39, 112]) {
+        expect(win(fsError(code)), ExportFailureKind.diskFull,
+            reason: 'code $code');
+      }
+      // POSIX 専用の番号は Windows では別物。
+      for (final code in [1, 13, 28, 30]) {
+        expect(win(fsError(code)), ExportFailureKind.other,
+            reason: 'code $code');
       }
     });
 
@@ -48,11 +79,20 @@ void main() {
           ExportFailureKind.encodeFailed);
     });
 
-    test('その他（未知の errno・番号なし・無関係な例外）', () {
-      expect(classifyExportError(fsError(28)), ExportFailureKind.other);
+    test('その他（番号なし・無関係な例外）', () {
       expect(classifyExportError(const FileSystemException('x')),
           ExportFailureKind.other);
       expect(classifyExportError(StateError('boom')), ExportFailureKind.other);
+    });
+  });
+
+  group('ensurePngExtension', () {
+    test('.png が無ければ足し、あれば（大文字小文字を問わず）そのまま', () {
+      expect(ensurePngExtension('/a/b'), '/a/b.png');
+      expect(ensurePngExtension('/a/b.jpg'), '/a/b.jpg.png');
+      expect(ensurePngExtension('/a/b.png'), '/a/b.png');
+      expect(ensurePngExtension('/a/b.PNG'), '/a/b.PNG');
+      expect(ensurePngExtension('/a/b.Png'), '/a/b.Png');
     });
   });
 
@@ -65,7 +105,7 @@ void main() {
             exportFailureMessage(l10n, k),
         };
         expect(messages.length, ExportFailureKind.values.length,
-            reason: '${locale.languageCode}: 4 種類が別の文言');
+            reason: '${locale.languageCode}: 全種類が別の文言');
         expect(exportFailureMessage(l10n, ExportFailureKind.other),
             l10n.exportFailure);
       }
@@ -74,6 +114,7 @@ void main() {
     test('保存場所を選び直せるのは保存先の問題だけ', () {
       expect(isSaveLocationProblem(ExportFailureKind.noTargetDirectory), isTrue);
       expect(isSaveLocationProblem(ExportFailureKind.notWritable), isTrue);
+      expect(isSaveLocationProblem(ExportFailureKind.diskFull), isTrue);
       expect(isSaveLocationProblem(ExportFailureKind.encodeFailed), isFalse);
       expect(isSaveLocationProblem(ExportFailureKind.other), isFalse);
     });
@@ -82,8 +123,9 @@ void main() {
   test('writePngToPath は選ばれたパスに書く', () async {
     final dir = await Directory.systemTemp.createTemp('ue162');
     addTearDown(() => dir.delete(recursive: true));
-    final path = '${dir.path}${Platform.pathSeparator}out.png';
+    final path = '${dir.path}${Platform.pathSeparator}out';
     final written = await writePngToPath(path, Uint8List.fromList([1, 2, 3]));
+    expect(written, endsWith('out.png'), reason: '拡張子が無ければ .png を足す');
     expect(await File(written).readAsBytes(), [1, 2, 3]);
   });
 
@@ -108,9 +150,7 @@ void main() {
       previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
       afterImageRenderer = BeforeAfterView.renderAfter;
       exportImageComposer = composeExportImage;
-      pngSaver = savePng;
-      saveLocationPicker = (name) async => null;
-      pngPathWriter = writePngToPath;
+      resetExportSeams();
       resetVisionFilterMetadataProviders();
     });
 
@@ -228,12 +268,41 @@ void main() {
 
     testWidgets('保存ダイアログをキャンセルしたら何も書かない', (tester) async {
       saveLocationPicker = (name) async => null;
+      var writes = 0;
+      pngPathWriter = (path, bytes) async {
+        writes++;
+        return path;
+      };
       await pumpAndExport(tester,
           saver: (b, f) async => throw const ExportNoTargetDirectoryException());
       await tester.tap(find.text(en.exportChooseLocationAction));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
+      expect(writes, 0);
       expect(clipboardWrites, isEmpty);
+    });
+
+    testWidgets('選んだ場所への書き込みも失敗したら、その失敗文言をもう一度出す（ループしない）',
+        (tester) async {
+      var picks = 0;
+      saveLocationPicker = (name) async {
+        picks++;
+        return '/readonly/x.png';
+      };
+      pngPathWriter = (path, bytes) async => throw const FileSystemException(
+          'x', '/readonly/x.png', OSError('denied', 13));
+      await pumpAndExport(tester,
+          saver: (b, f) async => throw const ExportNoTargetDirectoryException());
+      await tester.tap(find.text(en.exportChooseLocationAction));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(picks, 1, reason: '自動で再度ダイアログを開かない');
+      expect(find.text(en.exportFailureNotWritable), findsOneWidget);
+      expect(find.text(en.exportChooseLocationAction), findsOneWidget,
+          reason: 'もう一度選び直せる');
+      expect(tester.takeException(), isNull);
     });
   });
 }

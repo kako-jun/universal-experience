@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
@@ -15,6 +15,7 @@ import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/color_vision_compare_view.dart';
+import 'package:universal_experience/ui/widgets/export_feedback.dart';
 
 import 'support/vision_filter_metadata_fixture.dart';
 
@@ -103,8 +104,7 @@ void main() {
     previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
     afterImageRenderer = BeforeAfterView.renderAfter;
     exportImageComposer = composeExportImage;
-    pngSaver = savePng;
-    folderRevealer = revealInFolder;
+    resetExportSeams();
     CpuVisionRenderer.pipelineApplier = CpuVisionRenderer.applyPipeline;
     resetVisionFilterMetadataProviders();
   });
@@ -621,6 +621,54 @@ void main() {
       await tapExport(tester);
       await waitFor(tester, () => saved > 0);
       expect(saved, 1);
+    });
+
+    testWidgets('成功してもクリップボードに書かず、保存先の問題なら種類別の文言と保存場所の選択を出す (#162)',
+        (tester) async {
+      await installFakes(tester);
+      final clipboard = <String>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          clipboard.add((call.arguments as Map)['text'] as String);
+        }
+        return null;
+      });
+      addTearDown(() => TestDefaultBinaryMessengerBinding
+          .instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null));
+      var fail = true;
+      String? savedPath;
+      pngSaver = (bytes, filename) async {
+        if (fail) throw const ExportNoTargetDirectoryException();
+        savedPath = '/fake/Downloads/$filename';
+        return savedPath!;
+      };
+
+      await tester.pumpWidget(localized(view(0.6)));
+      await settle(tester);
+      await tapExport(tester);
+      final en = lookupAppLocalizations(enLocale);
+      await waitFor(
+          tester,
+          () => find
+              .text(en.exportFailureNoTargetDirectory)
+              .evaluate()
+              .isNotEmpty);
+      expect(find.text(en.exportChooseLocationAction), findsOneWidget);
+
+      fail = false;
+      ScaffoldMessenger.of(tester.element(find.byType(Scaffold).first))
+          .clearSnackBars();
+      await tester.pump();
+      await tapExport(tester);
+      await waitFor(tester, () => savedPath != null);
+      await waitFor(
+          tester, () => find.text(en.exportCopyPathAction).evaluate().isNotEmpty);
+      expect(clipboard, isEmpty, reason: '書き出しだけではクリップボードに書かない');
+      await tester.tap(find.text(en.exportCopyPathAction));
+      await tester.pump();
+      expect(clipboard, [savedPath]);
     });
 
     testWidgets('合成に失敗しても失敗を知らせ、表示中の画像は生きている', (tester) async {

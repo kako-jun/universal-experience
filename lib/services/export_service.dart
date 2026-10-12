@@ -514,8 +514,7 @@ Future<String> savePngInto(
 Future<String> savePng(Uint8List bytes, String filename) async {
   Directory? dir;
   try {
-    dir =
-        (await getDownloadsDirectory()) ??
+    dir = (await getDownloadsDirectory()) ??
         (await getApplicationDocumentsDirectory());
   } on MissingPlatformDirectoryException {
     dir = null;
@@ -550,6 +549,9 @@ enum ExportFailureKind {
   /// 保存先に書き込めない（権限・読み取り専用など）。
   notWritable,
 
+  /// ディスクの空きが無い。
+  diskFull,
+
   /// PNG へのエンコードに失敗。
   encodeFailed,
 
@@ -559,10 +561,12 @@ enum ExportFailureKind {
 
 /// 書き出しの例外を [ExportFailureKind] に分類する。pure（I/O なし、#162）。
 ///
-/// [FileSystemException] は OS のエラー番号で見る: ENOENT（POSIX 2・Windows 2/3）は
-/// 保存先が無い、EACCES/EPERM/EROFS（POSIX 13/1/30・Windows 5/19）は書き込めない。
-/// 番号が取れない・知らない番号は [ExportFailureKind.other]。
-ExportFailureKind classifyExportError(Object error) {
+/// [FileSystemException] は OS のエラー番号で見る。番号の体系が OS で違うので
+/// [isWindows] で分ける。POSIX: ENOENT 2 は保存先なし、EPERM 1 / EACCES 13 /
+/// EROFS 30 は書き込めない、ENOSPC 28 は空き容量なし。Windows: 2・3 は保存先なし、
+/// 5・19 は書き込めない、39（ERROR_HANDLE_DISK_FULL）・112（ERROR_DISK_FULL）は
+/// 空き容量なし。番号が取れない・知らない番号は [ExportFailureKind.other]。
+ExportFailureKind classifyExportError(Object error, {bool? isWindows}) {
   if (error is ExportNoTargetDirectoryException ||
       error is MissingPlatformDirectoryException) {
     return ExportFailureKind.noTargetDirectory;
@@ -570,18 +574,27 @@ ExportFailureKind classifyExportError(Object error) {
   if (error is ExportEncodeException) return ExportFailureKind.encodeFailed;
   if (error is FileSystemException) {
     final code = error.osError?.errorCode;
-    if (code == 2 || code == 3) return ExportFailureKind.noTargetDirectory;
-    if (code == 1 || code == 13 || code == 30 || code == 5 || code == 19) {
-      return ExportFailureKind.notWritable;
-    }
+    if (code == null) return ExportFailureKind.other;
+    final windows = isWindows ?? Platform.isWindows;
+    final (noDir, denied, full) = windows
+        ? (const {2, 3}, const {5, 19}, const {39, 112})
+        : (const {2}, const {1, 13, 30}, const {28});
+    if (noDir.contains(code)) return ExportFailureKind.noTargetDirectory;
+    if (denied.contains(code)) return ExportFailureKind.notWritable;
+    if (full.contains(code)) return ExportFailureKind.diskFull;
   }
   return ExportFailureKind.other;
 }
 
+/// 保存ダイアログで選ばれた [path] の拡張子が `.png`（大文字小文字は問わない）で
+/// なければ `.png` を足す。pure（#162）。
+String ensurePngExtension(String path) =>
+    path.toLowerCase().endsWith('.png') ? path : '$path.png';
+
 /// ユーザーが選んだ [path] へ [bytes] を書く（保存ダイアログ経由、#162）。
 /// ダイアログが上書き確認を済ませているので上書きする。規律3: I/O はここ。
 Future<String> writePngToPath(String path, Uint8List bytes) async {
-  final file = File(path);
+  final file = File(ensurePngExtension(path));
   await file.writeAsBytes(bytes, flush: true);
   return resolvePathOrSelf(file.path);
 }

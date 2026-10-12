@@ -16,8 +16,12 @@ import '../../rendering/image_fit.dart';
 import '../../services/export_layers.dart';
 import '../../services/export_service.dart';
 import '../../services/vision_filter_metadata.dart';
-import 'export_feedback.dart';
 import '../../src/rust/api/sensus_bridge.dart';
+import 'export_feedback.dart';
+
+// テスト・他の widget が従来どおり before_after_view.dart 経由で差し替えられるよう再公開する。
+export 'export_feedback.dart'
+    show FolderRevealer, PngSaver, folderRevealer, pngSaver;
 
 /// [_BeforeAfterViewState] が内部で使う「before 画像を [PreviewImageSource]
 /// から読み込む」ステップの型（#78）。実体は
@@ -67,25 +71,6 @@ typedef ExportImageComposer = Future<ui.Image> Function(
 /// [composeExportImage]。
 @visibleForTesting
 ExportImageComposer exportImageComposer = composeExportImage;
-
-/// [_BeforeAfterViewState._export] が使う PNG 書き出しステップの型。
-///
-/// 実体は [savePng]。`path_provider` の実プラットフォームを要する I/O
-/// （`test/export_service_test.dart` の doc 参照）なので、widget test では
-/// フェイクに差し替えて実ファイルへ触れずに済ませる。
-typedef PngSaver = Future<String> Function(Uint8List bytes, String filename);
-
-/// PNG 書き出しの供給源（テストで差し替え可能）。既定は [savePng]。
-@visibleForTesting
-PngSaver pngSaver = savePng;
-
-/// 保存したファイルの場所を開く処理の型。実体は [revealInFolder]。
-/// 実 OS のファイルマネージャを起動するので、widget test ではフェイクに差し替える。
-typedef FolderRevealer = Future<bool> Function(String path);
-
-/// 「フォルダで表示」の供給源（テストで差し替え可能）。既定は [revealInFolder]。
-@visibleForTesting
-FolderRevealer folderRevealer = revealInFolder;
 
 /// 上の 3 つの差し替え口（[previewSourceImageLoader] / [afterImageRenderer] /
 /// [exportImageComposer]）を、テスト以外のコード（2×2 比較の
@@ -1104,64 +1089,6 @@ Future<Uint8List> encodePngAndDispose(ui.Image composed) async {
     throw const ExportEncodeException();
   }
   return bytes;
-}
-
-/// [bytes] を [filename] で保存して保存先のフルパスを返す（[pngSaver] の呼び出し口。
-/// クリップボードには触れない、#162）。
-Future<String> saveExportPng(Uint8List bytes, String filename) =>
-    pngSaver(bytes, filename);
-
-/// 書き出し成功の SnackBar（保存先の表示 + 「フォルダで表示」 + 「パスをコピー」）。
-/// クリップボードへはコピー操作が押されたときだけ書く（#162）。
-///
-/// #64: 保存先はユーザーが実際に辿れる場所（Downloads）。パスを読ませるだけでなく、
-/// その場でファイルマネージャを開けるようにする。アクション付きの SnackBar は既定で
-/// 消えないので、時間で閉じるよう明示する。[messenger] は書き出し開始時に取って
-/// あり context を使わないので、ビューが外れた後でも「開けなかった」を必ず知らせる。
-void showExportSuccess(
-  ScaffoldMessengerState messenger,
-  AppLocalizations l10n,
-  String path,
-) {
-  messenger.showSnackBar(
-    SnackBar(
-      content: Row(
-        children: [
-          Expanded(child: Text(l10n.exportSuccess(path))),
-          // #162: パスのコピーはこの操作が押されたときだけ（書き出し時に勝手に
-          // クリップボードを上書きしない）。
-          TextButton(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: path));
-              messenger
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  SnackBar(content: Text(l10n.exportPathCopied)),
-                );
-            },
-            style: TextButton.styleFrom(
-              foregroundColor:
-                  Theme.of(messenger.context).colorScheme.inversePrimary,
-            ),
-            child: Text(l10n.exportCopyPathAction),
-          ),
-        ],
-      ),
-      persist: false,
-      duration: const Duration(seconds: 10),
-      action: SnackBarAction(
-        label: l10n.exportRevealAction,
-        onPressed: () async {
-          final opened = await folderRevealer(path);
-          if (!opened) {
-            messenger.showSnackBar(
-              SnackBar(content: Text(l10n.exportRevealFailure)),
-            );
-          }
-        },
-      ),
-    ),
-  );
 }
 
 class _Pane extends StatelessWidget {
