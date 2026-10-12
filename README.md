@@ -29,7 +29,7 @@ OS に対応する配布物を選んでください。`vX.Y.Z` タグは、各 O
 ### 初回起動の手順（いずれも未署名の配布物です）
 
 - **macOS**: ダウンロードした dmg を開いてアプリを Applications へ移し、起動すると
-  未署名のため macOS の警告が出て開けません（文言は macOS のバージョンで異なります）。
+  Apple の公証を受けていないため macOS の警告が出て開けません（文言は macOS のバージョンで異なります）。
   「システム設定 › プライバシーとセキュリティ」を開き、ブロックされたアプリの項目にある
   「このまま開く」を選び、もう一度起動してパスワードで確認してください（以降は通常どおり起動できます）。
 - **Windows**: zip を展開して `universal_experience.exe` を起動すると SmartScreen の警告
@@ -39,7 +39,7 @@ OS に対応する配布物を選んでください。`vX.Y.Z` タグは、各 O
   Ubuntu 24.04 では `sudo apt-get install libgtk-3-0t64 libayatana-appindicator3-1 libkeybinder-3.0-0`
   （トレイ = ayatana appindicator、ホットキー = keybinder。ビルド用の `-dev` パッケージは不要です）。
   無い環境ではトレイやホットキーが使えないか、起動しない可能性があります。
-  配布物のビルド環境は GitHub Actions の `ubuntu-latest`（Ubuntu 24.04）です。
+  配布物のビルド環境は GitHub Actions の `ubuntu-latest`（現在は Ubuntu 24.04）です。
   24.04 より前（22.04 以前など）の古い glibc の環境で動くかは未検証です。
 
 ## 機能
@@ -390,7 +390,7 @@ ue 自身の UI も、スクリーンリーダー・キーボード・低視力�
 現行で対応（ランナーが存在し、ビルド・実行できる）:
 
 - macOS 13+（deployment target 13.0。Flutter の native assets が macOS 13 を要求する）
-- Linux x64（GTK 3 ベース。配布物は GitHub Actions の `ubuntu-latest` = Ubuntu 24.04 でビルド。それより古い glibc での動作は未検証）
+- Linux x64（GTK 3 ベース。配布物は GitHub Actions の `ubuntu-latest` = 現在 Ubuntu 24.04 でビルド。それより古い glibc での動作は未検証）
 - Windows 10/11 x64（GitHub Releases で配布。実機の操作確認は未完了）
 
 計画中（ランナー未作成）:
