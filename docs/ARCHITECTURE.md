@@ -1013,7 +1013,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   書き出しは各セルを `buildExportCaption` + `composeExportImage`（単独の書き出しと同じキャプション）で
   焼き込み、`composeCompareGrid`（`export_service.dart`。配置は pure な `compareGridLayout`）で
   1 枚に並べる。キャプションは描画時点の強さから作り、保存・通知・失敗の扱いは
-  `savePngWithClipboard` / `showExportSuccess`（`BeforeAfterView` の書き出しと共通）を使う。
+  `saveExportPng` / `showExportSuccess` / `showExportFailure`（`BeforeAfterView` の書き出しと共通）を使う。
   **層の土台（#122）**: `colorVisionCompareInputOf(VisionFilterState)`（`color_vision_compare.dart`）が
   色覚層の有無（`colorVisionLayerOf`）・色覚層の強度・土台（色覚以外の強度 > 0 の層を状態の順に、
   `VisionStep` と `ExportLayer` の両方）を決める。色覚層が無ければ null（切替を出さない）。bypass 中は強度 0 で土台なし。
@@ -1059,12 +1059,17 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   コンテナ内 `Data/Downloads`（実 `~/Downloads` へのシンボリックリンク）を返し、
   `files.downloads.read-write` entitlement が無いとリンク先への書き込みが拒否される
   想定（#64。修正前の実機挙動は未検証）。`savePngInto` は保存先とファイルの最終パスを `resolveSymbolicLinks` で
-  実パスにして返す（SnackBar・クリップボード・「フォルダで表示」用）。ファイル名は
+  実パスにして返す（SnackBar・「パスをコピー」・「フォルダで表示」用。クリップボードへは「パスをコピー」を押したときだけ書く、#162）。ファイル名は
   日付＋時刻（`exportFilename`）で、同名があっても `writeBytesWithoutOverwrite` が
   `File.create(exclusive: true)` で連番にし上書きしない（書き込み失敗時は作りかけの
   ファイルを消す）。成功 SnackBar の「フォルダで表示」は `revealInFolder`
   （コマンドと成功条件の決定は pure な `revealCommandFor`。macOS は終了コード 0、
-  Windows は終了コード無視、Linux は `xdg-open` を切り離して起動）。判断の経緯は
+  Windows は終了コード無視、Linux は `xdg-open` を切り離して起動）。
+  失敗は `classifyExportError`（pure。`ExportFailureKind` = 保存先なし / 書き込み不可 / エンコード失敗 / その他。
+  `ExportNoTargetDirectoryException`・`ExportEncodeException` と `FileSystemException` の errno で判定）で分類し、
+  `ui/widgets/export_feedback.dart` の `showExportFailure` が種類別の文言を出す。保存先の問題のときは
+  「保存場所を選ぶ」で `file_selector` の `getSaveLocation`（seam `saveLocationPicker`）から選んだ場所へ
+  `writePngToPath` で書く（macOS は `user-selected.read-write` entitlement、#162）。判断の経緯は
   `docs/adr/2026-09-30-export-png-to-downloads.md`
 - `ExperiencePresetTile`（`lib/ui/widgets/experience_presets.dart`）: sensus の
   `experiences()` をワンタップ適用の行として消費する（複合体験、#19）。統合一覧

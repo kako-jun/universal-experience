@@ -16,6 +16,7 @@ import '../../rendering/image_fit.dart';
 import '../../services/export_layers.dart';
 import '../../services/export_service.dart';
 import '../../services/vision_filter_metadata.dart';
+import 'export_feedback.dart';
 import '../../src/rust/api/sensus_bridge.dart';
 
 /// [_BeforeAfterViewState] が内部で使う「before 画像を [PreviewImageSource]
@@ -717,6 +718,8 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     setState(() => _exporting = true);
 
     final messenger = ScaffoldMessenger.of(context);
+    Uint8List? encoded;
+    String? encodedName;
     try {
       final now = DateTime.now();
       final date = isoDate(now);
@@ -741,13 +744,22 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         // 衝突したら savePng が連番にする）。焼き込むキャプションは日付のみ。
         time: compactTime(now),
       );
-      final path = await savePngWithClipboard(bytes, filename);
+      encoded = bytes;
+      encodedName = filename;
+      final path = await saveExportPng(bytes, filename);
 
       if (!mounted) return;
       showExportSuccess(messenger, l10n, path);
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text(l10n.exportFailure)));
+      showExportFailure(
+        messenger,
+        l10n,
+        e,
+        bytes: encoded,
+        filename: encodedName,
+        onSaved: (path) => showExportSuccess(messenger, l10n, path),
+      );
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
@@ -1083,25 +1095,24 @@ Future<Uint8List> encodePngAndDispose(ui.Image composed) async {
   Uint8List? bytes;
   try {
     bytes = await encodeImagePng(composed);
+  } catch (e) {
+    throw ExportEncodeException(e);
   } finally {
     composed.dispose();
   }
   if (bytes == null) {
-    throw StateError('PNG encoding returned no bytes');
+    throw const ExportEncodeException();
   }
   return bytes;
 }
 
-/// [bytes] を [filename] で保存し（[pngSaver]）、保存先のフルパスを
-/// クリップボードへテキストとしてコピーして、そのパスを返す。画像そのものの
-/// クリップボード書き込みはプラグインを要し環境変更になるため非スコープ。
-Future<String> savePngWithClipboard(Uint8List bytes, String filename) async {
-  final path = await pngSaver(bytes, filename);
-  await Clipboard.setData(ClipboardData(text: path));
-  return path;
-}
+/// [bytes] を [filename] で保存して保存先のフルパスを返す（[pngSaver] の呼び出し口。
+/// クリップボードには触れない、#162）。
+Future<String> saveExportPng(Uint8List bytes, String filename) =>
+    pngSaver(bytes, filename);
 
-/// 書き出し成功の SnackBar（保存先の表示 + 「フォルダで表示」）。
+/// 書き出し成功の SnackBar（保存先の表示 + 「フォルダで表示」 + 「パスをコピー」）。
+/// クリップボードへはコピー操作が押されたときだけ書く（#162）。
 ///
 /// #64: 保存先はユーザーが実際に辿れる場所（Downloads）。パスを読ませるだけでなく、
 /// その場でファイルマネージャを開けるようにする。アクション付きの SnackBar は既定で
@@ -1114,7 +1125,28 @@ void showExportSuccess(
 ) {
   messenger.showSnackBar(
     SnackBar(
-      content: Text(l10n.exportSuccess(path)),
+      content: Row(
+        children: [
+          Expanded(child: Text(l10n.exportSuccess(path))),
+          // #162: パスのコピーはこの操作が押されたときだけ（書き出し時に勝手に
+          // クリップボードを上書きしない）。
+          TextButton(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: path));
+              messenger
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(content: Text(l10n.exportPathCopied)),
+                );
+            },
+            style: TextButton.styleFrom(
+              foregroundColor:
+                  Theme.of(messenger.context).colorScheme.inversePrimary,
+            ),
+            child: Text(l10n.exportCopyPathAction),
+          ),
+        ],
+      ),
       persist: false,
       duration: const Duration(seconds: 10),
       action: SnackBarAction(

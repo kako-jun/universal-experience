@@ -4,8 +4,8 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
-	<!-- ユーザー画像の読み込み (#78)。DebugProfile.entitlements と同じ理由。 -->
-	<key>com.apple.security.files.user-selected.read-only</key>
+	<!-- ユーザー画像の読み込み (#78) と PNG の保存ダイアログ (#162)。DebugProfile.entitlements と同じ理由（read-write）。 -->
+	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
 	<!-- PNG エクスポート (#64)。サンドボックス下の getDownloadsDirectory() は
 	     コンテナ内 Data/Downloads を返し、実機ではそれが実 ~/Downloads への

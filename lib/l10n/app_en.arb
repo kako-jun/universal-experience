@@ -268,7 +268,7 @@
   },
   "exportSuccess": "Exported to {path}",
   "@exportSuccess": {
-    "description": "SnackBar shown after a successful PNG export. {path} is the full path of the saved file (the user's Downloads folder; a numbered name if the name was taken). The file path is also copied to the clipboard.",
+    "description": "SnackBar shown after a successful PNG export. {path} is the full path of the saved file (the user's Downloads folder; a numbered name if the name was taken). The path is copied to the clipboard only via the copy action.",
     "placeholders": {
       "path": { "type": "String" }
     }
@@ -284,6 +284,31 @@
   "exportFailure": "Export failed. Please try again.",
   "@exportFailure": {
     "description": "SnackBar shown when PNG export fails (no exception detail is leaked to the UI)."
+  },
+
+  "exportFailureNoTargetDirectory": "Export failed: the save folder was not found.",
+  "@exportFailureNoTargetDirectory": {
+    "description": "SnackBar when PNG export fails because the default save folder (Downloads) doesn't exist or can't be determined (#162)."
+  },
+  "exportFailureNotWritable": "Export failed: couldn't write to the save folder.",
+  "@exportFailureNotWritable": {
+    "description": "SnackBar when PNG export fails because the save folder isn't writable (permissions, read-only) (#162)."
+  },
+  "exportFailureEncode": "Export failed: couldn't create the PNG image.",
+  "@exportFailureEncode": {
+    "description": "SnackBar when encoding the exported image to PNG fails (#162)."
+  },
+  "exportChooseLocationAction": "Choose location",
+  "@exportChooseLocationAction": {
+    "description": "Action on the export-failure SnackBar (no/unwritable save folder) that opens a save dialog to pick where to save the PNG (#162)."
+  },
+  "exportCopyPathAction": "Copy path",
+  "@exportCopyPathAction": {
+    "description": "Button on the export-success SnackBar that copies the saved file's path to the clipboard. The path is copied only when pressed (#162)."
+  },
+  "exportPathCopied": "Path copied.",
+  "@exportPathCopied": {
+    "description": "SnackBar confirming the exported file's path was copied (#162)."
   },
 
   "experienceSectionTitle": "Experience Presets",

@@ -9,11 +9,11 @@
 	<key>com.apple.security.network.server</key>
 	<true/>
 	<!-- ユーザー画像の読み込み (#78)。file_selector のファイル選択ダイアログが
-	     開くファイルを読むために要る（読み取り専用、書き込みは行わない）。
+	     開くファイルを読むために要る（読み取りに加え、PNG の保存ダイアログ #162 で書き込むため read-write）。
 	     ドラッグ＆ドロップ（desktop_drop）はドロップ操作自体がユーザーの
 	     明示的な意図とみなされ、サンドボックス下でも追加の entitlement なしで
 	     ドロップされたファイルを読める。 -->
-	<key>com.apple.security.files.user-selected.read-only</key>
+	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
 	<!-- PNG エクスポート (#64)。サンドボックス下の getDownloadsDirectory() は
 	     コンテナ内 Data/Downloads を返し、実機ではそれが実 ~/Downloads への

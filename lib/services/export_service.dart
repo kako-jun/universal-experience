@@ -512,9 +512,78 @@ Future<String> savePngInto(
 /// に入れてある（#64）。同名ファイルは
 /// 上書きせず連番にする（[writeBytesWithoutOverwrite]）。
 Future<String> savePng(Uint8List bytes, String filename) async {
-  final dir = (await getDownloadsDirectory()) ??
-      (await getApplicationDocumentsDirectory());
+  Directory? dir;
+  try {
+    dir =
+        (await getDownloadsDirectory()) ??
+        (await getApplicationDocumentsDirectory());
+  } on MissingPlatformDirectoryException {
+    dir = null;
+  }
+  if (dir == null) throw const ExportNoTargetDirectoryException();
   return savePngInto(dir, bytes, filename);
+}
+
+/// 保存先フォルダが無い（OS が既定の保存先を返さない・フォルダが存在しない）。
+class ExportNoTargetDirectoryException implements Exception {
+  const ExportNoTargetDirectoryException();
+
+  @override
+  String toString() => 'ExportNoTargetDirectoryException';
+}
+
+/// PNG へのエンコードに失敗した（結果が得られない・エンコーダが例外を投げた）。
+class ExportEncodeException implements Exception {
+  const ExportEncodeException([this.cause]);
+
+  final Object? cause;
+
+  @override
+  String toString() => 'ExportEncodeException($cause)';
+}
+
+/// 書き出し失敗の種類（#162）。UI はこれで文言と「保存場所を選ぶ」の出し分けをする。
+enum ExportFailureKind {
+  /// 保存先フォルダが無い。
+  noTargetDirectory,
+
+  /// 保存先に書き込めない（権限・読み取り専用など）。
+  notWritable,
+
+  /// PNG へのエンコードに失敗。
+  encodeFailed,
+
+  /// 上のどれでもない。
+  other,
+}
+
+/// 書き出しの例外を [ExportFailureKind] に分類する。pure（I/O なし、#162）。
+///
+/// [FileSystemException] は OS のエラー番号で見る: ENOENT（POSIX 2・Windows 2/3）は
+/// 保存先が無い、EACCES/EPERM/EROFS（POSIX 13/1/30・Windows 5/19）は書き込めない。
+/// 番号が取れない・知らない番号は [ExportFailureKind.other]。
+ExportFailureKind classifyExportError(Object error) {
+  if (error is ExportNoTargetDirectoryException ||
+      error is MissingPlatformDirectoryException) {
+    return ExportFailureKind.noTargetDirectory;
+  }
+  if (error is ExportEncodeException) return ExportFailureKind.encodeFailed;
+  if (error is FileSystemException) {
+    final code = error.osError?.errorCode;
+    if (code == 2 || code == 3) return ExportFailureKind.noTargetDirectory;
+    if (code == 1 || code == 13 || code == 30 || code == 5 || code == 19) {
+      return ExportFailureKind.notWritable;
+    }
+  }
+  return ExportFailureKind.other;
+}
+
+/// ユーザーが選んだ [path] へ [bytes] を書く（保存ダイアログ経由、#162）。
+/// ダイアログが上書き確認を済ませているので上書きする。規律3: I/O はここ。
+Future<String> writePngToPath(String path, Uint8List bytes) async {
+  final file = File(path);
+  await file.writeAsBytes(bytes, flush: true);
+  return resolvePathOrSelf(file.path);
 }
 
 /// [revealCommandFor] のコマンドをどう実行し、何を成功とみなすか。

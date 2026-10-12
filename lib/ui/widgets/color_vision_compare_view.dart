@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart' show listEquals;
@@ -14,6 +15,7 @@ import '../../services/export_service.dart';
 import '../../services/vision_layer.dart';
 import '../../src/rust/api/sensus_bridge.dart' show VisionStep;
 import 'before_after_view.dart';
+import 'export_feedback.dart';
 
 /// [ColorVisionCompareView] の書き出しファイル名に入れる識別子（`exportFilename` の
 /// `symptomId`）。単独の型ではなく 4 型の比較であることを名前で区別する。
@@ -30,7 +32,7 @@ const String kColorVisionCompareExportId = 'color-vision-compare';
 /// - 各セルの焼き込みは [buildExportCaption] + [composeCaptionedExportImage]（#43/#80 の
 ///   「シミュレーション（近似）」を含む、1 枚ずつ書き出すときと同じキャプション）。
 ///   4 枚を [composeCompareGrid] で 1 枚に並べ、保存と通知は
-///   [savePngWithClipboard] / [showExportSuccess]（単独の書き出しと共通）。
+///   [saveExportPng] / [showExportSuccess] / [showExportFailure]（単独の書き出しと共通）。
 ///
 /// 並べる型は `kColorVisionCompareEntries`（カタログが正本）、強さは全セル共通で
 /// [strength] を受け取る（色覚層の強度。`colorVisionCompareInputOf` が決める）。
@@ -383,6 +385,8 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
     final clones = [for (final image in afters) image.clone()];
     final composedCells = <ui.Image>[];
     final messenger = ScaffoldMessenger.of(context);
+    Uint8List? encoded;
+    String? encodedName;
     try {
       final now = DateTime.now();
       final date = isoDate(now);
@@ -428,12 +432,21 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
         isoDate: date,
         time: compactTime(now),
       );
-      final path = await savePngWithClipboard(bytes, filename);
+      encoded = bytes;
+      encodedName = filename;
+      final path = await saveExportPng(bytes, filename);
       if (!mounted) return;
       showExportSuccess(messenger, l10n, path);
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text(l10n.exportFailure)));
+      showExportFailure(
+        messenger,
+        l10n,
+        e,
+        bytes: encoded,
+        filename: encodedName,
+        onSaved: (path) => showExportSuccess(messenger, l10n, path),
+      );
     } finally {
       for (final image in clones) {
         image.dispose();
