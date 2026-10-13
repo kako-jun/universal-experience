@@ -17,7 +17,7 @@
 //!
 //! -omaly（protanomaly 等）は sensus 側で対応する -opia と同一の [`VisionFilter`] に
 //! マップされ、severity（strength）を下げて弱め表現するだけなので、専用テーブルは無い
-//! （`lib/services/filter_service.dart` の `kAnomalyDefaultSeverity` 参照）。
+//! （`lib/models/vision_filter_catalog.dart` の `kAnomalyDefaultSeverity` 参照）。
 //!
 //! 再生成の実行: `cargo test -- --ignored gen_color_matrices`
 //! ドリフト検出（CI 常時実行）: [`tests::generated_json_matches_committed_file`]

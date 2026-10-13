@@ -17,9 +17,11 @@ lib/
 ├── main.dart
 ├── l10n/                   # 多言語化（ARB: app_en.arb / app_ja.arb、ja/en。生成物は非コミット）。
 │                           # locale_resolution.dart が「選んだ言語 → OS → 英語」の解決の唯一の入口（#82）
+│                           # l10n_extensions.dart が定義（カタログ id・enum）→ 表示文言の解決の集約先（#18）
 ├── models/
 │   ├── vision_filter_catalog.dart   # sensus カタログ（30種）の Dart 側定義と、色覚の別名表（-omaly = -opia と同 id・variantId・強度 0.6。
 │   │                                 # kVisionAliases / resolveVisionKey / colorVisionDefaultStrength、#124）
+│   ├── vision_filter_stage.dart     # 重ね掛けの「段」（宣言順 = 適用順）と色覚の排他グループ（#117）
 │   ├── vision_filter_contract_notes.dart # sensus API 契約上の注意の定義（強度の上限付近の警告の対象・閾値、#66）
 │   ├── sample_catalog.dart          # サンプル画像集（8種）+ フィルタ id ごとの推奨サンプル（#78）
 │   └── preview_image_source.dart    # プレビュー原画の値型（サンプル/ユーザー画像、#78）
@@ -46,6 +48,7 @@ lib/
 │   ├── hotkey_actions.dart          # グローバルホットキー4アクションの実処理（#63。フィルタ解除は全層を外す、#121 でテスト固定）
 │   ├── hotkey_service.dart          # hotkey_manager 登録の副作用層（#63）
 │   ├── image_source_state.dart      # プレビュー原画（サンプル/ユーザー画像）の選択の唯一の正本（#78）
+│   ├── layer_consult_notice.dart    # 層 1 つ単体の受診喚起 layerConsultNotice（調整パネルの層ごとの節が使う、#120）
 │   ├── loupe_rect_source.dart       # ルーペ矩形決定元のインターフェース（#44 向け seam、#63）
 │   ├── loupe_window_controller.dart # ルーペ窓のモード/透過/最前面/クリックスルー（#63）
 │   ├── native_bridge_service.dart   # flutter_rust_bridge（sensus-core）の bootstrap 初期化
@@ -108,6 +111,9 @@ rust/                        # sensus-core を FRB で公開する Rust crate
 └── src/
     ├── api/sensus_bridge.rs
     ├── frb_generated.rs
+    ├── color_matrix_gen.rs  # tools/color_matrices.g.json の再生成器（Machado 11 段テーブルの汲み出し、#59。
+    │                        # `cargo test -- --ignored gen_color_matrices`。ドリフト検出テストは常時実行）
+    ├── shader_dump_gen.rs   # tools/sensus_shaders.g.json の再生成器（#56。sensus-core のシェーダ GLSL を汲み出す）
     └── golden_gen.rs        # GPU golden 参照生成（#[cfg(test)] のみ）
 rust_builder/                 # cargokit 統合（#55）。flutter build/run 時に rust/ をビルドし
                                # macOS/Linux/Windows アプリへ同梱する FFI plugin（テンプレート由来）
@@ -124,7 +130,10 @@ assets/samples/              # サンプル画像集（図形は自作・手続�
 
 macos/                       # macOS ランナー（現行対応）
 linux/                       # Linux ランナー（現行対応）
-windows/                     # Windows ランナー（x64 debug / CI artifact、#149。実機確認は残る）
+windows/                     # Windows ランナー（x64。Flutter 標準テンプレート + トレイ用 ICO #163。cargokit が
+                              # universal_experience_rust.dll を exe の隣へ同梱。CI は実ブリッジ integration test
+                              # まで検証、配布は GitHub Releases の未署名 zip。実機確認は残る #150。
+                              # 判断は docs/adr/2026-10-13-windows-support-and-releases-distribution.md）
 # Android ランナーは計画中（未作成）
 
 DESIGN.md                    # UI 設計原則（カラートークン・タイポ・余白・コンポーネント・画面構成・検証方法、#72）
@@ -336,22 +345,32 @@ UI を変える場合は先に `DESIGN.md` を読む（色は `colorScheme` の�
 
 ## CI
 
-`.github/workflows/ci.yml` は3ジョブ構成。`windows-build` は x64 debug の exe/DLL 同梱を
+`.github/workflows/ci.yml` は3ジョブ構成（`windows-build` / `check` / `linux-build`）。
+`push`（main）・`pull_request`（main）に加え `workflow_call` でも起動する。`windows-build` は x64 debug の exe/DLL 同梱を
 確認し、実機確認用 artifact を保存する（#149）。`check`（runs-on: macos-latest。
 Flutter golden を生成プラットフォームと揃えるため）が push/PR（main）で
 flutter analyze / flutter test / `rust/` の cargo fmt --check /
 clippy --all-targets -D warnings / cargo test / flutter build macos --debug /
-実ブリッジ integration test（`flutter test integration_test/experience_presets_smoke_test.dart -d macos`
-と `flutter test integration_test/app_bootstrap_test.dart -d macos` の2コマンド、#55。
-2ファイルを1回の `flutter test integration_test` 呼び出しにまとめるとデスクトップでは
-2番目のアプリ起動が失敗するため個別に実行する）を回す。cargokit 統合（#55）により
+実ブリッジ integration test（`flutter test integration_test/<file> -d macos` を4ファイル分、後述。#55。
+複数ファイルを1回の `flutter test integration_test` 呼び出しにまとめるとデスクトップでは
+2番目以降のアプリ起動が失敗するため個別に実行する）を回す。cargokit 統合（#55）により
 `flutter build macos` が rust/ crate のビルドも兼ねるため、Setup Rust は Flutter
 build より前に置く。rust 依存は crates.io のみ（sensus-core）なので、private
 依存を git 経由で引く場合に要る deploy key / ssh-agent 設定は不要。
 
-`windows-build` も実ブリッジ integration test（macOS / Linux と同じ5ファイルを
-`-d windows` でファイルごとに実行、#158）を回す。ci.yml は `workflow_call` でも
-呼べる（release.yml が使う）。
+実ブリッジ integration test は `integration_test/` の5ファイル（`experience_presets_smoke_test` /
+`app_bootstrap_test` / `cpu_preview_all_filters_test` / `vision_filter_urgency_parity_test` / `tunnel_vision_threshold_drift_test`）を、
+macOS（`check`）・Linux（`linux-build`、xvfb）・Windows（`windows-build`）のそれぞれで
+ファイルごとに1コマンドずつ実行する（#158）。
+ci.yml は `workflow_call` でも呼べる（release.yml が使う）。
+
+### 配布（`.github/workflows/release.yml`、#158）
+
+`v*` タグの push で起動し、`ci`（ci.yml を呼ぶ）+ `version-check` を通った後、`build-macos`（`macos-latest`、
+`universal-experience-macos.dmg`）/ `build-linux`（`ubuntu-latest`、`universal-experience-linux-x64.tar.gz`）/
+`build-windows`（`windows-latest`、`universal-experience-windows-x64.zip`）が release bundle を作り、`publish` が
+`softprops/action-gh-release` で同じ Release へ公開する。Linux / Windows の build job は exe と Rust ライブラリ（.so / .dll）の同梱を、macOS は .app とその実行ファイルの存在を確認してから
+パッケージする（macOS の Rust は universal_experience_rust.framework として入る）。全て未署名・インストーラなし。理由は `docs/adr/2026-10-13-windows-support-and-releases-distribution.md`。
 
 ### リリース手順（#158）
 
