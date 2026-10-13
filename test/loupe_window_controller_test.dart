@@ -106,7 +106,8 @@ void main() {
       );
     });
 
-    test('GDK_BACKEND=x11 が明示されていても Wayland セッションの兆候があれば true（信頼できない側に倒す）', () {
+    test('GDK_BACKEND=x11 が明示されていても Wayland セッションの兆候があれば true（信頼できない側に倒す）',
+        () {
       expect(
         LoupeWindowPolicy.isLikelyWaylandNativeSession({
           'XDG_SESSION_TYPE': 'wayland',
@@ -347,7 +348,8 @@ void main() {
       expect(controller.appMode, LoupeWindowPolicy.defaultAppMode);
     });
 
-    test('settings モード中は setClickThrough(true) を呼んでも ON にならない (#63)', () async {
+    test('settings モード中は setClickThrough(true) を呼んでも ON にならない (#63)',
+        () async {
       SharedPreferences.setMockInitialValues({});
       final controller = LoupeWindowController(loupeModeAvailable: true);
       await controller.load();
@@ -371,7 +373,8 @@ void main() {
   });
 
   group('LoupeWindowController.restorePersistedClickThrough (#63)', () {
-    test('永続化された clickThrough=true をそのまま適用する（復帰手段の可用性を問わない）', () async {
+    test('永続化された clickThrough=true をそのまま適用する（復帰手段の可用性を問わない）',
+        () async {
       SharedPreferences.setMockInitialValues({});
       final controller = LoupeWindowController(loupeModeAvailable: true);
       await controller.load();
@@ -397,8 +400,7 @@ void main() {
   });
 
   group('LoupeWindowController.load() 正規化', () {
-    test(
-        'settings モードで clickThrough=true が保存されていたら false へ正規化し、'
+    test('settings モードで clickThrough=true が保存されていたら false へ正規化し、'
         '書き直す', () async {
       SharedPreferences.setMockInitialValues({
         'loupeWindow.appMode': 'settings',
@@ -417,7 +419,8 @@ void main() {
       expect(other.clickThrough, isFalse);
     });
 
-    test('loupe モードで clickThrough=true が保存されていたらそのまま復元する', () async {
+    test('loupe モードで clickThrough=true が保存されていたらそのまま復元する',
+        () async {
       SharedPreferences.setMockInitialValues({
         'loupeWindow.appMode': 'loupe',
         'loupeWindow.clickThrough': true,
@@ -454,8 +457,7 @@ void main() {
       return controller;
     }
 
-    test(
-        'ON の状態で onWindowFocus → releaseClickThroughOnFirstKeyPress の順で呼ぶと解除される',
+    test('ON の状態で onWindowFocus → releaseClickThroughOnFirstKeyPress の順で呼ぶと解除される',
         () async {
       final controller = await buildClickThroughOnController();
 
@@ -473,8 +475,7 @@ void main() {
       expect(controller.clickThrough, isTrue);
     });
 
-    test(
-        'onWindowFocus の後に onWindowBlur を呼ぶと予約は取り消され、その後の'
+    test('onWindowFocus の後に onWindowBlur を呼ぶと予約は取り消され、その後の'
         'releaseClickThroughOnFirstKeyPress は何もしない', () async {
       final controller = await buildClickThroughOnController();
 
@@ -485,8 +486,7 @@ void main() {
       expect(controller.clickThrough, isTrue);
     });
 
-    test(
-        'クリックスルーが OFF のときは onWindowFocus → releaseClickThroughOnFirstKeyPress '
+    test('クリックスルーが OFF のときは onWindowFocus → releaseClickThroughOnFirstKeyPress '
         'の順で呼んでも何も起きない', () async {
       SharedPreferences.setMockInitialValues({});
       final controller = LoupeWindowController(loupeModeAvailable: true);
