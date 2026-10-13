@@ -30,9 +30,10 @@ import 'ui/widgets/loupe_hud.dart';
 /// ルーペ窓の挙動 (#14) を集約したコントローラ。
 /// 最小サイズ・状態遷移(normal/maximized/fullscreen)・枠ポリシー・
 /// 透過/最前面/クリックスルーの責務を持つ (詳細は docs/ARCHITECTURE.md)。
-/// 本番では差し替えない。ルーペ窓モードが使えない間（#156）にそのモードを
-/// 前提とするテストだけが、使える設定のコントローラへ差し替える。
-LoupeWindowController loupeWindow = LoupeWindowController();
+final LoupeWindowController loupeWindow = LoupeWindowController();
+
+// UniversalExperienceApp の同名フィールドに隠れる場所から参照するための別名。
+final LoupeWindowController _globalLoupeWindow = loupeWindow;
 
 /// トレイとウィンドウ UI で共有する VisionFilterState（プレビューの選択の
 /// 唯一の正本、#60, #124）。色覚のクイック選択も advanced も体験プリセットも、
@@ -431,6 +432,7 @@ class UniversalExperienceApp extends StatelessWidget {
     required this.settings,
     this.trayAvailable = false,
     this.hotkeyStatus = const HotkeyStatus(),
+    this.loupeWindow,
   });
 
   /// Pre-loaded settings service (theme mode / last filter type / locale).
@@ -445,8 +447,14 @@ class UniversalExperienceApp extends StatelessWidget {
   /// グローバルホットキーの登録結果 (#63)。同じ理由で既定値は「ホットキー無し」。
   final HotkeyStatus hotkeyStatus;
 
+  /// ルーペ窓のコントローラ。省略時はトップレベルの [loupeWindow]。ルーペ窓
+  /// モードが使えない間（#156）にそのモードを前提とするテストが、使える設定の
+  /// コントローラを渡すための差し込み口（本番では渡さない）。
+  final LoupeWindowController? loupeWindow;
+
   @override
   Widget build(BuildContext context) {
+    final loupeWindowController = loupeWindow ?? _globalLoupeWindow;
     return MultiProvider(
       providers: [
         // SettingsService is created+loaded in main() so the first frame uses
@@ -466,7 +474,9 @@ class UniversalExperienceApp extends StatelessWidget {
         ),
         // ルーペ窓のモード/最前面/クリックスルー (#63)。同じ理由でトップレベルの
         // 1 個を使い回す（トレイ・main() の起動シーケンスと同じインスタンス）。
-        ChangeNotifierProvider<LoupeWindowController>.value(value: loupeWindow),
+        ChangeNotifierProvider<LoupeWindowController>.value(
+          value: loupeWindowController,
+        ),
         // トレイ/ホットキーの可用性 (#63)。汎用的な Provider<bool> は他の bool
         // provider と衝突しうるため使わず、専用の値オブジェクトにまとめて供給する。
         Provider<WindowModeUiContext>.value(

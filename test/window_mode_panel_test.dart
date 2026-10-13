@@ -21,10 +21,12 @@ import 'support/home_screen_harness.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  late LoupeWindowController testLoupe;
+
   setUp(() {
     // ルーペ窓モードが使えない間（#156）でも、このファイルはルーペ窓モードを
-    // 前提にするため、使える設定のコントローラへ差し替える。
-    loupeWindow = LoupeWindowController(loupeModeAvailable: true);
+    // 前提にするため、使える設定のコントローラを用意する。
+    testLoupe = LoupeWindowController(loupeModeAvailable: true);
     // 体験・メタデータ・プレビューの読み込み/適用をハーネスの fixture（Rust 非依存、
     // #127/#131）に揃える。体験プリセットの行は不要なので空にする。
     installHomeScreenFixtures();
@@ -33,9 +35,9 @@ void main() {
   tearDown(() async {
     resetHomeScreenFixtures();
     // トップレベル共有シングルトンをテスト間で汚染しない（#63）。
-    await loupeWindow.setClickThrough(false);
-    await loupeWindow.setAlwaysOnTop(false);
-    await loupeWindow.setAppMode(AppMode.settings);
+    await testLoupe.setClickThrough(false);
+    await testLoupe.setAlwaysOnTop(false);
+    await testLoupe.setAppMode(AppMode.settings);
   });
 
   Future<SettingsService> preparedSettings() async {
@@ -63,10 +65,11 @@ void main() {
     final settings = await preparedSettings();
     // クリックスルーは settings モード中は ON にできない
     // (setClickThrough 自身のガード、#63)。loupe モードへ切り替えておく。
-    await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
+    await tester.runAsync(() => testLoupe.setAppMode(AppMode.loupe));
 
     // 引数省略 = 既定コンストラクタ（trayAvailable: false, hotkeyStatus: 空）。
-    await tester.pumpWidget(UniversalExperienceApp(settings: settings));
+    await tester.pumpWidget(
+        UniversalExperienceApp(settings: settings, loupeWindow: testLoupe));
     await tester.pump();
     final dialog = await openWindowModeDialog(tester);
 
@@ -115,7 +118,8 @@ void main() {
 
     final settings = await preparedSettings();
 
-    await tester.pumpWidget(UniversalExperienceApp(settings: settings));
+    await tester.pumpWidget(
+        UniversalExperienceApp(settings: settings, loupeWindow: testLoupe));
     await tester.pump();
     final dialog = await openWindowModeDialog(tester);
 
@@ -136,10 +140,11 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
-    loupeWindow = LoupeWindowController();
+    testLoupe = LoupeWindowController();
     final settings = await preparedSettings();
 
-    await tester.pumpWidget(UniversalExperienceApp(settings: settings));
+    await tester.pumpWidget(
+        UniversalExperienceApp(settings: settings, loupeWindow: testLoupe));
     await tester.pump();
     final dialog = await openWindowModeDialog(tester);
 
@@ -159,7 +164,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(loupeWindow.appMode, AppMode.settings);
+    expect(testLoupe.appMode, AppMode.settings);
   });
 
   testWidgets('トレイが使える環境ではトレイの復帰手段ヒントも表示される (#63)',
@@ -169,9 +174,10 @@ void main() {
     addTearDown(tester.view.reset);
 
     final settings = await preparedSettings();
-    await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
+    await tester.runAsync(() => testLoupe.setAppMode(AppMode.loupe));
 
     await tester.pumpWidget(UniversalExperienceApp(
+      loupeWindow: testLoupe,
       settings: settings,
       trayAvailable: true,
       hotkeyStatus: const HotkeyStatus(),
@@ -195,9 +201,10 @@ void main() {
     addTearDown(tester.view.reset);
 
     final settings = await preparedSettings();
-    await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
+    await tester.runAsync(() => testLoupe.setAppMode(AppMode.loupe));
 
     await tester.pumpWidget(UniversalExperienceApp(
+      loupeWindow: testLoupe,
       settings: settings,
       trayAvailable: false,
       hotkeyStatus: const HotkeyStatus(

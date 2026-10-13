@@ -298,7 +298,7 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
       requested,
       loupeAvailable: _loupeModeAvailable,
     );
-    if (requested == AppMode.loupe && mode != AppMode.loupe) {
+    if (mode != requested) {
       // ルーペ窓が使えない間の要求は拒否する (#156)。状態も保存値も変えない。
       return;
     }

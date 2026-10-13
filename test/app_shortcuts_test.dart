@@ -2,9 +2,9 @@
 //
 // `/`・↑↓・←→ が home_screen.dart の Shortcuts/Actions 経由で
 // preview_selection.dart のロジックへ正しく配線されていることを検証する。
-// UniversalExperienceApp はトップレベル共有の visionFilterState/
-// loupeWindow シングルトンを使うため（main.dart 参照）、各テストの前後で
-// 状態をリセットする。
+// UniversalExperienceApp はトップレベル共有の visionFilterState を使うため
+// （main.dart 参照）、各テストの前後で状態をリセットする。ルーペ窓のコントローラは
+// testLoupe を引数で差し込む。
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
@@ -32,10 +32,12 @@ class _ProbeIntent extends Intent {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  late LoupeWindowController testLoupe;
+
   setUp(() {
     // ルーペ窓モードが使えない間（#156）でも、このファイルはルーペ窓モードを
-    // 前提にするため、使える設定のコントローラへ差し替える。
-    loupeWindow = LoupeWindowController(loupeModeAvailable: true);
+    // 前提にするため、使える設定のコントローラを用意する。
+    testLoupe = LoupeWindowController(loupeModeAvailable: true);
     // 体験・メタデータ・プレビューの読み込み/適用をハーネスの fixture（Rust 非依存、
     // #127/#131）に揃える。体験プリセットの行はキー移動の対象に混ざらないよう空にする。
     installHomeScreenFixtures();
@@ -47,8 +49,8 @@ void main() {
     // 記憶を消さない（同じフィルタを選び直したときに戻すため）ので、空の snapshot で
     // 記憶ごと初期状態へ戻す。
     visionFilterState.restore(const VisionFilterSnapshot());
-    await loupeWindow.setClickThrough(false);
-    await loupeWindow.setAppMode(AppMode.settings);
+    await testLoupe.setClickThrough(false);
+    await testLoupe.setAppMode(AppMode.settings);
   });
 
   Future<void> pumpApp(WidgetTester tester) async {
@@ -60,7 +62,8 @@ void main() {
     final settings = SettingsService();
     await settings.load();
 
-    await tester.pumpWidget(UniversalExperienceApp(settings: settings));
+    await tester.pumpWidget(
+        UniversalExperienceApp(settings: settings, loupeWindow: testLoupe));
     await tester.pump();
   }
 
@@ -171,15 +174,15 @@ void main() {
     // 切り替える。window_manager のプラットフォームチャンネル呼び出しの解決に
     // 実イベントループが要るため tester.runAsync 経由で呼ぶ
     // （window_mode_panel_test.dart の同種コメント参照）。
-    await tester.runAsync(() => loupeWindow.setAppMode(AppMode.loupe));
-    await tester.runAsync(() => loupeWindow.setClickThrough(true));
+    await tester.runAsync(() => testLoupe.setAppMode(AppMode.loupe));
+    await tester.runAsync(() => testLoupe.setClickThrough(true));
     await tester.pump();
-    expect(loupeWindow.clickThrough, isTrue);
+    expect(testLoupe.clickThrough, isTrue);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pump();
 
-    expect(loupeWindow.clickThrough, isFalse);
+    expect(testLoupe.clickThrough, isFalse);
   });
 
   group(

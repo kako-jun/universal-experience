@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:flutter/widgets.dart' show Rect, Size;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -105,8 +106,7 @@ void main() {
       );
     });
 
-    test('GDK_BACKEND=x11 が明示されていても Wayland セッションの兆候があれば true（信頼できない側に倒す）',
-        () {
+    test('GDK_BACKEND=x11 が明示されていても Wayland セッションの兆候があれば true（信頼できない側に倒す）', () {
       expect(
         LoupeWindowPolicy.isLikelyWaylandNativeSession({
           'XDG_SESSION_TYPE': 'wayland',
@@ -217,8 +217,7 @@ void main() {
   });
 
   group('ルーペ窓が使えない間のフォールバック (#156)', () {
-    test('保存値が loupe でも settings で起動し、クリックスルーも OFF、保存値は残る',
-        () async {
+    test('保存値が loupe でも settings で起動し、クリックスルーも OFF、保存値は残る', () async {
       SharedPreferences.setMockInitialValues({
         'loupeWindow.appMode': 'loupe',
         'loupeWindow.clickThrough': true,
@@ -231,6 +230,7 @@ void main() {
       expect(controller.clickThrough, isFalse);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString('loupeWindow.appMode'), 'loupe');
+      expect(prefs.getBool('loupeWindow.clickThrough'), isFalse);
     });
 
     test('setAppMode(loupe) は拒否され、他の設定を保存しても保存値は残る', () async {
@@ -248,6 +248,33 @@ void main() {
       expect(controller.clickThrough, isFalse);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString('loupeWindow.appMode'), 'loupe');
+    });
+
+    test('setAppMode(loupe) の拒否では通知もウィンドウ操作もしない', () async {
+      SharedPreferences.setMockInitialValues({});
+      final controller = LoupeWindowController();
+      await controller.load();
+      var notified = 0;
+      controller.addListener(() => notified++);
+      final calls = <String>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+        const MethodChannel('window_manager'),
+        (call) async {
+          calls.add(call.method);
+          return null;
+        },
+      );
+      addTearDown(() => TestDefaultBinaryMessengerBinding
+          .instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+              const MethodChannel('window_manager'), null));
+
+      await controller.setAppMode(AppMode.loupe);
+
+      expect(notified, 0);
+      expect(calls, isNot(contains('setBackgroundColor')));
+      expect(controller.appMode, AppMode.settings);
     });
 
     test('settings を明示的に選ぶと保存値も settings になる', () async {
@@ -320,8 +347,7 @@ void main() {
       expect(controller.appMode, LoupeWindowPolicy.defaultAppMode);
     });
 
-    test('settings モード中は setClickThrough(true) を呼んでも ON にならない (#63)',
-        () async {
+    test('settings モード中は setClickThrough(true) を呼んでも ON にならない (#63)', () async {
       SharedPreferences.setMockInitialValues({});
       final controller = LoupeWindowController(loupeModeAvailable: true);
       await controller.load();
@@ -345,8 +371,7 @@ void main() {
   });
 
   group('LoupeWindowController.restorePersistedClickThrough (#63)', () {
-    test('永続化された clickThrough=true をそのまま適用する（復帰手段の可用性を問わない）',
-        () async {
+    test('永続化された clickThrough=true をそのまま適用する（復帰手段の可用性を問わない）', () async {
       SharedPreferences.setMockInitialValues({});
       final controller = LoupeWindowController(loupeModeAvailable: true);
       await controller.load();
@@ -372,7 +397,8 @@ void main() {
   });
 
   group('LoupeWindowController.load() 正規化', () {
-    test('settings モードで clickThrough=true が保存されていたら false へ正規化し、'
+    test(
+        'settings モードで clickThrough=true が保存されていたら false へ正規化し、'
         '書き直す', () async {
       SharedPreferences.setMockInitialValues({
         'loupeWindow.appMode': 'settings',
@@ -391,8 +417,7 @@ void main() {
       expect(other.clickThrough, isFalse);
     });
 
-    test('loupe モードで clickThrough=true が保存されていたらそのまま復元する',
-        () async {
+    test('loupe モードで clickThrough=true が保存されていたらそのまま復元する', () async {
       SharedPreferences.setMockInitialValues({
         'loupeWindow.appMode': 'loupe',
         'loupeWindow.clickThrough': true,
@@ -429,7 +454,8 @@ void main() {
       return controller;
     }
 
-    test('ON の状態で onWindowFocus → releaseClickThroughOnFirstKeyPress の順で呼ぶと解除される',
+    test(
+        'ON の状態で onWindowFocus → releaseClickThroughOnFirstKeyPress の順で呼ぶと解除される',
         () async {
       final controller = await buildClickThroughOnController();
 
@@ -447,7 +473,8 @@ void main() {
       expect(controller.clickThrough, isTrue);
     });
 
-    test('onWindowFocus の後に onWindowBlur を呼ぶと予約は取り消され、その後の'
+    test(
+        'onWindowFocus の後に onWindowBlur を呼ぶと予約は取り消され、その後の'
         'releaseClickThroughOnFirstKeyPress は何もしない', () async {
       final controller = await buildClickThroughOnController();
 
@@ -458,7 +485,8 @@ void main() {
       expect(controller.clickThrough, isTrue);
     });
 
-    test('クリックスルーが OFF のときは onWindowFocus → releaseClickThroughOnFirstKeyPress '
+    test(
+        'クリックスルーが OFF のときは onWindowFocus → releaseClickThroughOnFirstKeyPress '
         'の順で呼んでも何も起きない', () async {
       SharedPreferences.setMockInitialValues({});
       final controller = LoupeWindowController(loupeModeAvailable: true);
