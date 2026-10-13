@@ -86,6 +86,8 @@ lib/
     │                                 # strength_caution（強度スライダの上限付近の印・注記、#66）,
     │                                 # filter_provenance（モデルと出典・表現できないこと、#80）,
     │                                 # experimental_badge（「実験的」バッジ、#80）,
+    │                                 # export_feedback（書き出しの成功/失敗の通知・パスをコピー・保存場所を選ぶ。
+    │                                 # テスト用の差し替え口 pngSaver/folderRevealer/saveLocationPicker/pngPathWriter、#162）,
     │                                 # window_mode_panel（起動モード・最前面・クリックスルー・
     │                                 # ホットキー一覧を持つ。AppBar のダイアログで開く、#63/#72）,
     │                                 # loupe_hud（ルーペ窓モード限定の HUD。症状名・強度・

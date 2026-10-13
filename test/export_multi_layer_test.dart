@@ -25,6 +25,7 @@ import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
+import 'package:universal_experience/ui/widgets/export_feedback.dart';
 
 import 'support/sample_image_generator.dart';
 import 'support/vision_filter_metadata_fixture.dart';

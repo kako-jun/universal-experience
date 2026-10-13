@@ -70,7 +70,7 @@ import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart';
 import 'package:universal_experience/ui/theme/app_theme.dart';
-import 'package:universal_experience/ui/widgets/before_after_view.dart';
+import 'package:universal_experience/ui/widgets/export_feedback.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/image_source_picker.dart';
 

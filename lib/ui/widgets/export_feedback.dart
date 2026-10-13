@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/export_service.dart';
 
-/// [_BeforeAfterViewState._export] が使う PNG 書き出しステップの型。
+/// 各ビュー（単独の書き出し・2×2 比較）の PNG 書き出しが使う保存ステップの型。
 ///
 /// 実体は [savePng]。`path_provider` の実プラットフォームを要する I/O
 /// （`test/export_service_test.dart` の doc 参照）なので、widget test では

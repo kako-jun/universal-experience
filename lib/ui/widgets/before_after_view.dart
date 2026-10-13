@@ -19,10 +19,6 @@ import '../../services/vision_filter_metadata.dart';
 import '../../src/rust/api/sensus_bridge.dart';
 import 'export_feedback.dart';
 
-// テスト・他の widget が従来どおり before_after_view.dart 経由で差し替えられるよう再公開する。
-export 'export_feedback.dart'
-    show FolderRevealer, PngSaver, folderRevealer, pngSaver;
-
 /// [_BeforeAfterViewState] が内部で使う「before 画像を [PreviewImageSource]
 /// から読み込む」ステップの型（#78）。実体は
 /// [BeforeAfterView.loadPreviewSourceImage]。widget test が世代管理

@@ -120,6 +120,28 @@ void main() {
     });
   });
 
+  test('writePngToPath: .png を足したときは既存ファイルを上書きしない', () async {
+    final dir = await Directory.systemTemp.createTemp('ue162c');
+    addTearDown(() => dir.delete(recursive: true));
+    final sep = Platform.pathSeparator;
+    final existing = File('${dir.path}${sep}out.png');
+    await existing.writeAsBytes([9, 9, 9]);
+    final written =
+        await writePngToPath('${dir.path}${sep}out', Uint8List.fromList([1]));
+    expect(await existing.readAsBytes(), [9, 9, 9], reason: '既存は無傷');
+    expect(written, isNot(endsWith('${sep}out.png')));
+    expect(await File(written).readAsBytes(), [1]);
+  });
+
+  test('writePngToPath: .png で終わる選択は（ダイアログの確認済みなので）上書きする', () async {
+    final dir = await Directory.systemTemp.createTemp('ue162d');
+    addTearDown(() => dir.delete(recursive: true));
+    final path = '${dir.path}${Platform.pathSeparator}out.png';
+    await File(path).writeAsBytes([9, 9, 9]);
+    final written = await writePngToPath(path, Uint8List.fromList([1]));
+    expect(await File(written).readAsBytes(), [1]);
+  });
+
   test('writePngToPath は選ばれたパスに書く', () async {
     final dir = await Directory.systemTemp.createTemp('ue162');
     addTearDown(() => dir.delete(recursive: true));

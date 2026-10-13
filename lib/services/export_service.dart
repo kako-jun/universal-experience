@@ -592,11 +592,20 @@ String ensurePngExtension(String path) =>
     path.toLowerCase().endsWith('.png') ? path : '$path.png';
 
 /// ユーザーが選んだ [path] へ [bytes] を書く（保存ダイアログ経由、#162）。
-/// ダイアログが上書き確認を済ませているので上書きする。規律3: I/O はここ。
+/// ダイアログが上書き確認を済ませているので、選ばれたパスが `.png` で終わるときは
+/// 上書きする。`.png` を足した場合は、ダイアログが確認していない別名のファイルなので
+/// 既存を上書きせず連番にする（[writeBytesWithoutOverwrite]）。規律3: I/O はここ。
 Future<String> writePngToPath(String path, Uint8List bytes) async {
-  final file = File(ensurePngExtension(path));
-  await file.writeAsBytes(bytes, flush: true);
-  return resolvePathOrSelf(file.path);
+  final withExt = ensurePngExtension(path);
+  if (withExt == path) {
+    final file = File(path);
+    await file.writeAsBytes(bytes, flush: true);
+    return resolvePathOrSelf(file.path);
+  }
+  final target = File(withExt);
+  final name = target.uri.pathSegments.last;
+  final written = await writeBytesWithoutOverwrite(target.parent, bytes, name);
+  return resolvePathOrSelf(written);
 }
 
 /// [revealCommandFor] のコマンドをどう実行し、何を成功とみなすか。

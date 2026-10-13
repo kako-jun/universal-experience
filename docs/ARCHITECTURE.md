@@ -1065,11 +1065,11 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   ファイルを消す）。成功 SnackBar の「フォルダで表示」は `revealInFolder`
   （コマンドと成功条件の決定は pure な `revealCommandFor`。macOS は終了コード 0、
   Windows は終了コード無視、Linux は `xdg-open` を切り離して起動）。
-  失敗は `classifyExportError`（pure。`ExportFailureKind` = 保存先なし / 書き込み不可 / エンコード失敗 / その他。
+  失敗は `classifyExportError`（pure。`ExportFailureKind` = 保存先なし / 書き込み不可 / 空き容量不足 / エンコード失敗 / その他。errno は OS 別。
   `ExportNoTargetDirectoryException`・`ExportEncodeException` と `FileSystemException` の errno で判定）で分類し、
   `ui/widgets/export_feedback.dart` の `showExportFailure` が種類別の文言を出す。保存先の問題のときは
-  「保存場所を選ぶ」で `file_selector` の `getSaveLocation`（seam `saveLocationPicker`）から選んだ場所へ
-  `writePngToPath` で書く（macOS は `user-selected.read-write` entitlement、#162）。判断の経緯は
+  「保存場所を選ぶ」（保存先なし・書き込み不可・空き容量不足のとき）で `file_selector` の `getSaveLocation`（seam `saveLocationPicker`）から選んだ場所へ
+  `writePngToPath` で書く（`.png` が無ければ `ensurePngExtension` で足し、足したときは非上書き。macOS は `user-selected.read-write` entitlement、#162）。判断の経緯は
   `docs/adr/2026-09-30-export-png-to-downloads.md`
 - `ExperiencePresetTile`（`lib/ui/widgets/experience_presets.dart`）: sensus の
   `experiences()` をワンタップ適用の行として消費する（複合体験、#19）。統合一覧
