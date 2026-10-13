@@ -56,8 +56,8 @@ jobs:
         run: flutter pub get
       - name: Build macOS release bundle
         run: flutter build macos --release
-      # macOS は cargokit が Rust ライブラリを universal_experience_rust.framework として .app に同梱するため、
-      # Windows/Linux のような DLL/SO ではないため、ここでは .app の存在だけ確認する。CI の macOS integration
+      # Rust は universal_experience_rust.framework として .app に同梱する（DLL/SO ではない）ので、
+      # ここでは .app とその実行ファイルの存在だけ確認する。CI の macOS integration
       # test が実ブリッジのロードまで検証済みであることを Release の前提にする。
       - name: Verify macOS application bundle
         run: |
