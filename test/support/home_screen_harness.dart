@@ -156,7 +156,7 @@ Future<HomeScreenHarness> pumpHomeScreen(
   final settings = SettingsService();
   await settings.load();
   final visionState = VisionFilterState();
-  final loupe = LoupeWindowController();
+  final loupe = LoupeWindowController(loupeModeAvailable: true);
   final imageSource = ImageSourceState();
   select?.call(visionState);
 

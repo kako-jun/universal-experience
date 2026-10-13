@@ -72,6 +72,26 @@ class LoupeWindowPolicy {
   /// 起動時の既定モード。設定窓（通常ウィンドウ・不透明）から始める (#63)。
   static const AppMode defaultAppMode = AppMode.settings;
 
+  /// ルーペ窓モードを選べるか (#156)。
+  ///
+  /// ライブ画面キャプチャ（#1/#3/#5）が未実装の間は、ルーペ窓モードにしても
+  /// 透明な窓に設定 UI が載るだけで、下のアプリにフィルタはかからない。
+  /// クリックスルーと組み合わさると見えない下のアプリを操作する状態になるため、
+  /// キャプチャが入るまで **false** にして通常モード（[AppMode.settings]）へ
+  /// フォールバックさせる。キャプチャ実装時はここを true に戻すだけでよい。
+  static const bool loupeModeAvailable = false;
+
+  /// 要求されたモードを実効モードへ解決する唯一の入口 (#156)。
+  /// 保存値・UI・トレイ・ホットキーなど、どの経路で [AppMode.loupe] が来ても
+  /// [loupeModeAvailable] が false の間は [AppMode.settings] を返す。
+  static AppMode resolveAppMode(
+    AppMode requested, {
+    bool loupeAvailable = loupeModeAvailable,
+  }) =>
+      requested == AppMode.loupe && !loupeAvailable
+          ? AppMode.settings
+          : requested;
+
   /// 指定モードでの透明背景。loupe モードのみ透明 (defaultTransparent を流用)、
   /// settings モードは常に不透明 (フィルタ選択 UI を見やすくするため)。
   static bool transparentForMode(AppMode mode) =>
@@ -139,10 +159,19 @@ class LoupeWindowPolicy {
 /// Linux/macOS/Windows で挙動差・未対応がある。利用不能でも落ちないよう
 /// 全 I/O を try/catch + ログで握る。
 class LoupeWindowController extends ChangeNotifier with WindowListener {
-  LoupeWindowController({LoupeRectSource rectSource = const ManualLoupeRectSource()})
-      : _rectSource = rectSource;
+  LoupeWindowController({
+    LoupeRectSource rectSource = const ManualLoupeRectSource(),
+    bool loupeModeAvailable = LoupeWindowPolicy.loupeModeAvailable,
+  })  : _rectSource = rectSource,
+        _loupeModeAvailable = loupeModeAvailable;
 
   final LoupeRectSource _rectSource;
+  final bool _loupeModeAvailable;
+
+  /// 保存済みの起動モードがルーペ窓だが、ルーペ窓が使えないため通常モードへ
+  /// フォールバックしている間 true (#156)。この間は保存値を上書きしない
+  /// （将来ルーペ窓が使えるようになったとき、利用者の選択を復元できる）。
+  bool _storedLoupeSuppressed = false;
 
   LoupeWindowMode _mode = LoupeWindowMode.normal;
   bool _clickThrough = LoupeWindowPolicy.defaultClickThrough;
@@ -164,8 +193,12 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
   /// 最前面固定が有効か。
   bool get alwaysOnTop => _alwaysOnTop;
 
-  /// アプリの起動モード (#63)。
+  /// アプリの起動モード (#63)。実効値（ルーペ窓が使えない間は常に
+  /// [AppMode.settings]、#156）。
   AppMode get appMode => _appMode;
+
+  /// ルーペ窓モードを選べるか (#156)。UI・トレイの無効化に使う。
+  bool get loupeModeAvailable => _loupeModeAvailable;
 
   /// 現在のウィンドウサイズ (リサイズ追従で更新)。null は未取得。
   Size? get currentSize => _currentSize;
@@ -184,10 +217,15 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
     final prefs = _prefs ??= await SharedPreferences.getInstance();
     final modeName = prefs.getString(_prefsAppMode);
     if (modeName != null) {
-      _appMode = AppMode.values.firstWhere(
+      final stored = AppMode.values.firstWhere(
         (m) => m.name == modeName,
         orElse: () => LoupeWindowPolicy.defaultAppMode,
       );
+      _appMode = LoupeWindowPolicy.resolveAppMode(
+        stored,
+        loupeAvailable: _loupeModeAvailable,
+      );
+      _storedLoupeSuppressed = _appMode != stored;
     }
     _alwaysOnTop =
         prefs.getBool(_prefsAlwaysOnTop) ?? LoupeWindowPolicy.defaultAlwaysOnTop;
@@ -205,7 +243,10 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
 
   Future<void> _persist() async {
     final prefs = _prefs ??= await SharedPreferences.getInstance();
-    await prefs.setString(_prefsAppMode, _appMode.name);
+    // フォールバック中は保存済みのルーペ窓を残す (#156)。
+    if (!_storedLoupeSuppressed) {
+      await prefs.setString(_prefsAppMode, _appMode.name);
+    }
     await prefs.setBool(_prefsAlwaysOnTop, _alwaysOnTop);
     await prefs.setBool(_prefsClickThrough, _clickThrough);
   }
@@ -252,7 +293,16 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
   /// 起動モードを切り替える (#63)。背景の透明値 (settings=不透明/loupe=透明)
   /// を反映する。settings モードに切り替えるときは、クリックスルーが ON の
   /// ままだと設定 UI が操作不能になるため強制 OFF にする。
-  Future<void> setAppMode(AppMode mode) async {
+  Future<void> setAppMode(AppMode requested) async {
+    final mode = LoupeWindowPolicy.resolveAppMode(
+      requested,
+      loupeAvailable: _loupeModeAvailable,
+    );
+    if (mode != requested) {
+      // ルーペ窓が使えない間の要求は拒否する (#156)。状態も保存値も変えない。
+      return;
+    }
+    _storedLoupeSuppressed = false;
     _appMode = mode;
     await _guard('setBackgroundColor', () async {
       // 色の例外（DESIGN.md）: OS ウィンドウの下地色（透過/不透明黒）。

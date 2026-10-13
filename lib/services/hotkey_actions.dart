@@ -62,10 +62,10 @@ class HotkeyActions {
   /// （ON にならない）バグがあった。都度クエリすることでこのズレを無くす。
   final bool Function() isBypassHeldByHotkey;
 
-  /// ルーペ窓を表示して前面化する（windowManager.show() + focus() 相当）。
+  /// ウィンドウを表示して前面化する（windowManager.show() + focus() 相当）。
   final Future<void> Function() showAndFocusLoupe;
 
-  /// ルーペ窓の表示/非表示トグル（TrayService.toggleLoupeVisible 相当）。
+  /// ウィンドウの表示/非表示トグル（TrayService.toggleLoupeVisible 相当）。
   final Future<void> Function() toggleLoupeVisible;
 
   /// トレイの表示状態ブックキーピング（`TrayService.setLoupeVisible`）と

@@ -13,8 +13,8 @@ import 'support/color_vision_select.dart';
 /// 文言は i18n 解決済みで [buildTrayMenuSpec] に注入する (#18)。純粋層のテストは
 /// app_ja.arb の ja 訳と同じ文字列を渡し、メニュー構造とラベル配線を検証する。
 const _labels = TrayMenuLabels(
-  showLoupe: 'ルーペ窓を表示',
-  hideLoupe: 'ルーペ窓を隠す',
+  showLoupe: 'ウィンドウを表示',
+  hideLoupe: 'ウィンドウを隠す',
   clearFilter: 'フィルタを解除',
   openSettings: '設定を開く…',
   quit: '終了',
@@ -26,6 +26,7 @@ const _labels = TrayMenuLabels(
     'protanomaly': '1型3色覚（赤）',
   },
   appModeLoupeLabel: 'ルーペ窓',
+  appModeLoupeUnavailableLabel: 'ルーペ窓（準備中）',
   alwaysOnTopLabel: '最前面に固定',
   clickThroughLabel: 'クリックスルー',
   advancedFilters: '高度なフィルタ',
@@ -54,11 +55,11 @@ void main() {
 
   group('TrayMenuLabels.toggleLabel', () {
     test('表示中は隠すラベル', () {
-      expect(_labels.toggleLabel(loupeVisible: true), 'ルーペ窓を隠す');
+      expect(_labels.toggleLabel(loupeVisible: true), 'ウィンドウを隠す');
     });
 
     test('非表示中は表示ラベル', () {
-      expect(_labels.toggleLabel(loupeVisible: false), 'ルーペ窓を表示');
+      expect(_labels.toggleLabel(loupeVisible: false), 'ウィンドウを表示');
     });
 
     test('未登録のキーは id をフォールバック表示する', () {
@@ -102,6 +103,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       );
       final kinds = spec.map((e) => e.kind).toSet();
 
@@ -120,6 +122,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       );
       final apply = spec
           .where((e) => e.kind == TrayMenuKind.applyColorVisionFilter)
@@ -139,6 +142,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       );
       final keys = interactive(spec).map((e) => e.key).toList();
 
@@ -153,6 +157,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       ).firstWhere((e) => e.kind == TrayMenuKind.toggleLoupe);
       final hidden = buildTrayMenuSpec(
         loupeVisible: false,
@@ -160,11 +165,12 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       ).firstWhere((e) => e.kind == TrayMenuKind.toggleLoupe);
 
-      expect(visible.label, 'ルーペ窓を隠す');
+      expect(visible.label, 'ウィンドウを隠す');
       expect(visible.checked, isTrue);
-      expect(hidden.label, 'ルーペ窓を表示');
+      expect(hidden.label, 'ウィンドウを表示');
       expect(hidden.checked, isFalse);
     });
 
@@ -175,6 +181,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
         checkedListEntryKeys: {colorVisionListEntryKey('deuteranopia')},
         hasLayers: true,
       );
@@ -195,6 +202,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       ).firstWhere((e) => e.kind == TrayMenuKind.clearFilter);
       final inactive = buildTrayMenuSpec(
         loupeVisible: true,
@@ -202,6 +210,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
         hasLayers: true,
       ).firstWhere((e) => e.kind == TrayMenuKind.clearFilter);
 
@@ -216,6 +225,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       );
       expect(spec.last.kind, TrayMenuKind.quit);
     });
@@ -227,6 +237,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
         checkedListEntryKeys: {colorVisionListEntryKey('protanopia')},
         hasLayers: true,
       );
@@ -245,6 +256,52 @@ void main() {
     });
   });
 
+  group('ルーペ窓モードが使えない間のトレイ項目 (#156)', () {
+    TrayMenuEntry appModeEntry(List<TrayMenuEntry> spec) =>
+        spec.firstWhere((e) => e.kind == TrayMenuKind.toggleAppMode);
+
+    test('loupeModeAvailable: false なら起動モード項目は無効', () {
+      final spec = buildTrayMenuSpec(
+        loupeVisible: true,
+        labels: _labels,
+        appMode: AppMode.settings,
+        alwaysOnTop: false,
+        clickThrough: false,
+        loupeModeAvailable: false,
+      );
+      expect(appModeEntry(spec).enabled, isFalse);
+      expect(appModeEntry(spec).label, 'ルーペ窓（準備中）');
+    });
+
+    test('loupeModeAvailable: true なら有効で通常のラベル', () {
+      final spec = buildTrayMenuSpec(
+        loupeVisible: true,
+        labels: _labels,
+        appMode: AppMode.settings,
+        alwaysOnTop: false,
+        clickThrough: false,
+        loupeModeAvailable: true,
+      );
+      expect(appModeEntry(spec).enabled, isTrue);
+      expect(appModeEntry(spec).label, 'ルーペ窓');
+    });
+
+    test('既定のコントローラの TrayService は無効の起動モード項目を出す', () {
+      final tray = TrayService(
+        visionFilterState: VisionFilterState(),
+        loupeWindow: LoupeWindowController(),
+        iconPath: 'assets/tray/tray_icon.png',
+        labels: _labels,
+        tooltip: 'Universal Experience',
+        onShowLoupe: () async {},
+        onHideLoupe: () async {},
+        onOpenSettings: () async {},
+        onQuit: () async {},
+      );
+      expect(appModeEntry(tray.currentMenuSpec()).enabled, isFalse);
+    });
+  });
+
   group('buildTrayMenuSpec の起動モード/最前面/クリックスルー (#63)', () {
     test('appMode/alwaysOnTop/clickThrough のチェック状態を反映する', () {
       final loupeChecked = buildTrayMenuSpec(
@@ -253,6 +310,7 @@ void main() {
         appMode: AppMode.loupe,
         alwaysOnTop: true,
         clickThrough: true,
+        loupeModeAvailable: true,
       );
       expect(
         loupeChecked
@@ -279,6 +337,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       );
       expect(
         settingsUnchecked
@@ -307,6 +366,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       );
       String labelOf(TrayMenuKind kind) =>
           spec.firstWhere((e) => e.kind == kind).label!;
@@ -323,6 +383,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       );
       expect(
         spec.firstWhere((e) => e.kind == TrayMenuKind.toggleAppMode).key,
@@ -384,7 +445,7 @@ void main() {
       visionFilterState = VisionFilterState();
       trayService = TrayService(
         visionFilterState: visionFilterState,
-        loupeWindow: LoupeWindowController(),
+        loupeWindow: LoupeWindowController(loupeModeAvailable: true),
         iconPath: 'assets/tray/tray_icon.png',
         labels: _labels,
         tooltip: 'Universal Experience',
@@ -447,7 +508,7 @@ void main() {
       final vs = VisionFilterState();
       final trayService = TrayService(
         visionFilterState: vs,
-        loupeWindow: LoupeWindowController(),
+        loupeWindow: LoupeWindowController(loupeModeAvailable: true),
         iconPath: 'assets/tray/tray_icon.png',
         labels: _labels,
         tooltip: 'Universal Experience',
@@ -484,7 +545,7 @@ void main() {
     // 確認する。
     test('init() のあと loupeWindow の変化で listener が発火する', () async {
       SharedPreferences.setMockInitialValues({});
-      final loupeWindow = LoupeWindowController();
+      final loupeWindow = LoupeWindowController(loupeModeAvailable: true);
       final vs = VisionFilterState();
       final trayService = TrayService(
         visionFilterState: vs,
@@ -511,7 +572,7 @@ void main() {
         'loupeWindow.setAppMode/setAlwaysOnTop/setClickThrough で '
         'トレイが参照する状態が反転する（クリックハンドラが最終的に呼ぶメソッド）', () async {
       SharedPreferences.setMockInitialValues({});
-      final loupeWindow = LoupeWindowController();
+      final loupeWindow = LoupeWindowController(loupeModeAvailable: true);
       await loupeWindow.load();
       final vs = VisionFilterState();
       TrayService(
@@ -544,8 +605,8 @@ void main() {
 
   group('TrayService.updateLocalization (#82)', () {
     const enLabels = TrayMenuLabels(
-      showLoupe: 'Show loupe window',
-      hideLoupe: 'Hide loupe window',
+      showLoupe: 'Show window',
+      hideLoupe: 'Hide window',
       clearFilter: 'Clear filter',
       openSettings: 'Open settings…',
       quit: 'Quit',
@@ -556,6 +617,7 @@ void main() {
         'achromatopsia': 'Achromatopsia',
       },
       appModeLoupeLabel: 'Loupe window',
+      appModeLoupeUnavailableLabel: 'Loupe window (coming soon)',
       alwaysOnTopLabel: 'Always on top',
       clickThroughLabel: 'Click-through',
       advancedFilters: 'Advanced filters',
@@ -564,7 +626,7 @@ void main() {
     final vs = VisionFilterState();
     TrayService buildTray() => TrayService(
           visionFilterState: vs,
-          loupeWindow: LoupeWindowController(),
+          loupeWindow: LoupeWindowController(loupeModeAvailable: true),
           iconPath: 'assets/tray/tray_icon.png',
           labels: _labels,
           tooltip: 'ユニバーサル・エクスペリエンス',
@@ -589,9 +651,10 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       );
       final labels = spec.map((e) => e.label).whereType<String>().toList();
-      expect(labels, contains('Hide loupe window'));
+      expect(labels, contains('Hide window'));
       expect(labels, contains('Protanopia'));
       expect(labels, contains('Quit'));
       expect(labels, isNot(contains('終了')));
@@ -670,7 +733,7 @@ void main() {
     TrayService build(Future<Uint8List> Function(String) loader, String icon) =>
         TrayService(
           visionFilterState: VisionFilterState(),
-          loupeWindow: LoupeWindowController(),
+          loupeWindow: LoupeWindowController(loupeModeAvailable: true),
           iconPath: icon,
           labels: _labels,
           tooltip: 'Universal Experience',

@@ -360,11 +360,15 @@
   "@trayTooltip": {
     "description": "Tray icon tooltip."
   },
-  "trayShowLoupe": "Show loupe window",
+  "trayAppModeLoupeUnavailable": "Loupe window (coming soon)",
+  "@trayAppModeLoupeUnavailable": {
+    "description": "Tray menu label of the loupe app mode item while it is disabled because live screen capture is not implemented yet (#156)."
+  },
+  "trayShowLoupe": "Show window",
   "@trayShowLoupe": {
     "description": "Tray menu item that shows the loupe (main) window."
   },
-  "trayHideLoupe": "Hide loupe window",
+  "trayHideLoupe": "Hide window",
   "@trayHideLoupe": {
     "description": "Tray menu item that hides the loupe (main) window."
   },
@@ -505,6 +509,10 @@
   "@windowModeLoupe": {
     "description": "Label for the loupe app mode (transparent, held up to the screen) in the mode switch."
   },
+  "windowModeLoupeUnavailableNote": "The loupe window is coming soon. It can't be selected yet because screen capture isn't implemented.",
+  "@windowModeLoupeUnavailableNote": {
+    "description": "Note shown under the app mode switch while the loupe window mode is disabled because live screen capture (#1/#3/#5) is not implemented yet (#156)."
+  },
   "alwaysOnTopLabel": "Always on top",
   "@alwaysOnTopLabel": {
     "description": "Label for the always-on-top toggle."
@@ -548,7 +556,7 @@
   "@hotkeyEmergencyExit": {
     "description": "Display name for the emergency-exit hotkey action (clears filters, click-through and always-on-top)."
   },
-  "hotkeyToggleLoupeVisibility": "Show/hide loupe window",
+  "hotkeyToggleLoupeVisibility": "Show/hide window",
   "@hotkeyToggleLoupeVisibility": {
     "description": "Display name for the toggle-loupe-visibility hotkey action."
   },

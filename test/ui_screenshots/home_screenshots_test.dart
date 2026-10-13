@@ -288,7 +288,9 @@ void main() {
       recommendedSampleIdForFilter(visionState.selectedId),
     );
 
-    final loupe = LoupeWindowController();
+    // ダイアログの撮影は既定（ルーペ窓が選べない）の状態で撮る。クリックスルーの
+    // 案内はルーペ窓モードでしか ON にできないため、そちらは使える設定で撮る (#156)。
+    final loupe = LoupeWindowController(loupeModeAvailable: !viaDialog);
     final boundaryKey = GlobalKey();
     await tester.pumpWidget(
       RepaintBoundary(
@@ -303,7 +305,7 @@ void main() {
             ChangeNotifierProvider<LoupeWindowController>.value(value: loupe),
             Provider<WindowModeUiContext>.value(
               value: WindowModeUiContext(
-                trayAvailable: clickThrough,
+                trayAvailable: clickThrough || viaDialog,
                 hotkeyStatus: const HotkeyStatus(),
               ),
             ),
@@ -384,26 +386,21 @@ void main() {
       await tester.tap(find.byIcon(Icons.language));
       await tester.pumpAndSettle();
     }
+    if (viaDialog) {
+      // 起動モードのダイアログ（ルーペ窓は準備中で無効、#156）。
+      await tester.tap(find.byIcon(Icons.window_outlined));
+      await tester.pumpAndSettle();
+      final dialogPath =
+          await writeScreenshot(tester, boundaryKey, '$base-dialog');
+      // ignore: avoid_print
+      print('[ui_screenshots] wrote $dialogPath');
+      return;
+    }
     if (clickThrough) {
-      // クリックスルー ON（復帰方法の案内バナー）の状態。viaDialog は、起動モードの
-      // ダイアログを開いてそのスイッチで ON にする（ON でダイアログが自動で閉じる）。
+      // クリックスルー ON（復帰方法の案内バナー）の状態。
       await tester.runAsync(() => loupe.setAppMode(AppMode.loupe));
-      if (viaDialog) {
-        await tester.tap(find.byIcon(Icons.window_outlined));
-        await tester.pumpAndSettle();
-        final dialogPath =
-            await writeScreenshot(tester, boundaryKey, '$base-dialog');
-        // ignore: avoid_print
-        print('[ui_screenshots] wrote $dialogPath');
-        await tester.runAsync(() async {
-          await tester.tap(find.byType(SwitchListTile).last);
-          await Future<void>.delayed(const Duration(milliseconds: 50));
-        });
-        await tester.pumpAndSettle();
-      } else {
-        await tester.runAsync(() => loupe.setClickThrough(true));
-        await tester.pump();
-      }
+      await tester.runAsync(() => loupe.setClickThrough(true));
+      await tester.pump();
     }
 
     final path = await writeScreenshot(tester, boundaryKey, '$base$suffix');
@@ -639,14 +636,30 @@ void main() {
     );
   }
 
-  // クリックスルー ON の復帰バナー（#63, #72）。ダイアログのスイッチで ON にすると
-  // ダイアログが自動で閉じ、主画面の案内が見える。低い広幅（1280x480）と既定
+  // 起動モードのダイアログ（ルーペ窓は準備中で無効、#156）。ファイル名は
+  // wide-light-ja-dialog.png。
+  testWidgets(
+    'screenshot wide startup mode dialog',
+    (tester) => shoot(
+      tester,
+      widthLabel: 'wide',
+      width: 1280,
+      height: 800,
+      dark: false,
+      locale: 'ja',
+      suffix: '',
+      viaDialog: true,
+    ),
+    skip: !screenshotsEnabled,
+  );
+
+  // クリックスルー ON の復帰バナー（#63, #72）。主画面の案内が見える。低い広幅（1280x480）と既定
   // ウィンドウ（800x600）でも、一覧とプレビューが破綻しないことを確認する。
-  for (final (label, width, height, viaDialog)
-      in const <(String, double, double, bool)>[
-    ('wide', 1280, 800, true),
-    ('wide-low', 1280, 480, false),
-    ('default-window', 800, 600, false),
+  for (final (label, width, height)
+      in const <(String, double, double)>[
+    ('wide', 1280, 800),
+    ('wide-low', 1280, 480),
+    ('default-window', 800, 600),
   ]) {
     testWidgets(
       'screenshot $label click-through banner',
@@ -659,7 +672,6 @@ void main() {
         locale: 'ja',
         suffix: '-clickthrough',
         clickThrough: true,
-        viaDialog: viaDialog,
       ),
       skip: !screenshotsEnabled,
     );

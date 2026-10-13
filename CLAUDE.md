@@ -50,7 +50,7 @@ lib/
 │   ├── image_source_state.dart      # プレビュー原画（サンプル/ユーザー画像）の選択の唯一の正本（#78）
 │   ├── layer_consult_notice.dart    # 層 1 つ単体の受診喚起 layerConsultNotice（調整パネルの層ごとの節が使う、#120）
 │   ├── loupe_rect_source.dart       # ルーペ矩形決定元のインターフェース（#44 向け seam、#63）
-│   ├── loupe_window_controller.dart # ルーペ窓のモード/透過/最前面/クリックスルー（#63）
+│   ├── loupe_window_controller.dart # ルーペ窓のモード/透過/最前面/クリックスルー（#63）。ルーペ窓モードの可否は LoupeWindowPolicy.loupeModeAvailable の 1 箇所（キャプチャ未実装の間は false、#156）
 │   ├── native_bridge_service.dart   # flutter_rust_bridge（sensus-core）の bootstrap 初期化
 │   ├── preview_selection.dart       # プレビュー強度の出どころを一本化する判定（#60/#63）・
 │   │                                 # 複数層のプレビューに渡すステップ列 previewPipelineSteps（#119）
