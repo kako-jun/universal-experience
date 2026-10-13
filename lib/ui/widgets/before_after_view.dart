@@ -17,6 +17,7 @@ import '../../services/export_layers.dart';
 import '../../services/export_service.dart';
 import '../../services/vision_filter_metadata.dart';
 import '../../src/rust/api/sensus_bridge.dart';
+import 'export_feedback.dart';
 
 /// [_BeforeAfterViewState] が内部で使う「before 画像を [PreviewImageSource]
 /// から読み込む」ステップの型（#78）。実体は
@@ -66,25 +67,6 @@ typedef ExportImageComposer = Future<ui.Image> Function(
 /// [composeExportImage]。
 @visibleForTesting
 ExportImageComposer exportImageComposer = composeExportImage;
-
-/// [_BeforeAfterViewState._export] が使う PNG 書き出しステップの型。
-///
-/// 実体は [savePng]。`path_provider` の実プラットフォームを要する I/O
-/// （`test/export_service_test.dart` の doc 参照）なので、widget test では
-/// フェイクに差し替えて実ファイルへ触れずに済ませる。
-typedef PngSaver = Future<String> Function(Uint8List bytes, String filename);
-
-/// PNG 書き出しの供給源（テストで差し替え可能）。既定は [savePng]。
-@visibleForTesting
-PngSaver pngSaver = savePng;
-
-/// 保存したファイルの場所を開く処理の型。実体は [revealInFolder]。
-/// 実 OS のファイルマネージャを起動するので、widget test ではフェイクに差し替える。
-typedef FolderRevealer = Future<bool> Function(String path);
-
-/// 「フォルダで表示」の供給源（テストで差し替え可能）。既定は [revealInFolder]。
-@visibleForTesting
-FolderRevealer folderRevealer = revealInFolder;
 
 /// 上の 3 つの差し替え口（[previewSourceImageLoader] / [afterImageRenderer] /
 /// [exportImageComposer]）を、テスト以外のコード（2×2 比較の
@@ -717,6 +699,8 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     setState(() => _exporting = true);
 
     final messenger = ScaffoldMessenger.of(context);
+    Uint8List? encoded;
+    String? encodedName;
     try {
       final now = DateTime.now();
       final date = isoDate(now);
@@ -741,13 +725,22 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         // 衝突したら savePng が連番にする）。焼き込むキャプションは日付のみ。
         time: compactTime(now),
       );
-      final path = await savePngWithClipboard(bytes, filename);
+      encoded = bytes;
+      encodedName = filename;
+      final path = await saveExportPng(bytes, filename);
 
       if (!mounted) return;
       showExportSuccess(messenger, l10n, path);
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text(l10n.exportFailure)));
+      showExportFailure(
+        messenger,
+        l10n,
+        e,
+        bytes: encoded,
+        filename: encodedName,
+        onSaved: (path) => showExportSuccess(messenger, l10n, path),
+      );
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
@@ -1083,53 +1076,15 @@ Future<Uint8List> encodePngAndDispose(ui.Image composed) async {
   Uint8List? bytes;
   try {
     bytes = await encodeImagePng(composed);
+  } catch (e) {
+    throw ExportEncodeException(e);
   } finally {
     composed.dispose();
   }
   if (bytes == null) {
-    throw StateError('PNG encoding returned no bytes');
+    throw const ExportEncodeException();
   }
   return bytes;
-}
-
-/// [bytes] を [filename] で保存し（[pngSaver]）、保存先のフルパスを
-/// クリップボードへテキストとしてコピーして、そのパスを返す。画像そのものの
-/// クリップボード書き込みはプラグインを要し環境変更になるため非スコープ。
-Future<String> savePngWithClipboard(Uint8List bytes, String filename) async {
-  final path = await pngSaver(bytes, filename);
-  await Clipboard.setData(ClipboardData(text: path));
-  return path;
-}
-
-/// 書き出し成功の SnackBar（保存先の表示 + 「フォルダで表示」）。
-///
-/// #64: 保存先はユーザーが実際に辿れる場所（Downloads）。パスを読ませるだけでなく、
-/// その場でファイルマネージャを開けるようにする。アクション付きの SnackBar は既定で
-/// 消えないので、時間で閉じるよう明示する。[messenger] は書き出し開始時に取って
-/// あり context を使わないので、ビューが外れた後でも「開けなかった」を必ず知らせる。
-void showExportSuccess(
-  ScaffoldMessengerState messenger,
-  AppLocalizations l10n,
-  String path,
-) {
-  messenger.showSnackBar(
-    SnackBar(
-      content: Text(l10n.exportSuccess(path)),
-      persist: false,
-      duration: const Duration(seconds: 10),
-      action: SnackBarAction(
-        label: l10n.exportRevealAction,
-        onPressed: () async {
-          final opened = await folderRevealer(path);
-          if (!opened) {
-            messenger.showSnackBar(
-              SnackBar(content: Text(l10n.exportRevealFailure)),
-            );
-          }
-        },
-      ),
-    ),
-  );
 }
 
 class _Pane extends StatelessWidget {

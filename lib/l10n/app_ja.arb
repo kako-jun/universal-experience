@@ -71,6 +71,13 @@
   "exportRevealAction": "フォルダで表示",
   "exportRevealFailure": "フォルダを開けませんでした。",
   "exportFailure": "エクスポートに失敗しました。もう一度お試しください。",
+  "exportFailureNoTargetDirectory": "エクスポートに失敗しました。保存先のフォルダが見つかりません。",
+  "exportFailureNotWritable": "エクスポートに失敗しました。保存先のフォルダに書き込めません。",
+  "exportFailureDiskFull": "エクスポートに失敗しました。ディスクの空き容量が足りません。",
+  "exportFailureEncode": "エクスポートに失敗しました。PNG 画像を作成できませんでした。",
+  "exportChooseLocationAction": "保存場所を選ぶ",
+  "exportCopyPathAction": "パスをコピー",
+  "exportPathCopied": "パスをコピーしました。",
 
   "experienceSectionTitle": "体験プリセット",
   "experienceMeniere": "メニエール病",

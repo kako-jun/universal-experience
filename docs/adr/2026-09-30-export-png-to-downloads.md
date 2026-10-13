@@ -24,7 +24,7 @@ PNG エクスポート（#43）は `getDownloadsDirectory()` へ書いていた�
    行う。
 3. **ユーザーに見せる・Finder に渡すパスは `resolveSymbolicLinks` で実パスにする。** サンドボックスの
    コンテナ内 `Data/Downloads` は実 `~/Downloads` へのシンボリックリンクなので、正規化しないと
-   SnackBar・クリップボード・「フォルダで表示」がコンテナ側のパスになる。
+   SnackBar・「パスをコピー」・「フォルダで表示」がコンテナ側のパスになる。
 4. **成功 SnackBar に保存先のフルパスと「フォルダで表示」を出す。** 新規依存は足さず、OS ごとのコマンド
    （macOS `/usr/bin/open -R`、Windows `explorer /select,`、Linux `xdg-open`）を呼ぶ。開けなければ失敗を
    SnackBar で知らせる。
@@ -34,6 +34,8 @@ PNG エクスポート（#43）は `getDownloadsDirectory()` へ書いていた�
 - **保存ダイアログ（`getSaveLocation`）**: 保存先が確実に見え、上書きも OS が確認する。しかし書き出しの
   たびに選択が要り、アイコン 1 タップで出せる現行の使い勝手が落ちる。user-selected の read-write
   entitlement へ変える必要もあった。Issue も第一案として Downloads entitlement を挙げていた。
+  **#162 の追記**: 既定は変えず、保存先の問題（フォルダなし・書き込み不可・空き容量不足）で失敗したときだけ、
+  失敗 SnackBar の「保存場所を選ぶ」から保存ダイアログを出す（`user-selected.read-write` を追加）。選ばれた名前に `.png` が無ければ足し、足した場合は既存を上書きしない。
 - **ドキュメントフォルダ固定**: 追加の entitlement は要らないが、コンテナ内に入ってユーザーに見えない
   のは同じ（と推定。未検証）。
 - **`url_launcher` 等でフォルダを開く**: 新規依存が要る。OS コマンドで足りる。

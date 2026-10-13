@@ -512,9 +512,100 @@ Future<String> savePngInto(
 /// に入れてある（#64）。同名ファイルは
 /// 上書きせず連番にする（[writeBytesWithoutOverwrite]）。
 Future<String> savePng(Uint8List bytes, String filename) async {
-  final dir = (await getDownloadsDirectory()) ??
-      (await getApplicationDocumentsDirectory());
+  Directory? dir;
+  try {
+    dir = (await getDownloadsDirectory()) ??
+        (await getApplicationDocumentsDirectory());
+  } on MissingPlatformDirectoryException {
+    dir = null;
+  }
+  if (dir == null) throw const ExportNoTargetDirectoryException();
   return savePngInto(dir, bytes, filename);
+}
+
+/// 保存先フォルダが無い（OS が既定の保存先を返さない・フォルダが存在しない）。
+class ExportNoTargetDirectoryException implements Exception {
+  const ExportNoTargetDirectoryException();
+
+  @override
+  String toString() => 'ExportNoTargetDirectoryException';
+}
+
+/// PNG へのエンコードに失敗した（結果が得られない・エンコーダが例外を投げた）。
+class ExportEncodeException implements Exception {
+  const ExportEncodeException([this.cause]);
+
+  final Object? cause;
+
+  @override
+  String toString() => 'ExportEncodeException($cause)';
+}
+
+/// 書き出し失敗の種類（#162）。UI はこれで文言と「保存場所を選ぶ」の出し分けをする。
+enum ExportFailureKind {
+  /// 保存先フォルダが無い。
+  noTargetDirectory,
+
+  /// 保存先に書き込めない（権限・読み取り専用など）。
+  notWritable,
+
+  /// ディスクの空きが無い。
+  diskFull,
+
+  /// PNG へのエンコードに失敗。
+  encodeFailed,
+
+  /// 上のどれでもない。
+  other,
+}
+
+/// 書き出しの例外を [ExportFailureKind] に分類する。pure（I/O なし、#162）。
+///
+/// [FileSystemException] は OS のエラー番号で見る。番号の体系が OS で違うので
+/// [isWindows] で分ける。POSIX: ENOENT 2 は保存先なし、EPERM 1 / EACCES 13 /
+/// EROFS 30 は書き込めない、ENOSPC 28 は空き容量なし。Windows: 2・3 は保存先なし、
+/// 5・19 は書き込めない、39（ERROR_HANDLE_DISK_FULL）・112（ERROR_DISK_FULL）は
+/// 空き容量なし。番号が取れない・知らない番号は [ExportFailureKind.other]。
+ExportFailureKind classifyExportError(Object error, {bool? isWindows}) {
+  if (error is ExportNoTargetDirectoryException ||
+      error is MissingPlatformDirectoryException) {
+    return ExportFailureKind.noTargetDirectory;
+  }
+  if (error is ExportEncodeException) return ExportFailureKind.encodeFailed;
+  if (error is FileSystemException) {
+    final code = error.osError?.errorCode;
+    if (code == null) return ExportFailureKind.other;
+    final windows = isWindows ?? Platform.isWindows;
+    final (noDir, denied, full) = windows
+        ? (const {2, 3}, const {5, 19}, const {39, 112})
+        : (const {2}, const {1, 13, 30}, const {28});
+    if (noDir.contains(code)) return ExportFailureKind.noTargetDirectory;
+    if (denied.contains(code)) return ExportFailureKind.notWritable;
+    if (full.contains(code)) return ExportFailureKind.diskFull;
+  }
+  return ExportFailureKind.other;
+}
+
+/// 保存ダイアログで選ばれた [path] の拡張子が `.png`（大文字小文字は問わない）で
+/// なければ `.png` を足す。pure（#162）。
+String ensurePngExtension(String path) =>
+    path.toLowerCase().endsWith('.png') ? path : '$path.png';
+
+/// ユーザーが選んだ [path] へ [bytes] を書く（保存ダイアログ経由、#162）。
+/// ダイアログが上書き確認を済ませているので、選ばれたパスが `.png` で終わるときは
+/// 上書きする。`.png` を足した場合は、ダイアログが確認していない別名のファイルなので
+/// 既存を上書きせず連番にする（[writeBytesWithoutOverwrite]）。規律3: I/O はここ。
+Future<String> writePngToPath(String path, Uint8List bytes) async {
+  final withExt = ensurePngExtension(path);
+  if (withExt == path) {
+    final file = File(path);
+    await file.writeAsBytes(bytes, flush: true);
+    return resolvePathOrSelf(file.path);
+  }
+  final target = File(withExt);
+  final name = target.uri.pathSegments.last;
+  final written = await writeBytesWithoutOverwrite(target.parent, bytes, name);
+  return resolvePathOrSelf(written);
 }
 
 /// [revealCommandFor] のコマンドをどう実行し、何を成功とみなすか。

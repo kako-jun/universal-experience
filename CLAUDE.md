@@ -36,7 +36,7 @@ lib/
 │   ├── color_vision_compare.dart    # 色覚 4 型の 2×2 比較で並べる型（カタログ順・実験的を除く）と
 │   │                                 # 切替を出す条件（色覚層があるとき。colorVisionLayerOf）・セルのフィルタ（#84）・
 │   │                                 # 他の層の土台と色覚の強度（colorVisionCompareInputOf、#122）
-│   ├── export_service.dart          # PNG エクスポート（メタ焼き込み・「シミュレーション（近似）」と実験的フィルタの注記の焼き込み #80・Downloads へ非上書き保存・フォルダで表示、#43/#64）。2×2 比較の書き出し用に composeCompareGrid（#84）。複数層はキャプションを層ごとの行にし（ExportCaption.layered）、ファイル名の症状 id は exportSymptomId（適用順・48 文字上限・`-plusN`、#121）
+│   ├── export_service.dart          # PNG エクスポート（メタ焼き込み・「シミュレーション（近似）」と実験的フィルタの注記の焼き込み #80・Downloads へ非上書き保存・フォルダで表示、#43/#64。失敗の分類 classifyExportError・ExportFailureKind と、選んだパスへの書き込み writePngToPath、#162）。2×2 比較の書き出し用に composeCompareGrid（#84）。複数層はキャプションを層ごとの行にし（ExportCaption.layered）、ファイル名の症状 id は exportSymptomId（適用順・48 文字上限・`-plusN`、#121）
 │   ├── experience_source.dart       # 体験プリセットの供給源 seam・availableExperiences・
 │   │                                 # isValidExperiencePreset（永続化した選択の検証、#65）
 │   ├── filter_list_selection.dart   # 統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行。行はカタログ id + 別名 id）の
@@ -86,6 +86,8 @@ lib/
     │                                 # strength_caution（強度スライダの上限付近の印・注記、#66）,
     │                                 # filter_provenance（モデルと出典・表現できないこと、#80）,
     │                                 # experimental_badge（「実験的」バッジ、#80）,
+    │                                 # export_feedback（書き出しの成功/失敗の通知・パスをコピー・保存場所を選ぶ。
+    │                                 # テスト用の差し替え口 pngSaver/folderRevealer/saveLocationPicker/pngPathWriter、#162）,
     │                                 # window_mode_panel（起動モード・最前面・クリックスルー・
     │                                 # ホットキー一覧を持つ。AppBar のダイアログで開く、#63/#72）,
     │                                 # loupe_hud（ルーペ窓モード限定の HUD。症状名・強度・
