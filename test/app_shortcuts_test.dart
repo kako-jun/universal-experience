@@ -33,6 +33,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() {
+    // ルーペ窓モードが使えない間（#156）でも、このファイルはルーペ窓モードを
+    // 前提にするため、使える設定のコントローラへ差し替える。
+    loupeWindow = LoupeWindowController(loupeModeAvailable: true);
     // 体験・メタデータ・プレビューの読み込み/適用をハーネスの fixture（Rust 非依存、
     // #127/#131）に揃える。体験プリセットの行はキー移動の対象に混ざらないよう空にする。
     installHomeScreenFixtures();

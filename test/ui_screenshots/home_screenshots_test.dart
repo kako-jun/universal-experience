@@ -288,7 +288,7 @@ void main() {
       recommendedSampleIdForFilter(visionState.selectedId),
     );
 
-    final loupe = LoupeWindowController();
+    final loupe = LoupeWindowController(loupeModeAvailable: true);
     final boundaryKey = GlobalKey();
     await tester.pumpWidget(
       RepaintBoundary(

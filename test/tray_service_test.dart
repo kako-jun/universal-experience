@@ -384,7 +384,7 @@ void main() {
       visionFilterState = VisionFilterState();
       trayService = TrayService(
         visionFilterState: visionFilterState,
-        loupeWindow: LoupeWindowController(),
+        loupeWindow: LoupeWindowController(loupeModeAvailable: true),
         iconPath: 'assets/tray/tray_icon.png',
         labels: _labels,
         tooltip: 'Universal Experience',
@@ -447,7 +447,7 @@ void main() {
       final vs = VisionFilterState();
       final trayService = TrayService(
         visionFilterState: vs,
-        loupeWindow: LoupeWindowController(),
+        loupeWindow: LoupeWindowController(loupeModeAvailable: true),
         iconPath: 'assets/tray/tray_icon.png',
         labels: _labels,
         tooltip: 'Universal Experience',
@@ -484,7 +484,7 @@ void main() {
     // 確認する。
     test('init() のあと loupeWindow の変化で listener が発火する', () async {
       SharedPreferences.setMockInitialValues({});
-      final loupeWindow = LoupeWindowController();
+      final loupeWindow = LoupeWindowController(loupeModeAvailable: true);
       final vs = VisionFilterState();
       final trayService = TrayService(
         visionFilterState: vs,
@@ -511,7 +511,7 @@ void main() {
         'loupeWindow.setAppMode/setAlwaysOnTop/setClickThrough で '
         'トレイが参照する状態が反転する（クリックハンドラが最終的に呼ぶメソッド）', () async {
       SharedPreferences.setMockInitialValues({});
-      final loupeWindow = LoupeWindowController();
+      final loupeWindow = LoupeWindowController(loupeModeAvailable: true);
       await loupeWindow.load();
       final vs = VisionFilterState();
       TrayService(
@@ -564,7 +564,7 @@ void main() {
     final vs = VisionFilterState();
     TrayService buildTray() => TrayService(
           visionFilterState: vs,
-          loupeWindow: LoupeWindowController(),
+          loupeWindow: LoupeWindowController(loupeModeAvailable: true),
           iconPath: 'assets/tray/tray_icon.png',
           labels: _labels,
           tooltip: 'ユニバーサル・エクスペリエンス',
@@ -670,7 +670,7 @@ void main() {
     TrayService build(Future<Uint8List> Function(String) loader, String icon) =>
         TrayService(
           visionFilterState: VisionFilterState(),
-          loupeWindow: LoupeWindowController(),
+          loupeWindow: LoupeWindowController(loupeModeAvailable: true),
           iconPath: icon,
           labels: _labels,
           tooltip: 'Universal Experience',

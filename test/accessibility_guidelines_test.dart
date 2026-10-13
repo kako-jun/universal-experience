@@ -221,7 +221,7 @@ void main() {
       visionFilterUrgencyEscalationProvider = (_) => const [];
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final visionState = VisionFilterState()..replaceWith('photophobia');
-      final loupe = LoupeWindowController();
+      final loupe = LoupeWindowController(loupeModeAvailable: true);
       await tester.runAsync(() => loupe.setAppMode(AppMode.loupe));
       tester.view.physicalSize = const Size(900, 300);
       tester.view.devicePixelRatio = 1.0;

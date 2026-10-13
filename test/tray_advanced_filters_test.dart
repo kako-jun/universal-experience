@@ -208,7 +208,7 @@ void main() {
           const MethodChannel('tray_manager'), null));
 
       visionState = VisionFilterState();
-      loupeWindow = LoupeWindowController();
+      loupeWindow = LoupeWindowController(loupeModeAvailable: true);
       loupeNotifications = 0;
       loupeWindow.addListener(() => loupeNotifications++);
       tray = TrayService(

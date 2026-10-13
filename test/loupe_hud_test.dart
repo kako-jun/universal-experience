@@ -44,7 +44,7 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     installVisionFilterMetadataFixture();
     visionState = VisionFilterState();
-    loupeWindow = LoupeWindowController();
+    loupeWindow = LoupeWindowController(loupeModeAvailable: true);
   });
 
   tearDown(() {
