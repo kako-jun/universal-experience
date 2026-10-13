@@ -32,9 +32,6 @@ import 'ui/widgets/loupe_hud.dart';
 /// 透過/最前面/クリックスルーの責務を持つ (詳細は docs/ARCHITECTURE.md)。
 final LoupeWindowController loupeWindow = LoupeWindowController();
 
-// UniversalExperienceApp の同名フィールドに隠れる場所から参照するための別名。
-final LoupeWindowController _globalLoupeWindow = loupeWindow;
-
 /// トレイとウィンドウ UI で共有する VisionFilterState（プレビューの選択の
 /// 唯一の正本、#60, #124）。色覚のクイック選択も advanced も体験プリセットも、
 /// トレイ・ウィンドウ内どちらから選んでも同じインスタンスを更新する必要があるため、
@@ -432,7 +429,7 @@ class UniversalExperienceApp extends StatelessWidget {
     required this.settings,
     this.trayAvailable = false,
     this.hotkeyStatus = const HotkeyStatus(),
-    this.loupeWindow,
+    this.loupeWindowOverride,
   });
 
   /// Pre-loaded settings service (theme mode / last filter type / locale).
@@ -450,11 +447,11 @@ class UniversalExperienceApp extends StatelessWidget {
   /// ルーペ窓のコントローラ。省略時はトップレベルの [loupeWindow]。ルーペ窓
   /// モードが使えない間（#156）にそのモードを前提とするテストが、使える設定の
   /// コントローラを渡すための差し込み口（本番では渡さない）。
-  final LoupeWindowController? loupeWindow;
+  final LoupeWindowController? loupeWindowOverride;
 
   @override
   Widget build(BuildContext context) {
-    final loupeWindowController = loupeWindow ?? _globalLoupeWindow;
+    final loupeWindowController = loupeWindowOverride ?? loupeWindow;
     return MultiProvider(
       providers: [
         // SettingsService is created+loaded in main() so the first frame uses

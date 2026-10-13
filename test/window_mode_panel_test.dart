@@ -68,8 +68,8 @@ void main() {
     await tester.runAsync(() => testLoupe.setAppMode(AppMode.loupe));
 
     // 引数省略 = 既定コンストラクタ（trayAvailable: false, hotkeyStatus: 空）。
-    await tester.pumpWidget(
-        UniversalExperienceApp(settings: settings, loupeWindow: testLoupe));
+    await tester.pumpWidget(UniversalExperienceApp(
+        settings: settings, loupeWindowOverride: testLoupe));
     await tester.pump();
     final dialog = await openWindowModeDialog(tester);
 
@@ -118,8 +118,8 @@ void main() {
 
     final settings = await preparedSettings();
 
-    await tester.pumpWidget(
-        UniversalExperienceApp(settings: settings, loupeWindow: testLoupe));
+    await tester.pumpWidget(UniversalExperienceApp(
+        settings: settings, loupeWindowOverride: testLoupe));
     await tester.pump();
     final dialog = await openWindowModeDialog(tester);
 
@@ -143,8 +143,8 @@ void main() {
     testLoupe = LoupeWindowController();
     final settings = await preparedSettings();
 
-    await tester.pumpWidget(
-        UniversalExperienceApp(settings: settings, loupeWindow: testLoupe));
+    await tester.pumpWidget(UniversalExperienceApp(
+        settings: settings, loupeWindowOverride: testLoupe));
     await tester.pump();
     final dialog = await openWindowModeDialog(tester);
 
@@ -177,7 +177,7 @@ void main() {
     await tester.runAsync(() => testLoupe.setAppMode(AppMode.loupe));
 
     await tester.pumpWidget(UniversalExperienceApp(
-      loupeWindow: testLoupe,
+      loupeWindowOverride: testLoupe,
       settings: settings,
       trayAvailable: true,
       hotkeyStatus: const HotkeyStatus(),
@@ -204,7 +204,7 @@ void main() {
     await tester.runAsync(() => testLoupe.setAppMode(AppMode.loupe));
 
     await tester.pumpWidget(UniversalExperienceApp(
-      loupeWindow: testLoupe,
+      loupeWindowOverride: testLoupe,
       settings: settings,
       trayAvailable: false,
       hotkeyStatus: const HotkeyStatus(

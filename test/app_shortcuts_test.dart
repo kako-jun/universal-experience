@@ -62,8 +62,8 @@ void main() {
     final settings = SettingsService();
     await settings.load();
 
-    await tester.pumpWidget(
-        UniversalExperienceApp(settings: settings, loupeWindow: testLoupe));
+    await tester.pumpWidget(UniversalExperienceApp(
+        settings: settings, loupeWindowOverride: testLoupe));
     await tester.pump();
   }
 
