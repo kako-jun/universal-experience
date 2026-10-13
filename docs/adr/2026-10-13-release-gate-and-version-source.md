@@ -52,6 +52,6 @@
 
 ## 関連 Issue・PR・docs
 
-- Issue #158（本件）、#160（リリース配布の整備）
+- Issue #158（本件）、#160（Windows 対応と Releases 配布の ADR）
 - PR #165
 - `CLAUDE.md`「リリース手順」、`.github/workflows/release.yml`、`.github/workflows/ci.yml`
