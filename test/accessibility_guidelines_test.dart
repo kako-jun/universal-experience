@@ -26,6 +26,7 @@ import 'package:universal_experience/src/rust/api/sensus_bridge.dart'
 import 'package:universal_experience/ui/widgets/loupe_hud.dart';
 import 'package:universal_experience/ui/theme/app_theme.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
+import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 
 import 'support/home_screen_harness.dart';
 import 'support/sample_image_generator.dart';

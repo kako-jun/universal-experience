@@ -8,6 +8,7 @@ import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart'
     show VisionStep;
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
+import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 import 'package:universal_experience/ui/widgets/color_vision_compare_view.dart';
 import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 

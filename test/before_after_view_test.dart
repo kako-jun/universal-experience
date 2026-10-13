@@ -12,6 +12,7 @@ import 'package:universal_experience/services/export_service.dart';
 import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
+import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 import 'package:universal_experience/ui/widgets/export_feedback.dart';
 
 import 'support/sample_image_generator.dart';

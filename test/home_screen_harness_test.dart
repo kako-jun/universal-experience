@@ -23,6 +23,7 @@ import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/services/vision_filter_snapshot.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
+import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
 import 'support/color_vision_select.dart';

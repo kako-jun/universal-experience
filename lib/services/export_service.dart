@@ -806,3 +806,28 @@ enum _Style {
     }
   }
 }
+
+/// [composed]（[exportImageComposer] などの戻り値）を PNG にエンコードし、
+/// **[composed] を破棄する**（エンコードの成否にかかわらず）。エンコード結果が
+/// 得られなければ [StateError]。
+Future<Uint8List> encodePngAndDispose(ui.Image composed) async {
+  Uint8List? bytes;
+  try {
+    bytes = await encodeImagePng(composed);
+  } catch (e) {
+    throw ExportEncodeException(e);
+  } finally {
+    composed.dispose();
+  }
+  if (bytes == null) {
+    throw const ExportEncodeException();
+  }
+  return bytes;
+}
+
+/// Encodes a [ui.Image] to PNG bytes. テストが描画済みの after 画像が空でないことを、
+/// ウィジェットの内部に依存せず確かめるのにも使う。
+Future<Uint8List?> encodeImagePng(ui.Image image) async {
+  final data = await image.toByteData(format: ui.ImageByteFormat.png);
+  return data?.buffer.asUint8List();
+}

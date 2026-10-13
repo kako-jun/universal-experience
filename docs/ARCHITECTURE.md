@@ -981,6 +981,15 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   （→ `CpuVisionRenderer.pipelineApplier`。テストはこちらを差し替える）で 1 回の合成として適用する。
   空の列は描画器を呼ばず原画を返す。層が 0〜1 のときは従来の単一フィルタの経路のままで、
   最新優先の `_generation` はどちらの経路でも同じ。見出しは複数層で名前の要約（#120）、書き出しは層ごとの行（#121）
+- 書き出しの計画とエンコード・プレビュー描画の共有（#159）: キャプションの解決（`buildExportCaption` /
+  `buildLayeredExportCaption`）と書き出しの計画（`planExport`）は `lib/services/export_plan.dart`、PNG のエンコード
+  （`encodePngAndDispose` / `encodeImagePng`）は `export_service.dart` に置く（ウィジェットは段取りを持たない）。
+  プレビュー描画の差し替え口（`previewSourceImageLoader` / `afterImageRenderer` / `exportImageComposer`）・
+  呼び出し口（`loadPreviewImage` / `renderPreviewAfter` / `composeCaptionedExportImage`）・既定の実体
+  （`loadDefaultPreviewSourceImage` / `renderDefaultAfter` / `renderDefaultAfterPipeline`）・正準サイズ
+  `kCanonicalSampleSize`・`PreviewImageView` / `PreviewErrorPlaceholder` は `ui/widgets/preview_rendering.dart`
+  にあり、`BeforeAfterView` と `ColorVisionCompareView` はこれを共有する（後者は `before_after_view.dart` を import しない。
+  `BeforeAfterView.loadPreviewSourceImage` / `renderAfter` / `renderAfterPipeline` / `canonicalSampleSize` は既定の実体への薄い委譲で残す）
 - `BeforeAfterView`（`lib/ui/widgets/before_after_view.dart`）: before/after
   プレビューペイン。横並びのとき、画像 1 枚の一辺は `maxPaneSide`（呼び出し側が高さから決める、#130）を
   上限にでき、超える幅では 2 枚を中央に寄せる（縦積みでは使わない）。#85 で、ペインの論理サイズ・
@@ -1011,7 +1020,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   まだ無ければ `widget.strength`）から作り、再描画中に新しい強さが古い画像に被らない。失敗したセルは
   「描画に失敗しました」の文言に切り替わる。新しい描画が控えている間（`_rebuildPending`）の失敗は
   表示せず、最新の入力の描画が失敗したときだけ失敗を出す（スライダー操作中の点滅防止）。
-  書き出しは各セルを `buildExportCaption` + `composeExportImage`（単独の書き出しと同じキャプション）で
+  書き出しは各セルを `buildExportCaption`（`lib/services/export_plan.dart`）+ `composeExportImage`（単独の書き出しと同じキャプション）で
   焼き込み、`composeCompareGrid`（`export_service.dart`。配置は pure な `compareGridLayout`）で
   1 枚に並べる。キャプションは描画時点の強さから作り、保存・通知・失敗の扱いは
   `saveExportPng` / `showExportSuccess` / `showExportFailure`（`BeforeAfterView` の書き出しと共通）を使う。
@@ -1041,7 +1050,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   GPU golden テストが（production の呼び出しとは独立に）担保する
 - 複数層の書き出し（#121）: `BeforeAfterView` は画像を描画した時点の層の列を `ExportLayer`
   （`lib/services/export_layers.dart`。層・構築済みフィルタ・強度）として控え、書き出しはその控えから
-  `planExport` でキャプション（`ExportCaption.layered`）・症状 id・強度を作る（呼び出し時点の選択は
+  `planExport`（`lib/services/export_plan.dart`。UI に依存しない純粋ロジックで、2×2 比較とも共有）でキャプション（`ExportCaption.layered`）・症状 id・強度を作る（呼び出し時点の選択は
   見ない）。画像に効いている層（強度 > 0 の `effectiveExportLayers`。判定はキャプションに出す整数パーセント
   `strengthPercent` で、0.004 のように「0%」と出る強度も数えない）ごとに「症状名 + 強度」の行を
   適用順に並べ、受診喚起は `consultInputForFilters` の併合（最大の緊急度・escalation は段ごとに重複除去）
