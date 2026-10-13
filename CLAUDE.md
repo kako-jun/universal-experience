@@ -351,15 +351,15 @@ UI を変える場合は先に `DESIGN.md` を読む（色は `colorScheme` の�
 Flutter golden を生成プラットフォームと揃えるため）が push/PR（main）で
 flutter analyze / flutter test / `rust/` の cargo fmt --check /
 clippy --all-targets -D warnings / cargo test / flutter build macos --debug /
-実ブリッジ integration test（`flutter test integration_test/<file> -d macos` を4ファイル分、後述。#55。
+実ブリッジ integration test（`flutter test integration_test/<file> -d macos` を5ファイル分、後述。#55。
 複数ファイルを1回の `flutter test integration_test` 呼び出しにまとめるとデスクトップでは
 2番目以降のアプリ起動が失敗するため個別に実行する）を回す。cargokit 統合（#55）により
 `flutter build macos` が rust/ crate のビルドも兼ねるため、Setup Rust は Flutter
 build より前に置く。rust 依存は crates.io のみ（sensus-core）なので、private
 依存を git 経由で引く場合に要る deploy key / ssh-agent 設定は不要。
 
-実ブリッジ integration test は `integration_test/` の4ファイル（`experience_presets_smoke_test` /
-`app_bootstrap_test` / `cpu_preview_all_filters_test` / `vision_filter_urgency_parity_test`）を、
+実ブリッジ integration test は `integration_test/` の5ファイル（`experience_presets_smoke_test` /
+`app_bootstrap_test` / `cpu_preview_all_filters_test` / `vision_filter_urgency_parity_test` / `tunnel_vision_threshold_drift_test`）を、
 macOS（`check`）・Linux（`linux-build`、xvfb）・Windows（`windows-build`）のそれぞれで
 ファイルごとに1コマンドずつ実行する（#158）。
 ci.yml は `workflow_call` でも呼べる（release.yml が使う）。

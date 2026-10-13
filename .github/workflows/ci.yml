@@ -70,6 +70,10 @@ jobs:
       - name: Flutter integration test (windows, vision_filter_urgency_parity_test)
         run: flutter test integration_test/vision_filter_urgency_parity_test.dart -d windows
 
+      # tunnel_vision の警告閾値 0.8 が依拠する sensus の可視半径の式を実測で固定（#161）。
+      - name: Flutter integration test (windows, tunnel_vision_threshold_drift_test)
+        run: flutter test integration_test/tunnel_vision_threshold_drift_test.dart -d windows
+
       - name: Upload Windows debug bundle
         uses: actions/upload-artifact@v4
         with:
@@ -244,6 +248,10 @@ jobs:
       - name: Flutter integration test (macos, vision_filter_urgency_parity_test)
         run: flutter test integration_test/vision_filter_urgency_parity_test.dart -d macos
 
+      # tunnel_vision の警告閾値 0.8 が依拠する sensus の可視半径の式を実測で固定（#161）。
+      - name: Flutter integration test (macos, tunnel_vision_threshold_drift_test)
+        run: flutter test integration_test/tunnel_vision_threshold_drift_test.dart -d macos
+
   # Linux でも cargokit (#55) が rust/ crate を実際にビルドして同梱することを
   # 検証する。macOS の `check` job は golden テスト用に必須だが、Linux 側の
   # 同梱経路（linux/CMakeLists.txt の apply_cargokit、rpath $ORIGIN/lib）は
@@ -344,3 +352,7 @@ jobs:
       # 経由で sensus-core の値と一致することを確認する（macOS 側と対）。
       - name: Flutter integration test (linux, vision_filter_urgency_parity_test)
         run: xvfb-run -a flutter test integration_test/vision_filter_urgency_parity_test.dart -d linux
+
+      # tunnel_vision の警告閾値 0.8 が依拠する sensus の可視半径の式を実測で固定（#161）。
+      - name: Flutter integration test (linux, tunnel_vision_threshold_drift_test)
+        run: xvfb-run -a flutter test integration_test/tunnel_vision_threshold_drift_test.dart -d linux
