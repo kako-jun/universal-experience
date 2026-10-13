@@ -870,7 +870,8 @@ ShaderFilter    (lib/rendering/) — Impeller FragmentProgram。将来のライ�
 `rust/` crate は `rust_builder/`（cargokit 統合、#55）経由でビルドされ、
 macOS / Linux / Windows アプリに同梱される。Windows は FFI plugin の CMake が
 `apply_cargokit` で Rust DLL を作り、標準 runner が exe と同じ場所へ同梱する（#149）。
-CI は x64 debug bundle の DLL 存在確認と artifact 保存を行う。画面・トレイ・
+CI は x64 debug bundle の DLL 存在確認・実ブリッジ integration test（#158）・
+artifact 保存を行う。画面・トレイ・
 ホットキー・クリップボード・PNG書き出しの実機確認は残る。
 `lib/main.dart` の `buildRootApp()`（#55 で `main()` から
 切り出したルート Widget 組み立て関数）が `runApp`

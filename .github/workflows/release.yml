@@ -12,7 +12,35 @@ permissions:
   contents: write
 
 jobs:
+  # 赤い CI のタグを公開しないための関門（#158）。ci.yml（workflow_call）が全 OS の
+  # 実ブリッジ integration test まで回す。ビルド系 job はすべてこれに依存する。
+  ci:
+    uses: ./.github/workflows/ci.yml
+    # CI は checkout / upload-artifact / cache しか使わないので read で足りる。
+    permissions:
+      contents: read
+
+  # タグ vX.Y.Z が pubspec.yaml の version（+build は無視）と rust/Cargo.toml の
+  # version に一致しなければ公開しない。
+  version-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify tag matches pubspec.yaml and rust/Cargo.toml
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pubspec=$(sed -nE 's/^version: *([0-9]+\.[0-9]+\.[0-9]+)(\+.*)?$/\1/p' pubspec.yaml | head -n1)
+          lock=$(awk '/^name = "universal_experience_rust"$/ {getline; gsub(/version = |"/, ""); print; exit}' rust/Cargo.lock)
+          cargo=$(sed -nE 's/^version = "([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p' rust/Cargo.toml | head -n1)
+          echo "tag=$tag pubspec=$pubspec cargo=$cargo lock=$lock"
+          test -n "$pubspec" && test -n "$cargo" && test -n "$lock"
+          if [ "$tag" != "$pubspec" ] || [ "$tag" != "$cargo" ] || [ "$tag" != "$lock" ]; then
+            echo "::error::tag v$tag, pubspec.yaml $pubspec, rust/Cargo.toml $cargo, rust/Cargo.lock $lock must all match"
+            exit 1
+          fi
+
   build-macos:
+    needs: [ci, version-check]
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
@@ -50,6 +78,7 @@ jobs:
           if-no-files-found: error
 
   build-linux:
+    needs: [ci, version-check]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -88,6 +117,7 @@ jobs:
           if-no-files-found: error
 
   build-windows:
+    needs: [ci, version-check]
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -130,10 +160,22 @@ jobs:
     needs: [build-macos, build-linux, build-windows]
     runs-on: ubuntu-latest
     steps:
-      - name: Download release assets
+      # ci job が保存する Windows debug bundle を拾わないよう、配布物だけ名前で取る。
+      - name: Download macOS release asset
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          name: universal-experience-macos
+          path: artifacts/universal-experience-macos
+      - name: Download Linux release asset
+        uses: actions/download-artifact@v4
+        with:
+          name: universal-experience-linux-x64
+          path: artifacts/universal-experience-linux-x64
+      - name: Download Windows release asset
+        uses: actions/download-artifact@v4
+        with:
+          name: universal-experience-windows-x64
+          path: artifacts/universal-experience-windows-x64
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:

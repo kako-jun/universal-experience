@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # release.yml が vX.Y.Z タグの公開前にこの CI 一式を呼ぶ（#158）。
+  # concurrency の group は呼び出し元（Release）の workflow 名と ref で決まるため、
+  # push/PR 用の CI とは衝突しない。secrets は使っていないので引き継ぎ不要。
+  workflow_call:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -49,6 +53,22 @@ jobs:
               throw "Missing Windows bundle file: $file"
             }
           }
+
+      # 実ブリッジ integration test を Windows でも走らせる（#158）。DLL が同梱
+      # されているだけでは、ロード・初期化できることは証明されない（macOS / Linux
+      # の job と対）。複数ファイルを 1 回の呼び出しに渡すと 2 番目以降の起動が
+      # 失敗するため、macOS / Linux と同じくファイルごとに分ける。
+      - name: Flutter integration test (windows, experience_presets_smoke_test)
+        run: flutter test integration_test/experience_presets_smoke_test.dart -d windows
+
+      - name: Flutter integration test (windows, app_bootstrap_test)
+        run: flutter test integration_test/app_bootstrap_test.dart -d windows
+
+      - name: Flutter integration test (windows, cpu_preview_all_filters_test)
+        run: flutter test integration_test/cpu_preview_all_filters_test.dart -d windows
+
+      - name: Flutter integration test (windows, vision_filter_urgency_parity_test)
+        run: flutter test integration_test/vision_filter_urgency_parity_test.dart -d windows
 
       - name: Upload Windows debug bundle
         uses: actions/upload-artifact@v4

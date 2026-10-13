@@ -123,8 +123,11 @@ flutter build macos --release
 flutter build linux --release
 ```
 
-`vX.Y.Z` タグを push すると Release workflow が既存のデスクトップ対応 OS の
-配布物を検証し、同じ GitHub Release に公開します。
+`vX.Y.Z` タグを push すると Release workflow が、まず CI 一式（ci.yml）とタグ・
+`pubspec.yaml`・`rust/Cargo.toml` の版の一致を確かめ、通ったときだけ既存の
+デスクトップ対応 OS の配布物をビルド・検証して同じ GitHub Release に公開します。
+タグを打つ前に `pubspec.yaml` の `version`（+build は無視）と `rust/Cargo.toml` の
+`version` を同じ X.Y.Z に揃えてください。
 
 - Windows x64: `universal-experience-windows-x64.zip`。展開後は DLL と `data/` を
   同じ場所に保ち、`universal_experience.exe` を起動します。

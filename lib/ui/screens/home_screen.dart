@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
@@ -60,6 +61,10 @@ double previewPaneSideFor(double viewportHeight) =>
 
 /// 狭幅で一覧が使う高さ（一覧は内側でスクロールする）。
 const double _kNarrowBrowserHeight = 560;
+
+/// 「このアプリについて」に出す版の供給源。test は差し替える（#158）。
+Future<String> Function() appVersionLoader =
+    () async => (await PackageInfo.fromPlatform()).version;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -479,12 +484,20 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showAboutDialog(BuildContext context) {
+  Future<void> _showAboutDialog(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
+    // 版は pubspec.yaml の version を実行時に読む（ハードコードしない、#158）。
+    // +build 番号は表示に含めない。
+    // 取得に失敗しても About 自体は開く（版は空のまま）。
+    String version = '';
+    try {
+      version = await appVersionLoader();
+    } catch (_) {}
+    if (!context.mounted) return;
     showAboutDialog(
       context: context,
       applicationName: l10n.appTitle,
-      applicationVersion: '0.1.0',
+      applicationVersion: version,
       applicationIcon: const Icon(Icons.accessibility_new, size: 48),
       children: [
         Text(l10n.aboutBody),
