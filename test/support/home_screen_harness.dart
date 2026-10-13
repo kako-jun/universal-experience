@@ -96,8 +96,8 @@ void installHomeScreenFixtures() {
 void resetHomeScreenFixtures() {
   experiencesProvider = experiences;
   resetVisionFilterMetadataProviders();
-  previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
-  afterImageRenderer = BeforeAfterView.renderAfter;
+  previewSourceImageLoader = loadDefaultPreviewSourceImage;
+  afterImageRenderer = renderDefaultAfter;
   CpuVisionRenderer.pipelineApplier = CpuVisionRenderer.applyPipeline;
 }
 

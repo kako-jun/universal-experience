@@ -988,8 +988,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   呼び出し口（`loadPreviewImage` / `renderPreviewAfter` / `composeCaptionedExportImage`）・既定の実体
   （`loadDefaultPreviewSourceImage` / `renderDefaultAfter` / `renderDefaultAfterPipeline`）・正準サイズ
   `kCanonicalSampleSize`・`PreviewImageView` / `PreviewErrorPlaceholder` は `ui/widgets/preview_rendering.dart`
-  にあり、`BeforeAfterView` と `ColorVisionCompareView` はこれを共有する（後者は `before_after_view.dart` を import しない。
-  `BeforeAfterView.loadPreviewSourceImage` / `renderAfter` / `renderAfterPipeline` / `canonicalSampleSize` は既定の実体への薄い委譲で残す）
+  にあり、`BeforeAfterView` と `ColorVisionCompareView` はこれを共有する（後者は `before_after_view.dart` を import しない）
 - `BeforeAfterView`（`lib/ui/widgets/before_after_view.dart`）: before/after
   プレビューペイン。横並びのとき、画像 1 枚の一辺は `maxPaneSide`（呼び出し側が高さから決める、#130）を
   上限にでき、超える幅では 2 枚を中央に寄せる（縦積みでは使わない）。#85 で、ペインの論理サイズ・
@@ -1028,7 +1027,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   色覚層の有無（`colorVisionLayerOf`）・色覚層の強度・土台（色覚以外の強度 > 0 の層を状態の順に、
   `VisionStep` と `ExportLayer` の両方）を決める。色覚層が無ければ null（切替を出さない）。bypass 中は強度 0 で土台なし。
   `ColorVisionCompareView` は `baseSteps` / `baseLayers` を受け取り、`_rebuild` の先頭で
-  `BeforeAfterView.renderAfterPipeline` を **1 回だけ**呼んで土台を作り（空なら原画）、4 セルは土台の複製に色覚 1 段を適用する。
+  `renderDefaultAfterPipeline` を **1 回だけ**呼んで土台を作り（空なら原画）、4 セルは土台の複製に色覚 1 段を適用する。
   土台は「steps・元画像・サイズ」をキーに保持し、色覚の強度だけが動いたときは作り直さない（層・強度・パラメータが
   変わると `didUpdateWidget` が再構築し、既存の直列・最新優先に乗る）。描画時点の値（強さ・土台の層）は控え
   （`_afterStrength` / `_afterBaseLayers`）に固定し、書き出し（キャプションの症状名行・ファイル名）はその控えから作るので

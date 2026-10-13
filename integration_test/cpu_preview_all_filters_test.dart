@@ -21,7 +21,7 @@ import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
 import 'package:universal_experience/services/native_bridge_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
-import 'package:universal_experience/ui/widgets/before_after_view.dart';
+import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 
 import '../test/support/sample_image_generator.dart';
 
@@ -51,7 +51,7 @@ void main() {
         // 原色スウォッチ）を共有する。輝度の高い領域を含むため、閾値依存の
         // フィルタ（starbursts 等）も strength=1.0 で効果が現れる。
         //
-        // サイズは production と同じ [BeforeAfterView.canonicalSampleSize]
+        // サイズは production と同じ [kCanonicalSampleSize]
         // （#85）を使う。sensus の disk blur 系
         // （myopia/hyperopia/presbyopia/astigmatism）は半径を「画像サイズ ×
         // 固定比率」で決め、半径が 1px 未満だと楕円カーネルが中心 1 点のみに
@@ -63,16 +63,16 @@ void main() {
         // canonical サイズ自体を大きく下げたりすると再び no-op になり得る点は
         // 変わらないので、この定数に依存していることを忘れないこと。
         final src = await generateSampleImage(
-          BeforeAfterView.canonicalSampleSize,
+          kCanonicalSampleSize,
         );
         addTearDown(src.dispose);
 
         final out = await CpuVisionRenderer.apply(src, filter!, 1.0);
         addTearDown(out.dispose);
 
-        expect(out.width, BeforeAfterView.canonicalSampleSize,
+        expect(out.width, kCanonicalSampleSize,
             reason: entry.id);
-        expect(out.height, BeforeAfterView.canonicalSampleSize,
+        expect(out.height, kCanonicalSampleSize,
             reason: entry.id);
 
         final srcPixels = await CpuVisionRenderer.imageToRgba8(src);
@@ -90,7 +90,7 @@ void main() {
   group('CpuVisionRenderer.apply(): protanopia の数値的な健全性', () {
     testWidgets('strength=0.0 は原画とバイト単位で一致する', (tester) async {
       final src = await generateSampleImage(
-        BeforeAfterView.canonicalSampleSize,
+        kCanonicalSampleSize,
       );
       addTearDown(src.dispose);
 
@@ -109,7 +109,7 @@ void main() {
 
     testWidgets('strength=1.0 と strength=0.6 は出力が異なる', (tester) async {
       final src = await generateSampleImage(
-        BeforeAfterView.canonicalSampleSize,
+        kCanonicalSampleSize,
       );
       addTearDown(src.dispose);
 
@@ -134,7 +134,7 @@ void main() {
 
     testWidgets('strength=1.0 で変化したピクセルの割合が下限を超える', (tester) async {
       final src = await generateSampleImage(
-        BeforeAfterView.canonicalSampleSize,
+        kCanonicalSampleSize,
       );
       addTearDown(src.dispose);
 

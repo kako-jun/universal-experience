@@ -63,7 +63,7 @@ const ui.Color kImageFitLetterboxColor = ui.Color(0xFF808080);
 
 /// Decodes arbitrary encoded image bytes (PNG/JPEG/etc., whatever
 /// `dart:ui`'s codec supports) into a [ui.Image]. Shared by
-/// `BeforeAfterView.loadPreviewSourceImage` (sample assets, #78) and the
+/// `loadDefaultPreviewSourceImage` (sample assets, #78) and the
 /// user image picker/drop handlers (`lib/ui/widgets/image_source_picker.dart`)
 /// so the decode step has one implementation. The caller owns and must
 /// dispose the returned image.

@@ -47,8 +47,8 @@ void main() {
   setUp(installVisionFilterMetadataFixture);
   tearDown(() {
     resetVisionFilterMetadataProviders();
-    previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
-    afterImageRenderer = BeforeAfterView.renderAfter;
+    previewSourceImageLoader = loadDefaultPreviewSourceImage;
+    afterImageRenderer = renderDefaultAfter;
     exportImageComposer = composeExportImage;
     pngSaver = savePng;
     CpuVisionRenderer.pipelineApplier = CpuVisionRenderer.applyPipeline;

@@ -2,7 +2,7 @@
 //
 // - kSampleCatalog の 8 件（#99 で日本語の案内板を追加）が assets/samples/ の実ファイルとして存在し、
 //   flutter test 環境でも rootBundle 経由でデコードでき、正準サイズ
-//   （BeforeAfterView.canonicalSampleSize、1024px）の正方形であること。
+//   （kCanonicalSampleSize、1024px）の正方形であること。
 // - kRecommendedSampleByFilterId が kVisionFilterCatalog の全 30 id を過不足
 //   なくカバーし、値がすべて kSampleCatalogById に存在する既知のサンプル id
 //   であること（sample_catalog.dart の doc コメントが謳う契約）。
@@ -14,8 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/models/sample_catalog.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/rendering/image_fit.dart';
-import 'package:universal_experience/ui/widgets/before_after_view.dart'
-    show BeforeAfterView;
+import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 
 Future<ui.Image> _decodeAsset(String path) async {
   final data = await rootBundle.load(path);
@@ -55,11 +54,11 @@ void main() {
     for (final entry in kSampleCatalog) {
       test(
           '${entry.id}: assetPath がデコードでき、'
-          '正準サイズ(${BeforeAfterView.canonicalSampleSize}px)の正方形', () async {
+          '正準サイズ(${kCanonicalSampleSize}px)の正方形', () async {
         final image = await _decodeAsset(entry.assetPath);
         addTearDown(image.dispose);
-        expect(image.width, BeforeAfterView.canonicalSampleSize);
-        expect(image.height, BeforeAfterView.canonicalSampleSize);
+        expect(image.width, kCanonicalSampleSize);
+        expect(image.height, kCanonicalSampleSize);
       });
     }
 
@@ -118,8 +117,8 @@ void main() {
       final entry = kSampleCatalogById['depth_landscape']!;
       final image = await _decodeAsset(entry.depthAssetPath!);
       addTearDown(image.dispose);
-      expect(image.width, BeforeAfterView.canonicalSampleSize);
-      expect(image.height, BeforeAfterView.canonicalSampleSize);
+      expect(image.width, kCanonicalSampleSize);
+      expect(image.height, kCanonicalSampleSize);
     });
   });
 

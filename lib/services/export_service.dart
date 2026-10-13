@@ -807,9 +807,9 @@ enum _Style {
   }
 }
 
-/// [composed]（[exportImageComposer] などの戻り値）を PNG にエンコードし、
+/// [composed]（`exportImageComposer` などの戻り値）を PNG にエンコードし、
 /// **[composed] を破棄する**（エンコードの成否にかかわらず）。エンコード結果が
-/// 得られなければ [StateError]。
+/// 得られなければ [ExportEncodeException]。
 Future<Uint8List> encodePngAndDispose(ui.Image composed) async {
   Uint8List? bytes;
   try {

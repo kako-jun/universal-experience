@@ -170,8 +170,8 @@ void main() {
     tearDown(() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(SystemChannels.platform, null);
-      previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
-      afterImageRenderer = BeforeAfterView.renderAfter;
+      previewSourceImageLoader = loadDefaultPreviewSourceImage;
+      afterImageRenderer = renderDefaultAfter;
       exportImageComposer = composeExportImage;
       resetExportSeams();
       resetVisionFilterMetadataProviders();

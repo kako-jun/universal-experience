@@ -15,7 +15,7 @@ import '../../src/rust/api/sensus_bridge.dart';
 // 画像の表示部品。`BeforeAfterView`（#58/#60）と 2×2 比較（`ColorVisionCompareView`、
 // #84）が共有する。ウィジェット同士が段取りを借りないよう、共有の実体はここに置く（#159）。
 
-/// [_BeforeAfterViewState] が内部で使う「before 画像を [PreviewImageSource]
+/// `_BeforeAfterViewState` が内部で使う「before 画像を [PreviewImageSource]
 /// から読み込む」ステップの型（#78）。実体は
 /// [loadDefaultPreviewSourceImage]。widget test が世代管理
 /// （古い結果は破棄され最新だけが残ること）を検証するために、応答が遅れる
@@ -26,7 +26,7 @@ typedef PreviewSourceImageLoader = Future<ui.Image> Function(
 );
 
 /// The fixed resolution (square side, pixels) the CPU preview renders at
-/// when `sampleSize` is `null`（`BeforeAfterView.canonicalSampleSize` の実体）.
+/// when `sampleSize` is `null`（`kCanonicalSampleSize` の実体）.
 ///
 /// Rationale for a **canonical size** instead of sizing to the rendered
 /// pane × `devicePixelRatio` (the pre-#85 GPU-era behaviour, #58):
@@ -64,7 +64,7 @@ const int kCanonicalSampleSize = 1024;
 PreviewSourceImageLoader previewSourceImageLoader =
     loadDefaultPreviewSourceImage;
 
-/// [_BeforeAfterViewState] が内部で使う after 画像描画ステップの型。
+/// `_BeforeAfterViewState` が内部で使う after 画像描画ステップの型。
 ///
 /// 実体は [renderDefaultAfter]。用途は [previewSourceImageLoader] と
 /// 同じ（#58）。[filter] は `VisionFilterState.build`（#60）が組み立てた、payload 込みの

@@ -93,7 +93,7 @@ class BeforeAfterView extends StatefulWidget {
   ///
   /// `null`（既定。層が 0〜1 のとき）なら従来どおり [filter] を [strength] で適用する
   /// （[afterImageRenderer]）。非 null のときは **この列を 1 回の合成で適用**し
-  /// （[BeforeAfterView.renderAfterPipeline] → [CpuVisionRenderer.pipelineApplier]。テストでは
+  /// （[renderDefaultAfterPipeline] → [CpuVisionRenderer.pipelineApplier]。テストでは
   /// `pipelineApplier` を差し替える）、[filter] と
   /// [strength] は描画に使わない（見出し・書き出しが代表として参照する、フォーカス中の層の
   /// 値。複数層の見出しは #120、書き出しは [exportLayers] で #121）。空なら原画をそのまま見せる。
@@ -144,54 +144,6 @@ class BeforeAfterView extends StatefulWidget {
   /// for why letterbox over crop).
   final PreviewImageSource imageSource;
 
-  /// The fixed resolution (square side, pixels) the CPU preview renders at
-  /// when [sampleSize] is `null`. 理由と根拠は [kCanonicalSampleSize]。
-  static const int canonicalSampleSize = kCanonicalSampleSize;
-
-  /// Loads the canonical-size *before* image for [source] (#78): a built-in
-  /// sample scene (decoded from `assets/samples/`) or a user-loaded image.
-  /// Either way the result is fit into a `size`×`size` square via
-  /// [fitImageToSquare] (letterbox — see that function's doc), so callers
-  /// never need to special-case the source's original aspect ratio.
-  ///
-  /// For [SamplePreviewImageSource], the asset bytes are decoded into a
-  /// transient [ui.Image] that's disposed immediately after fitting (it's
-  /// never shared/cached — [fitImageToSquare] copies pixels into a brand new
-  /// image). For [UserPreviewImageSource], [UserPreviewImageSource.image] is
-  /// only *read*, never disposed here (`ImageSourceState` owns it — see
-  /// `PreviewImageSource`'s doc for the full ownership contract).
-  static Future<ui.Image> loadPreviewSourceImage(
-    PreviewImageSource source,
-    int size,
-  ) =>
-      loadDefaultPreviewSourceImage(source, size);
-
-  /// Produces the *after* image for [filter] from [source] at [strength].
-  ///
-  /// `null` [filter] (nothing selected) returns [source] unchanged (no
-  /// filter to apply) without calling the renderer. Otherwise renders through
-  /// [CpuVisionRenderer.applier] — CPU `apply()`, not the GPU shader path
-  /// (#85; GPU is kept for a future live screen-capture display, unused
-  /// today). The mapping from a UI selection (color-vision quick pick /
-  /// advanced catalog / experience preset) to a [VisionFilter] happens
-  /// upstream, in `VisionFilterState.build` (#60) — this widget never
-  /// constructs a [VisionFilter] itself.
-  static Future<ui.Image?> renderAfter(
-    ui.Image source,
-    VisionFilter? filter,
-    double strength,
-  ) =>
-      renderDefaultAfter(source, filter, strength);
-
-  /// 複数層の after 画像: [source] に [steps] を並びの順に 1 回の合成で適用する
-  /// （#119）。[steps] が空（全層が強度 0、または原画比較中）なら [source] をそのまま返し、
-  /// レンダラは呼ばない。
-  static Future<ui.Image?> renderAfterPipeline(
-    ui.Image source,
-    List<VisionStep> steps,
-  ) =>
-      renderDefaultAfterPipeline(source, steps);
-
   @override
   State<BeforeAfterView> createState() => _BeforeAfterViewState();
 }
@@ -213,7 +165,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// were generated at. `null` until the first generation completes (#58).
   /// Since pane-size-driven auto-sizing was removed, this only
   /// changes if [BeforeAfterView.sampleSize] itself changes (test-only in
-  /// practice) — production always uses [BeforeAfterView.canonicalSampleSize].
+  /// practice) — production always uses [kCanonicalSampleSize].
   int? _currentSampleSize;
 
   /// The [PreviewImageSource] (#78) that actually produced the
@@ -276,10 +228,10 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   int? _pendingRebuildSampleSize;
 
   /// The sample size to render at when [BeforeAfterView.sampleSize] isn't
-  /// explicitly set — [BeforeAfterView.canonicalSampleSize] in production;
+  /// explicitly set — [kCanonicalSampleSize] in production;
   /// tests can override via the widget's `sampleSize` constructor param.
   int get _effectiveSampleSize =>
-      widget.sampleSize ?? BeforeAfterView.canonicalSampleSize;
+      widget.sampleSize ?? kCanonicalSampleSize;
 
   @override
   void initState() {
@@ -447,7 +399,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
               renderFilter,
               renderStrength,
             )
-          : await BeforeAfterView.renderAfterPipeline(rendererInput, steps);
+          : await renderDefaultAfterPipeline(rendererInput, steps);
     } catch (e, st) {
       // こちらも同様に報告する。
       FlutterError.reportError(FlutterErrorDetails(
@@ -627,7 +579,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     final l10n = AppLocalizations.of(context)!;
 
     // The CPU preview renders at a canonical fixed size
-    // (see [BeforeAfterView.canonicalSampleSize]) regardless of the pane's
+    // (see [kCanonicalSampleSize]) regardless of the pane's
     // layout size or devicePixelRatio — LayoutBuilder here only decides
     // whether to stack the panes, it no longer drives sample-size generation
     // (the pre-#85 GPU-era `_recordPaneLayout`/auto-resize machinery, #58,

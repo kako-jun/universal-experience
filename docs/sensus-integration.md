@@ -536,7 +536,7 @@ deuteranopia/tritanopia/achromatopsia のプレビュー UI 配線、-omaly の 
 - **正準サイズでの描画**: 旧 GPU 時代（#58）はプレビューをペインの
   論理サイズ × `devicePixelRatio` に自動で追従させ、リサイズをデバウンスして
   いた。CPU プレビューではこれをやめ、常に固定の正準サイズ
-  （`BeforeAfterView.canonicalSampleSize` = 1024）で描画し、表示側で
+  （`kCanonicalSampleSize` = 1024）で描画し、表示側で
   `FilterQuality.medium` によるスケーリングに任せる。理由: (1) `DetailLoss`
   の `cellSize` のように絶対ピクセル数でパラメータを取るフィルタは、画像
   サイズが変わるたびに見え方自体が変わってしまう、(2) disk blur 系

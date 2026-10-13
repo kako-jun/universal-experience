@@ -13,7 +13,7 @@ import 'vision_filter_metadata.dart';
 /// 書き出し PNG に焼き込む [ExportCaption] を、描画時の値から解決する（#43/#76/#80、
 /// 2×2 比較の各セル #84 と共有）。
 ///
-/// i18n はここで解決し、pure な [exportImageComposer] へは解決済み文字列だけを渡す
+/// i18n はここで解決し、pure な `exportImageComposer` へは解決済み文字列だけを渡す
 /// （規律2）。引数は **画像を描画した時点の値** を渡すこと（呼び出し時点の現在の
 /// widget props ではなく）。
 ///

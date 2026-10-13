@@ -25,7 +25,6 @@ import 'package:universal_experience/src/rust/api/sensus_bridge.dart'
     show Urgency;
 import 'package:universal_experience/ui/widgets/loupe_hud.dart';
 import 'package:universal_experience/ui/theme/app_theme.dart';
-import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 
 import 'support/home_screen_harness.dart';
@@ -38,8 +37,8 @@ void main() {
   setUp(installHomeScreenFixtures);
   tearDown(() {
     resetHomeScreenFixtures();
-    previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
-    afterImageRenderer = BeforeAfterView.renderAfter;
+    previewSourceImageLoader = loadDefaultPreviewSourceImage;
+    afterImageRenderer = renderDefaultAfter;
   });
 
   late ui.Image master;

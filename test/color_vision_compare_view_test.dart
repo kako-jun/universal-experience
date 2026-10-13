@@ -13,7 +13,6 @@ import 'package:universal_experience/services/color_vision_compare.dart';
 import 'package:universal_experience/services/export_service.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
-import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 import 'package:universal_experience/ui/widgets/color_vision_compare_view.dart';
 import 'package:universal_experience/ui/widgets/export_feedback.dart';
@@ -102,8 +101,8 @@ void main() {
   });
 
   tearDown(() {
-    previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
-    afterImageRenderer = BeforeAfterView.renderAfter;
+    previewSourceImageLoader = loadDefaultPreviewSourceImage;
+    afterImageRenderer = renderDefaultAfter;
     exportImageComposer = composeExportImage;
     resetExportSeams();
     CpuVisionRenderer.pipelineApplier = CpuVisionRenderer.applyPipeline;
