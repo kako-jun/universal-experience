@@ -351,7 +351,7 @@ UI を変える場合は先に `DESIGN.md` を読む（色は `colorScheme` の�
 Flutter golden を生成プラットフォームと揃えるため）が push/PR（main）で
 flutter analyze / flutter test / `rust/` の cargo fmt --check /
 clippy --all-targets -D warnings / cargo test / flutter build macos --debug /
-実ブリッジ integration test（`flutter test integration_test/<file> -d macos` を4ファイル分、後述。#55。
+実ブリッジ integration test（`flutter test integration_test/<file> -d macos` を5ファイル分、後述。#55。
 複数ファイルを1回の `flutter test integration_test` 呼び出しにまとめるとデスクトップでは
 2番目以降のアプリ起動が失敗するため個別に実行する）を回す。cargokit 統合（#55）により
 `flutter build macos` が rust/ crate のビルドも兼ねるため、Setup Rust は Flutter
