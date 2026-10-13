@@ -1,25 +1,27 @@
 // tunnel_vision 警告閾値のドリフト検知 integration test（#161）。
 //
 // `lib/models/vision_filter_contract_notes.dart` の `kStrengthCautionByFilterId`
-// は tunnel_vision の警告閾値 0.8 を、sensus-core の可視半径の式
+// は tunnel_vision の警告閾値（0.8）を、sensus-core の可視半径の式
 //   inner_r = (1 - strength) * 0.5,  outer_r = inner_r + 0.05
 // （半径は画像の半対角線 `max_r` で正規化した比。`src/vision/field.rs`）に
-// 依存して決めている（0.8 のとき可視半径 0.1）。sensus が式を変えると閾値の根拠が
-// 黙って崩れるので、実ブリッジで実際に適用して可視半径を測り、式と一致することを
-// 確認する。
+// 依存して決めている。sensus が式を変えると閾値の根拠が黙って崩れるので、
+// 実ブリッジで適用して半径を測り、式と一致することを確認する。
 //
-// 測定方法: 全面が一様な白（255,255,255,255）の 1280x720（16:9）画像に
-// `apply_vision_cpu_rgba8` で tunnel_vision(Darken) を適用し、画像中心の水平行を
-// 中心から右へ走査する。
-//  - 可視半径 = 最初に「白から変化した」ピクセルまでの距離 / max_r（Darken は
-//    `fade == 0`（r <= inner_r）のピクセルに触れないので、変化が始まる位置が inner_r）。
-//    スムースステップの立ち上がりは緩やかで、最初の 8bit 変化は inner_r より
-//    数 px 先に出るため、許容誤差を 0.005（≒3.7px）とする。
-//  - 完全暗転半径 = 画像隅（r > outer_r が確実）のピクセルと同値になる最初の位置 /
-//    max_r（= outer_r）。可視半径との差が帯の幅 0.05 になることも確認する。
-//  - 面積: 白のまま残ったピクセル数が円 π(inner_r·max_r)² に一致すること。
-// 許容誤差は半径で 0.005、帯の幅で 0.01（暗転側は 8bit 量子化で早く飽和し実測 0.045 前後になる）、面積比で 20%（半径が数 px 大きく測れると小円では面積が 1 割超増える）。式が意味のある形で変わる
-// （係数 0.5 の変更、max_r の正規化の変更、帯の幅の変更）と落ちる。
+// 測定方法: 全面が一様な白の 2560x1440（16:9）画像に `apply_vision_cpu_rgba8`
+// で tunnel_vision(Darken) を適用する。白では Darken の出力は
+// `pack_u8(linear_to_srgb(1 - s*fade))` になり、fade は inner_r..outer_r の
+// スムースステップ（fade=0.5 は r = inner_r + 帯幅/2 ちょうど）。
+//  - 半減半径: 中心から右（水平行）・下（垂直列）へ走査し、値が
+//    round(255*linear_to_srgb(1 - s/2)) 以下になる最初の画素の距離 / max_r。
+//    期待は inner_r + 0.025。画素単位の離散化（ceil）を含め ±1px で一致を要求する。
+//    係数 0.5 と帯幅の両方に感度があり、8bit 飽和には依存しない。
+//  - 白から最初に変化する画素は inner_r より手前には来ない（>= inner_r - 0.5px）。
+//  - 面積: 白のまま残る画素数 / 円 π(inner_r·max_r)² が 1.01..1.11（実値は
+//    1.02..1.09。立ち上がりの緩やかな裾が数 px 乗る分だけ 1 を超える）。
+//    水平・垂直の異方的な変化の検知を兼ねる。
+// 係数 ±2%・帯幅 ±10% の変化は、強度 0.9 の「係数 +2%」を除く全強度で落ちる
+// （numpy でのシミュレーション結果）。閾値以外の強度の係数が極端に小さい領域の
+// 微小な変化までは保証しない。
 //
 // 実行: `flutter test integration_test/tunnel_vision_threshold_drift_test.dart -d macos`
 // デスクトップでは複数ファイルを 1 回で渡せない既知の制約があるため、CI でも個別実行。
@@ -33,18 +35,24 @@ import 'package:universal_experience/models/vision_filter_contract_notes.dart';
 import 'package:universal_experience/services/native_bridge_service.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 
-const int _w = 1280;
-const int _h = 720;
+const int _w = 2560;
+const int _h = 1440;
 final double _maxR = math.sqrt((_w / 2) * (_w / 2) + (_h / 2) * (_h / 2));
 
-/// 0.8 付近の強度で、式 (1 - s) * 0.5 を確認する。
-const List<double> _strengths = [0.7, 0.79, 0.8, 0.81, 0.9];
+/// sensus の linear → sRGB（標準ガンマ）。
+double _linearToSrgb(double c) =>
+    c <= 0.0031308 ? c * 12.92 : 1.055 * math.pow(c, 1 / 2.4) - 0.055;
 
 class _Measured {
-  _Measured(this.visibleR, this.darkR, this.untouchedPixels);
-  final double visibleR;
-  final double darkR;
-  final int untouchedPixels;
+  _Measured(this.halfX, this.halfY, this.firstX, this.firstY, this.untouched);
+
+  /// 半減点（値が round(255*srgb(1 - s/2)) 以下になる最初の画素）までの距離 px。
+  final int halfX; // 水平（中心から右）
+  final int halfY; // 垂直（中心から下）
+  /// 白から最初に変化した画素までの距離 px。
+  final int firstX;
+  final int firstY;
+  final int untouched;
 }
 
 Future<_Measured> _measure(double strength) async {
@@ -64,25 +72,25 @@ Future<_Measured> _measure(double strength) async {
   bool isWhite(int x, int y) =>
       px(x, y, 0) == 255 && px(x, y, 1) == 255 && px(x, y, 2) == 255;
 
+  final halfValue = (_linearToSrgb(1.0 - strength / 2) * 255).round();
+
   const cx = _w ~/ 2;
   const cy = _h ~/ 2;
-  final cornerR = px(0, 0, 0);
-  final cornerG = px(0, 0, 1);
-  final cornerB = px(0, 0, 2);
-
-  int? visibleX;
-  int? darkX;
-  for (var x = cx; x < _w; x++) {
-    if (visibleX == null && !isWhite(x, cy)) visibleX = x - cx;
-    if (darkX == null &&
-        px(x, cy, 0) == cornerR &&
-        px(x, cy, 1) == cornerG &&
-        px(x, cy, 2) == cornerB) {
-      darkX = x - cx;
+  int? scan(int n, int Function(int) at, bool Function(int) hit) {
+    for (var i = 0; i < n; i++) {
+      if (hit(at(i))) return i;
     }
+    return null;
   }
-  expect(visibleX, isNotNull, reason: 'strength=$strength: 変化したピクセルが無い');
-  expect(darkX, isNotNull, reason: 'strength=$strength: 完全暗転域に届かない');
+
+  final halfX = scan(_w - cx, (i) => px(cx + i, cy, 0), (v) => v <= halfValue);
+  final halfY = scan(_h - cy, (i) => px(cx, cy + i, 0), (v) => v <= halfValue);
+  final firstX = scan(_w - cx, (i) => px(cx + i, cy, 0), (v) => v < 255);
+  final firstY = scan(_h - cy, (i) => px(cx, cy + i, 0), (v) => v < 255);
+  expect(halfX, isNotNull, reason: 'strength=$strength: 水平に半減点が無い');
+  expect(halfY, isNotNull, reason: 'strength=$strength: 垂直に半減点が無い');
+  expect(firstX, isNotNull, reason: 'strength=$strength: 水平に変化が無い');
+  expect(firstY, isNotNull, reason: 'strength=$strength: 垂直に変化が無い');
 
   var untouched = 0;
   for (var y = 0; y < _h; y++) {
@@ -90,7 +98,7 @@ Future<_Measured> _measure(double strength) async {
       if (isWhite(x, y)) untouched++;
     }
   }
-  return _Measured(visibleX! / _maxR, darkX! / _maxR, untouched);
+  return _Measured(halfX!, halfY!, firstX!, firstY!, untouched);
 }
 
 void main() {
@@ -103,39 +111,54 @@ void main() {
     }
   });
 
-  test('警告閾値は 0.8 のまま（このテストの前提）', () {
-    expect(kStrengthCautionByFilterId['tunnel_vision']?.threshold, 0.8);
-  });
+  // アプリの警告閾値そのもの。値が変わってもその強度で式を検証する。
+  final threshold = kStrengthCautionByFilterId['tunnel_vision']!.threshold;
+  final strengths = <double>[
+    0.5,
+    0.7,
+    threshold - 0.01,
+    threshold,
+    threshold + 0.01,
+    0.9
+  ];
 
-  for (final s in _strengths) {
-    testWidgets('strength=$s: 可視半径が (1-s)*0.5、帯の幅が 0.05（sensus 式との一致）',
+  for (final s in strengths) {
+    testWidgets(
+        'strength=$s: 半減半径 = inner_r + 0.025（±1px）、最初の変化は inner_r 以降、面積が円に近い',
         (tester) async {
       final m = await _measure(s);
-      final innerR = (1.0 - s) * 0.5;
+      final innerPx = (1.0 - s) * 0.5 * _maxR;
+      // 半減点は fade=0.5 の r = inner_r + 帯幅/2。画素は整数なので ceil が期待値。
+      final halfPx = innerPx + 0.025 * _maxR;
+      final expected = halfPx.ceil();
 
-      expect(m.visibleR, closeTo(innerR, 0.005),
-          reason: '可視半径が式 (1-s)*0.5 からずれた: sensus の式が変わった疑い');
-      expect(m.darkR - m.visibleR, closeTo(0.05, 0.01),
-          reason: '遷移帯の幅が 0.05 から外れた');
+      expect((m.halfX - expected).abs(), lessThanOrEqualTo(1),
+          reason: '水平の半減半径 ${m.halfX}px が期待 $expected px（式 '
+              '(1-s)*0.5 + 0.05/2）から外れた: sensus の式が変わった疑い');
+      expect((m.halfY - expected).abs(), lessThanOrEqualTo(1),
+          reason: '垂直の半減半径 ${m.halfY}px が期待 $expected px から外れた'
+              '（異方的な変化の疑い）');
+      expect(m.firstX, greaterThanOrEqualTo(innerPx - 0.5),
+          reason: '白からの最初の変化が inner_r より手前に来た（水平）');
+      expect(m.firstY, greaterThanOrEqualTo(innerPx - 0.5),
+          reason: '白からの最初の変化が inner_r より手前に来た（垂直）');
 
-      final expectedArea = math.pi * math.pow(innerR * _maxR, 2);
-      expect(m.untouchedPixels / expectedArea, closeTo(1.0, 0.2),
-          reason: '無変化領域の面積が円 π(inner_r·max_r)² と合わない');
+      final ratio = m.untouched / (math.pi * innerPx * innerPx);
+      expect(ratio, inInclusiveRange(1.01, 1.11),
+          reason: '無変化領域の面積比 $ratio が円 π(inner_r·max_r)² から外れた');
     });
   }
 
-  testWidgets('閾値 0.8 の前提: 可視半径 0.1、16:9 で幅の約 1 割強、強度に対し単調減少',
-      (tester) async {
-    final at79 = await _measure(0.79);
-    final at80 = await _measure(0.8);
-    final at81 = await _measure(0.81);
+  testWidgets('警告閾値の前提: 閾値で可視円の直径が幅の 10-13%、強度に対し単調減少', (tester) async {
+    final at = await _measure(threshold);
+    final lower = await _measure(threshold - 0.01);
+    final higher = await _measure(threshold + 0.01);
 
-    expect(at80.visibleR, closeTo(0.1, 0.005));
-    // 可視円の直径が画像幅に占める比（コメントの「幅の約 1 割」）。
-    final diameterOverWidth = 2 * at80.visibleR * _maxR / _w;
+    // 可視円（半減半径）の直径が画像幅に占める比（コメントの「幅の約 1 割」）。
+    final diameterOverWidth = 2 * at.halfX / _w;
     expect(diameterOverWidth, inInclusiveRange(0.10, 0.13));
 
-    expect(at79.visibleR, greaterThan(at80.visibleR));
-    expect(at80.visibleR, greaterThan(at81.visibleR));
+    expect(lower.halfX, greaterThan(at.halfX));
+    expect(at.halfX, greaterThan(higher.halfX));
   });
 }

@@ -1246,6 +1246,11 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
     ルートと一致するため file I/O が安全）で引き続き検証している。widget test の
     フェイク注入では検知できない「実際に sensus-core の CPU apply が 30 種
     すべてで動く」ことを保証するのがこのファイルの役割
+  - `tunnel_vision_threshold_drift_test.dart`（#161）: `kStrengthCautionByFilterId`
+    の tunnel_vision 警告閾値（0.8）が依拠する sensus の可視半径の式
+    （inner_r = (1-s)×0.5、帯 0.05、半対角線で正規化）を、白一色 2560x1440 に
+    実ブリッジで適用して実測し固定する。fade=0.5 の半減半径を水平・垂直で
+    ±1px、面積比を円と比較する。sensus が式を変えると落ちる
 - **CI**（#38、完了）: `.github/workflows/ci.yml` は2ジョブ構成。`check`
   （macos-latest）が push/PR で上記に加え `flutter build macos --debug` を
   回す（#54）。cargokit 統合（#55）によりこの build が rust/ crate のビルドも
