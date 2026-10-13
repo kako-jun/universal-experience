@@ -16,7 +16,7 @@ enum AppHotkeyAction {
   /// ウィンドウ表示/前面化。
   emergencyExit,
 
-  /// ルーペ窓の表示/非表示。
+  /// ウィンドウの表示/非表示。
   toggleLoupeVisibility,
 }
 

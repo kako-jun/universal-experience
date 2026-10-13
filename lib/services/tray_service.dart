@@ -30,7 +30,7 @@ export 'tray_menu_labels.dart';
 ///
 /// このアプリのメインウィンドウ自体がルーペ窓 (#14)。`LoupeWindowController`
 /// は枠/モード/透過の責務を持つが表示/非表示 (show/hide) は持たないため、
-/// トレイの「ルーペ窓を表示/隠す」は `windowManager.show()` / `hide()` を呼ぶ
+/// トレイの「ウィンドウを表示/隠す」は `windowManager.show()` / `hide()` を呼ぶ
 /// コールバック ([onShowLoupe] / [onHideLoupe]) を main.dart から注入して実現する。
 ///
 /// ## ウィンドウクローズ・ポリシー (ここで決定)
@@ -72,7 +72,7 @@ export 'tray_menu_labels.dart';
 
 /// トレイメニュー項目の種別。
 enum TrayMenuKind {
-  /// ルーペ窓の表示/非表示トグル。
+  /// ウィンドウの表示/非表示トグル。
   toggleLoupe,
 
   /// 起動モード（設定窓/ルーペ窓）の切替 (#63)。
@@ -451,10 +451,10 @@ class TrayService with TrayListener {
   String get tooltip => _tooltip;
   String _tooltip;
 
-  /// ルーペ窓を表示する (main.dart が windowManager.show を呼ぶ)。
+  /// ウィンドウを表示する (main.dart が windowManager.show を呼ぶ)。
   final Future<void> Function() onShowLoupe;
 
-  /// ルーペ窓を隠す (main.dart が windowManager.hide を呼ぶ)。
+  /// ウィンドウを隠す (main.dart が windowManager.hide を呼ぶ)。
   final Future<void> Function() onHideLoupe;
 
   /// "設定を開く" が選ばれたとき (main.dart がウィンドウを表示する)。
@@ -729,7 +729,7 @@ class TrayService with TrayListener {
     return null;
   }
 
-  /// トレイの「ルーペ窓を表示/隠す」と同じロジックをホットキーからも呼べるようにする (#63)。
+  /// トレイの「ウィンドウを表示/隠す」と同じロジックをホットキーからも呼べるようにする (#63)。
   Future<void> toggleLoupeVisible() => _toggleLoupe();
 
   Future<void> _toggleLoupe() async {

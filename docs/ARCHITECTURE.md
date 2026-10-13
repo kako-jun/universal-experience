@@ -507,7 +507,7 @@ Linux debug ビルド成功で代替している:
 |---|---|---|
 | `toggleClickThrough` | Ctrl+Alt+Shift+C | クリックスルーの ON/OFF |
 | `holdOriginal` | Ctrl+Alt+Shift+O | 押している間だけ原画を表示 |
-| `emergencyExit` | Ctrl+Alt+Shift+Esc | 非常口: 全フィルタ停止 + 原画表示解除 + クリックスルー解除 + 最前面解除 + ルーペ窓表示/前面化 |
+| `emergencyExit` | Ctrl+Alt+Shift+Esc | 非常口: 全フィルタ停止 + 原画表示解除 + クリックスルー解除 + 最前面解除 + ウィンドウ表示/前面化 |
 | `toggleLoupeVisibility` | Ctrl+Alt+Shift+L | ウィンドウの表示/非表示 |
 
 既定キーはすべて Ctrl+Alt+Shift の 3 修飾（`defaultHotkeyBindings()`）。主要

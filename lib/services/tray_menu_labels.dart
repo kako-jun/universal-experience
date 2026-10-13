@@ -39,10 +39,10 @@ class TrayMenuLabels {
     this.catalogNames = const {},
   });
 
-  /// ルーペ窓を表示する項目のラベル（非表示状態のトグルに使う）。
+  /// ウィンドウを表示する項目のラベル（非表示状態のトグルに使う）。
   final String showLoupe;
 
-  /// ルーペ窓を隠す項目のラベル（表示状態のトグルに使う）。
+  /// ウィンドウを隠す項目のラベル（表示状態のトグルに使う）。
   final String hideLoupe;
 
   /// フィルタ解除項目のラベル。

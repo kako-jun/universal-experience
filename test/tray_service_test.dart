@@ -13,8 +13,8 @@ import 'support/color_vision_select.dart';
 /// 文言は i18n 解決済みで [buildTrayMenuSpec] に注入する (#18)。純粋層のテストは
 /// app_ja.arb の ja 訳と同じ文字列を渡し、メニュー構造とラベル配線を検証する。
 const _labels = TrayMenuLabels(
-  showLoupe: 'ルーペ窓を表示',
-  hideLoupe: 'ルーペ窓を隠す',
+  showLoupe: 'ウィンドウを表示',
+  hideLoupe: 'ウィンドウを隠す',
   clearFilter: 'フィルタを解除',
   openSettings: '設定を開く…',
   quit: '終了',
@@ -55,11 +55,11 @@ void main() {
 
   group('TrayMenuLabels.toggleLabel', () {
     test('表示中は隠すラベル', () {
-      expect(_labels.toggleLabel(loupeVisible: true), 'ルーペ窓を隠す');
+      expect(_labels.toggleLabel(loupeVisible: true), 'ウィンドウを隠す');
     });
 
     test('非表示中は表示ラベル', () {
-      expect(_labels.toggleLabel(loupeVisible: false), 'ルーペ窓を表示');
+      expect(_labels.toggleLabel(loupeVisible: false), 'ウィンドウを表示');
     });
 
     test('未登録のキーは id をフォールバック表示する', () {
@@ -168,9 +168,9 @@ void main() {
         loupeModeAvailable: true,
       ).firstWhere((e) => e.kind == TrayMenuKind.toggleLoupe);
 
-      expect(visible.label, 'ルーペ窓を隠す');
+      expect(visible.label, 'ウィンドウを隠す');
       expect(visible.checked, isTrue);
-      expect(hidden.label, 'ルーペ窓を表示');
+      expect(hidden.label, 'ウィンドウを表示');
       expect(hidden.checked, isFalse);
     });
 
@@ -605,8 +605,8 @@ void main() {
 
   group('TrayService.updateLocalization (#82)', () {
     const enLabels = TrayMenuLabels(
-      showLoupe: 'Show loupe window',
-      hideLoupe: 'Hide loupe window',
+      showLoupe: 'Show window',
+      hideLoupe: 'Hide window',
       clearFilter: 'Clear filter',
       openSettings: 'Open settings…',
       quit: 'Quit',
@@ -654,7 +654,7 @@ void main() {
         loupeModeAvailable: true,
       );
       final labels = spec.map((e) => e.label).whereType<String>().toList();
-      expect(labels, contains('Hide loupe window'));
+      expect(labels, contains('Hide window'));
       expect(labels, contains('Protanopia'));
       expect(labels, contains('Quit'));
       expect(labels, isNot(contains('終了')));
