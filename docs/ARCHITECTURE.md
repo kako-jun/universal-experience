@@ -248,7 +248,7 @@ OS の言語は Flutter 標準の `basicLocaleListResolution` に一覧ごと渡
 `docs/ADDING_A_LANGUAGE.md`。
 
 メインウィンドウ自体がルーペ窓 (#14)。`LoupeWindowController` は枠/モード/透過の
-責務を持つが show/hide は持たないため、トレイの「ルーペ窓を表示/隠す」は
+責務を持つが show/hide は持たないため、トレイの「ウィンドウを表示/隠す」は
 main.dart が `windowManager.show()` / `hide()` を `onShowLoupe` / `onHideLoupe`
 として `TrayService` に注入して実現する。
 
@@ -256,7 +256,7 @@ main.dart が `windowManager.show()` / `hide()` を `onShowLoupe` / `onHideLoupe
 
 上から順に:
 
-1. **ルーペ窓を表示 / 隠す** — トグル (注入された `windowManager.show()` /
+1. **ウィンドウを表示 / 隠す** — トグル (注入された `windowManager.show()` /
    `hide()` を呼ぶ。ラベルは現在の表示状態で切替)
 2. (区切り線)
 3. **起動モード切替** — `LoupeWindowController.setAppMode()`（settings/loupe をトグル、#63）
@@ -508,7 +508,7 @@ Linux debug ビルド成功で代替している:
 | `toggleClickThrough` | Ctrl+Alt+Shift+C | クリックスルーの ON/OFF |
 | `holdOriginal` | Ctrl+Alt+Shift+O | 押している間だけ原画を表示 |
 | `emergencyExit` | Ctrl+Alt+Shift+Esc | 非常口: 全フィルタ停止 + 原画表示解除 + クリックスルー解除 + 最前面解除 + ルーペ窓表示/前面化 |
-| `toggleLoupeVisibility` | Ctrl+Alt+Shift+L | ルーペ窓の表示/非表示 |
+| `toggleLoupeVisibility` | Ctrl+Alt+Shift+L | ウィンドウの表示/非表示 |
 
 既定キーはすべて Ctrl+Alt+Shift の 3 修飾（`defaultHotkeyBindings()`）。主要
 アプリ・OS 標準ショートカットと衝突しにくくするため。

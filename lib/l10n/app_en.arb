@@ -364,11 +364,11 @@
   "@trayAppModeLoupeUnavailable": {
     "description": "Tray menu label of the loupe app mode item while it is disabled because live screen capture is not implemented yet (#156)."
   },
-  "trayShowLoupe": "Show loupe window",
+  "trayShowLoupe": "Show window",
   "@trayShowLoupe": {
     "description": "Tray menu item that shows the loupe (main) window."
   },
-  "trayHideLoupe": "Hide loupe window",
+  "trayHideLoupe": "Hide window",
   "@trayHideLoupe": {
     "description": "Tray menu item that hides the loupe (main) window."
   },
@@ -556,7 +556,7 @@
   "@hotkeyEmergencyExit": {
     "description": "Display name for the emergency-exit hotkey action (clears filters, click-through and always-on-top)."
   },
-  "hotkeyToggleLoupeVisibility": "Show/hide loupe window",
+  "hotkeyToggleLoupeVisibility": "Show/hide window",
   "@hotkeyToggleLoupeVisibility": {
     "description": "Display name for the toggle-loupe-visibility hotkey action."
   },
