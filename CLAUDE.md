@@ -41,6 +41,7 @@ lib/
 │   │                                 # isValidExperiencePreset（永続化した選択の検証、#65）
 │   ├── filter_list_selection.dart   # 統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行。行はカタログ id + 別名 id）の
 │   │                                 # 検索・選択入口 toggleFilterListEntry・↑↓ の順送りの純粋ロジック（#72）
+│   ├── export_plan.dart             # 書き出しの計画（UI 非依存の純粋ロジック）: buildExportCaption / buildLayeredExportCaption（描画時点の値からキャプションを解決）・planExport（キャプション + ファイル名の症状 id + 強度。複数層は層ごとの行）。BeforeAfterView と 2×2 比較が共有（#159）。PNG のエンコード encodePngAndDispose / encodeImagePng は export_service.dart
 │   ├── export_layers.dart           # 書き出しが数える層 effectiveExportLayers（強度 > 0 のみ。表示の整数パーセントが 0 になる強度も除く）・描画時点の控え ExportLayer / exportLayersOf（#121）
 │   ├── hotkey_actions.dart          # グローバルホットキー4アクションの実処理（#63。フィルタ解除は全層を外す、#121 でテスト固定）
 │   ├── hotkey_service.dart          # hotkey_manager 登録の副作用層（#63）
@@ -80,6 +81,9 @@ lib/
     │                                 # layer_chip_strip（プレビュー上の適用順チップ帯・✕・すべて解除、#120）,
     │                                 # adjust_panel（右カラム「調整」: 2 層以上は層ごとの節、#72/#120）,
     │                                 # before_after_view（複数層は名前の要約見出し・書き出しは層ごとの行と併合した受診喚起、#120/#121）, loupe_hud,
+    │                                 # preview_rendering（プレビュー描画の共有: before 読み込み・after 描画・書き出し合成の差し替え口
+    │                                 # previewSourceImageLoader/afterImageRenderer/exportImageComposer と PreviewImageView・PreviewErrorPlaceholder。
+    │                                 # BeforeAfterView と 2×2 比較が共有し、互いを import しない、#159）,
     │                                 # color_vision_compare_view（色覚 4 型の 2×2 比較と書き出し、#84。他の層の土台つき、#122）,
     │                                 # experience_presets（体験プリセットの行 ExperiencePresetTile）, filter_param_panel,
     │                                 # consult_notice_block（受診喚起の共有表示ウィジェット、#76）,

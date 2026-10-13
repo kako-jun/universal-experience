@@ -63,7 +63,7 @@ const ui.Color kImageFitLetterboxColor = ui.Color(0xFF808080);
 
 /// Decodes arbitrary encoded image bytes (PNG/JPEG/etc., whatever
 /// `dart:ui`'s codec supports) into a [ui.Image]. Shared by
-/// `BeforeAfterView.loadPreviewSourceImage` (sample assets, #78) and the
+/// `loadDefaultPreviewSourceImage` (sample assets, #78) and the
 /// user image picker/drop handlers (`lib/ui/widgets/image_source_picker.dart`)
 /// so the decode step has one implementation. The caller owns and must
 /// dispose the returned image.
@@ -80,8 +80,7 @@ Future<ui.Image> decodeImageBytes(Uint8List bytes) async {
 /// Maximum long-edge dimension [decodeUserImageBytes] decodes a user image
 /// to (#78). A modern phone photo can easily be 4000px+ on the
 /// long edge; decoding (and holding in memory) at full intrinsic resolution
-/// when the canonical preview size is only [1024]（`BeforeAfterView.
-/// canonicalSampleSize`) wastes memory for no visual benefit —
+/// when the canonical preview size is only [1024](`kCanonicalSampleSize`) wastes memory for no visual benefit —
 /// [fitImageToSquare] would immediately downscale it anyway. 2048 leaves
 /// headroom above the canonical size while still bounding memory use.
 const int kUserImageMaxDimension = 2048;

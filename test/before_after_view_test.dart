@@ -12,6 +12,7 @@ import 'package:universal_experience/services/export_service.dart';
 import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
+import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 import 'package:universal_experience/ui/widgets/export_feedback.dart';
 
 import 'support/sample_image_generator.dart';
@@ -36,7 +37,7 @@ import 'support/vision_filter_metadata_fixture.dart';
 /// `integration_test/cpu_preview_all_filters_test.dart`（CI）が担う。
 ///
 /// #85 で以下を変更した:
-/// - CPU プレビューは固定の正準サイズ（[BeforeAfterView.canonicalSampleSize]）
+/// - CPU プレビューは固定の正準サイズ（[kCanonicalSampleSize]）
 ///   で描画し、ペインの論理サイズ・devicePixelRatio には依存しない。旧
 ///   `group('自動サイズ調整 (#58: Retina 対策)', ...)`（DPR 連動・リサイズの
 ///   デバウンス）はこの仕様変更で丸ごと不要になったため削除した。
@@ -102,7 +103,7 @@ void main() {
         return fakeOut;
       };
 
-      final out = await BeforeAfterView.renderAfter(src, null, 1.0);
+      final out = await renderDefaultAfter(src, null, 1.0);
       expect(identical(out, src), isTrue);
       expect(called, isFalse, reason: 'filter なしなので CPU レンダラを呼ぶ必要がない');
     });
@@ -120,7 +121,7 @@ void main() {
       };
 
       const filter = VisionFilter.protanopia();
-      final out = await BeforeAfterView.renderAfter(src, filter, 0.75);
+      final out = await renderDefaultAfter(src, filter, 0.75);
       expect(identical(out, fakeOut), isTrue);
       expect(identical(capturedSource, src), isTrue);
       expect(capturedFilter, filter);
@@ -136,7 +137,7 @@ void main() {
       };
 
       const filter = VisionFilter.astigmatism(axisDeg: 45.0);
-      await BeforeAfterView.renderAfter(src, filter, 1.0);
+      await renderDefaultAfter(src, filter, 1.0);
       expect(capturedFilter, filter);
     });
   });
@@ -189,7 +190,7 @@ void main() {
       });
       tearDown(() {
         CpuVisionRenderer.applier = CpuVisionRenderer.apply;
-        previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
+        previewSourceImageLoader = loadDefaultPreviewSourceImage;
       });
 
       testWidgets('protanopia で原画ラベルとフィルタ名ラベルの両ペインを出す', (tester) async {
@@ -288,7 +289,7 @@ void main() {
       });
       tearDown(() {
         CpuVisionRenderer.applier = CpuVisionRenderer.apply;
-        previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
+        previewSourceImageLoader = loadDefaultPreviewSourceImage;
       });
 
       testWidgets('vertigo（時間依存）は静止フレームの注記を出す', (tester) async {
@@ -332,7 +333,7 @@ void main() {
       });
       tearDown(() {
         CpuVisionRenderer.applier = CpuVisionRenderer.apply;
-        previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
+        previewSourceImageLoader = loadDefaultPreviewSourceImage;
       });
 
       // 幅 [width] の中に BeforeAfterView を置き、画像（正方形）の矩形を 2 枚返す。
@@ -430,8 +431,8 @@ void main() {
     // 中でも安全に awaiter できるようにする）。
     group('生成の世代管理とリソース破棄 (#58)', () {
       tearDown(() {
-        previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
-        afterImageRenderer = BeforeAfterView.renderAfter;
+        previewSourceImageLoader = loadDefaultPreviewSourceImage;
+        afterImageRenderer = renderDefaultAfter;
       });
 
       // #85: `_scheduleRebuild` が実行を直列化する（同時に走る
@@ -784,7 +785,7 @@ void main() {
       });
 
       testWidgets(
-          'sampleSize 未指定のとき generator は canonicalSampleSize（1024）で'
+          'sampleSize 未指定のとき generator は kCanonicalSampleSize（1024）で'
           '呼ばれる (#85)', (tester) async {
         late ui.Image stub;
         await tester.runAsync(() async {
@@ -806,14 +807,14 @@ void main() {
         await tester.pump();
         await tester.pump();
 
-        expect(requestedSizes, [BeforeAfterView.canonicalSampleSize]);
+        expect(requestedSizes, [kCanonicalSampleSize]);
       });
     });
 
     group('例外処理と復帰 (#58)', () {
       tearDown(() {
-        previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
-        afterImageRenderer = BeforeAfterView.renderAfter;
+        previewSourceImageLoader = loadDefaultPreviewSourceImage;
+        afterImageRenderer = renderDefaultAfter;
       });
 
       testWidgets(
@@ -1031,8 +1032,8 @@ void main() {
 
     group('失敗の表示と復帰 (#58)', () {
       tearDown(() {
-        previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
-        afterImageRenderer = BeforeAfterView.renderAfter;
+        previewSourceImageLoader = loadDefaultPreviewSourceImage;
+        afterImageRenderer = renderDefaultAfter;
       });
 
       testWidgets(
@@ -1109,8 +1110,8 @@ void main() {
       // flutter test ではフィクスチャに差し替える。
       setUp(installVisionFilterMetadataFixture);
       tearDown(() {
-        previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
-        afterImageRenderer = BeforeAfterView.renderAfter;
+        previewSourceImageLoader = loadDefaultPreviewSourceImage;
+        afterImageRenderer = renderDefaultAfter;
         exportImageComposer = composeExportImage;
         pngSaver = savePng;
         folderRevealer = revealInFolder;

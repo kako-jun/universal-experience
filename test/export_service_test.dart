@@ -4,7 +4,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/services/export_service.dart';
-import 'package:universal_experience/ui/widgets/before_after_view.dart';
 
 /// export_service の pure 中核（ISO 日付・ファイル名・メタ焼き込み PNG 合成）の
 /// テスト (#43)。I/O（savePng）は path_provider の実プラットフォームを要するため

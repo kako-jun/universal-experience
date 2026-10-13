@@ -3,93 +3,17 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/preview_image_source.dart';
-import '../../models/sample_catalog.dart';
 import '../../models/vision_filter_catalog.dart';
-import '../../models/vision_filter_contract_notes.dart' as contract_notes;
-import '../../rendering/cpu_vision_renderer.dart';
-import '../../rendering/image_fit.dart';
 import '../../services/export_layers.dart';
+import '../../services/export_plan.dart';
 import '../../services/export_service.dart';
-import '../../services/vision_filter_metadata.dart';
 import '../../src/rust/api/sensus_bridge.dart';
 import 'export_feedback.dart';
-
-/// [_BeforeAfterViewState] が内部で使う「before 画像を [PreviewImageSource]
-/// から読み込む」ステップの型（#78）。実体は
-/// [BeforeAfterView.loadPreviewSourceImage]。widget test が世代管理
-/// （古い結果は破棄され最新だけが残ること）を検証するために、応答が遅れる
-/// フェイクへ差し替えられるようにするための seam（#58 と同じパターン）。
-typedef PreviewSourceImageLoader = Future<ui.Image> Function(
-  PreviewImageSource source,
-  int size,
-);
-
-/// [PreviewImageSource] からの画像読み込みの供給源（テストで差し替え可能）。
-/// 既定は [BeforeAfterView.loadPreviewSourceImage]。
-@visibleForTesting
-PreviewSourceImageLoader previewSourceImageLoader =
-    BeforeAfterView.loadPreviewSourceImage;
-
-/// [_BeforeAfterViewState] が内部で使う after 画像描画ステップの型。
-///
-/// 実体は [BeforeAfterView.renderAfter]。用途は [previewSourceImageLoader] と
-/// 同じ（#58）。[filter] は `VisionFilterState.build`（#60）が組み立てた、payload 込みの
-/// sensus [VisionFilter]。null は「何も選択されていない」を表し、[source] を
-/// そのまま返す（[BeforeAfterView.renderAfter] 参照）。
-typedef AfterImageRenderer = Future<ui.Image?> Function(
-  ui.Image source,
-  VisionFilter? filter,
-  double strength,
-);
-
-/// after 画像描画の供給源（テストで差し替え可能）。既定は
-/// [BeforeAfterView.renderAfter]。
-@visibleForTesting
-AfterImageRenderer afterImageRenderer = BeforeAfterView.renderAfter;
-
-/// [_BeforeAfterViewState._export] が使うキャプション合成ステップの型。
-///
-/// 実体は [composeExportImage]。widget test が実ファイル I/O（[pngSaver]）に
-/// 触れずに export の挙動（caption が描画時の
-/// `(filterId, strength)` から作られること）を検証できるようにするための
-/// seam（#58 の `previewSourceImageLoader`/`afterImageRenderer` と同じパターン）。
-typedef ExportImageComposer = Future<ui.Image> Function(
-  ui.Image base,
-  ExportCaption caption,
-);
-
-/// export 用画像合成の供給源（テストで差し替え可能）。既定は
-/// [composeExportImage]。
-@visibleForTesting
-ExportImageComposer exportImageComposer = composeExportImage;
-
-/// 上の 3 つの差し替え口（[previewSourceImageLoader] / [afterImageRenderer] /
-/// [exportImageComposer]）を、テスト以外のコード（2×2 比較の
-/// `color_vision_compare_view.dart`、#84）から呼ぶための入口。差し替え口そのものは
-/// `@visibleForTesting` なので、本番コードはここを経由して同じ経路（と、テストでの
-/// 差し替え）を共有する。
-Future<ui.Image> loadPreviewImage(PreviewImageSource source, int size) =>
-    previewSourceImageLoader(source, size);
-
-/// [afterImageRenderer] の呼び出し口（[loadPreviewImage] 参照）。
-Future<ui.Image?> renderPreviewAfter(
-  ui.Image source,
-  VisionFilter? filter,
-  double strength,
-) =>
-    afterImageRenderer(source, filter, strength);
-
-/// [exportImageComposer] の呼び出し口（[loadPreviewImage] 参照）。
-Future<ui.Image> composeCaptionedExportImage(
-  ui.Image base,
-  ExportCaption caption,
-) =>
-    exportImageComposer(base, caption);
+import 'preview_rendering.dart';
 
 /// 横並びのときの Before / After 2 枚の間隔（dp）。[BeforeAfterView.maxPaneSide] が
 /// 幅の上限（2 枚分 + この間隔）を出すのにも使うので、1 か所で持つ。
@@ -169,7 +93,7 @@ class BeforeAfterView extends StatefulWidget {
   ///
   /// `null`（既定。層が 0〜1 のとき）なら従来どおり [filter] を [strength] で適用する
   /// （[afterImageRenderer]）。非 null のときは **この列を 1 回の合成で適用**し
-  /// （[BeforeAfterView.renderAfterPipeline] → [CpuVisionRenderer.pipelineApplier]。テストでは
+  /// （[renderDefaultAfterPipeline] → [CpuVisionRenderer.pipelineApplier]。テストでは
   /// `pipelineApplier` を差し替える）、[filter] と
   /// [strength] は描画に使わない（見出し・書き出しが代表として参照する、フォーカス中の層の
   /// 値。複数層の見出しは #120、書き出しは [exportLayers] で #121）。空なら原画をそのまま見せる。
@@ -204,11 +128,11 @@ class BeforeAfterView extends StatefulWidget {
 
   /// Explicit width/height (in pixels) for the generated square sample
   /// image. When `null` (the default, used by real callers), the resolution
-  /// is [canonicalSampleSize] — **not** derived from the pane's layout size or
+  /// is [kCanonicalSampleSize] — **not** derived from the pane's layout size or
   /// `devicePixelRatio` (this pane used to auto-size to the
   /// rendered box × DPR, #58, but the CPU preview now always renders at a
   /// fixed canonical resolution and lets the display scale it — see
-  /// [canonicalSampleSize] for why). Tests that want a small, fast image
+  /// [kCanonicalSampleSize] for why). Tests that want a small, fast image
   /// regardless of the canonical size pass an explicit (smaller) value here.
   final int? sampleSize;
 
@@ -219,103 +143,6 @@ class BeforeAfterView extends StatefulWidget {
   /// square via `lib/rendering/image_fit.dart`'s letterbox (see that file
   /// for why letterbox over crop).
   final PreviewImageSource imageSource;
-
-  /// The fixed resolution (square side, pixels) the CPU preview renders at
-  /// when [sampleSize] is `null`.
-  ///
-  /// Rationale for a **canonical size** instead of sizing to the rendered
-  /// pane × `devicePixelRatio` (the pre-#85 GPU-era behaviour, #58):
-  /// - Several sensus filters key their effect off **fixed pixel counts**
-  ///   rather than a size-relative ratio — e.g. `DetailLoss.cellSize` (a
-  ///   payload the UI lets the user pick directly, in px), eye_strain's
-  ///   pillbox blur radius (`strength × 1.5px`), dry_eye's noise tile
-  ///   (32px), cataract's noise cell (32px), metamorphopsia's max
-  ///   displacement (8px), flickering_stars' point blob radius (2px) —
-  ///   re-rendering at a different resolution every time the window resizes
-  ///   would change how those filters look, independent of any real change
-  ///   in strength (`starbursts` is excluded from this list: its ray length
-  ///   is itself a size-relative *ratio*, `rayLengthRatio`, not a fixed
-  ///   pixel count).
-  /// - The disk-blur family (myopia/hyperopia/presbyopia/astigmatism) derives
-  ///   its blur radius as `strength × ratio × min(width, height)`; sensus's
-  ///   elliptical kernel degenerates to a single center pixel (a no-op) once
-  ///   that radius drops under ~1px (see
-  ///   `integration_test/cpu_preview_all_filters_test.dart`). A small pane on
-  ///   a low-DPR display could shrink the old auto-derived sample size enough
-  ///   to silently lose the effect for the tightest-ratio filters
-  ///   (astigmatism/presbyopia, ratio 1.1%).
-  ///
-  /// 1024 keeps every filter's effect comfortably visible. Per-filter CPU
-  /// `apply()` timing at this size is recorded on Issue
-  /// #85 — see that Issue for the measured numbers/method rather than a
-  /// number here that could silently go stale. The pane simply scales the
-  /// rendered image up/down to fit (`_UiImagePainter.paint`,
-  /// `FilterQuality.medium`); it never re-renders on resize.
-  static const int canonicalSampleSize = 1024;
-
-  /// Loads the canonical-size *before* image for [source] (#78): a built-in
-  /// sample scene (decoded from `assets/samples/`) or a user-loaded image.
-  /// Either way the result is fit into a `size`×`size` square via
-  /// [fitImageToSquare] (letterbox — see that function's doc), so callers
-  /// never need to special-case the source's original aspect ratio.
-  ///
-  /// For [SamplePreviewImageSource], the asset bytes are decoded into a
-  /// transient [ui.Image] that's disposed immediately after fitting (it's
-  /// never shared/cached — [fitImageToSquare] copies pixels into a brand new
-  /// image). For [UserPreviewImageSource], [UserPreviewImageSource.image] is
-  /// only *read*, never disposed here (`ImageSourceState` owns it — see
-  /// `PreviewImageSource`'s doc for the full ownership contract).
-  static Future<ui.Image> loadPreviewSourceImage(
-    PreviewImageSource source,
-    int size,
-  ) async {
-    switch (source) {
-      case SamplePreviewImageSource(:final sampleId):
-        final entry = kSampleCatalogById[sampleId];
-        if (entry == null) {
-          throw ArgumentError('Unknown sample id: $sampleId');
-        }
-        final data = await rootBundle.load(entry.assetPath);
-        final decoded = await decodeImageBytes(data.buffer.asUint8List());
-        try {
-          return await fitImageToSquare(decoded, size);
-        } finally {
-          decoded.dispose();
-        }
-      case UserPreviewImageSource(:final image):
-        return fitImageToSquare(image, size);
-    }
-  }
-
-  /// Produces the *after* image for [filter] from [source] at [strength].
-  ///
-  /// `null` [filter] (nothing selected) returns [source] unchanged (no
-  /// filter to apply) without calling the renderer. Otherwise renders through
-  /// [CpuVisionRenderer.applier] — CPU `apply()`, not the GPU shader path
-  /// (#85; GPU is kept for a future live screen-capture display, unused
-  /// today). The mapping from a UI selection (color-vision quick pick /
-  /// advanced catalog / experience preset) to a [VisionFilter] happens
-  /// upstream, in `VisionFilterState.build` (#60) — this widget never
-  /// constructs a [VisionFilter] itself.
-  static Future<ui.Image?> renderAfter(
-    ui.Image source,
-    VisionFilter? filter,
-    double strength,
-  ) async {
-    if (filter == null) return source;
-    return CpuVisionRenderer.applier(source, filter, strength);
-  }
-
-  /// 複数層の after 画像: [source] に [steps] を並びの順に 1 回の合成で適用する
-  /// （#119）。[steps] が空（全層が強度 0、または原画比較中）なら [source] をそのまま返し、
-  /// レンダラは呼ばない。
-  static Future<ui.Image?> renderAfterPipeline(
-    ui.Image source,
-    List<VisionStep> steps,
-  ) async {
-    if (steps.isEmpty) return source;
-    return CpuVisionRenderer.pipelineApplier(source, steps);
-  }
 
   @override
   State<BeforeAfterView> createState() => _BeforeAfterViewState();
@@ -338,7 +165,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// were generated at. `null` until the first generation completes (#58).
   /// Since pane-size-driven auto-sizing was removed, this only
   /// changes if [BeforeAfterView.sampleSize] itself changes (test-only in
-  /// practice) — production always uses [BeforeAfterView.canonicalSampleSize].
+  /// practice) — production always uses [kCanonicalSampleSize].
   int? _currentSampleSize;
 
   /// The [PreviewImageSource] (#78) that actually produced the
@@ -401,10 +228,10 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   int? _pendingRebuildSampleSize;
 
   /// The sample size to render at when [BeforeAfterView.sampleSize] isn't
-  /// explicitly set — [BeforeAfterView.canonicalSampleSize] in production;
+  /// explicitly set — [kCanonicalSampleSize] in production;
   /// tests can override via the widget's `sampleSize` constructor param.
   int get _effectiveSampleSize =>
-      widget.sampleSize ?? BeforeAfterView.canonicalSampleSize;
+      widget.sampleSize ?? kCanonicalSampleSize;
 
   @override
   void initState() {
@@ -522,7 +349,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       before = _before!;
     } else {
       try {
-        before = await previewSourceImageLoader(source, sampleSize);
+        before = await loadPreviewImage(source, sampleSize);
       } catch (e, st) {
         // 静かに握りつぶさず Flutter のエラー報告経路に
         // 乗せる（crash reporting 等が拾えるように）。
@@ -567,12 +394,12 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     ui.Image? after;
     try {
       after = steps == null
-          ? await afterImageRenderer(
+          ? await renderPreviewAfter(
               rendererInput,
               renderFilter,
               renderStrength,
             )
-          : await BeforeAfterView.renderAfterPipeline(rendererInput, steps);
+          : await renderDefaultAfterPipeline(rendererInput, steps);
     } catch (e, st) {
       // こちらも同様に報告する。
       FlutterError.reportError(FlutterErrorDetails(
@@ -714,7 +541,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         isoDate: date,
       );
 
-      final composed = await exportImageComposer(base, plan.caption);
+      final composed = await composeCaptionedExportImage(base, plan.caption);
       final bytes = await encodePngAndDispose(composed);
 
       final filename = exportFilename(
@@ -752,7 +579,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     final l10n = AppLocalizations.of(context)!;
 
     // The CPU preview renders at a canonical fixed size
-    // (see [BeforeAfterView.canonicalSampleSize]) regardless of the pane's
+    // (see [kCanonicalSampleSize]) regardless of the pane's
     // layout size or devicePixelRatio — LayoutBuilder here only decides
     // whether to stack the panes, it no longer drives sample-size generation
     // (the pre-#85 GPU-era `_recordPaneLayout`/auto-resize machinery, #58,
@@ -922,171 +749,6 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   }
 }
 
-/// 書き出し PNG に焼き込む [ExportCaption] を、描画時の値から解決する（#43/#76/#80、
-/// 2×2 比較の各セル #84 と共有）。
-///
-/// i18n はここで解決し、pure な [exportImageComposer] へは解決済み文字列だけを渡す
-/// （規律2）。引数は **画像を描画した時点の値** を渡すこと（呼び出し時点の現在の
-/// widget props ではなく）。
-///
-/// - 受診喚起は プレビューの注記（`FilterParamPanel`・`ExperiencePresetTile`）と同じ
-///   正本・同じ解決経路（[resolveConsultNotice]）を使う。色覚 7 型は urgency=none
-///   かつ escalation も無いので notice は自然に null になる。
-/// - 実験的なフィルタ（四色覚）には、近似であることに加えて「実験的」も焼き込む。
-///   対象は [VisionFilterEntry.isExperimental] が正本。
-/// - escalation は `ConsultNotice.escalationGroups` を詰め替えるだけで、グルーピングの
-///   ロジックはここに複製しない。
-ExportCaption buildExportCaption(
-  AppLocalizations l10n, {
-  required String? filterId,
-  required String? variantId,
-  required VisionFilter? filter,
-  required double strength,
-  required String isoDate,
-}) {
-  final notice = filter == null
-      ? null
-      : resolveConsultNotice(
-          l10n,
-          visionFilterUrgencyProvider(filter),
-          visionFilterUrgencyEscalationProvider(filter),
-        );
-  return ExportCaption(
-    symptomLabel: visionFilterDisplayName(l10n, variantId, filterId),
-    strengthLabel: l10n.strengthLabel(contract_notes.strengthPercent(strength)),
-    isoDate: isoDate,
-    simulationNotice: l10n.exportSimulationNotice,
-    experimentalNotice:
-        (kVisionFilterCatalogById[filterId]?.isExperimental ?? false)
-        ? l10n.exportExperimentalNotice
-        : null,
-    urgencyMessage: notice?.message,
-    escalationGroups: [
-      for (final g in notice?.escalationGroups ?? const [])
-        ExportEscalationGroup(header: g.header, lines: g.lines),
-    ],
-    disclaimer: notice?.disclaimerShort,
-  );
-}
-
-/// [planExport] の結果: 焼き込むキャプション・ファイル名の症状 id・強度（% の整数。複数層は null）。
-typedef ExportPlan = ({
-  ExportCaption caption,
-  String symptomId,
-  int? strengthPercent,
-});
-
-/// 書き出しの内容（キャプション・ファイル名の素）を、描画時点の値から決める（#121）。
-///
-/// [layers] は重ねている全層（[BeforeAfterView.exportLayers]、単一層なら null）。
-/// キャプションに数えるのは**強度が 0 より大きい層だけ**（[effectiveExportLayers]。強度 0 の層は
-/// 画素に効かないので、症状の行にも受診喚起にもファイル名にも入れない。表示が「0%」になる強度も同じ）。
-///
-/// - 2 層以上: [buildLayeredExportCaption]（層ごとの行 + 合成した受診喚起）。ファイル名は
-///   層の id を適用順につないだもの（[exportSymptomId]）で、強度の % は付けない。
-/// - 1 層: その層だけを、単一層の書き出し（[buildExportCaption]）と同じ見た目・同じ名前にする。
-/// - 0 層（単一層、原画比較中、表示強度（整数パーセント）が 0 の層しかない）: 引数の
-///   [filterId]/[variantId]/[filter]/[strength]（フォーカス中の層の値）で、従来どおりの
-///   単一層の書き出し。
-ExportPlan planExport(
-  AppLocalizations l10n, {
-  required List<ExportLayer>? layers,
-  required String? filterId,
-  required String? variantId,
-  required VisionFilter? filter,
-  required double strength,
-  required String isoDate,
-}) {
-  final effective = effectiveExportLayers(layers ?? const []);
-  if (effective.length >= 2) {
-    return (
-      caption: buildLayeredExportCaption(l10n,
-          layers: effective, isoDate: isoDate),
-      symptomId: exportSymptomId([for (final l in effective) l.layer.strengthKey]),
-      strengthPercent: null,
-    );
-  }
-  if (effective.length == 1) {
-    final only = effective.single;
-    filterId = only.layer.id;
-    variantId = only.layer.variantId;
-    filter = only.filter;
-    strength = only.strength;
-  }
-  return (
-    caption: buildExportCaption(
-      l10n,
-      filterId: filterId,
-      variantId: variantId,
-      filter: filter,
-      strength: strength,
-      isoDate: isoDate,
-    ),
-    // variantId があればその id（-omaly を含む）を使う（#60）。
-    // filterId は -omaly を base の -opia と区別できないため。
-    symptomId: exportSymptomId([variantId ?? filterId ?? 'none']),
-    strengthPercent: contract_notes.strengthPercent(strength),
-  );
-}
-
-/// 複数の層（[layers]、適用順、2 つ以上。呼び出し側が強度 0 を除いたもの）を重ねた書き出しの
-/// [ExportCaption]（#121）。
-///
-/// - 症状の行: 層ごとに 1 行（名前 + その層の強度）。
-/// - 受診喚起: 各層の緊急度の**最大**と、escalation の**段ごとの併合（重複は 1 行）**を
-///   [consultInputForFilters]（[mergeConsultInputs]）で 1 つにして、単一層と同じ
-///   [resolveConsultNotice] の経路で解決する。
-/// - 実験的の注記: どれか 1 層でも [VisionFilterEntry.isExperimental] なら添える。
-/// - 「シミュレーション（近似）」は常に焼き込む。
-ExportCaption buildLayeredExportCaption(
-  AppLocalizations l10n, {
-  required List<ExportLayer> layers,
-  required String isoDate,
-}) {
-  final input = consultInputForFilters([for (final l in layers) l.filter]);
-  final notice = resolveConsultNotice(l10n, input.urgency, input.escalation);
-  return ExportCaption.layered(
-    layers: [
-      for (final l in layers)
-        ExportLayerRow(
-          name: visionLayerDisplayName(l10n, l.layer),
-          strengthLabel:
-              l10n.strengthLabel(contract_notes.strengthPercent(l.strength)),
-        ),
-    ],
-    isoDate: isoDate,
-    simulationNotice: l10n.exportSimulationNotice,
-    experimentalNotice: layers.any(
-            (l) => kVisionFilterCatalogById[l.layer.id]?.isExperimental ?? false)
-        ? l10n.exportExperimentalNotice
-        : null,
-    urgencyMessage: notice?.message,
-    escalationGroups: [
-      for (final g in notice?.escalationGroups ?? const [])
-        ExportEscalationGroup(header: g.header, lines: g.lines),
-    ],
-    disclaimer: notice?.disclaimerShort,
-  );
-}
-
-/// [composed]（[exportImageComposer] などの戻り値）を PNG にエンコードし、
-/// **[composed] を破棄する**（エンコードの成否にかかわらず）。エンコード結果が
-/// 得られなければ [StateError]。
-Future<Uint8List> encodePngAndDispose(ui.Image composed) async {
-  Uint8List? bytes;
-  try {
-    bytes = await encodeImagePng(composed);
-  } catch (e) {
-    throw ExportEncodeException(e);
-  } finally {
-    composed.dispose();
-  }
-  if (bytes == null) {
-    throw const ExportEncodeException();
-  }
-  return bytes;
-}
-
 class _Pane extends StatelessWidget {
   const _Pane({
     required this.label,
@@ -1165,111 +827,3 @@ class _Pane extends StatelessWidget {
   }
 }
 
-/// A ui.Image drawn to fill its box (also used by the 2x2 color-vision compare
-/// view, #84). Shows a neutral placeholder box while [image] is null.
-///
-/// [semanticLabel] は画像の代替テキスト（スクリーンリーダー向け、#45）。null なら
-/// 読み上げ対象にしない（周囲の文言が説明を担うとき）。
-class PreviewImageView extends StatelessWidget {
-  const PreviewImageView({super.key, required this.image, this.semanticLabel});
-
-  final ui.Image? image;
-
-  /// 画像の代替テキスト。
-  final String? semanticLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    final img = image;
-    final Widget content = img == null
-        ? ColoredBox(
-            color: Theme.of(context).colorScheme.onSurface.withAlpha(0x11),
-          )
-        : CustomPaint(painter: _UiImagePainter(img), size: Size.infinite);
-    final label = semanticLabel;
-    if (label == null) return content;
-    return Semantics(image: true, label: label, child: content);
-  }
-}
-
-class _UiImagePainter extends CustomPainter {
-  _UiImagePainter(this.image);
-
-  final ui.Image image;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final src = Rect.fromLTWH(
-      0,
-      0,
-      image.width.toDouble(),
-      image.height.toDouble(),
-    );
-    final dst = Rect.fromLTWH(0, 0, size.width, size.height);
-    // filterQuality medium+ (#58): the sample is now sized close to the
-    // pane's physical resolution, but drawImageRect still scales it to fit
-    // `size` exactly — the default FilterQuality.none (nearest-neighbour)
-    // looks aliased on any residual up/downscale, especially on Retina.
-    canvas.drawImageRect(
-      image,
-      src,
-      dst,
-      Paint()..filterQuality = FilterQuality.medium,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_UiImagePainter oldDelegate) =>
-      !identical(oldDelegate.image, image);
-}
-
-/// Shown in the "after" pane when the latest generation/render attempt
-/// failed. Colours come only from `colorScheme` roles
-/// (#72 の方針): the `error`/`onErrorContainer` family, not a hardcoded value.
-class PreviewErrorPlaceholder extends StatelessWidget {
-  const PreviewErrorPlaceholder(
-      {super.key, required this.theme, required this.label});
-
-  final ThemeData theme;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      liveRegion: true,
-      container: true,
-      child: ColoredBox(
-        color: theme.colorScheme.errorContainer,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  color: theme.colorScheme.onErrorContainer,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onErrorContainer,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Encodes a [ui.Image] to PNG bytes. Helper kept here so tests can assert the
-/// rendered "after" image is non-empty without depending on widget internals.
-Future<Uint8List?> encodeImagePng(ui.Image image) async {
-  final data = await image.toByteData(format: ui.ImageByteFormat.png);
-  return data?.buffer.asUint8List();
-}

@@ -27,6 +27,7 @@ import 'package:universal_experience/ui/screens/home_screen.dart'
     show kMinPreviewPaneSide, previewPaneSideFor;
 import 'package:universal_experience/ui/widgets/adjust_panel.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
+import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 import 'package:universal_experience/ui/widgets/consult_notice_block.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';

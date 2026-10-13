@@ -15,6 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/models/preview_image_source.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
+import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 
 import 'support/sample_image_generator.dart';
 
@@ -23,7 +24,7 @@ void main() {
 
   group('loadPreviewSourceImage', () {
     test('SamplePreviewImageSource: asset をデコードし size×size に fit する', () async {
-      final image = await BeforeAfterView.loadPreviewSourceImage(
+      final image = await loadDefaultPreviewSourceImage(
         const SamplePreviewImageSource('chart'),
         32,
       );
@@ -34,7 +35,7 @@ void main() {
 
     test('未知の sampleId は ArgumentError', () {
       expect(
-        () => BeforeAfterView.loadPreviewSourceImage(
+        () => loadDefaultPreviewSourceImage(
           const SamplePreviewImageSource('no_such_sample'),
           32,
         ),
@@ -47,7 +48,7 @@ void main() {
       final source = await generateSampleImage(10);
       addTearDown(source.dispose);
 
-      final fitted = await BeforeAfterView.loadPreviewSourceImage(
+      final fitted = await loadDefaultPreviewSourceImage(
         UserPreviewImageSource(source, 1),
         16,
       );
@@ -75,7 +76,7 @@ void main() {
         );
 
     tearDown(() {
-      previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
+      previewSourceImageLoader = loadDefaultPreviewSourceImage;
     });
 
     testWidgets('imageSource が非 null なら previewSourceImageLoader 経由で読み込む',

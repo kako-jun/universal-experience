@@ -25,6 +25,7 @@ import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
+import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
 import 'vision_filter_metadata_fixture.dart';
@@ -95,8 +96,8 @@ void installHomeScreenFixtures() {
 void resetHomeScreenFixtures() {
   experiencesProvider = experiences;
   resetVisionFilterMetadataProviders();
-  previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
-  afterImageRenderer = BeforeAfterView.renderAfter;
+  previewSourceImageLoader = loadDefaultPreviewSourceImage;
+  afterImageRenderer = renderDefaultAfter;
   CpuVisionRenderer.pipelineApplier = CpuVisionRenderer.applyPipeline;
 }
 

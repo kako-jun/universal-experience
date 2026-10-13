@@ -11,6 +11,7 @@ import 'package:universal_experience/models/preview_image_source.dart';
 import 'package:universal_experience/services/export_service.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
+import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 import 'package:universal_experience/ui/widgets/export_feedback.dart';
 
 import 'support/sample_image_generator.dart';
@@ -169,8 +170,8 @@ void main() {
     tearDown(() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(SystemChannels.platform, null);
-      previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
-      afterImageRenderer = BeforeAfterView.renderAfter;
+      previewSourceImageLoader = loadDefaultPreviewSourceImage;
+      afterImageRenderer = renderDefaultAfter;
       exportImageComposer = composeExportImage;
       resetExportSeams();
       resetVisionFilterMetadataProviders();

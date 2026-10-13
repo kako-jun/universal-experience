@@ -22,6 +22,7 @@ import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
 import 'package:universal_experience/services/preview_selection.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
+import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 
 import 'support/color_vision_select.dart';
 import 'support/home_screen_harness.dart';

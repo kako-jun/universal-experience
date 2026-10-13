@@ -22,7 +22,7 @@ import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
 import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/services/vision_filter_snapshot.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
-import 'package:universal_experience/ui/widgets/before_after_view.dart';
+import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 
 import 'support/color_vision_select.dart';
@@ -44,8 +44,8 @@ void main() {
     // 外れたことを同一性で決定論的に確かめる（実時間に頼らない）。以降の runAsync を
     // 使う回帰テストは、ここで差し替えが効いていることを前提にしている。
     expect(previewSourceImageLoader,
-        isNot(BeforeAfterView.loadPreviewSourceImage));
-    expect(afterImageRenderer, isNot(BeforeAfterView.renderAfter));
+        isNot(loadDefaultPreviewSourceImage));
+    expect(afterImageRenderer, isNot(renderDefaultAfter));
     expect(CpuVisionRenderer.pipelineApplier,
         isNot(CpuVisionRenderer.applyPipeline));
     expect(experiencesProvider, isNot(experiences));
@@ -82,8 +82,8 @@ void main() {
 
     resetHomeScreenFixtures();
     expect(CpuVisionRenderer.pipelineApplier, CpuVisionRenderer.applyPipeline);
-    expect(previewSourceImageLoader, BeforeAfterView.loadPreviewSourceImage);
-    expect(afterImageRenderer, BeforeAfterView.renderAfter);
+    expect(previewSourceImageLoader, loadDefaultPreviewSourceImage);
+    expect(afterImageRenderer, renderDefaultAfter);
     expect(experiencesProvider, experiences);
   });
 

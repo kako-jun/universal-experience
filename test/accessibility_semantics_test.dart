@@ -23,7 +23,7 @@ import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart'
     show Urgency;
-import 'package:universal_experience/ui/widgets/before_after_view.dart';
+import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 import 'package:universal_experience/ui/widgets/image_source_picker.dart';
 import 'package:universal_experience/ui/widgets/loupe_hud.dart';
@@ -38,8 +38,8 @@ void main() {
   setUp(installHomeScreenFixtures);
   tearDown(() {
     resetHomeScreenFixtures();
-    previewSourceImageLoader = BeforeAfterView.loadPreviewSourceImage;
-    afterImageRenderer = BeforeAfterView.renderAfter;
+    previewSourceImageLoader = loadDefaultPreviewSourceImage;
+    afterImageRenderer = renderDefaultAfter;
   });
 
   const wide = Size(1280, 800);

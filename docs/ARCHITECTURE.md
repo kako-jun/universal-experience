@@ -981,11 +981,19 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   （→ `CpuVisionRenderer.pipelineApplier`。テストはこちらを差し替える）で 1 回の合成として適用する。
   空の列は描画器を呼ばず原画を返す。層が 0〜1 のときは従来の単一フィルタの経路のままで、
   最新優先の `_generation` はどちらの経路でも同じ。見出しは複数層で名前の要約（#120）、書き出しは層ごとの行（#121）
+- 書き出しの計画とエンコード・プレビュー描画の共有（#159）: キャプションの解決（`buildExportCaption` /
+  `buildLayeredExportCaption`）と書き出しの計画（`planExport`）は `lib/services/export_plan.dart`、PNG のエンコード
+  （`encodePngAndDispose` / `encodeImagePng`）は `export_service.dart` に置く（ウィジェットは段取りを持たない）。
+  プレビュー描画の差し替え口（`previewSourceImageLoader` / `afterImageRenderer` / `exportImageComposer`）・
+  呼び出し口（`loadPreviewImage` / `renderPreviewAfter` / `composeCaptionedExportImage`）・既定の実体
+  （`loadDefaultPreviewSourceImage` / `renderDefaultAfter` / `renderDefaultAfterPipeline`）・正準サイズ
+  `kCanonicalSampleSize`・`PreviewImageView` / `PreviewErrorPlaceholder` は `ui/widgets/preview_rendering.dart`
+  にあり、`BeforeAfterView` と `ColorVisionCompareView` はこれを共有する（後者は `before_after_view.dart` を import しない）
 - `BeforeAfterView`（`lib/ui/widgets/before_after_view.dart`）: before/after
   プレビューペイン。横並びのとき、画像 1 枚の一辺は `maxPaneSide`（呼び出し側が高さから決める、#130）を
   上限にでき、超える幅では 2 枚を中央に寄せる（縦積みでは使わない）。#85 で、ペインの論理サイズ・
   `devicePixelRatio` に連動して都度サイズを変えていた旧 GPU 時代の auto-sizing
-  （#58）を撤去し、常に固定の正準サイズ（`canonicalSampleSize` = 1024）で
+  （#58）を撤去し、常に固定の正準サイズ（`kCanonicalSampleSize` = 1024）で
   `CpuVisionRenderer` に描画させ、表示側は `FilterQuality.medium` でスケールする
   方式に変えた。理由は2つ: (1) `DetailLoss.cellSize` のように**絶対ピクセル数**
   でパラメータを取るフィルタは、画像サイズが変わるたびに見え方自体が変わって
@@ -1011,7 +1019,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   まだ無ければ `widget.strength`）から作り、再描画中に新しい強さが古い画像に被らない。失敗したセルは
   「描画に失敗しました」の文言に切り替わる。新しい描画が控えている間（`_rebuildPending`）の失敗は
   表示せず、最新の入力の描画が失敗したときだけ失敗を出す（スライダー操作中の点滅防止）。
-  書き出しは各セルを `buildExportCaption` + `composeExportImage`（単独の書き出しと同じキャプション）で
+  書き出しは各セルを `buildExportCaption`（`lib/services/export_plan.dart`）+ `composeExportImage`（単独の書き出しと同じキャプション）で
   焼き込み、`composeCompareGrid`（`export_service.dart`。配置は pure な `compareGridLayout`）で
   1 枚に並べる。キャプションは描画時点の強さから作り、保存・通知・失敗の扱いは
   `saveExportPng` / `showExportSuccess` / `showExportFailure`（`BeforeAfterView` の書き出しと共通）を使う。
@@ -1019,7 +1027,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   色覚層の有無（`colorVisionLayerOf`）・色覚層の強度・土台（色覚以外の強度 > 0 の層を状態の順に、
   `VisionStep` と `ExportLayer` の両方）を決める。色覚層が無ければ null（切替を出さない）。bypass 中は強度 0 で土台なし。
   `ColorVisionCompareView` は `baseSteps` / `baseLayers` を受け取り、`_rebuild` の先頭で
-  `BeforeAfterView.renderAfterPipeline` を **1 回だけ**呼んで土台を作り（空なら原画）、4 セルは土台の複製に色覚 1 段を適用する。
+  `renderDefaultAfterPipeline` を **1 回だけ**呼んで土台を作り（空なら原画）、4 セルは土台の複製に色覚 1 段を適用する。
   土台は「steps・元画像・サイズ」をキーに保持し、色覚の強度だけが動いたときは作り直さない（層・強度・パラメータが
   変わると `didUpdateWidget` が再構築し、既存の直列・最新優先に乗る）。描画時点の値（強さ・土台の層）は控え
   （`_afterStrength` / `_afterBaseLayers`）に固定し、書き出し（キャプションの症状名行・ファイル名）はその控えから作るので
@@ -1041,7 +1049,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   GPU golden テストが（production の呼び出しとは独立に）担保する
 - 複数層の書き出し（#121）: `BeforeAfterView` は画像を描画した時点の層の列を `ExportLayer`
   （`lib/services/export_layers.dart`。層・構築済みフィルタ・強度）として控え、書き出しはその控えから
-  `planExport` でキャプション（`ExportCaption.layered`）・症状 id・強度を作る（呼び出し時点の選択は
+  `planExport`（`lib/services/export_plan.dart`。UI に依存しない純粋ロジックで、2×2 比較とも共有）でキャプション（`ExportCaption.layered`）・症状 id・強度を作る（呼び出し時点の選択は
   見ない）。画像に効いている層（強度 > 0 の `effectiveExportLayers`。判定はキャプションに出す整数パーセント
   `strengthPercent` で、0.004 のように「0%」と出る強度も数えない）ごとに「症状名 + 強度」の行を
   適用順に並べ、受診喚起は `consultInputForFilters` の併合（最大の緊急度・escalation は段ごとに重複除去）
@@ -1222,7 +1230,7 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   - `cpu_preview_all_filters_test.dart`（#85）: `kVisionFilterCatalog` の全 30
     エントリについて、`VisionFilterState.select()/build()` でカタログ既定値の
     payload を埋めた `VisionFilter` を組み立て、`CpuVisionRenderer.apply()`
-    （実ブリッジ）で production と同じ [canonicalSampleSize]（1024、#85）の
+    （実ブリッジ）で production と同じ [kCanonicalSampleSize]（1024、#85）の
     サンプル画像に適用する。例外が出ないこと・出力が入力サイズと
     一致すること・出力ピクセルが入力と異なること（strength=1.0 で全フィルタが
     視覚的に効果を持つ設計であるため）を検証する。加えて protanopia について、

@@ -11,10 +11,11 @@ import '../../models/preview_image_source.dart';
 import '../../models/vision_filter_contract_notes.dart' as contract_notes;
 import '../../services/color_vision_compare.dart';
 import '../../services/export_layers.dart';
+import '../../services/export_plan.dart';
 import '../../services/export_service.dart';
 import '../../services/vision_layer.dart';
 import '../../src/rust/api/sensus_bridge.dart' show VisionStep;
-import 'before_after_view.dart';
+import 'preview_rendering.dart';
 import 'export_feedback.dart';
 
 /// [ColorVisionCompareView] の書き出しファイル名に入れる識別子（`exportFilename` の
@@ -73,7 +74,7 @@ class ColorVisionCompareView extends StatefulWidget {
   final PreviewImageSource imageSource;
 
   /// テスト用の描画解像度（正方形の一辺）。null（本番）は
-  /// [BeforeAfterView.canonicalSampleSize]。
+  /// [kCanonicalSampleSize]。
   final int? sampleSize;
 
   @override
@@ -123,7 +124,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
   bool _rebuildPending = false;
 
   int get _effectiveSampleSize =>
-      widget.sampleSize ?? BeforeAfterView.canonicalSampleSize;
+      widget.sampleSize ?? kCanonicalSampleSize;
 
   @override
   void initState() {
@@ -264,7 +265,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       final input = before.clone();
       ui.Image? composed;
       try {
-        composed = await BeforeAfterView.renderAfterPipeline(input, baseSteps);
+        composed = await renderDefaultAfterPipeline(input, baseSteps);
         if (composed == null) {
           throw StateError('Renderer returned no base image');
         }
