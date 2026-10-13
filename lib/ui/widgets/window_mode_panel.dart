@@ -288,6 +288,13 @@ class WindowModePanel extends StatelessWidget {
   }
 }
 
+/// ホットキー表記用の等幅フォント名（macOS / Windows / Linux の順）。
+const List<String> _kMonospaceFallback = <String>[
+  'Menlo',
+  'Consolas',
+  'DejaVu Sans Mono',
+];
+
 class _HotkeyRow extends StatelessWidget {
   const _HotkeyRow({
     required this.hotKey,
@@ -321,6 +328,13 @@ class _HotkeyRow extends StatelessWidget {
             style: theme.textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
               fontFamily: 'monospace',
+              // macOS・Windows では 'monospace' が解決されず既定のプロポーショナル
+              // フォントになるため、OS ごとの等幅フォント名を先に並べる。テーマ既存の
+              // fallback（日本語・記号）は後ろに残す。
+              fontFamilyFallback: <String>[
+                ..._kMonospaceFallback,
+                ...?theme.textTheme.bodySmall?.fontFamilyFallback,
+              ],
             ),
           ),
           if (failed) ...[
