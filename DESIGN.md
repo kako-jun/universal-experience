@@ -100,6 +100,7 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 
 - **イタリックを使わない。** 日本語では斜体が崩れて読みにくい。注記・免責文は `w500` などの太さで区別する。
   アプリ内に `FontStyle.italic` は残っていない。
+- 等幅（ホットキー表記）は `fontFamily: 'monospace'` だが、`monospace` の解決は OS で異なる（Linux は fontconfig で等幅になるが、macOS・Windows は解決されず既定のプロポーショナルになる）。そのため `fontFamilyFallback` の先頭に具体名（`Menlo` / `Consolas` / `DejaVu Sans Mono`）を足し、テーマ既存の fallback は後ろに残す。フォントファイルは同梱しない（OS 同梱のフォントを名前で参照するだけ）。
 - 行の長さは日本語で 40 字前後、英語で 70 字前後を上限の目安にする（本文カラムの最大幅で制御）。
 
 ## 4. 余白・角丸
@@ -384,7 +385,7 @@ UE_SCREENSHOTS=1 UE_SCREENSHOT_DIR=/path/to/out \
   `composeExportImage` の出力そのものを `export-{1|3|5}-layers-{ja|en}-{1024|480}.png` に書く
   （同じく `UE_SCREENSHOTS=1`。土台はダミーのグラデーションで、受診喚起は文章量が最大になる入力）。
 - フォールバック: macOS のシステムフォント（ヒラギノ角ゴシック / Apple Symbols）と Flutter SDK 同梱の
-  Roboto・Material Icons を `FontLoader` で読む。**フォントファイルはリポに入れない。** 見つからない環境では
+  Roboto・Material Icons を `FontLoader` で読む。ホットキー表記が指定する `fontFamily: 'monospace'` はテストで解決できず四角になるため、macOS の Menlo（無ければ Roboto）を `monospace` 名でも登録する（#171）。**フォントファイルはリポに入れない。** 見つからない環境では
   警告を出して既定フォント（四角）のまま進む。
 - after ペインは実ブリッジ（sensus の CPU `apply()`）を呼べないため、レイアウト確認専用の簡易フェイク
   （輝度への単純なブレンド）に差し替えている。**色覚シミュレーションの正しさを示す画像ではない。**

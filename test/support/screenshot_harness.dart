@@ -89,6 +89,7 @@ Future<void> loadScreenshotFonts() async {
 
   final fontsDir = _materialFontsDir();
   final missing = <String>[];
+  Future<ByteData>? monoFallback;
 
   if (fontsDir != null) {
     final icons = File('${fontsDir.path}/MaterialIcons-Regular.otf');
@@ -105,15 +106,31 @@ Future<void> loadScreenshotFonts() async {
     ].where((f) => f.existsSync()).toList();
     if (roboto.isNotEmpty) {
       final loader = FontLoader('Roboto');
-      for (final f in roboto) {
-        loader.addFont(read(f));
-      }
+      final futures = <Future<ByteData>>[for (final f in roboto) read(f)];
+      futures.forEach(loader.addFont);
       await loader.load();
+      // 等幅の予備（Menlo が無い環境用。下で登録する）。読み込み済みの bytes を再利用する。
+      monoFallback = futures.first;
     } else {
       missing.add('Roboto');
     }
   } else {
     missing.addAll(<String>['MaterialIcons', 'Roboto']);
+  }
+
+  // ホットキー表記の `fontFamily: 'monospace'` は flutter test では解決できず Ahem（四角）に
+  // なる（#171）。macOS の Menlo があれば 'monospace' / 'Menlo' 名で登録して本番に合わせ、
+  // 無ければ Roboto を 'monospace' 名で代用する。
+  final menlo = File('/System/Library/Fonts/Menlo.ttc');
+  if (menlo.existsSync()) {
+    final bytes = await read(menlo);
+    for (final family in <String>['monospace', 'Menlo']) {
+      final loader = FontLoader(family)..addFont(Future<ByteData>.value(bytes));
+      await loader.load();
+    }
+  } else if (monoFallback != null) {
+    final loader = FontLoader('monospace')..addFont(monoFallback);
+    await loader.load();
   }
 
   // 日本語は別ファミリ名で読み込み、テーマの fontFamilyFallback から参照する
