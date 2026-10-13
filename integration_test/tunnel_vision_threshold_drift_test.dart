@@ -154,8 +154,8 @@ void main() {
     final lower = await _measure(threshold - 0.01);
     final higher = await _measure(threshold + 0.01);
 
-    // 可視円（半減半径）の直径が画像幅に占める比（コメントの「幅の約 1 割」）。
-    final diameterOverWidth = 2 * at.halfX / _w;
+    // 完全に見える円（最初の変化まで）の直径が画像幅に占める比（コメントの「幅の約 1 割」）。
+    final diameterOverWidth = 2 * at.firstX / _w;
     expect(diameterOverWidth, inInclusiveRange(0.10, 0.13));
 
     expect(lower.halfX, greaterThan(at.halfX));
