@@ -53,5 +53,6 @@
 ## 関連 Issue・PR・docs
 
 - Issue #158（本件）、#160（Windows 対応と Releases 配布の ADR）
+- `docs/adr/2026-10-13-windows-support-and-releases-distribution.md`（配布形式・未署名の判断）
 - PR #165
 - `CLAUDE.md`「リリース手順」、`.github/workflows/release.yml`、`.github/workflows/ci.yml`
