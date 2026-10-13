@@ -355,7 +355,8 @@ tray_manager 0.2.4 の Windows 実装は、画像を読めなくても `setIcon`
 **検出できないもの**: 形式は正しいのに壊れていて `LoadImage` が NULL を返す場合と、
 `Shell_NotifyIcon(NIM_ADD)` の失敗 (Explorer 未起動など)。tray_manager がどちらの戻り値も
 無視するため。最終的な防御は Windows 実機確認。テストは `test/tray_service_test.dart`。
-Windows 実機での表示・✕ の挙動の確認は未了。
+Windows 実機での表示・✕ の挙動の確認は未了（#150）。ICO の同梱（#163）と、実ブリッジのロード・初期化の CI
+検証（#165）は済んでいるが、トレイの描画自体は CI の対象外。
 
 ### 実機目視について (正直な明記)
 
@@ -546,7 +547,8 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
 
 > **実機未検証の注意**: Windows で `Ctrl+Alt+Shift+Esc`（`emergencyExit` の既定キー）が
 > OS 標準や他アプリのショートカットと衝突しないかは、Windows 実機でまだ
-> 確認できていない。Windows 対応時に確認が必要。
+> 確認できていない。Windows は対応 OS になっている（CI は実ブリッジのロードまで）が、
+> このキーの衝突確認は実機確認（#150）に残っている。
 
 ### クリックスルーの復帰経路
 
@@ -571,7 +573,7 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
 > **実機未検証の注意**: フォーカス復帰＋最初のキー入力と Esc の組み合わせが、実際にすべてのプラット
 > フォーム（macOS/Linux/Windows）で意図どおり動くかは、この実装段階では実機確認していない。特に
 > Windows はトレイアイコンのクリックが `SetForegroundWindow` でこのウィンドウを前面化することがあり、
-> その挙動が「解除の予約」にどう影響するかは Windows 対応時に確認が必要（トレイ操作そのものではクリック
+> その挙動が「解除の予約」にどう影響するかは Windows 実機での確認が残っている（#150。トレイ操作そのものではクリック
 > スルーは解除されず、その後アプリ内で最初のキー入力があった時点で解除される設計だが、実機での動作は
 > 未検証）。
 
@@ -870,9 +872,10 @@ ShaderFilter    (lib/rendering/) — Impeller FragmentProgram。将来のライ�
 `rust/` crate は `rust_builder/`（cargokit 統合、#55）経由でビルドされ、
 macOS / Linux / Windows アプリに同梱される。Windows は FFI plugin の CMake が
 `apply_cargokit` で Rust DLL を作り、標準 runner が exe と同じ場所へ同梱する（#149）。
-CI は x64 debug bundle の DLL 存在確認・実ブリッジ integration test（#158）・
-artifact 保存を行う。画面・トレイ・
-ホットキー・クリップボード・PNG書き出しの実機確認は残る。
+CI は x64 debug bundle の DLL 存在確認・実ブリッジ integration test（#158、#165）・
+artifact 保存を行い、配布は GitHub Releases の未署名 zip
+（`docs/adr/2026-10-13-windows-support-and-releases-distribution.md`）。画面・トレイ・
+ホットキー・クリップボード・PNG書き出しの Windows 実機確認は残る（#150）。
 `lib/main.dart` の `buildRootApp()`（#55 で `main()` から
 切り出したルート Widget 組み立て関数）が `runApp`
 前に `services/native_bridge_service.dart` の `initNativeBridge()` を呼んで
@@ -1175,6 +1178,27 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   `VisionFilterState`/`ImageSourceState` 自体の変更は監視しない（起動時の復元・
   `seedInitialLayers`・推奨サンプルへの自動追従と区別するため）。トレイ・ホットキー経由の
   選択では閉じない
+- UI ウィジェットの役割（#72 / #120 以降で追加。`lib/ui/widgets/` ほか）:
+  - `FilterBrowser` / `FilterBrowserController`: 左カラム「選ぶ」。検索語・カテゴリ・検索欄フォーカスをコントローラが持ち、
+    選択の正本は `VisionFilterState` のまま
+  - `FilterListTile`: 統合一覧の 1 行。種別（`FilterListTileKind`: preset / check / radio）で形を変え、選択中は色だけでなく
+    チェック・適用順の番号で示す。上限で選べない行は理由を 2 行目に出す
+  - `LayerChipStrip`: プレビュー上の、重ねた層のチップ帯（適用順・✕ で 1 層除去・すべて解除）。2 層以上のときだけ出る
+  - `AdjustPanel`: 右カラム「調整」。1 層は従来の 1 節、複数層は層ごとの節（調整中の層だけ展開）。何も選んでいなければ空状態
+  - `FilterParamPanel`: 調整中の層の強度スライダー 1 本・推奨値に戻す・受診喚起・`VisionParam` から動的に作るパラメータ UI
+  - `ConsultNoticeBlock`: 受診喚起（喚起文・escalation・免責文）の唯一の表示ウィジェット。`layerConsultNotice`
+    （`lib/services/layer_consult_notice.dart`）は層 1 つ単体の喚起を解決し、複数層の合成 `mergeConsultInputs` は PNG 書き出し側が使う
+  - `StrengthCautionNote` / `StrengthCautionTrackShape`: 強度の上限付近の印と注記（#66）
+  - `FilterProvenance`: 最下段の折りたたみ「モデルと出典」「表現できないこと」（sensus の英文をそのまま出す、#80）。
+    `ExperimentalBadge`: 「実験的」バッジ（枠・アイコン・文言）
+  - `PreviewImageView` / `PreviewErrorPlaceholder` と描画の差し替え口（`preview_rendering.dart`）: `BeforeAfterView` と
+    `ColorVisionCompareView` の共有部品（#159）
+  - `export_feedback.dart`: PNG 書き出しの保存ステップ（`saveExportPng`）と成功/失敗の通知（`showExportSuccess` /
+    `showExportFailure`、パスをコピー・保存場所を選ぶ）。テスト用の差し替え口を持つ（#162）
+  - `WindowModePanel` / `ClickThroughRecoveryBanner`: 起動モードのダイアログの中身と、クリックスルー ON の間の復帰方法の案内
+  - `ClickThroughDialogScope`: ダイアログ共通。クリックスルー ON でダイアログを閉じ、ON の間は Esc を解除にする。
+    起動モードと言語の両ダイアログが使う
+  - `showLanguageDialog`: AppBar の言語ピッカー（自動 / 日本語 / English、自称名で表示、#82）
 - カテゴリチップ（`FilterBrowser`）: 検索語があるあいだ（`isSearching`）は全チップを非選択表示（チェック・選択色なし。通常の非選択チップと同じ見た目）にする。
   `FilterBrowserController.category` は保持し、検索語を消すと元の選択表示に戻る（#143）
 

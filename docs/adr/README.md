@@ -36,6 +36,7 @@ Universal Experience（ue）の主要な設計判断を記録する正本ディ�
 
 | ファイル | タイトル | 決定日 | ステータス |
 |---|---|---|---|
+| [2026-10-13-windows-support-and-releases-distribution.md](2026-10-13-windows-support-and-releases-distribution.md) | Windows を対応 OS に加え、配布は GitHub Releases の未署名アーカイブにする | 2026-10-13 | Accepted |
 | [2026-10-13-release-gate-and-version-source.md](2026-10-13-release-gate-and-version-source.md) | リリースの CI 関門と版の正本（pubspec.yaml） | 2026-10-13 | Accepted |
 | [2026-09-30-multi-select-filter-state-model.md](2026-09-30-multi-select-filter-state-model.md) | 状態モデルを「順序つきレイヤー列」の 1 系統に統一し、複数症状の同時適用を sensus の Pipeline で合成する | 2026-09-30 | Accepted（#117〜#124 実装済み・#125 は sensus の標準順序 API 待ち） |
 | [2026-09-30-color-vision-2x2-compare.md](2026-09-30-color-vision-2x2-compare.md) | 色覚 4 型の一覧比較（2×2）は Before / After の代わりに中央カラムへ出し、既存の描画・書き出しの経路を再利用する | 2026-09-30 | Accepted |
