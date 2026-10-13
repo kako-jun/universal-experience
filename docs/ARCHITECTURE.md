@@ -107,6 +107,17 @@
 (window_manager ラッパ + 純粋ロジック `LoupeWindowPolicy`) と `lib/main.dart` の配線。
 画面キャプチャ (#3/#4/#5)・ライブ適用・描画 (#1)・フィルタ UI (#16)・トレイ (#15) は本節のスコープ外。
 
+### ルーペ窓モードの可用性 (#156)
+
+ライブ画面キャプチャ（#1/#3/#5）が入るまで、ルーペ窓モード（`AppMode.loupe`）は選べない。
+可否は `LoupeWindowPolicy.loupeModeAvailable`（現状 `false`）の 1 箇所で決め、
+`LoupeWindowPolicy.resolveAppMode` が要求モードを実効モードへ解決する。`LoupeWindowController`
+は保存値の復元（`load`）と `setAppMode` の両方でこれを通すため、保存済み設定・UI・トレイ・
+ホットキーのどの経路でも透明背景＋クリックスルーの状態に入らない（`setClickThrough` は
+設定窓モードで拒否する既存の不変条件による）。フォールバック中は保存値のルーペ窓を上書きしない。
+UI は起動モードのルーペ窓を無効表示にして理由を出し（`windowModeLoupeUnavailableNote`）、
+トレイの項目も無効にする。キャプチャ実装時は `loupeModeAvailable` を `true` にすれば戻る。
+
 対象アプリ指定モード（ルーペ窓の自動配置モード）の設計判断・要検証事項・OS ごとの
 提供可否は `docs/adr/2026-09-26-loupe-as-single-render-unit.md` 参照。
 
