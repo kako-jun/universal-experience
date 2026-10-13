@@ -289,6 +289,7 @@ class WindowModePanel extends StatelessWidget {
 }
 
 /// ホットキー表記用の等幅フォント名（macOS / Windows / Linux の順）。
+/// Linux では 'monospace' 自体が fontconfig で先に解決されるので、DejaVu Sans Mono は保険。
 const List<String> _kMonospaceFallback = <String>[
   'Menlo',
   'Consolas',

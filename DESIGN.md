@@ -1,5 +1,3 @@
-
-等幅（ホットキー表記）は `fontFamily: 'monospace'` だが、`monospace` の解決は OS で異なる（Linux は fontconfig で等幅になるが、macOS・Windows は解決されず既定のプロポーショナルになる）。そのため `fontFamilyFallback` の先頭に具体名（`Menlo` / `Consolas` / `DejaVu Sans Mono`）を足し、テーマ既存の fallback は後ろに残す。フォントファイルは同梱しない（OS 同梱のフォントを名前で参照するだけ）。
 # DESIGN.md — Universal Experience の UI 設計原則
 
 UI を触る変更（色・余白・コンポーネント・画面構成）は、この文書に従う。
@@ -102,6 +100,7 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 
 - **イタリックを使わない。** 日本語では斜体が崩れて読みにくい。注記・免責文は `w500` などの太さで区別する。
   アプリ内に `FontStyle.italic` は残っていない。
+- 等幅（ホットキー表記）は `fontFamily: 'monospace'` だが、`monospace` の解決は OS で異なる（Linux は fontconfig で等幅になるが、macOS・Windows は解決されず既定のプロポーショナルになる）。そのため `fontFamilyFallback` の先頭に具体名（`Menlo` / `Consolas` / `DejaVu Sans Mono`）を足し、テーマ既存の fallback は後ろに残す。フォントファイルは同梱しない（OS 同梱のフォントを名前で参照するだけ）。
 - 行の長さは日本語で 40 字前後、英語で 70 字前後を上限の目安にする（本文カラムの最大幅で制御）。
 
 ## 4. 余白・角丸
