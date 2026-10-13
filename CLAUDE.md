@@ -349,7 +349,7 @@ clippy --all-targets -D warnings / cargo test / flutter build macos --debug /
 build より前に置く。rust 依存は crates.io のみ（sensus-core）なので、private
 依存を git 経由で引く場合に要る deploy key / ssh-agent 設定は不要。
 
-`windows-build` も実ブリッジ integration test（macOS / Linux と同じ4ファイルを
+`windows-build` も実ブリッジ integration test（macOS / Linux と同じ5ファイルを
 `-d windows` でファイルごとに実行、#158）を回す。ci.yml は `workflow_call` でも
 呼べる（release.yml が使う）。
 
