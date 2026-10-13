@@ -91,6 +91,7 @@
   "experienceIncludesHearingNote": "この体験には聴覚症状も含まれます（音声再生は未対応です）。",
 
   "trayTooltip": "Universal Experience",
+  "trayAppModeLoupeUnavailable": "ルーペ窓（準備中）",
   "trayShowLoupe": "ルーペ窓を表示",
   "trayHideLoupe": "ルーペ窓を隠す",
   "trayClearFilter": "フィルタを解除",

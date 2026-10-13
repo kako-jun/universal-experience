@@ -272,7 +272,7 @@ List<TrayMenuEntry> buildTrayMenuSpec({
   required AppMode appMode,
   required bool alwaysOnTop,
   required bool clickThrough,
-  bool loupeModeAvailable = true,
+  required bool loupeModeAvailable,
   Set<String> checkedListEntryKeys = const {},
   Set<String> disabledListEntryKeys = const {},
   bool hasLayers = false,
@@ -288,7 +288,9 @@ List<TrayMenuEntry> buildTrayMenuSpec({
     TrayMenuEntry(
       kind: TrayMenuKind.toggleAppMode,
       key: kToggleAppModeKey,
-      label: labels.appModeLoupeLabel,
+      label: loupeModeAvailable
+          ? labels.appModeLoupeLabel
+          : labels.appModeLoupeUnavailableLabel,
       checked: appMode == AppMode.loupe,
       // ライブキャプチャ未実装の間は選べない (#156)。
       enabled: loupeModeAvailable,
@@ -567,7 +569,33 @@ class TrayService with TrayListener {
     await _rebuildMenu();
   }
 
+  /// 現在の状態から組み立てたトレイメニュー構造。ネイティブへは送らない
+  /// （起動モード項目の無効化などをテストから確かめるための入口）。
+  @visibleForTesting
+  List<TrayMenuEntry> currentMenuSpec() => _buildSpec();
+
   Future<void> _rebuildMenu() async {
+    final spec = _buildSpec();
+    // 変化が無いなら OS へ再送しない。スライダーのドラッグ中などに
+    // visionFilterState が連続通知されても、ネイティブメニューを作り直し続けない。
+    final last = _lastSpec;
+    if (last != null && listEquals(last, spec)) return;
+    // 送信の完了を待たずに「最後に送った構造」を更新する。完了後に更新すると、
+    // 送信中に A→B→A と変わったとき、最後の A が（まだ記録が古い A と等しいため）
+    // 送られず、ネイティブが B のまま残る。チャネルは送信順に処理される。
+    _lastSpec = spec;
+    final menu = Menu(items: spec.map(_toMenuItem).toList());
+    try {
+      await trayManager.setContextMenu(menu);
+    } catch (error) {
+      // 失敗した送信が最新なら、次の再構築で必ず再送させる（より新しい送信が
+      // すでに走っているなら、その記録を消さない）。
+      if (identical(_lastSpec, spec)) _lastSpec = null;
+      debugPrint('TrayService.setContextMenu failed: $error');
+    }
+  }
+
+  List<TrayMenuEntry> _buildSpec() {
     // チェックと灰色は、すべて VisionFilterState の層の集合から決める（ウィンドウ内 UI の
     // 選択がそのままトレイに出る、#65/#121）。一覧の行との対応はメイン画面の一覧と同じ
     // 判定（[layerForFilterListEntry]）なので、色覚 base 型を高度な
@@ -595,23 +623,7 @@ class TrayService with TrayListener {
       disabledListEntryKeys: disabled,
       hasLayers: visionFilterState.layers.isNotEmpty,
     );
-    // 変化が無いなら OS へ再送しない。スライダーのドラッグ中などに
-    // visionFilterState が連続通知されても、ネイティブメニューを作り直し続けない。
-    final last = _lastSpec;
-    if (last != null && listEquals(last, spec)) return;
-    // 送信の完了を待たずに「最後に送った構造」を更新する。完了後に更新すると、
-    // 送信中に A→B→A と変わったとき、最後の A が（まだ記録が古い A と等しいため）
-    // 送られず、ネイティブが B のまま残る。チャネルは送信順に処理される。
-    _lastSpec = spec;
-    final menu = Menu(items: spec.map(_toMenuItem).toList());
-    try {
-      await trayManager.setContextMenu(menu);
-    } catch (error) {
-      // 失敗した送信が最新なら、次の再構築で必ず再送させる（より新しい送信が
-      // すでに走っているなら、その記録を消さない）。
-      if (identical(_lastSpec, spec)) _lastSpec = null;
-      debugPrint('TrayService.setContextMenu failed: $error');
-    }
+    return spec;
   }
 
   /// 最後にネイティブへ送ったメニュー構造（[_rebuildMenu] の重複送信の抑止用）。

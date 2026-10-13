@@ -360,6 +360,10 @@
   "@trayTooltip": {
     "description": "Tray icon tooltip."
   },
+  "trayAppModeLoupeUnavailable": "Loupe window (coming soon)",
+  "@trayAppModeLoupeUnavailable": {
+    "description": "Tray menu label of the loupe app mode item while it is disabled because live screen capture is not implemented yet (#156)."
+  },
   "trayShowLoupe": "Show loupe window",
   "@trayShowLoupe": {
     "description": "Tray menu item that shows the loupe (main) window."

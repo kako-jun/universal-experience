@@ -26,6 +26,7 @@ const _labels = TrayMenuLabels(
     'protanomaly': '1型3色覚（赤）',
   },
   appModeLoupeLabel: 'ルーペ窓',
+  appModeLoupeUnavailableLabel: 'ルーペ窓（準備中）',
   alwaysOnTopLabel: '最前面に固定',
   clickThroughLabel: 'クリックスルー',
   advancedFilters: '高度なフィルタ',
@@ -102,6 +103,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       );
       final kinds = spec.map((e) => e.kind).toSet();
 
@@ -120,6 +122,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       );
       final apply = spec
           .where((e) => e.kind == TrayMenuKind.applyColorVisionFilter)
@@ -139,6 +142,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       );
       final keys = interactive(spec).map((e) => e.key).toList();
 
@@ -153,6 +157,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       ).firstWhere((e) => e.kind == TrayMenuKind.toggleLoupe);
       final hidden = buildTrayMenuSpec(
         loupeVisible: false,
@@ -160,6 +165,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       ).firstWhere((e) => e.kind == TrayMenuKind.toggleLoupe);
 
       expect(visible.label, 'ルーペ窓を隠す');
@@ -175,6 +181,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
         checkedListEntryKeys: {colorVisionListEntryKey('deuteranopia')},
         hasLayers: true,
       );
@@ -195,6 +202,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       ).firstWhere((e) => e.kind == TrayMenuKind.clearFilter);
       final inactive = buildTrayMenuSpec(
         loupeVisible: true,
@@ -202,6 +210,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
         hasLayers: true,
       ).firstWhere((e) => e.kind == TrayMenuKind.clearFilter);
 
@@ -216,6 +225,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       );
       expect(spec.last.kind, TrayMenuKind.quit);
     });
@@ -227,6 +237,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
         checkedListEntryKeys: {colorVisionListEntryKey('protanopia')},
         hasLayers: true,
       );
@@ -245,6 +256,52 @@ void main() {
     });
   });
 
+  group('ルーペ窓モードが使えない間のトレイ項目 (#156)', () {
+    TrayMenuEntry appModeEntry(List<TrayMenuEntry> spec) =>
+        spec.firstWhere((e) => e.kind == TrayMenuKind.toggleAppMode);
+
+    test('loupeModeAvailable: false なら起動モード項目は無効', () {
+      final spec = buildTrayMenuSpec(
+        loupeVisible: true,
+        labels: _labels,
+        appMode: AppMode.settings,
+        alwaysOnTop: false,
+        clickThrough: false,
+        loupeModeAvailable: false,
+      );
+      expect(appModeEntry(spec).enabled, isFalse);
+      expect(appModeEntry(spec).label, 'ルーペ窓（準備中）');
+    });
+
+    test('loupeModeAvailable: true なら有効で通常のラベル', () {
+      final spec = buildTrayMenuSpec(
+        loupeVisible: true,
+        labels: _labels,
+        appMode: AppMode.settings,
+        alwaysOnTop: false,
+        clickThrough: false,
+        loupeModeAvailable: true,
+      );
+      expect(appModeEntry(spec).enabled, isTrue);
+      expect(appModeEntry(spec).label, 'ルーペ窓');
+    });
+
+    test('既定のコントローラの TrayService は無効の起動モード項目を出す', () {
+      final tray = TrayService(
+        visionFilterState: VisionFilterState(),
+        loupeWindow: LoupeWindowController(),
+        iconPath: 'assets/tray/tray_icon.png',
+        labels: _labels,
+        tooltip: 'Universal Experience',
+        onShowLoupe: () async {},
+        onHideLoupe: () async {},
+        onOpenSettings: () async {},
+        onQuit: () async {},
+      );
+      expect(appModeEntry(tray.currentMenuSpec()).enabled, isFalse);
+    });
+  });
+
   group('buildTrayMenuSpec の起動モード/最前面/クリックスルー (#63)', () {
     test('appMode/alwaysOnTop/clickThrough のチェック状態を反映する', () {
       final loupeChecked = buildTrayMenuSpec(
@@ -253,6 +310,7 @@ void main() {
         appMode: AppMode.loupe,
         alwaysOnTop: true,
         clickThrough: true,
+        loupeModeAvailable: true,
       );
       expect(
         loupeChecked
@@ -279,6 +337,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       );
       expect(
         settingsUnchecked
@@ -307,6 +366,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       );
       String labelOf(TrayMenuKind kind) =>
           spec.firstWhere((e) => e.kind == kind).label!;
@@ -323,6 +383,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       );
       expect(
         spec.firstWhere((e) => e.kind == TrayMenuKind.toggleAppMode).key,
@@ -556,6 +617,7 @@ void main() {
         'achromatopsia': 'Achromatopsia',
       },
       appModeLoupeLabel: 'Loupe window',
+      appModeLoupeUnavailableLabel: 'Loupe window (coming soon)',
       alwaysOnTopLabel: 'Always on top',
       clickThroughLabel: 'Click-through',
       advancedFilters: 'Advanced filters',
@@ -589,6 +651,7 @@ void main() {
         appMode: AppMode.settings,
         alwaysOnTop: false,
         clickThrough: false,
+        loupeModeAvailable: true,
       );
       final labels = spec.map((e) => e.label).whereType<String>().toList();
       expect(labels, contains('Hide loupe window'));

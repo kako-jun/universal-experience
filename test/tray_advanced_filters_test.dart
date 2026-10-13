@@ -53,6 +53,7 @@ List<TrayMenuEntry> _spec({
       appMode: AppMode.settings,
       alwaysOnTop: false,
       clickThrough: false,
+      loupeModeAvailable: true,
       checkedListEntryKeys: checked,
       disabledListEntryKeys: disabled,
       hasLayers: hasLayers,

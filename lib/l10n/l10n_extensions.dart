@@ -510,8 +510,9 @@ TrayMenuLabels trayMenuLabelsFrom(AppLocalizations l10n) {
         entry.id: visionFilterName(l10n, entry.id),
     },
     // 起動モード・最前面・クリックスルーのトレイ項目 (#63) は WindowModePanel が
-    // 使っているのと同じ ARB キーを再利用する（新規キー不要）。
+    // 使っているのと同じ ARB キーを再利用する（準備中の間のラベルだけ #156 で追加）。
     appModeLoupeLabel: l10n.windowModeLoupe,
+    appModeLoupeUnavailableLabel: l10n.trayAppModeLoupeUnavailable,
     alwaysOnTopLabel: l10n.alwaysOnTopLabel,
     clickThroughLabel: l10n.clickThroughLabel,
   );

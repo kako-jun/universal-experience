@@ -31,6 +31,7 @@ class TrayMenuLabels {
     required this.quit,
     required this.filterLabels,
     required this.appModeLoupeLabel,
+    required this.appModeLoupeUnavailableLabel,
     required this.alwaysOnTopLabel,
     required this.clickThroughLabel,
     required this.advancedFilters,
@@ -50,6 +51,10 @@ class TrayMenuLabels {
   /// 起動モード切替項目のラベル（`WindowModePanel` の「ルーペモード」表記を
   /// 再利用、#63）。
   final String appModeLoupeLabel;
+
+  /// ルーペ窓が選べない間（画面キャプチャ未実装、#156）の起動モード切替項目の
+  /// ラベル。「準備中」と分かる文言にする。
+  final String appModeLoupeUnavailableLabel;
 
   /// 最前面固定切替項目のラベル（`WindowModePanel` と同じ ARB キーを再利用、#63）。
   final String alwaysOnTopLabel;
