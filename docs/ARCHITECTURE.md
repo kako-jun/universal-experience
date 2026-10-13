@@ -993,7 +993,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   プレビューペイン。横並びのとき、画像 1 枚の一辺は `maxPaneSide`（呼び出し側が高さから決める、#130）を
   上限にでき、超える幅では 2 枚を中央に寄せる（縦積みでは使わない）。#85 で、ペインの論理サイズ・
   `devicePixelRatio` に連動して都度サイズを変えていた旧 GPU 時代の auto-sizing
-  （#58）を撤去し、常に固定の正準サイズ（`canonicalSampleSize` = 1024）で
+  （#58）を撤去し、常に固定の正準サイズ（`kCanonicalSampleSize` = 1024）で
   `CpuVisionRenderer` に描画させ、表示側は `FilterQuality.medium` でスケールする
   方式に変えた。理由は2つ: (1) `DetailLoss.cellSize` のように**絶対ピクセル数**
   でパラメータを取るフィルタは、画像サイズが変わるたびに見え方自体が変わって
@@ -1230,7 +1230,7 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   - `cpu_preview_all_filters_test.dart`（#85）: `kVisionFilterCatalog` の全 30
     エントリについて、`VisionFilterState.select()/build()` でカタログ既定値の
     payload を埋めた `VisionFilter` を組み立て、`CpuVisionRenderer.apply()`
-    （実ブリッジ）で production と同じ [canonicalSampleSize]（1024、#85）の
+    （実ブリッジ）で production と同じ [kCanonicalSampleSize]（1024、#85）の
     サンプル画像に適用する。例外が出ないこと・出力が入力サイズと
     一致すること・出力ピクセルが入力と異なること（strength=1.0 で全フィルタが
     視覚的に効果を持つ設計であるため）を検証する。加えて protanopia について、

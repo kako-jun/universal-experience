@@ -785,7 +785,7 @@ void main() {
       });
 
       testWidgets(
-          'sampleSize 未指定のとき generator は canonicalSampleSize（1024）で'
+          'sampleSize 未指定のとき generator は kCanonicalSampleSize（1024）で'
           '呼ばれる (#85)', (tester) async {
         late ui.Image stub;
         await tester.runAsync(() async {

@@ -81,7 +81,7 @@ typedef AfterImageRenderer = Future<ui.Image?> Function(
 @visibleForTesting
 AfterImageRenderer afterImageRenderer = renderDefaultAfter;
 
-/// [_BeforeAfterViewState._export] が使うキャプション合成ステップの型。
+/// `BeforeAfterView` の書き出し が使うキャプション合成ステップの型。
 ///
 /// 実体は [composeExportImage]。widget test が実ファイル I/O（[pngSaver]）に
 /// 触れずに export の挙動（caption が描画時の

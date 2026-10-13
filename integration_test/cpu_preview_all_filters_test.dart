@@ -172,7 +172,7 @@ void main() {
     testWidgets(
         '非正方形（96×64）の画像でも出力サイズが一致し例外が出ない',
         (tester) async {
-      // canonicalSampleSize は常に正方形だが、CpuVisionRenderer.apply 自体は
+      // kCanonicalSampleSize は常に正方形だが、CpuVisionRenderer.apply 自体は
       // 任意のアスペクト比を受け付ける契約（#60 の advanced カタログ結線で
       // 正方形以外の入力が来ないとは限らない）なので、非正方形でも壊れない
       // ことを実ブリッジで確かめる。

@@ -80,8 +80,7 @@ Future<ui.Image> decodeImageBytes(Uint8List bytes) async {
 /// Maximum long-edge dimension [decodeUserImageBytes] decodes a user image
 /// to (#78). A modern phone photo can easily be 4000px+ on the
 /// long edge; decoding (and holding in memory) at full intrinsic resolution
-/// when the canonical preview size is only [1024]（`BeforeAfterView.
-/// canonicalSampleSize`) wastes memory for no visual benefit —
+/// when the canonical preview size is only [1024](`kCanonicalSampleSize`) wastes memory for no visual benefit —
 /// [fitImageToSquare] would immediately downscale it anyway. 2048 leaves
 /// headroom above the canonical size while still bounding memory use.
 const int kUserImageMaxDimension = 2048;

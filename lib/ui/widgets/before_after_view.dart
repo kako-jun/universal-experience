@@ -128,11 +128,11 @@ class BeforeAfterView extends StatefulWidget {
 
   /// Explicit width/height (in pixels) for the generated square sample
   /// image. When `null` (the default, used by real callers), the resolution
-  /// is [canonicalSampleSize] — **not** derived from the pane's layout size or
+  /// is [kCanonicalSampleSize] — **not** derived from the pane's layout size or
   /// `devicePixelRatio` (this pane used to auto-size to the
   /// rendered box × DPR, #58, but the CPU preview now always renders at a
   /// fixed canonical resolution and lets the display scale it — see
-  /// [canonicalSampleSize] for why). Tests that want a small, fast image
+  /// [kCanonicalSampleSize] for why). Tests that want a small, fast image
   /// regardless of the canonical size pass an explicit (smaller) value here.
   final int? sampleSize;
 
