@@ -112,6 +112,13 @@ Future<void> loadScreenshotFonts() async {
     } else {
       missing.add('Roboto');
     }
+
+    // 本番の Text は fontFamily: 'monospace'（ホットキー表記）を指定するが、flutter test では
+    // 解決できず Ahem（全角の四角）になる。同じ Roboto を 'monospace' 名でも登録する（#171）。
+    if (roboto.isNotEmpty) {
+      final mono = FontLoader('monospace')..addFont(read(roboto.first));
+      await mono.load();
+    }
   } else {
     missing.addAll(<String>['MaterialIcons', 'Roboto']);
   }
