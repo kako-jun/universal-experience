@@ -30,7 +30,9 @@ import 'ui/widgets/loupe_hud.dart';
 /// ルーペ窓の挙動 (#14) を集約したコントローラ。
 /// 最小サイズ・状態遷移(normal/maximized/fullscreen)・枠ポリシー・
 /// 透過/最前面/クリックスルーの責務を持つ (詳細は docs/ARCHITECTURE.md)。
-final LoupeWindowController loupeWindow = LoupeWindowController();
+/// 本番では差し替えない。ルーペ窓モードが使えない間（#156）にそのモードを
+/// 前提とするテストだけが、使える設定のコントローラへ差し替える。
+LoupeWindowController loupeWindow = LoupeWindowController();
 
 /// トレイとウィンドウ UI で共有する VisionFilterState（プレビューの選択の
 /// 唯一の正本、#60, #124）。色覚のクイック選択も advanced も体験プリセットも、

@@ -193,6 +193,8 @@ class WindowModePanel extends StatelessWidget {
                   value: AppMode.loupe,
                   label: Text(l10n.windowModeLoupe),
                   icon: const Icon(Icons.search),
+                  // ライブ画面キャプチャ未実装の間は選べない (#156)。
+                  enabled: loupeWindow.loupeModeAvailable,
                 ),
               ],
               selected: {loupeWindow.appMode},
@@ -201,6 +203,15 @@ class WindowModePanel extends StatelessWidget {
                 loupeWindow.setAppMode(selected.first);
               },
             ),
+            if (!loupeWindow.loupeModeAvailable)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  l10n.windowModeLoupeUnavailableNote,
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: colorScheme.onSurfaceVariant),
+                ),
+              ),
             const SizedBox(height: 8),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,

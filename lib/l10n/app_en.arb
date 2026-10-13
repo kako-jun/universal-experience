@@ -505,6 +505,10 @@
   "@windowModeLoupe": {
     "description": "Label for the loupe app mode (transparent, held up to the screen) in the mode switch."
   },
+  "windowModeLoupeUnavailableNote": "The loupe window is coming soon. It can't be selected yet because screen capture isn't implemented.",
+  "@windowModeLoupeUnavailableNote": {
+    "description": "Note shown under the app mode switch while the loupe window mode is disabled because live screen capture (#1/#3/#5) is not implemented yet (#156)."
+  },
   "alwaysOnTopLabel": "Always on top",
   "@alwaysOnTopLabel": {
     "description": "Label for the always-on-top toggle."

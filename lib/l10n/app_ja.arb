@@ -188,6 +188,7 @@
   "windowModeSectionTitle": "起動モード",
   "windowModeSettings": "設定窓",
   "windowModeLoupe": "ルーペ窓",
+  "windowModeLoupeUnavailableNote": "ルーペ窓は準備中です。画面キャプチャが未実装のため、いまは選べません。",
   "alwaysOnTopLabel": "最前面に固定",
   "clickThroughLabel": "クリックスルー",
   "clickThroughRecoveryFocusHint": "Alt+Tab などでこのウィンドウを選び、何かキーを押すと解除されます",

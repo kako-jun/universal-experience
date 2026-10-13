@@ -272,6 +272,7 @@ List<TrayMenuEntry> buildTrayMenuSpec({
   required AppMode appMode,
   required bool alwaysOnTop,
   required bool clickThrough,
+  bool loupeModeAvailable = true,
   Set<String> checkedListEntryKeys = const {},
   Set<String> disabledListEntryKeys = const {},
   bool hasLayers = false,
@@ -289,6 +290,8 @@ List<TrayMenuEntry> buildTrayMenuSpec({
       key: kToggleAppModeKey,
       label: labels.appModeLoupeLabel,
       checked: appMode == AppMode.loupe,
+      // ライブキャプチャ未実装の間は選べない (#156)。
+      enabled: loupeModeAvailable,
     ),
     TrayMenuEntry(
       kind: TrayMenuKind.toggleAlwaysOnTop,
@@ -587,6 +590,7 @@ class TrayService with TrayListener {
       appMode: loupeWindow.appMode,
       alwaysOnTop: loupeWindow.alwaysOnTop,
       clickThrough: loupeWindow.clickThrough,
+      loupeModeAvailable: loupeWindow.loupeModeAvailable,
       checkedListEntryKeys: checked,
       disabledListEntryKeys: disabled,
       hasLayers: visionFilterState.layers.isNotEmpty,
