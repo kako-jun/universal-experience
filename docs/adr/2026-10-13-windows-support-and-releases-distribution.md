@@ -1,6 +1,6 @@
 # ADR: Windows を対応 OS に加え、配布は GitHub Releases の未署名アーカイブにする
 
-- **決定日**: 2026-10-13（Issue #149 / #150 / #158 / #160 の積み重ねを正式化）
+- **決定日**: 2026-10-13（Releases・zip / dmg / tar.gz の配布は PR #153・#155 で 2026-10-09 に導入済み。2026-10-13 は、CI で関門された対応 OS としての判断を記録する。Issue #149 / #150 / #158 / #160 の積み重ね）
 - **記録日**: 2026-10-13
 - **ステータス**: Accepted
 
@@ -23,12 +23,12 @@ ue は macOS と Linux のランナーだけを持ち、配布物は Actions の
    - Windows: `universal-experience-windows-x64.zip`（`build/windows/x64/runner/Release` の中身を
      `Compress-Archive`）。
    - macOS: `universal-experience-macos.dmg`（`.app` と `/Applications` へのリンクを `hdiutil` で UDZO 化）。
-     ビルドは `macos-latest` で `flutter build macos --release`。アーキテクチャは明示指定しておらず、
-     ランナーとツールチェーンの既定に従う。
+     ビルドは `macos-latest` で `flutter build macos --release`。ユニバーサルバイナリ（arm64 + x86_64）。
+     ARCHS は明示指定せず Flutter の Release 既定に従う（v0.1.1 の dmg で本体・Rust framework とも両スライスを確認）。
    - Linux: `universal-experience-linux-x64.tar.gz`（`build/linux/x64/release/bundle`）。`ubuntu-latest`
      （現在は Ubuntu 24.04）でビルドし、それより古い glibc での動作は未検証。
 4. **全 OS 未署名**。Windows は Authenticode 署名なし（SmartScreen の警告が出うる）、macOS は Developer ID 署名・
-   公証なし（Gatekeeper で「このまま開く」操作が要る）。`release.yml` は署名用の secrets を使わない。
+   公証なし（ad-hoc 署名のみ。Gatekeeper で「このまま開く」操作が要る）。`release.yml` は署名用の secrets を使わない。
    初回起動の手順は `README.md` に書く。
 
 ## 代替案
@@ -60,7 +60,7 @@ ue は macOS と Linux のランナーだけを持ち、配布物は Actions の
 ## 関連 Issue・PR・docs
 
 - Issue #149（Windows ランナー）、#150（トレイ ICO・実機確認）、#158（実ブリッジ integration test・Release 公開）、#160（本件）
-- PR #163（トレイ ICO）、#165（リリースの CI 関門）
+- PR #153・#155（Releases 配布の導入）、#163（トレイ ICO）、#165（リリースの CI 関門）
 - `docs/adr/2026-10-13-release-gate-and-version-source.md`
 - `.github/workflows/release.yml`、`.github/workflows/ci.yml`、`CLAUDE.md`「CI」「リリース手順」、`README.md`
 - `docs/ARCHITECTURE.md`「プラットフォーム差」「システムアーキテクチャ（現行）」

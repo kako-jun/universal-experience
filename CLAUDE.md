@@ -369,8 +369,8 @@ ci.yml は `workflow_call` でも呼べる（release.yml が使う）。
 `v*` タグの push で起動し、`ci`（ci.yml を呼ぶ）+ `version-check` を通った後、`build-macos`（`macos-latest`、
 `universal-experience-macos.dmg`）/ `build-linux`（`ubuntu-latest`、`universal-experience-linux-x64.tar.gz`）/
 `build-windows`（`windows-latest`、`universal-experience-windows-x64.zip`）が release bundle を作り、`publish` が
-`softprops/action-gh-release` で同じ Release へ公開する。各 build job は exe/.app と Rust ライブラリの同梱を確認してから
-パッケージする。全て未署名・インストーラなし。理由は `docs/adr/2026-10-13-windows-support-and-releases-distribution.md`。
+`softprops/action-gh-release` で同じ Release へ公開する。Linux / Windows の build job は exe と Rust ライブラリ（.so / .dll）の同梱を、macOS は .app とその実行ファイルの存在を確認してから
+パッケージする（macOS の Rust は universal_experience_rust.framework として入る）。全て未署名・インストーラなし。理由は `docs/adr/2026-10-13-windows-support-and-releases-distribution.md`。
 
 ### リリース手順（#158）
 

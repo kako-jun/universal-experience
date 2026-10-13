@@ -1189,7 +1189,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   - `ConsultNoticeBlock`: 受診喚起（喚起文・escalation・免責文）の唯一の表示ウィジェット。`layerConsultNotice`
     （`lib/services/layer_consult_notice.dart`）は層 1 つ単体の喚起を解決し、複数層の合成 `mergeConsultInputs` は PNG 書き出し側が使う
   - `StrengthCautionNote` / `StrengthCautionTrackShape`: 強度の上限付近の印と注記（#66）
-  - `FilterProvenance`: 最下段の折りたたみ「モデルと出典」「表現できないこと」（sensus の英文をそのまま出す、#80）。
+  - `FilterProvenanceSection`（`filter_provenance.dart`）: 最下段の折りたたみ「モデルと出典」「表現できないこと」（sensus の英文をそのまま出す、#80）。
     `ExperimentalBadge`: 「実験的」バッジ（枠・アイコン・文言）
   - `PreviewImageView` / `PreviewErrorPlaceholder` と描画の差し替え口（`preview_rendering.dart`）: `BeforeAfterView` と
     `ColorVisionCompareView` の共有部品（#159）
