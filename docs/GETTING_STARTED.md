@@ -141,8 +141,8 @@ macOS / Linux / Windows / Android の配布物をビルド・検証して同じ 
 - Linux x64: `universal-experience-linux-x64.tar.gz`。展開後は `lib/` と `data/` を
   同じ場所に保ち、`universal_experience` を起動します。
 - Android: `universal-experience-android.apk`。Release workflow はリポジトリSecretsの
-  release keystore で署名する。arm64-v8a / armeabi-v7a / x86_64 / x86 を含む universal APK で、CI は
-  4 ABIすべてに Rust library が同梱されることを検証する。端末でフォトを選択→フィルタを選択→PNGを書き出す
+  release keystore で署名する。arm64-v8a / armeabi-v7a / x86_64 を含む universal APK で、CI は
+  3 ABIすべてに Rust library が同梱されることを検証する。端末でフォトを選択→フィルタを選択→PNGを書き出す
   golden pathを確認し、PNGが `Pictures/Universal Experience` に保存されることを確認する。
 
 Android を含むタグを公開する前に、Repository Secrets に次の **4 つすべて**を設定します。
@@ -177,7 +177,7 @@ universal-experience/
 ├── rust_builder/          # cargokit 統合（#55）。flutter build/run 時に rust/ をビルドし同梱する FFI plugin
 ├── tools/                 # シェーダ codegen（sensus の .frag → Impeller サブセット変換）、FRB 生成物のドリフト検証（check_frb_drift.sh）、サンプル画像の生成（generate_samples.dart）と OFL フォントのアトラス（fonts/）
 ├── shaders/               # 変換済み .frag（ビルド時 impellerc がコンパイル）
-├── android/               # Android runner（MediaStore出力、4 ABI universal APKへcargokit FFIを同梱）
+├── android/               # Android runner（MediaStore出力、3 ABI universal APKへcargokit FFIを同梱）
 ├── macos/                 # macOS固有コード（現行対応）
 ├── linux/                 # Linux固有コード（現行対応）
 ├── windows/               # Windows固有コード（x64 debug runner）

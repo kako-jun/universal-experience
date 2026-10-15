@@ -32,8 +32,8 @@ ue は macOS と Linux のランナーだけを持ち、配布物は Actions の
    release JKS で署名した APK を配布する。必要な4つの Repository Secrets と、未設定時に公開を止める
    仕組みは `docs/GETTING_STARTED.md` と `CLAUDE.md` に記録する。初回起動の手順は `README.md` に書く。
 5. **Android（API 29+）を対応 OS に加える**。`android/` ランナーと `rust_builder` の
-   cargokit plugin が Rust `.so` を arm64-v8a / armeabi-v7a / x86_64 / x86 を含む universal APK へ同梱する。
-   `ci.yml` は debug APK の4 ABIすべてで native library の同梱を確認し、`release.yml` は署名済み
+   cargokit plugin が Rust `.so` を arm64-v8a / armeabi-v7a / x86_64 を含む universal APK へ同梱する。
+   `ci.yml` は debug APK の3 ABIすべてで native library の同梱を確認し、`release.yml` は署名済み
    `universal-experience-android.apk` を同じ Release に公開する。
 
 ## 代替案

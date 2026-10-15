@@ -16,7 +16,7 @@ OS に対応する配布物を選んでください。`vX.Y.Z` タグは、各 O
   Applications へドラッグします。未署名です。
 - **Linux x64**: `universal-experience-linux-x64.tar.gz` を展開し、
   `universal_experience` を起動します。`lib/` と `data/` は同じフォルダに保ちます。
-- **Android 10+**: `universal-experience-android.apk`（arm64-v8a / armeabi-v7a / x86_64 / x86 を含む universal APK）を端末へダウンロードして
+- **Android 10+**: `universal-experience-android.apk`（arm64-v8a / armeabi-v7a / x86_64 を含む universal APK）を端末へダウンロードして
   インストールします。APK は Release workflow が release keystore で署名します。
 
 ## 現状できること／まだできないこと
@@ -414,7 +414,7 @@ ue 自身の UI も、スクリーンリーダー・キーボード・低視力�
 - macOS 13+（deployment target 13.0。Flutter の native assets が macOS 13 を要求する）
 - Linux x64（GTK 3 ベース。配布物は GitHub Actions の `ubuntu-latest` = 現在 Ubuntu 24.04 でビルド。それより古い glibc での動作は未検証）
 - Windows 10/11 x64（GitHub Releases で配布。実機の操作確認は未完了）
-- Android 10+（GitHub Releases の署名済みuniversal APK: arm64-v8a / armeabi-v7a / x86_64 / x86。画像入力は端末の
+- Android 10+（GitHub Releases の署名済みuniversal APK: arm64-v8a / armeabi-v7a / x86_64。画像入力は端末の
   フォト/ドキュメントピッカー、PNG書き出しは Pictures/Universal Experience）
 
 ※ iOS は技術的制約により非対応（`docs/adr/2025-11-17-no-ios-support.md`）

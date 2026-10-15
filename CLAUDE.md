@@ -130,7 +130,7 @@ assets/samples/              # サンプル画像集（図形は自作・手続�
 
 macos/                       # macOS ランナー（現行対応）
 linux/                       # Linux ランナー（現行対応）
-android/                     # Android ランナー（API 29+。cargokit が Rust .so を arm64-v8a / armeabi-v7a / x86_64 / x86 の
+android/                     # Android ランナー（API 29+。cargokit が Rust .so を arm64-v8a / armeabi-v7a / x86_64 の
                              # universal APK へ同梱。入力はシステム
                              # フォト/ドキュメントピッカー、PNG は MediaStore の Pictures/Universal Experience へ保存）
 windows/                     # Windows ランナー（x64。Flutter 標準テンプレート + トレイ用 ICO #163。cargokit が
@@ -375,7 +375,7 @@ ci.yml は `workflow_call` でも呼べる（release.yml が使う）。
 `softprops/action-gh-release` で同じ Release へ公開する。Linux / Windows の build job は exe と Rust ライブラリ（.so / .dll）の同梱を、macOS は .app とその実行ファイルの存在を確認してから
 パッケージする（macOS の Rust は universal_experience_rust.framework として入る）。デスクトップは未署名・インストーラなし。
 Android は次の4つの Repository Secrets から keystore を一時生成して署名する: `UNIVERSAL_EXPERIENCE_RELEASE_KEYSTORE`（release JKS 全体の Base64）、`UNIVERSAL_EXPERIENCE_RELEASE_KEYSTORE_PASSWORD`、`UNIVERSAL_EXPERIENCE_RELEASE_KEY_PASSWORD`、`UNIVERSAL_EXPERIENCE_RELEASE_KEY_ALIAS`。4つすべて必須で、1つでも無ければ `build-android` が失敗し Release は公開されない。理由は `docs/adr/2026-10-13-windows-support-and-releases-distribution.md`。
-`ci.yml` は universal debug APK に arm64-v8a / armeabi-v7a / x86_64 / x86 のすべてで `libuniversal_experience_rust.so` が入ることを検証する。
+`ci.yml` は universal debug APK に arm64-v8a / armeabi-v7a / x86_64 のすべてで `libuniversal_experience_rust.so` が入ることを検証する。
 
 ### リリース手順（#158）
 
