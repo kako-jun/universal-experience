@@ -107,6 +107,9 @@ coverage/
 rust/target/
 
 # Exceptions to above rules.
+!android/gradlew
+!android/gradlew.bat
+!android/gradle/wrapper/gradle-wrapper.jar
 !**/ios/**/default.mode1v3
 !**/ios/**/default.mode2v3
 !**/ios/**/default.pbxuser

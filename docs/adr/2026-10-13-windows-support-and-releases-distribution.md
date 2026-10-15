@@ -1,4 +1,4 @@
-# ADR: Windows を対応 OS に加え、配布は GitHub Releases の未署名アーカイブにする
+# ADR: Windows を対応 OS に加え、GitHub Releases で配布する
 
 - **決定日**: 2026-10-13（Releases・zip / dmg / tar.gz の配布は PR #153・#155 で 2026-10-09 に導入済み。2026-10-13 は、CI で関門された対応 OS としての判断を記録する。Issue #149 / #150 / #158 / #160 の積み重ね）
 - **記録日**: 2026-10-13
@@ -27,9 +27,14 @@ ue は macOS と Linux のランナーだけを持ち、配布物は Actions の
      ARCHS は明示指定せず Flutter の Release 既定に従う（v0.1.1 の dmg で本体・Rust framework とも両スライスを確認）。
    - Linux: `universal-experience-linux-x64.tar.gz`（`build/linux/x64/release/bundle`）。`ubuntu-latest`
      （現在は Ubuntu 24.04）でビルドし、それより古い glibc での動作は未検証。
-4. **全 OS 未署名**。Windows は Authenticode 署名なし（SmartScreen の警告が出うる）、macOS は Developer ID 署名・
-   公証なし（ad-hoc 署名のみ。Gatekeeper で「このまま開く」操作が要る）。`release.yml` は署名用の secrets を使わない。
-   初回起動の手順は `README.md` に書く。
+4. **デスクトップ3 OSは未署名**。Windows は Authenticode 署名なし（SmartScreen の警告が出うる）、macOS は Developer ID 署名・
+   公証なし（ad-hoc 署名のみ。Gatekeeper で「このまま開く」操作が要る）。Android は v0.2.0 から
+   release JKS で署名した APK を配布する。必要な4つの Repository Secrets と、未設定時に公開を止める
+   仕組みは `docs/GETTING_STARTED.md` と `CLAUDE.md` に記録する。初回起動の手順は `README.md` に書く。
+5. **Android（API 29+）を対応 OS に加える**。`android/` ランナーと `rust_builder` の
+   cargokit plugin が Rust `.so` を arm64-v8a / armeabi-v7a / x86_64 / x86 を含む universal APK へ同梱する。
+   `ci.yml` は debug APK の4 ABIすべてで native library の同梱を確認し、`release.yml` は署名済み
+   `universal-experience-android.apk` を同じ Release に公開する。
 
 ## 代替案
 
@@ -55,7 +60,8 @@ ue は macOS と Linux のランナーだけを持ち、配布物は Actions の
 - Windows 実機での画面表示・フィルタ選択・トレイ・ホットキー・クリップボード・PNG 書き出しの確認は
   残っている（#150）。CI はロードと CPU プレビューまでで、これらは保証しない。
 - Linux はトレイ・ホットキー用の共有ライブラリを利用者が入れる必要がある（`README.md`）。
-- 版・ゲートの規則は release-gate ADR に従う。Android は未対応（ランナー未作成）、iOS は非対応のまま。
+- 版・ゲートの規則は release-gate ADR に従う。Android は CI で APK と native library の同梱を検証するが、
+  実機 golden path はリリース前に別途確認する。iOS は非対応のまま。
 
 ## 関連 Issue・PR・docs
 

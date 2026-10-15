@@ -29,3 +29,6 @@ flutter:
         ffiPlugin: true
       windows:
         ffiPlugin: true
+      # Keep Android on the same cargokit-built Rust FFI path as desktop.
+      android:
+        ffiPlugin: true

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
@@ -217,11 +218,12 @@ class _HomeScreenState extends State<HomeScreen> {
             appBar: AppBar(
               title: Text(l10n.appTitle),
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.window_outlined),
-                  onPressed: () => showWindowModeDialog(context),
-                  tooltip: l10n.windowModeSectionTitle,
-                ),
+                if (!Platform.isAndroid)
+                  IconButton(
+                    icon: const Icon(Icons.window_outlined),
+                    onPressed: () => showWindowModeDialog(context),
+                    tooltip: l10n.windowModeSectionTitle,
+                  ),
                 IconButton(
                   icon: const Icon(Icons.language),
                   onPressed: () => showLanguageDialog(context),

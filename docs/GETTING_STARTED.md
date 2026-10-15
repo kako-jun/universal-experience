@@ -31,8 +31,8 @@
 
 ### プラットフォーム別要件
 
-現行のランナーは macOS / Linux / Windows です。Windows は x64 debug bundle の
-CI ビルドを対象とし、実機の操作確認が残っています。Android はランナー未作成です。
+現行のランナーは macOS / Linux / Windows / Android です。Windows は x64 debug bundle の
+CI ビルドを対象とし、実機の操作確認が残っています。
 
 #### macOS開発（現行対応）
 - 最新の安定版 Xcode（macOS 13 以上をターゲットにできるもの。Flutter の native assets が
@@ -52,10 +52,12 @@ CI ビルドを対象とし、実機の操作確認が残っています。Andro
 ライブラリは通常 `-dev` パッケージの依存で一緒に入る。配布物だけを動かす場合の実行時パッケージは
 （Ubuntu 24.04）`libgtk-3-0t64 libayatana-appindicator3-1 libkeybinder-3.0-0`。
 
-#### Android開発（計画中）
+#### Android開発
 - Android Studio
-- Android SDK (API 23以上)
-- Java Development Kit (JDK) 11以上
+- Android SDK / NDK（Flutterが要求する版。Release CI は hosted runner に導入済み）
+- Java Development Kit 17
+- Android 10（API 29）以上の実機またはエミュレータ。PNG書き出しは MediaStore の
+  `Pictures/Universal Experience` を使うため、広域ストレージ権限は要求しない。
 
 #### Windows開発（debug runner）
 - Visual Studio 2022 (C++ desktop development)
@@ -111,7 +113,7 @@ flutter run
 flutter run -d <device-id>
 ```
 
-Windows では `flutter run -d windows` を使います。Android はランナー未作成です。
+Windows では `flutter run -d windows`、Android では `flutter run -d <android-device-id>` を使います。
 
 ### リリースビルド
 
@@ -121,11 +123,14 @@ flutter build macos --release
 
 # Linuxリリースビルド
 flutter build linux --release
+
+# Androidリリースビルド（ローカルでは key.properties が無ければ debug key を使う）
+flutter build apk --release
 ```
 
 `vX.Y.Z` タグを push すると Release workflow が、まず CI 一式（ci.yml）とタグ・
-`pubspec.yaml`・`rust/Cargo.toml` の版の一致を確かめ、通ったときだけ既存の
-デスクトップ対応 OS の配布物をビルド・検証して同じ GitHub Release に公開します。
+`pubspec.yaml`・`rust/Cargo.toml`・`rust/Cargo.lock` の版の一致を確かめ、通ったときだけ
+macOS / Linux / Windows / Android の配布物をビルド・検証して同じ GitHub Release に公開します。
 タグを打つ前に `pubspec.yaml` の `version`（+build は無視）と `rust/Cargo.toml` の
 `version` を同じ X.Y.Z に揃えてください。
 
@@ -135,13 +140,26 @@ flutter build linux --release
   ドラッグします（未署名）。
 - Linux x64: `universal-experience-linux-x64.tar.gz`。展開後は `lib/` と `data/` を
   同じ場所に保ち、`universal_experience` を起動します。
+- Android: `universal-experience-android.apk`。Release workflow はリポジトリSecretsの
+  release keystore で署名する。arm64-v8a / armeabi-v7a / x86_64 / x86 を含む universal APK で、CI は
+  4 ABIすべてに Rust library が同梱されることを検証する。端末でフォトを選択→フィルタを選択→PNGを書き出す
+  golden pathを確認し、PNGが `Pictures/Universal Experience` に保存されることを確認する。
+
+Android を含むタグを公開する前に、Repository Secrets に次の **4 つすべて**を設定します。
+`build-android` はこれらを release keystore として一時生成するため、1 つでも未設定なら
+失敗し、GitHub Release は公開されません。
+
+- `UNIVERSAL_EXPERIENCE_RELEASE_KEYSTORE`: release JKS ファイル全体を Base64 エンコードした値
+- `UNIVERSAL_EXPERIENCE_RELEASE_KEYSTORE_PASSWORD`: keystore のパスワード
+- `UNIVERSAL_EXPERIENCE_RELEASE_KEY_PASSWORD`: signing key のパスワード
+- `UNIVERSAL_EXPERIENCE_RELEASE_KEY_ALIAS`: signing key の alias
 
 Windows x64 ホストでは `flutter build windows --release`、macOS では
 `flutter build macos --release`、Linux では `flutter build linux --release` で
 各配布用 bundle をビルドできます。
-実機では画面表示・フィルタ選択・サンプル切替・トレイ・ホットキー・クリップボード・
-PNG書き出しを確認します。アプリは未署名で、インストーラ形式ではありません。
-Android はランナー未作成です。
+デスクトップ実機では画面表示・フィルタ選択・サンプル切替・トレイ・ホットキー・
+クリップボード・PNG書き出しを確認します。Androidはフォトピッカー入力とMediaStoreへの
+PNG書き出しを確認します。デスクトップ配布物は未署名で、インストーラ形式ではありません。
 
 ## プロジェクト構造
 
@@ -159,6 +177,7 @@ universal-experience/
 ├── rust_builder/          # cargokit 統合（#55）。flutter build/run 時に rust/ をビルドし同梱する FFI plugin
 ├── tools/                 # シェーダ codegen（sensus の .frag → Impeller サブセット変換）、FRB 生成物のドリフト検証（check_frb_drift.sh）、サンプル画像の生成（generate_samples.dart）と OFL フォントのアトラス（fonts/）
 ├── shaders/               # 変換済み .frag（ビルド時 impellerc がコンパイル）
+├── android/               # Android runner（MediaStore出力、4 ABI universal APKへcargokit FFIを同梱）
 ├── macos/                 # macOS固有コード（現行対応）
 ├── linux/                 # Linux固有コード（現行対応）
 ├── windows/               # Windows固有コード（x64 debug runner）
@@ -166,7 +185,7 @@ universal-experience/
 └── test/                  # テスト
 ```
 
-Android 固有ディレクトリ（`android/`）はランナー未作成のため存在しません。
+AndroidのRustライブラリも `rust_builder/` のcargokit Gradle pluginがビルド・APKへ同梱します。
 
 ## 開発ワークフロー
 

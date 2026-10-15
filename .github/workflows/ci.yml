@@ -15,6 +15,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Android runner and cargokit must be exercised before a tag can reach the
+  # release workflow. Inspecting the APK is stronger than a Gradle success:
+  # it proves the Rust cdylib actually made it into every packaged ABI.
+  android-debug-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Flutter pub get
+        run: flutter pub get
+      - name: Build Android debug APK
+        run: flutter build apk --debug
+      - name: Verify Rust libraries in APK
+        run: |
+          apk=build/app/outputs/flutter-apk/app-debug.apk
+          test -f "$apk"
+          for abi in arm64-v8a armeabi-v7a x86_64 x86; do
+            unzip -Z1 "$apk" | grep -Fx "lib/$abi/libuniversal_experience_rust.so"
+          done
+
   # Windows bundle を実機確認用に取得できるようにする（#149）。
   windows-build:
     runs-on: windows-latest

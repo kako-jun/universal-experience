@@ -130,11 +130,13 @@ assets/samples/              # サンプル画像集（図形は自作・手続�
 
 macos/                       # macOS ランナー（現行対応）
 linux/                       # Linux ランナー（現行対応）
+android/                     # Android ランナー（API 29+。cargokit が Rust .so を arm64-v8a / armeabi-v7a / x86_64 / x86 の
+                             # universal APK へ同梱。入力はシステム
+                             # フォト/ドキュメントピッカー、PNG は MediaStore の Pictures/Universal Experience へ保存）
 windows/                     # Windows ランナー（x64。Flutter 標準テンプレート + トレイ用 ICO #163。cargokit が
                               # universal_experience_rust.dll を exe の隣へ同梱。CI は実ブリッジ integration test
                               # まで検証、配布は GitHub Releases の未署名 zip。実機確認は残る #150。
                               # 判断は docs/adr/2026-10-13-windows-support-and-releases-distribution.md）
-# Android ランナーは計画中（未作成）
 
 DESIGN.md                    # UI 設計原則（カラートークン・タイポ・余白・コンポーネント・画面構成・検証方法、#72）
 
@@ -368,14 +370,17 @@ ci.yml は `workflow_call` でも呼べる（release.yml が使う）。
 
 `v*` タグの push で起動し、`ci`（ci.yml を呼ぶ）+ `version-check` を通った後、`build-macos`（`macos-latest`、
 `universal-experience-macos.dmg`）/ `build-linux`（`ubuntu-latest`、`universal-experience-linux-x64.tar.gz`）/
-`build-windows`（`windows-latest`、`universal-experience-windows-x64.zip`）が release bundle を作り、`publish` が
+`build-windows`（`windows-latest`、`universal-experience-windows-x64.zip`）/ `build-android`（`ubuntu-latest`、
+`universal-experience-android.apk`）が release bundle を作り、`publish` が
 `softprops/action-gh-release` で同じ Release へ公開する。Linux / Windows の build job は exe と Rust ライブラリ（.so / .dll）の同梱を、macOS は .app とその実行ファイルの存在を確認してから
-パッケージする（macOS の Rust は universal_experience_rust.framework として入る）。全て未署名・インストーラなし。理由は `docs/adr/2026-10-13-windows-support-and-releases-distribution.md`。
+パッケージする（macOS の Rust は universal_experience_rust.framework として入る）。デスクトップは未署名・インストーラなし。
+Android は次の4つの Repository Secrets から keystore を一時生成して署名する: `UNIVERSAL_EXPERIENCE_RELEASE_KEYSTORE`（release JKS 全体の Base64）、`UNIVERSAL_EXPERIENCE_RELEASE_KEYSTORE_PASSWORD`、`UNIVERSAL_EXPERIENCE_RELEASE_KEY_PASSWORD`、`UNIVERSAL_EXPERIENCE_RELEASE_KEY_ALIAS`。4つすべて必須で、1つでも無ければ `build-android` が失敗し Release は公開されない。理由は `docs/adr/2026-10-13-windows-support-and-releases-distribution.md`。
+`ci.yml` は universal debug APK に arm64-v8a / armeabi-v7a / x86_64 / x86 のすべてで `libuniversal_experience_rust.so` が入ることを検証する。
 
 ### リリース手順（#158）
 
 1. `pubspec.yaml` の `version`（`X.Y.Z+build`）と `rust/Cargo.toml` の `version`（`X.Y.Z`）
-   を同じ X.Y.Z に揃え、`rust/Cargo.lock` の `universal_experience_rust` も更新して main へ入れる。
+   を同じ X.Y.Z に揃え、`rust/Cargo.lock` の `universal_experience_rust` も更新して main へ入れる。Android を含む Release では前記4 Secretsも設定する。
 2. main の検証済みコミットに `vX.Y.Z` タグを打って push する。
 3. `.github/workflows/release.yml` が (a) ci.yml を呼んで全 OS の CI（Windows の実ブリッジ
    integration test を含む）を通し、(b) タグと pubspec.yaml / rust/Cargo.toml / rust/Cargo.lock の版の一致を検査する。

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:ui' as ui;
 
 import 'package:desktop_drop/desktop_drop.dart';
@@ -323,38 +324,41 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            DropTarget(
-              onDragEntered: (_) => setState(() => _dragging = true),
-              onDragExited: (_) => setState(() => _dragging = false),
-              onDragDone: (details) {
-                setState(() => _dragging = false);
-                unawaited(_handleDrop(details));
-              },
-              child: AnimatedContainer(
-                // OS の「視差効果を減らす」等（disableAnimations）では遷移を省く（#45）。
-                duration: MediaQuery.disableAnimationsOf(context)
-                    ? Duration.zero
-                    : const Duration(milliseconds: 120),
-                decoration: BoxDecoration(
-                  // Colors.transparent ではなく colorScheme
-                  // のロール（primary、alpha=0）を使う。見た目は同じ透明だが、
-                  // Colors.* を直接参照しない規約に従う。
-                  border: Border.all(
-                    color: theme.colorScheme.primary
-                        .withAlpha(_dragging ? 255 : 0),
-                    width: 2,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: widget.child,
-              ),
-            ),
+            _previewWithOptionalDropTarget(theme),
             const SizedBox(height: 12),
             // サンプル画像の切替はプレビューに隣接させ、その下に置く（#72）。
             _buildControls(l10n, theme, imageSourceState, recommendedId),
           ],
         );
       },
+    );
+  }
+
+  /// Android uses the system picker; a desktop drag target and its hint have
+  /// no touch equivalent, so keep that affordance off mobile.
+  Widget _previewWithOptionalDropTarget(ThemeData theme) {
+    final preview = AnimatedContainer(
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 120),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: theme.colorScheme.primary.withAlpha(_dragging ? 255 : 0),
+          width: 2,
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: widget.child,
+    );
+    if (Platform.isAndroid) return preview;
+    return DropTarget(
+      onDragEntered: (_) => setState(() => _dragging = true),
+      onDragExited: (_) => setState(() => _dragging = false),
+      onDragDone: (details) {
+        setState(() => _dragging = false);
+        unawaited(_handleDrop(details));
+      },
+      child: preview,
     );
   }
 
@@ -404,21 +408,21 @@ class _ImageSourcePickerState extends State<ImageSourcePicker> {
           icon: const Icon(Icons.photo_outlined, size: 18),
           label: Text(l10n.imageSourcePickButton),
         ),
-        // #97: クリップボードの画像を貼り付ける。Cmd/Ctrl+V（home_screen.dart）
-        // と同じ経路（pasteUserImageFromClipboard）を通る。
-        Tooltip(
-          message: l10n.imageSourcePasteTooltip(pasteShortcutLabel()),
-          child: OutlinedButton.icon(
-            onPressed: () => pasteUserImageFromClipboard(context),
-            icon: const Icon(Icons.content_paste, size: 18),
-            label: Text(l10n.imageSourcePasteButton),
+        if (!Platform.isAndroid)
+          Tooltip(
+            message: l10n.imageSourcePasteTooltip(pasteShortcutLabel()),
+            child: OutlinedButton.icon(
+              onPressed: () => pasteUserImageFromClipboard(context),
+              icon: const Icon(Icons.content_paste, size: 18),
+              label: Text(l10n.imageSourcePasteButton),
+            ),
           ),
-        ),
-        Text(
-          l10n.imageSourceDropHint,
-          style: theme.textTheme.bodySmall
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-        ),
+        if (!Platform.isAndroid)
+          Text(
+            l10n.imageSourceDropHint,
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
         if (!imageSourceState.isFollowingRecommended)
           TextButton(
             onPressed: () {

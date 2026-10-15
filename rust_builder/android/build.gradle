@@ -1,0 +1,21 @@
+group 'com.llll.universal_experience_rust'
+version '1.0-SNAPSHOT'
+
+buildscript {
+    repositories { google(); mavenCentral() }
+    dependencies { classpath 'com.android.tools.build:gradle:8.7.3' }
+}
+
+apply plugin: 'com.android.library'
+apply from: '../cargokit/gradle/plugin.gradle'
+
+android {
+    namespace 'com.llll.universal_experience_rust'
+    compileSdk 35
+    defaultConfig { minSdk 29 }
+}
+
+cargokit {
+    manifestDir = '../../rust'
+    libname = 'universal_experience_rust'
+}

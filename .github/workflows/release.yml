@@ -1,8 +1,8 @@
 name: Release
 
 # 配布物は Actions artifact ではなく GitHub Releases から取得する。
-# main の検証済みコミットに vX.Y.Z タグを打つと、既存の全デスクトップ対応 OS
-# （macOS / Linux / Windows）の配布 bundle を同じ Release に公開する。
+# main の検証済みコミットに vX.Y.Z タグを打つと、全対応 OS
+# （macOS / Linux / Windows / Android）の配布 bundle を同じ Release に公開する。
 on:
   push:
     tags:
@@ -156,8 +156,56 @@ jobs:
           path: universal-experience-windows-x64.zip
           if-no-files-found: error
 
+  # Android shares the same Rust FFI crate through cargokit. A physical device
+  # still owns the golden-path sign-off; this job proves the release APK and
+  # its native libraries compile, then signs the artifact before publication.
+  build-android:
+    needs: [ci, version-check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Flutter pub get
+        run: flutter pub get
+      # The release key is never committed. The four repository secrets must
+      # be configured before tagging a release; fail explicitly rather than
+      # silently publishing a debug-signed APK.
+      - name: Configure Android release signing
+        env:
+          KS_B64: ${{ secrets.UNIVERSAL_EXPERIENCE_RELEASE_KEYSTORE }}
+          KS_PASS: ${{ secrets.UNIVERSAL_EXPERIENCE_RELEASE_KEYSTORE_PASSWORD }}
+          KEY_PASS: ${{ secrets.UNIVERSAL_EXPERIENCE_RELEASE_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.UNIVERSAL_EXPERIENCE_RELEASE_KEY_ALIAS }}
+        run: |
+          test -n "$KS_B64" && test -n "$KS_PASS" && test -n "$KEY_PASS" && test -n "$KEY_ALIAS"
+          printf '%s' "$KS_B64" | base64 --decode > android/app/release.jks
+          printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=release.jks\n' \
+            "$KS_PASS" "$KEY_PASS" "$KEY_ALIAS" > android/key.properties
+      - name: Build signed Android release APK
+        run: flutter build apk --release
+      - name: Package Android release APK
+        run: cp build/app/outputs/flutter-apk/app-release.apk universal-experience-android.apk
+      - name: Upload Android release asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: universal-experience-android
+          path: universal-experience-android.apk
+          if-no-files-found: error
+
   publish:
-    needs: [build-macos, build-linux, build-windows]
+    needs: [build-macos, build-linux, build-windows, build-android]
     runs-on: ubuntu-latest
     steps:
       # ci job が保存する Windows debug bundle を拾わないよう、配布物だけ名前で取る。
@@ -176,6 +224,11 @@ jobs:
         with:
           name: universal-experience-windows-x64
           path: artifacts/universal-experience-windows-x64
+      - name: Download Android release asset
+        uses: actions/download-artifact@v4
+        with:
+          name: universal-experience-android
+          path: artifacts/universal-experience-android
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -184,3 +237,4 @@ jobs:
             artifacts/universal-experience-macos/universal-experience-macos.dmg
             artifacts/universal-experience-linux-x64/universal-experience-linux-x64.tar.gz
             artifacts/universal-experience-windows-x64/universal-experience-windows-x64.zip
+            artifacts/universal-experience-android/universal-experience-android.apk

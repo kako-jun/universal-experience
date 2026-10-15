@@ -4,7 +4,7 @@
 
 **「すべての感覚を、すべての人に。」**
 
-## デスクトップ版の入手
+## アプリの入手
 
 [GitHub Releases](https://github.com/kako-jun/universal-experience/releases) から
 OS に対応する配布物を選んでください。`vX.Y.Z` タグは、各 OS の release bundle を
@@ -16,6 +16,8 @@ OS に対応する配布物を選んでください。`vX.Y.Z` タグは、各 O
   Applications へドラッグします。未署名です。
 - **Linux x64**: `universal-experience-linux-x64.tar.gz` を展開し、
   `universal_experience` を起動します。`lib/` と `data/` は同じフォルダに保ちます。
+- **Android 10+**: `universal-experience-android.apk`（arm64-v8a / armeabi-v7a / x86_64 / x86 を含む universal APK）を端末へダウンロードして
+  インストールします。APK は Release workflow が release keystore で署名します。
 
 ## 現状できること／まだできないこと
 
@@ -26,7 +28,7 @@ OS に対応する配布物を選んでください。`vX.Y.Z` タグは、各 O
   - 画面や他アプリへのライブ適用は未実装です。ルーペ窓は準備中で、いまは選べません。
     窓の下の画面をキャプチャしてフィルタをかける機能はありません（#156）。
 
-### 初回起動の手順（いずれも未署名の配布物です）
+### 初回起動の手順
 
 - **macOS**: ダウンロードした dmg を開いてアプリを Applications へ移し、起動すると
   Apple の公証を受けていないため macOS の警告が出て開けません（文言は macOS のバージョンで異なります）。
@@ -41,6 +43,10 @@ OS に対応する配布物を選んでください。`vX.Y.Z` タグは、各 O
   無い環境ではトレイやホットキーが使えないか、起動しない可能性があります。
   配布物のビルド環境は GitHub Actions の `ubuntu-latest`（現在は Ubuntu 24.04）です。
   24.04 より前（22.04 以前など）の古い glibc の環境で動くかは未検証です。
+- **Android**: APK を開いてインストールします。初回はフォトを選ぶ → フィルタを選ぶ →
+  PNGを書き出す、の順で確認してください。書き出した PNG は
+  `Pictures/Universal Experience` に保存されます。広域ストレージ権限は要求せず、
+  ドラッグ&ドロップ・トレイ・グローバルホットキーは提供しません。
 
 ## 機能
 
@@ -408,10 +414,8 @@ ue 自身の UI も、スクリーンリーダー・キーボード・低視力�
 - macOS 13+（deployment target 13.0。Flutter の native assets が macOS 13 を要求する）
 - Linux x64（GTK 3 ベース。配布物は GitHub Actions の `ubuntu-latest` = 現在 Ubuntu 24.04 でビルド。それより古い glibc での動作は未検証）
 - Windows 10/11 x64（GitHub Releases で配布。実機の操作確認は未完了）
-
-計画中（ランナー未作成）:
-
-- Android
+- Android 10+（GitHub Releases の署名済みuniversal APK: arm64-v8a / armeabi-v7a / x86_64 / x86。画像入力は端末の
+  フォト/ドキュメントピッカー、PNG書き出しは Pictures/Universal Experience）
 
 ※ iOS は技術的制約により非対応（`docs/adr/2025-11-17-no-ios-support.md`）
 
@@ -422,6 +426,12 @@ Windows の実機確認には GitHub Releases の `universal-experience-windows-
 展開し、フォルダ全体を保ったまま `universal_experience.exe` を起動します。
 画面表示・フィルタ選択・サンプル切替・トレイ・ホットキー・クリップボード・PNG書き出しは
 実機での確認が残っています。アプリは未署名で、インストーラ形式ではありません。
+
+Android は Release の `universal-experience-android.apk` をダウンロードしてインストールします。
+初回はフォトを選ぶ → フィルタを選ぶ → PNGを書き出す、の順で確認してください。
+書き出したPNGは端末の `Pictures/Universal Experience` に現れます。アプリは広域ストレージ
+権限を要求せず、ドラッグ&ドロップ・トレイ・グローバルホットキーはAndroidでは提供しません。
+ハードウェアキーボードからの貼り付けは利用できます。
 
 ## セットアップ
 

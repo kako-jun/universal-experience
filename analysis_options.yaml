@@ -8,6 +8,11 @@ analyzer:
     # rust_builder/cargokit/build_tool/.dart_tool が既に生成済みで analyzer が
     # 依存解決を再利用できていたためで、クリーンチェックアウトでは失敗する）。
     - rust_builder/**
+    - build/**
+    - android/**
+    - windows/**
+    - macos/**
+    - linux/**
 
 linter:
   rules:

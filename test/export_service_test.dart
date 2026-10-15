@@ -434,7 +434,7 @@ void main() {
 
     test('未対応 OS は runner を呼ばず失敗', () async {
       var called = false;
-      final ok = await reveal('android', (_) async {
+      final ok = await reveal('fuchsia', (_) async {
         called = true;
         return 0;
       });
@@ -1257,7 +1257,12 @@ void main() {
     test(
         'キャプション込みのセルを並べても、各セルの文字（型名・強度・シミュレーション注記）は'
         '1 枚ずつ書き出したときと同じ画素のまま並ぶ（#84）', () async {
-      const notices = ['Protanopia', 'Deuteranopia', 'Tritanopia', 'Achromatopsia'];
+      const notices = [
+        'Protanopia',
+        'Deuteranopia',
+        'Tritanopia',
+        'Achromatopsia'
+      ];
       final bases = [for (final c in colors) await solid(96, 64, c)];
       final composed = <ui.Image>[];
       for (var i = 0; i < 4; i++) {

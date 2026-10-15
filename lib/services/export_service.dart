@@ -1,10 +1,13 @@
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/painting.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+
+const MethodChannel _androidExportChannel =
+    MethodChannel('universal_experience/export');
 
 /// フィルタ適用後（after）画像を、症状名・強度・受診喚起・日付を焼き込んだ
 /// PNG として書き出すための pure 中核 + I/O 分離サービス (#43)。
@@ -512,6 +515,18 @@ Future<String> savePngInto(
 /// に入れてある（#64）。同名ファイルは
 /// 上書きせず連番にする（[writeBytesWithoutOverwrite]）。
 Future<String> savePng(Uint8List bytes, String filename) async {
+  // Android 10+ uses MediaStore. This makes exports visible in Pictures
+  // without requesting broad storage access (the runner's minSdk is 29).
+  if (Platform.isAndroid) {
+    final uri = await _androidExportChannel.invokeMethod<String>(
+      'savePngToPictures',
+      <String, Object>{'bytes': bytes, 'filename': filename},
+    );
+    if (uri == null || uri.isEmpty) {
+      throw const ExportNoTargetDirectoryException();
+    }
+    return uri;
+  }
   Directory? dir;
   try {
     dir = (await getDownloadsDirectory()) ??
@@ -692,7 +707,17 @@ Future<bool> revealInFolder(
   String? platform,
   RevealRunner runner = _defaultRevealRunner,
 }) async {
-  final cmd = revealCommandFor(platform ?? Platform.operatingSystem, path);
+  final targetPlatform = platform ?? Platform.operatingSystem;
+  if (targetPlatform == 'android') {
+    try {
+      return await _androidExportChannel.invokeMethod<bool>(
+              'viewExportedImage', <String, Object>{'uri': path}) ??
+          false;
+    } on PlatformException {
+      return false;
+    }
+  }
+  final cmd = revealCommandFor(targetPlatform, path);
   if (cmd == null) return false;
   try {
     final exitCode = await runner(cmd);
