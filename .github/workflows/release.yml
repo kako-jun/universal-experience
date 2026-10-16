@@ -189,8 +189,21 @@ jobs:
           KEY_PASS: ${{ secrets.UNIVERSAL_EXPERIENCE_RELEASE_KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.UNIVERSAL_EXPERIENCE_RELEASE_KEY_ALIAS }}
         run: |
-          test -n "$KS_B64" && test -n "$KS_PASS" && test -n "$KEY_PASS" && test -n "$KEY_ALIAS"
-          printf '%s' "$KS_B64" | base64 --decode > android/app/release.jks
+          # Secrets pasted via a UI often carry stray CR/LF/space; strip them.
+          KS_B64=$(printf '%s' "$KS_B64" | tr -d ' \t\r\n')
+          KS_PASS=$(printf '%s' "$KS_PASS" | tr -d '\r\n')
+          KEY_PASS=$(printf '%s' "$KEY_PASS" | tr -d '\r\n')
+          KEY_ALIAS=$(printf '%s' "$KEY_ALIAS" | tr -d '\r\n')
+          for v in KS_B64 KS_PASS KEY_PASS KEY_ALIAS; do
+            test -n "${!v}" || { echo "::error::secret for $v is empty after trimming"; exit 1; }
+          done
+          printf '%s' "$KS_B64" | base64 --decode > android/app/release.jks \
+            || { echo "::error::keystore secret is not valid base64"; exit 1; }
+          echo "decoded keystore: $(wc -c < android/app/release.jks) bytes"
+          keytool -list -keystore android/app/release.jks -storepass "$KS_PASS" >/dev/null 2>&1 \
+            || { echo "::error::decoded file is not a readable keystore (corrupt keystore secret or wrong store password)"; exit 1; }
+          keytool -list -keystore android/app/release.jks -storepass "$KS_PASS" -alias "$KEY_ALIAS" >/dev/null 2>&1 \
+            || { echo "::error::keystore is readable but the key alias was not found"; exit 1; }
           printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=release.jks\n' \
             "$KS_PASS" "$KEY_PASS" "$KEY_ALIAS" > android/key.properties
       - name: Build signed Android release APK
