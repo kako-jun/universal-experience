@@ -532,6 +532,49 @@ Linux debug ビルド成功で代替している:
   `main()` が `HotkeyStatus` として `UniversalExperienceApp` へ渡し、
   `WindowModePanel` が失敗したアクションをエラー色で表示する。
 
+### Linux Wayland セッションの GDK バックエンド (#178)
+
+Wayland ネイティブセッション（COSMIC で確認）では、Flutter (GTK) の描画サーフェスが
+`Timed out waiting for subsurface frame ... (have 0x0)` のまま描画されず、ウィンドウは出るが
+操作できなかった。`GDK_BACKEND=x11` では正常に動く。グローバルホットキーの
+`Binding '...' failed!` は X11 バックエンドでも同じく出るため原因ではない（登録失敗は
+上記のとおりアクションごとに握りつぶして続行する）。
+
+`linux/main.cc` が Wayland セッションで `GDK_BACKEND=x11,wayland` を GTK 初期化前に設定し、
+XWayland を優先する（無ければ Wayland にフォールバック）。`UE_ALLOW_WAYLAND=1` で従来の
+ネイティブ Wayland 起動に戻せる。決定の背景・GTK3 の挙動・代替案・副作用は
+`docs/adr/2026-11-14-prefer-xwayland-on-linux-wayland.md`。X11 / Windows / macOS の挙動は
+変わらない。XWayland 上でもグローバルホットキーはネイティブ Wayland アプリのキー入力を拾えない
+ため、`isLikelyWaylandNativeSession` による UI ヒントの除外はそのまま維持する。
+
+判定ロジックは GTK/Flutter/glib に依存しない純関数 `decide_gdk_backend`
+（`linux/backend_policy.{h,cc}`）に切り出してあり、`main.cc` は `getenv` で集めて呼び、結果が
+あれば `setenv` するだけ。単体テストは `linux/test/`（Flutter ビルドとは独立した CMake
+プロジェクト、assert ベース）にあり、CI の `linux-build` ジョブで実行する:
+
+```sh
+cmake -S linux/test -B build/backend_policy_test
+cmake --build build/backend_policy_test
+ctest --test-dir build/backend_policy_test
+```
+
+`WindowModePanel` のホットキーヒントのテストは `LoupeWindowPolicy.environmentProvider`
+（`@visibleForTesting`）で環境変数を差し替えるため、実機が Wayland でも結果が変わらない。
+
+実機確認手順（COSMIC など Wayland 実機で行う。単体テストでは描画自体は確認できない）:
+
+1. Wayland セッションで環境変数を何も付けずに通常起動し、ウィンドウが描画され、操作
+   （クリック・スライダー等）できること。
+2. `UE_ALLOW_WAYLAND=1` を付けて起動すると従来のネイティブ Wayland 動作になること
+   （COSMIC では描画されない症状が再現しうる）。
+3. XWayland が無い環境（または `DISPLAY` を外した環境）で起動しても、`x11,wayland` の
+   優先リストにより Wayland へフォールバックして起動すること。
+4. XWayland 上のタイトルバー: `linux/my_application.cc` は Wayland では常にヘッダーバー、X11 では
+   WM が GNOME Shell 以外なら通常のタイトルバー（WM 装飾）にする。COSMIC の XWayland で
+   どちらの見た目になるか（二重装飾や欠落がないか）を確認する。
+5. ルーペの最前面・クリックスルー・フレームレス・透過が XWayland 上で期待どおり効くこと
+   （効き方が変わりうる。未確認）。
+
 ### `holdOriginal` の keyUp フォールバック設計
 
 「押している間だけ原画を表示」は理想的には keyDown で ON・keyUp で OFF にする

@@ -31,8 +31,12 @@ void main() {
     // #127/#131）に揃える。体験プリセットの行は不要なので空にする。
     installHomeScreenFixtures();
     experiencesProvider = () => const [];
+    // 実機が Wayland セッションでもテストが変わらないよう、環境変数は非 Wayland の
+    // 空 Map に固定する (#178)。
+    LoupeWindowPolicy.environmentProvider = () => const <String, String>{};
   });
   tearDown(() async {
+    LoupeWindowPolicy.resetEnvironmentProvider();
     resetHomeScreenFixtures();
     // トップレベル共有シングルトンをテスト間で汚染しない（#63）。
     await testLoupe.setClickThrough(false);
@@ -240,6 +244,65 @@ void main() {
           )),
       findsNothing,
       reason: '登録に失敗した toggleClickThrough のキーをヒントに案内してはいけない',
+    );
+  });
+
+  Future<Finder> openDialogWithEmergencyExitRegistered(
+      WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1200, 4000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final settings = await preparedSettings();
+    await tester.runAsync(() => testLoupe.setAppMode(AppMode.loupe));
+
+    await tester.pumpWidget(UniversalExperienceApp(
+      loupeWindowOverride: testLoupe,
+      settings: settings,
+      trayAvailable: false,
+      hotkeyStatus: const HotkeyStatus(
+        registered: {AppHotkeyAction.emergencyExit},
+      ),
+    ));
+    await tester.pump();
+    return openWindowModeDialog(tester);
+  }
+
+  testWidgets('Waylandネイティブセッションでは登録済みでもホットキーのヒントを出さない (#63)',
+      (WidgetTester tester) async {
+    LoupeWindowPolicy.environmentProvider =
+        () => const {'XDG_SESSION_TYPE': 'wayland'};
+    final dialog = await openDialogWithEmergencyExitRegistered(tester);
+
+    final hotkeyText = describeHotkey(
+      defaultHotkeyBindings()[AppHotkeyAction.emergencyExit]!,
+      useMacSymbols: Platform.isMacOS,
+    );
+    expect(
+      find.descendant(
+          of: dialog,
+          matching: find
+              .text('You can also turn it off with the $hotkeyText hotkey')),
+      findsNothing,
+      reason: 'Wayland ネイティブでは登録成功が発火を保証しないのでヒントを出さない',
+    );
+  }, skip: !Platform.isLinux);
+
+  testWidgets('非WaylandのLinuxでは登録済みホットキーのヒントを出す', (WidgetTester tester) async {
+    LoupeWindowPolicy.environmentProvider =
+        () => const {'XDG_SESSION_TYPE': 'x11'};
+    final dialog = await openDialogWithEmergencyExitRegistered(tester);
+
+    final hotkeyText = describeHotkey(
+      defaultHotkeyBindings()[AppHotkeyAction.emergencyExit]!,
+      useMacSymbols: Platform.isMacOS,
+    );
+    expect(
+      find.descendant(
+          of: dialog,
+          matching: find
+              .text('You can also turn it off with the $hotkeyText hotkey')),
+      findsOneWidget,
     );
   });
 }
