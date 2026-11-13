@@ -45,9 +45,32 @@ static void gdk_backend_x11_wayland_no_change() {
   assert(decide_gdk_backend(nullptr, "wayland", "wayland-0", "x11,wayland") ==
          nullptr);
 }
-static void gdk_backend_x1_sets() {
-  // strncmp(.., "x11", 3) の境界: "x1" は先頭一致しない。
-  expect_set(decide_gdk_backend(nullptr, "wayland", "wayland-0", "x1"));
+static void gdk_backend_x1_no_change() {
+  // wayland を含まない明示指定は尊重する。
+  assert(decide_gdk_backend(nullptr, "wayland", "wayland-0", "x1") == nullptr);
+}
+static void gdk_backend_x11foo_no_change() {
+  // 先頭一致 "x11" の後ろが区切りでない場合は x11 そのものではないが、
+  // wayland を含まないので尊重する (意図: x11 判定の境界を strncmp だけに頼らない)。
+  assert(decide_gdk_backend(nullptr, "wayland", "wayland-0", "x11foo") ==
+         nullptr);
+}
+static void gdk_backend_x11foo_wayland_sets() {
+  // "x11foo,wayland" は先頭が x11 そのものではなく wayland を含むので上書き。
+  expect_set(decide_gdk_backend(nullptr, "wayland", "wayland-0", "x11foo,wayland"));
+}
+static void gdk_backend_broadway_no_change() {
+  assert(decide_gdk_backend(nullptr, "wayland", "wayland-0", "broadway") ==
+         nullptr);
+}
+static void gdk_backend_wayland_only_overridden() {
+  expect_set(decide_gdk_backend(nullptr, "wayland", "wayland-0", "wayland"));
+}
+static void gdk_backend_star_overridden() {
+  expect_set(decide_gdk_backend(nullptr, "wayland", "wayland-0", "*"));
+}
+static void gdk_backend_empty_is_unset() {
+  expect_set(decide_gdk_backend(nullptr, "wayland", "wayland-0", ""));
 }
 static void gdk_backend_wayland_x11_overridden() {
   expect_set(decide_gdk_backend(nullptr, "wayland", "wayland-0", "wayland,x11"));
@@ -81,7 +104,13 @@ static const Case kCases[] = {
     C(wayland_display_empty_is_not_wayland),
     C(gdk_backend_x11_no_change),
     C(gdk_backend_x11_wayland_no_change),
-    C(gdk_backend_x1_sets),
+    C(gdk_backend_x1_no_change),
+    C(gdk_backend_x11foo_no_change),
+    C(gdk_backend_x11foo_wayland_sets),
+    C(gdk_backend_broadway_no_change),
+    C(gdk_backend_wayland_only_overridden),
+    C(gdk_backend_star_overridden),
+    C(gdk_backend_empty_is_unset),
     C(gdk_backend_wayland_x11_overridden),
     C(gdk_backend_unset_sets),
     C(idempotent),

@@ -27,7 +27,13 @@ set(CASES
   wayland_display_empty_is_not_wayland
   gdk_backend_x11_no_change
   gdk_backend_x11_wayland_no_change
-  gdk_backend_x1_sets
+  gdk_backend_x1_no_change
+  gdk_backend_x11foo_no_change
+  gdk_backend_x11foo_wayland_sets
+  gdk_backend_broadway_no_change
+  gdk_backend_wayland_only_overridden
+  gdk_backend_star_overridden
+  gdk_backend_empty_is_unset
   gdk_backend_wayland_x11_overridden
   gdk_backend_unset_sets
   idempotent
