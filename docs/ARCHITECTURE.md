@@ -549,6 +549,29 @@ X11 / Windows / macOS の挙動は変わらない。XWayland 上でもグロー�
 Wayland アプリのキー入力を拾えないため、`isLikelyWaylandNativeSession` による UI ヒントの
 除外はそのまま維持する。
 
+判定ロジックは GTK/Flutter/glib に依存しない純関数 `decide_gdk_backend`
+（`linux/backend_policy.{h,cc}`）に切り出してあり、`main.cc` は `getenv` で集めて呼び、結果が
+あれば `setenv` するだけ。単体テストは `linux/test/`（Flutter ビルドとは独立した CMake
+プロジェクト、assert ベース）にあり、CI の `linux-build` ジョブで実行する:
+
+```sh
+cmake -S linux/test -B build/backend_policy_test
+cmake --build build/backend_policy_test
+ctest --test-dir build/backend_policy_test
+```
+
+`WindowModePanel` のホットキーヒントのテストは `LoupeWindowPolicy.environmentProvider`
+（`@visibleForTesting`）で環境変数を差し替えるため、実機が Wayland でも結果が変わらない。
+
+実機確認手順（COSMIC など Wayland 実機で行う。単体テストでは描画自体は確認できない）:
+
+1. Wayland セッションで環境変数を何も付けずに通常起動し、ウィンドウが描画され、操作
+   （クリック・スライダー等）できること。
+2. `UE_ALLOW_WAYLAND=1` を付けて起動すると従来のネイティブ Wayland 動作になること
+   （COSMIC では描画されない症状が再現しうる）。
+3. XWayland が無い環境（または `DISPLAY` を外した環境）で起動しても、`x11,wayland` の
+   優先リストにより Wayland へフォールバックして起動すること。
+
 ### `holdOriginal` の keyUp フォールバック設計
 
 「押している間だけ原画を表示」は理想的には keyDown で ON・keyUp で OFF にする
