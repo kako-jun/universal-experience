@@ -340,6 +340,14 @@ jobs:
           workspaces: |
             rust -> ../build/linux/x64/debug/plugins/universal_experience_rust/cargokit_build
 
+      # linux/main.cc の GDK バックエンド判定（純関数 backend_policy.cc、#178）の単体テスト。
+      # Flutter ビルドとは独立した CMake プロジェクト（GTK 不要）。
+      - name: Linux backend_policy unit test
+        run: |
+          cmake -S linux/test -B build/backend_policy_test
+          cmake --build build/backend_policy_test
+          ctest --test-dir build/backend_policy_test --output-on-failure
+
       - name: Flutter pub get
         run: flutter pub get
 
