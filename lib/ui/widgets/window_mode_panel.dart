@@ -26,10 +26,12 @@ List<String> clickThroughRecoveryLines(
   WindowModeUiContext uiContext,
 ) {
   final isLikelyUnreliableHotkeyEnvironment = Platform.isLinux &&
-      LoupeWindowPolicy.isLikelyWaylandNativeSession(Platform.environment);
+      LoupeWindowPolicy.isLikelyWaylandNativeSession(
+          LoupeWindowPolicy.currentEnvironment());
   AppHotkeyAction? hotkeyRecoveryAction;
   if (!isLikelyUnreliableHotkeyEnvironment) {
-    if (uiContext.hotkeyStatus.isRegistered(AppHotkeyAction.toggleClickThrough)) {
+    if (uiContext.hotkeyStatus
+        .isRegistered(AppHotkeyAction.toggleClickThrough)) {
       hotkeyRecoveryAction = AppHotkeyAction.toggleClickThrough;
     } else if (uiContext.hotkeyStatus
         .isRegistered(AppHotkeyAction.emergencyExit)) {
@@ -127,7 +129,8 @@ class ClickThroughRecoveryBanner extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.ads_click, size: 18, color: scheme.onTertiaryContainer),
+                    Icon(Icons.ads_click,
+                        size: 18, color: scheme.onTertiaryContainer),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -342,8 +345,8 @@ class _HotkeyRow extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               l10n.hotkeyRegistrationFailed,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: colorScheme.error),
+              style:
+                  theme.textTheme.bodySmall?.copyWith(color: colorScheme.error),
             ),
           ],
         ],

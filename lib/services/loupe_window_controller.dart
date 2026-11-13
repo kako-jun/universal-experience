@@ -1,7 +1,9 @@
 import 'dart:async' show unawaited;
+import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' show HardwareKeyboard, KeyDownEvent, KeyEvent;
+import 'package:flutter/services.dart'
+    show HardwareKeyboard, KeyDownEvent, KeyEvent;
 import 'package:flutter/widgets.dart' show Color, Rect, Size;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
@@ -147,6 +149,20 @@ class LoupeWindowPolicy {
     return sessionType == 'wayland' ||
         (waylandDisplay != null && waylandDisplay.isNotEmpty);
   }
+
+  /// [currentEnvironment] の供給源（テストで差し替え可能）。既定は `Platform.environment`。
+  ///
+  /// 実機が Wayland セッションだと [isLikelyWaylandNativeSession] が真になり、環境に
+  /// 依存するテストが落ちるため、widget test から固定の Map を注入できるようにする。
+  /// production からは [currentEnvironment] 経由で既定値をそのまま使う。
+  @visibleForTesting
+  static Map<String, String> Function() environmentProvider =
+      _platformEnvironment;
+
+  static Map<String, String> _platformEnvironment() => Platform.environment;
+
+  /// 今のプロセス環境変数（[environmentProvider] の現在値）。
+  static Map<String, String> currentEnvironment() => environmentProvider();
 }
 
 /// window_manager の薄いラッパ。
@@ -227,10 +243,10 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
       );
       _storedLoupeSuppressed = _appMode != stored;
     }
-    _alwaysOnTop =
-        prefs.getBool(_prefsAlwaysOnTop) ?? LoupeWindowPolicy.defaultAlwaysOnTop;
-    final storedClickThrough =
-        prefs.getBool(_prefsClickThrough) ?? LoupeWindowPolicy.defaultClickThrough;
+    _alwaysOnTop = prefs.getBool(_prefsAlwaysOnTop) ??
+        LoupeWindowPolicy.defaultAlwaysOnTop;
+    final storedClickThrough = prefs.getBool(_prefsClickThrough) ??
+        LoupeWindowPolicy.defaultClickThrough;
     if (_appMode == AppMode.settings && storedClickThrough) {
       // 保存値が不変条件（設定窓モードはクリックスルー禁止）と矛盾していた
       // 場合は正しい値へ正規化し、書き直す (#63)。
