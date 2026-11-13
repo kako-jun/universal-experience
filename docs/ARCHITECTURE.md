@@ -540,14 +540,12 @@ Wayland ネイティブセッション（COSMIC で確認）では、Flutter (GT
 `Binding '...' failed!` は X11 バックエンドでも同じく出るため原因ではない（登録失敗は
 上記のとおりアクションごとに握りつぶして続行する）。
 
-`linux/main.cc` が、`XDG_SESSION_TYPE=wayland` または `WAYLAND_DISPLAY` のセッションで
-`GDK_BACKEND=x11,wayland` を GTK 初期化前に設定し（GTK3 は環境変数を
-`gdk_set_allowed_backends()` より優先するため後者では効かない）、XWayland を優先する
-（XWayland が無ければ Wayland にフォールバック）。`GDK_BACKEND` の先頭が `x11` の場合は
-何もしない。`UE_ALLOW_WAYLAND=1` で従来のネイティブ Wayland 起動に戻せる。
-X11 / Windows / macOS の挙動は変わらない。XWayland 上でもグローバルホットキーはネイティブ
-Wayland アプリのキー入力を拾えないため、`isLikelyWaylandNativeSession` による UI ヒントの
-除外はそのまま維持する。
+`linux/main.cc` が Wayland セッションで `GDK_BACKEND=x11,wayland` を GTK 初期化前に設定し、
+XWayland を優先する（無ければ Wayland にフォールバック）。`UE_ALLOW_WAYLAND=1` で従来の
+ネイティブ Wayland 起動に戻せる。決定の背景・GTK3 の挙動・代替案・副作用は
+`docs/adr/2026-11-14-prefer-xwayland-on-linux-wayland.md`。X11 / Windows / macOS の挙動は
+変わらない。XWayland 上でもグローバルホットキーはネイティブ Wayland アプリのキー入力を拾えない
+ため、`isLikelyWaylandNativeSession` による UI ヒントの除外はそのまま維持する。
 
 判定ロジックは GTK/Flutter/glib に依存しない純関数 `decide_gdk_backend`
 （`linux/backend_policy.{h,cc}`）に切り出してあり、`main.cc` は `getenv` で集めて呼び、結果が
@@ -571,6 +569,11 @@ ctest --test-dir build/backend_policy_test
    （COSMIC では描画されない症状が再現しうる）。
 3. XWayland が無い環境（または `DISPLAY` を外した環境）で起動しても、`x11,wayland` の
    優先リストにより Wayland へフォールバックして起動すること。
+4. XWayland 上のタイトルバー: `linux/my_application.cc` は Wayland では常にヘッダーバー、X11 では
+   WM が GNOME Shell 以外なら通常のタイトルバー（WM 装飾）にする。COSMIC の XWayland で
+   どちらの見た目になるか（二重装飾や欠落がないか）を確認する。
+5. ルーペの最前面・クリックスルー・フレームレス・透過が XWayland 上で期待どおり効くこと
+   （効き方が変わりうる。未確認）。
 
 ### `holdOriginal` の keyUp フォールバック設計
 

@@ -130,6 +130,9 @@ assets/samples/              # サンプル画像集（図形は自作・手続�
 
 macos/                       # macOS ランナー（現行対応）
 linux/                       # Linux ランナー（現行対応）
+                             # + backend_policy.{h,cc}（Wayland で XWayland を優先する GDK_BACKEND 判定の純関数、#178）
+                             # + test/（その単体テスト。Flutter ビルドとは独立した CMake プロジェクト）
+                             # 判断は docs/adr/2026-11-14-prefer-xwayland-on-linux-wayland.md
 android/                     # Android ランナー（API 29+。cargokit が Rust .so を arm64-v8a / armeabi-v7a / x86_64 の
                              # universal APK へ同梱。入力はシステム
                              # フォト/ドキュメントピッカー、PNG は MediaStore の Pictures/Universal Experience へ保存）
@@ -393,7 +396,7 @@ Android は次の4つの Repository Secrets から keystore を一時生成し�
 
 `linux-build`（runs-on: ubuntu-latest、#55）は Linux 側の cargokit 同梱経路
 （`flutter build linux --debug`、`.so` がバンドルされることを ls/test -f で
-確認）と、xvfb 上での実ブリッジ integration test を検証する。`Swatinem/rust-cache`
+確認）と、Linux backend_policy unit test（`linux/test/`、#178）、xvfb 上での実ブリッジ integration test を検証する。`Swatinem/rust-cache`
 によるキャッシュ対象は両ジョブで異なり、`linux-build` は cargokit のビルド出力も
 含めるが、`check`（macOS）は `rust/`（cargo target）+ crates.io 依存のみキャッシュする。
 
