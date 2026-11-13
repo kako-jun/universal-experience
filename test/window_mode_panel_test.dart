@@ -36,7 +36,7 @@ void main() {
     LoupeWindowPolicy.environmentProvider = () => const <String, String>{};
   });
   tearDown(() async {
-    LoupeWindowPolicy.environmentProvider = () => Platform.environment;
+    LoupeWindowPolicy.resetEnvironmentProvider();
     resetHomeScreenFixtures();
     // トップレベル共有シングルトンをテスト間で汚染しない（#63）。
     await testLoupe.setClickThrough(false);

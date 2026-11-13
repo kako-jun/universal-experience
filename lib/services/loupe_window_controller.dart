@@ -2,8 +2,7 @@ import 'dart:async' show unawaited;
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart'
-    show HardwareKeyboard, KeyDownEvent, KeyEvent;
+import 'package:flutter/services.dart' show HardwareKeyboard, KeyDownEvent, KeyEvent;
 import 'package:flutter/widgets.dart' show Color, Rect, Size;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
@@ -143,6 +142,9 @@ class LoupeWindowPolicy {
   /// 信頼できない側に倒す — 判定を誤って「使える」と過信するより、ヒントから
   /// 除外しすぎる方が安全なため。[environment] は呼び出し側が `Platform.environment`
   /// を渡す想定（テストではフェイクの Map を渡せる）。
+  ///
+  /// #178 以降、Linux の Wayland セッションでは XWayland 上で動くが、Wayland ネイティブ
+  /// アプリへのキー入力は XWayland のグラブでは拾えないので、この判定はそのまま維持する。
   static bool isLikelyWaylandNativeSession(Map<String, String> environment) {
     final sessionType = environment['XDG_SESSION_TYPE'];
     final waylandDisplay = environment['WAYLAND_DISPLAY'];
@@ -160,6 +162,11 @@ class LoupeWindowPolicy {
       _platformEnvironment;
 
   static Map<String, String> _platformEnvironment() => Platform.environment;
+
+  /// [environmentProvider] を既定（`Platform.environment`）へ戻す。テストの tearDown 用。
+  @visibleForTesting
+  static void resetEnvironmentProvider() =>
+      environmentProvider = _platformEnvironment;
 
   /// 今のプロセス環境変数（[environmentProvider] の現在値）。
   static Map<String, String> currentEnvironment() => environmentProvider();
@@ -243,10 +250,10 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
       );
       _storedLoupeSuppressed = _appMode != stored;
     }
-    _alwaysOnTop = prefs.getBool(_prefsAlwaysOnTop) ??
-        LoupeWindowPolicy.defaultAlwaysOnTop;
-    final storedClickThrough = prefs.getBool(_prefsClickThrough) ??
-        LoupeWindowPolicy.defaultClickThrough;
+    _alwaysOnTop =
+        prefs.getBool(_prefsAlwaysOnTop) ?? LoupeWindowPolicy.defaultAlwaysOnTop;
+    final storedClickThrough =
+        prefs.getBool(_prefsClickThrough) ?? LoupeWindowPolicy.defaultClickThrough;
     if (_appMode == AppMode.settings && storedClickThrough) {
       // 保存値が不変条件（設定窓モードはクリックスルー禁止）と矛盾していた
       // 場合は正しい値へ正規化し、書き直す (#63)。
