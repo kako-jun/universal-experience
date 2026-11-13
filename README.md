@@ -41,6 +41,9 @@ OS に対応する配布物を選んでください。`vX.Y.Z` タグは、各 O
   Ubuntu 24.04 では `sudo apt-get install libgtk-3-0t64 libayatana-appindicator3-1 libkeybinder-3.0-0`
   （トレイ = ayatana appindicator、ホットキー = keybinder。ビルド用の `-dev` パッケージは不要です）。
   無い環境ではトレイやホットキーが使えないか、起動しない可能性があります。
+  Wayland セッションでは、ネイティブ Wayland だと描画されず操作できない環境（COSMIC など）があるため、
+  自動で XWayland（X11 バックエンド）を優先して起動します（`GDK_BACKEND` の指定は不要）。ネイティブ
+  Wayland で起動したいときは `UE_ALLOW_WAYLAND=1` を付けてください。
   配布物のビルド環境は GitHub Actions の `ubuntu-latest`（現在は Ubuntu 24.04）です。
   24.04 より前（22.04 以前など）の古い glibc の環境で動くかは未検証です。
 - **Android**: APK を開いてインストールします。初回はフォトを選ぶ → フィルタを選ぶ →

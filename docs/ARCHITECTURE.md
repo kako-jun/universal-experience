@@ -532,6 +532,23 @@ Linux debug ビルド成功で代替している:
   `main()` が `HotkeyStatus` として `UniversalExperienceApp` へ渡し、
   `WindowModePanel` が失敗したアクションをエラー色で表示する。
 
+### Linux Wayland セッションの GDK バックエンド (#178)
+
+Wayland ネイティブセッション（COSMIC で確認）では、Flutter (GTK) の描画サーフェスが
+`Timed out waiting for subsurface frame ... (have 0x0)` のまま描画されず、ウィンドウは出るが
+操作できなかった。`GDK_BACKEND=x11` では正常に動く。グローバルホットキーの
+`Binding '...' failed!` は X11 バックエンドでも同じく出るため原因ではない（登録失敗は
+上記のとおりアクションごとに握りつぶして続行する）。
+
+`linux/main.cc` が、`XDG_SESSION_TYPE=wayland` または `WAYLAND_DISPLAY` のセッションで
+`GDK_BACKEND=x11,wayland` を GTK 初期化前に設定し（GTK3 は環境変数を
+`gdk_set_allowed_backends()` より優先するため後者では効かない）、XWayland を優先する
+（XWayland が無ければ Wayland にフォールバック）。`GDK_BACKEND` の先頭が `x11` の場合は
+何もしない。`UE_ALLOW_WAYLAND=1` で従来のネイティブ Wayland 起動に戻せる。
+X11 / Windows / macOS の挙動は変わらない。XWayland 上でもグローバルホットキーはネイティブ
+Wayland アプリのキー入力を拾えないため、`isLikelyWaylandNativeSession` による UI ヒントの
+除外はそのまま維持する。
+
 ### `holdOriginal` の keyUp フォールバック設計
 
 「押している間だけ原画を表示」は理想的には keyDown で ON・keyUp で OFF にする
