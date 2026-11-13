@@ -50,14 +50,32 @@ static void gdk_backend_x1_no_change() {
   assert(decide_gdk_backend(nullptr, "wayland", "wayland-0", "x1") == nullptr);
 }
 static void gdk_backend_x11foo_no_change() {
-  // 先頭一致 "x11" の後ろが区切りでない場合は x11 そのものではないが、
-  // wayland を含まないので尊重する (意図: x11 判定の境界を strncmp だけに頼らない)。
+  // "x11foo" は x11 そのものではないが wayland / * を含まないので、「wayland を含まない」
+  // 規則で何もしない (x11 判定の区切りを固定するのは次の x11foo_wayland_sets)。
   assert(decide_gdk_backend(nullptr, "wayland", "wayland-0", "x11foo") ==
          nullptr);
 }
 static void gdk_backend_x11foo_wayland_sets() {
   // "x11foo,wayland" は先頭が x11 そのものではなく wayland を含むので上書き。
   expect_set(decide_gdk_backend(nullptr, "wayland", "wayland-0", "x11foo,wayland"));
+}
+static void gdk_backend_x11_star_no_change() {
+  // 先頭が x11 そのもの: * を含んでいても何もしない。
+  assert(decide_gdk_backend(nullptr, "wayland", "wayland-0", "x11,*") == nullptr);
+}
+static void gdk_backend_star_x11_overridden() {
+  // 先頭が x11 でなく * を含むので上書き。
+  expect_set(decide_gdk_backend(nullptr, "wayland", "wayland-0", "*,x11"));
+}
+static void gdk_backend_broadway_wayland_overridden() {
+  // wayland を含めば先頭が broadway でも上書き (セッション既定の流入と区別できない)。
+  expect_set(
+      decide_gdk_backend(nullptr, "wayland", "wayland-0", "broadway,wayland"));
+}
+static void gdk_backend_uppercase_wayland_no_change() {
+  // 大文字小文字は区別する (GTK の g_str_equal も区別する)。"Wayland" は wayland でない。
+  assert(decide_gdk_backend(nullptr, "wayland", "wayland-0", "Wayland") ==
+         nullptr);
 }
 static void gdk_backend_broadway_no_change() {
   assert(decide_gdk_backend(nullptr, "wayland", "wayland-0", "broadway") ==
@@ -107,6 +125,10 @@ static const Case kCases[] = {
     C(gdk_backend_x1_no_change),
     C(gdk_backend_x11foo_no_change),
     C(gdk_backend_x11foo_wayland_sets),
+    C(gdk_backend_x11_star_no_change),
+    C(gdk_backend_star_x11_overridden),
+    C(gdk_backend_broadway_wayland_overridden),
+    C(gdk_backend_uppercase_wayland_no_change),
     C(gdk_backend_broadway_no_change),
     C(gdk_backend_wayland_only_overridden),
     C(gdk_backend_star_overridden),

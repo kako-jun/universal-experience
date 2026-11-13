@@ -17,14 +17,22 @@ COSMIC の Wayland ネイティブセッションで起動すると、Flutter (G
 1. Wayland セッション（`XDG_SESSION_TYPE=wayland` または `WAYLAND_DISPLAY` あり）では、
    `linux/main.cc` が GTK 初期化前に `GDK_BACKEND=x11,wayland` を `setenv` する。
    XWayland が無い環境では Wayland にフォールバックする。
-2. 上書きするのは `GDK_BACKEND` が未設定、または値に `wayland` / `*` を含む場合だけ。
-   先頭が `x11` の場合や `broadway` など wayland を含まない明示指定は尊重して何もしない。
+2. 上書きするのは `GDK_BACKEND` が未設定（空文字含む）、または値のどこかに `wayland` または
+   `*` が含まれる場合だけ。`broadway,wayland` のように wayland を含めば先頭が `broadway` でも
+   上書きされる（wayland を含む指定は、セッション既定の流入と区別できないため）。先頭が
+   `x11` の場合や `broadway` など wayland / `*` を含まない明示指定は尊重して何もしない。
+   大文字小文字は区別する（GTK の `g_str_equal` も区別する）。
 3. 逃げ道として `UE_ALLOW_WAYLAND=1`（`0` と空は未設定扱い）を付けると何もせず、従来の
    ネイティブ Wayland 起動になる。
 4. 判定は GTK 非依存の純関数 `decide_gdk_backend`（`linux/backend_policy.{h,cc}`）に切り出し、
    `linux/test/` で単体テストする。
 
 ### GTK3 の挙動（一次確認）
+
+今回の問題の根: `GDK_BACKEND` 未設定時の許可リストの既定は `*` で、`gdk_backends[]` の
+並び（quartz, win32, wayland, x11）の順に試すため、Wayland セッションでは Wayland が選ばれる。
+`GDK_BACKEND=""`（空文字）のときは `g_strsplit` が空リストを返し、どのバックエンドも試され
+ない。そのため空文字は未設定扱いにして上書きする。（GTK 3.24 `gdk/gdkdisplaymanager.c` で確認。）
 
 GTK 3.24 の `gdk/gdkdisplaymanager.c` `gdk_display_manager_open_display` は、環境変数
 `GDK_BACKEND` が設定されていればそれを「試す順番」として使い、無ければ
@@ -53,7 +61,8 @@ XWayland は主要な Wayland コンポジタで標準的に提供され、`x11,
 
 - `setenv` した `GDK_BACKEND` は子プロセスにも引き継がれる（本アプリが起動する子プロセスが
   GTK アプリだと X11 優先で動く）。
-- `linux/my_application.cc:31-38` により、Wayland では常にヘッダーバー、X11 では WM が
+- `linux/my_application.cc` の `#ifdef GDK_WINDOWING_X11` ブロック（ヘッダーバー/タイトルバーの
+  切り替え）により、Wayland では常にヘッダーバー、X11 では WM が
   GNOME Shell 以外なら通常のタイトルバー（WM 装飾）になる。XWayland 上の COSMIC 等では
   見た目が変わりうる。
 - ルーペの最前面（always on top）・クリックスルー・フレームレス・透過は window_manager

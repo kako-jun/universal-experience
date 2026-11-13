@@ -11,8 +11,11 @@
 // フォールバックできるよう "x11,wayland" の優先リストにする。
 //
 // 判定ロジックは backend_policy.cc の純関数 (linux/test/ で単体テスト)。
-// 上書きするのは GDK_BACKEND が未設定、または wayland / * を含む場合だけ。先頭が
-// x11 の場合や broadway など wayland を含まない明示指定は尊重して何もしない。
+// 上書きするのは GDK_BACKEND が未設定 (空文字含む)、または値のどこかに wayland または
+// * が含まれる場合だけ。"broadway,wayland" のように wayland を含めば先頭が broadway でも
+// 上書きされる (wayland を含む指定は、セッション既定の流入と区別できないため)。
+// 先頭が x11 の場合や broadway など wayland / * を含まない明示指定は尊重して何もしない。
+// 大文字小文字は区別する (GTK の g_str_equal も区別する)。
 // ネイティブ Wayland を試したいときは UE_ALLOW_WAYLAND=1 で従来どおりにできる。
 // GDK_BACKEND が "wayland,x11" のようにセッション既定で入っているだけの場合も
 // 明示指定とは区別できないため、上書き対象にする。

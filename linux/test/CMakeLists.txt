@@ -30,6 +30,10 @@ set(CASES
   gdk_backend_x1_no_change
   gdk_backend_x11foo_no_change
   gdk_backend_x11foo_wayland_sets
+  gdk_backend_x11_star_no_change
+  gdk_backend_star_x11_overridden
+  gdk_backend_broadway_wayland_overridden
+  gdk_backend_uppercase_wayland_no_change
   gdk_backend_broadway_no_change
   gdk_backend_wayland_only_overridden
   gdk_backend_star_overridden
