@@ -17,6 +17,7 @@ import '../../services/vision_layer.dart';
 import '../../src/rust/api/sensus_bridge.dart' show VisionStep;
 import 'preview_rendering.dart';
 import 'export_feedback.dart';
+import 'bypass_badge.dart';
 
 /// [ColorVisionCompareView] の書き出しファイル名に入れる識別子（`exportFilename` の
 /// `symptomId`）。単独の型ではなく 4 型の比較であることを名前で区別する。
@@ -57,10 +58,14 @@ class ColorVisionCompareView extends StatefulWidget {
     this.baseSteps = const [],
     this.baseLayers = const [],
     this.sampleSize,
+    this.bypassed = false,
   });
 
   /// 4 セル共通の強さ 0.0..1.0（色覚層の強度）。
   final double strength;
+
+  /// 原画比較中（bypass、#63）。右下のセルの画像の左下に「原画表示中」のバッジを重ねる（#183）。
+  final bool bypassed;
 
   /// 4 型の前に 1 回だけ適用する層のステップ列（適用順、強度 0 は除いたもの、#122）。
   /// 空なら土台 = 原画。
@@ -123,8 +128,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
   /// 描画中に新しい要求が来たか。来ていたら進行中の描画は途中で打ち切る。
   bool _rebuildPending = false;
 
-  int get _effectiveSampleSize =>
-      widget.sampleSize ?? kCanonicalSampleSize;
+  int get _effectiveSampleSize => widget.sampleSize ?? kCanonicalSampleSize;
 
   @override
   void initState() {
@@ -501,6 +505,9 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
                   visionFilterName(l10n, entries[i].id),
                   percent,
                 ),
+          overlay: widget.bypassed && i == entries.length - 1
+              ? const BypassBadge()
+              : null,
           child: afters == null
               ? PreviewErrorPlaceholder(theme: theme, label: l10n.previewFailed)
               : PreviewImageView(image: afters[i]),
@@ -574,11 +581,15 @@ class _CompareCell extends StatelessWidget {
     required this.label,
     required this.semanticsLabel,
     required this.child,
+    this.overlay,
   });
 
   final String label;
   final String semanticsLabel;
   final Widget child;
+
+  /// 画像の左下に重ねるもの（原画表示中のバッジ）。
+  final Widget? overlay;
 
   @override
   Widget build(BuildContext context) {
@@ -604,12 +615,27 @@ class _CompareCell extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          AspectRatio(
-            aspectRatio: 1,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: child,
-            ),
+          Stack(
+            children: [
+              AspectRatio(
+                aspectRatio: 1,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: child,
+                ),
+              ),
+              if (overlay != null)
+                Positioned(
+                  left: 4,
+                  right: 4,
+                  bottom: 4,
+                  // 画像より幅が広いときは縮めて、画像の枠からはみ出さない。
+                  child: Align(
+                    alignment: Alignment.bottomLeft,
+                    child: FittedBox(fit: BoxFit.scaleDown, child: overlay!),
+                  ),
+                ),
+            ],
           ),
         ],
       ),

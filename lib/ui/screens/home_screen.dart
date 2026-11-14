@@ -43,7 +43,7 @@ const double _kNarrowPreviewMaxWidth = 560;
 const double kMinPreviewPaneSide = 160;
 
 /// プレビューカードのうち、画像以外が縦に使う高さ（dp、#130）。カード上端の余白 16、チップ帯
-/// （#183。チップ 48 + スクロールバーの段 6 = 54。「2×2 で比較」「原画表示中」も帯の右端に入る）、
+/// （#183。チップ 48 + スクロールバーの段 6 = 54。「2×2 で比較」も帯の右端に入る。「原画表示中」は画像の枠の中に重ねるので高さを足さない）、
 /// 画像の見出し行 48（書き出しボタン）と余白、画像の下端から選択欄の下端まで（`ImageSourcePicker`。
 /// サンプルのチップが 3 行ほど折り返す）、選択欄の下の余白 16 の合計。
 /// 実フォントでの実測は日本語で約 318、英語（チップが長く折り返しが 1 行増える）で約 342
@@ -385,7 +385,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _previewCard(double maxPaneSide) {
     return Consumer2<VisionFilterState, ImageSourceState>(
       builder: (context, visionState, imageSourceState, _) {
-        final theme = Theme.of(context);
         final l10n = AppLocalizations.of(context)!;
         // 「2×2 で比較」は、層の集合に色覚層があるときだけ出す（#122）。他の層を重ねていても
         // 出せて、そのとき 4 枚は「色覚以外の層を先に適用した画像」の上に色覚 4 型を 1 つずつ
@@ -402,7 +401,7 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // 見出し行は廃止した（#183）: 下の画像の見出し（「元の画像」/ フィルタ名）と内容が重複し、
-                // 48dp を食うため。「2×2 で比較」と「原画表示中」は帯の右端の固定枠へ移した。
+                // 48dp を食うため。「2×2 で比較」は帯の右端の固定枠へ移した（「原画表示中」は画像側に重ねる）。
                 // 見出しの読み上げは、見えない 1dp の Semantics(header) で残す（高さは足さない）。
                 Stack(
                   children: [
@@ -443,63 +442,47 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 ImageSourcePicker(
-                  // 原画表示中のバッジ（#183。見出し行を廃止したので、高さを足さずプレビューの
-                  // 右下に重ねる）。
-                  child: Stack(
-                    children: [
-                      comparing
-                          ? ColorVisionCompareView(
-                              strength: compareInput.strength,
-                              baseSteps: compareInput.baseSteps,
-                              baseLayers: compareInput.baseLayers,
-                              imageSource: imageSourceState.current,
-                            )
-                          : BeforeAfterView(
-                              filter: visionState.build(),
-                              filterId: visionState.selectedId,
-                              strength: strength,
-                              variantId: visionState.focusedVariantId,
-                              // 層が複数のときだけ合成経路（#119）。1 層以下は従来の
-                              // 単一フィルタ経路のまま。
-                              steps: visionState.layers.length > 1
-                                  ? previewPipelineSteps(visionState)
-                                  : null,
-                              // 複数層の見出し・HUD は名前の要約にする（#120）。
-                              layerNames: visionState.layers.length > 1
-                                  ? [
-                                      for (final layer in visionState.layers)
-                                        visionLayerDisplayName(l10n, layer),
-                                    ]
-                                  : null,
-                              layerIds: visionState.layers.length > 1
-                                  ? [
-                                      for (final layer in visionState.layers)
-                                        layer.id,
-                                    ]
-                                  : null,
-                              // 書き出しは全層の値から作る（#121）。
-                              exportLayers: visionState.layers.length > 1
-                                  ? exportLayersOf(visionState)
-                                  : null,
-                              imageSource: imageSourceState.current,
-                              maxPaneSide: maxPaneSide,
-                            ),
-                      if (visionState.bypassed)
-                        Positioned(
-                          right: 4,
-                          bottom: 4,
-                          child: Chip(
-                            label: Text(l10n.bypassedBadgeLabel),
-                            backgroundColor:
-                                theme.colorScheme.secondaryContainer,
-                            labelStyle: theme.textTheme.labelLarge?.copyWith(
-                              color: theme.colorScheme.onSecondaryContainer,
-                            ),
-                            visualDensity: VisualDensity.compact,
-                          ),
+                  // 原画表示中のバッジは、表示側（After 画像・2×2 の右下のセル）が自分の画像の
+                  // 枠の中に重ねる（#183）。
+                  child: comparing
+                      ? ColorVisionCompareView(
+                          strength: compareInput.strength,
+                          baseSteps: compareInput.baseSteps,
+                          baseLayers: compareInput.baseLayers,
+                          imageSource: imageSourceState.current,
+                          bypassed: visionState.bypassed,
+                        )
+                      : BeforeAfterView(
+                          bypassed: visionState.bypassed,
+                          filter: visionState.build(),
+                          filterId: visionState.selectedId,
+                          strength: strength,
+                          variantId: visionState.focusedVariantId,
+                          // 層が複数のときだけ合成経路（#119）。1 層以下は従来の
+                          // 単一フィルタ経路のまま。
+                          steps: visionState.layers.length > 1
+                              ? previewPipelineSteps(visionState)
+                              : null,
+                          // 複数層の見出し・HUD は名前の要約にする（#120）。
+                          layerNames: visionState.layers.length > 1
+                              ? [
+                                  for (final layer in visionState.layers)
+                                    visionLayerDisplayName(l10n, layer),
+                                ]
+                              : null,
+                          layerIds: visionState.layers.length > 1
+                              ? [
+                                  for (final layer in visionState.layers)
+                                    layer.id,
+                                ]
+                              : null,
+                          // 書き出しは全層の値から作る（#121）。
+                          exportLayers: visionState.layers.length > 1
+                              ? exportLayersOf(visionState)
+                              : null,
+                          imageSource: imageSourceState.current,
+                          maxPaneSide: maxPaneSide,
                         ),
-                    ],
-                  ),
                 ),
               ],
             ),

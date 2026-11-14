@@ -26,6 +26,7 @@ import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart'
     show kMinPreviewPaneSide, previewPaneSideFor;
 import 'package:universal_experience/ui/widgets/adjust_panel.dart';
+import 'package:universal_experience/ui/widgets/bypass_badge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 import 'package:universal_experience/ui/widgets/consult_notice_block.dart';
@@ -139,7 +140,7 @@ void main() {
     testWidgets('既定 800x600: 画像は下限より大きく、選択欄の下に余白が残る（初回起動と同じ色覚 1 層）',
         (tester) async {
       // 見積り（_kPreviewChromeHeight）が測っている最悪の状態 = 初回起動の色覚層
-      //（見出し行に「2×2 で比較」が出て、チップ帯と同じ 48dp の行になる）。
+      //（帯の右端に「2×2 で比較」が出る。帯の高さは色覚の層の有無で動かない）。
       loadPreviewImages();
       await pumpHomeScreen(tester,
           size: defaultWindow,
@@ -1022,6 +1023,8 @@ void main() {
       ('広幅 1280x800', wide),
       ('広幅 1600x900', const Size(1600, 900)),
       ('既定 800x600', defaultWindow),
+      // 画像が下限 160dp になる低い広幅（複数層の After 見出しが最も狭い）。
+      ('低い広幅 1280x480', wideLow),
     ]) {
       // 1.19 = 「2×2 で比較」が文字つきの最大（実測でチップの領域が足りる）、2.0 = アイコンだけに縮む。
       for (final scale in [1.0, 1.19, 2.0]) {
@@ -1042,7 +1045,7 @@ void main() {
             try {
               final h =
                   await pumpHomeScreen(tester, size: size, locale: locale);
-              // 「原画表示中」も出した状態で測る（右端の固定枠が帯を潰さないこと）。
+              // 「原画表示中」も出した状態で測る（画像の枠の中に重なるだけで、帯・位置に影響しない）。
               h.visionState.acquireBypass(Object());
               final firstSampleChip = find
                   .descendant(
@@ -1111,6 +1114,22 @@ void main() {
                   expectNoPageScroll();
                   expectStripContents('$n 層');
                 }
+                if (n == 2) {
+                  // 「2×2 で比較」を ON / OFF しても、帯に収まりチップ領域が最小幅以上（選択中の
+                  // チェックで幅が増えても縮み方が変わらない）。
+                  final compare = find.descendant(
+                      of: find.byType(LayerChipStrip),
+                      matching: find.byType(FilterChip));
+                  await tester.tap(compare);
+                  await tester.pump();
+                  await tester.pump();
+                  expectStripContents('2×2 で比較 ON');
+                  await tester.tap(compare);
+                  await tester.pump();
+                  await tester.pump();
+                  expectStripContents('2×2 で比較 OFF');
+                  expect(measure(), base, reason: 'ON/OFF のあと');
+                }
               }
               h.visionState.clear();
               await tester.pump();
@@ -1121,12 +1140,65 @@ void main() {
             final fromStrip = errors
                 .where((e) =>
                     e.contains('layer_chip_strip') ||
-                    e.contains('LayerChipStrip'))
+                    e.contains('LayerChipStrip') ||
+                    // 複数層の After 見出し（画像が下限のとき横に溢れた、#183）。
+                    e.contains('before_after_view') ||
+                    e.contains('BeforeAfterView'))
                 .toList();
-            expect(fromStrip, isEmpty, reason: '帯由来の例外: $fromStrip');
+            expect(fromStrip, isEmpty, reason: '帯・プレビュー由来の例外: $fromStrip');
           });
         }
       }
+    }
+
+    for (final (label, size) in [
+      ('既定 800x600', defaultWindow),
+      ('低い広幅 1280x480', wideLow),
+    ]) {
+      testWidgets('$label: 「原画表示中」は After 画像の枠の中にあり、操作部品と重ならない',
+          (tester) async {
+        loadPreviewImages();
+        final h = await pumpHomeScreen(tester,
+            size: size, locale: const Locale('en'));
+        for (final id in ['myopia', 'protanopia', 'glaucoma']) {
+          h.visionState.toggle(id);
+        }
+        h.visionState.acquireBypass(Object());
+        await tester.pump();
+        await tester.pump();
+        final badge = tester.getRect(find.byType(BypassBadge));
+        final after = tester.getRect(find.byType(PreviewImageView).at(1));
+        expect(
+            after.contains(badge.topLeft) && after.contains(badge.bottomRight),
+            isTrue,
+            reason: 'バッジ $badge は After 画像 $after の中');
+        for (final f in [
+          find.byType(IconButton),
+          find.byType(FilterChip),
+          find.byType(ChoiceChip),
+          find.byType(LayerChipStrip),
+        ]) {
+          for (final e in f.evaluate()) {
+            final r = tester.getRect(find.byWidget(e.widget));
+            expect(r.overlaps(badge), isFalse, reason: '操作部品 $r と重ならない');
+          }
+        }
+        // 2×2 のとき: 右下のセルの画像の枠の中。
+        await tester.tap(find
+            .descendant(
+                of: find.byType(LayerChipStrip),
+                matching: find.byType(FilterChip))
+            .first);
+        await tester.pump();
+        await tester.pump();
+        final cells = find.byType(PreviewImageView);
+        final badge2 = tester.getRect(find.byType(BypassBadge));
+        final last = tester.getRect(cells.last);
+        expect(
+            last.contains(badge2.topLeft) && last.contains(badge2.bottomRight),
+            isTrue,
+            reason: '2×2: バッジ $badge2 は右下のセル $last の中');
+      });
     }
 
     // 英語は実フォントでないと選択欄のチップの折り返しが測れない（テスト用フォントでは異常に

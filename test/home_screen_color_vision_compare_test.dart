@@ -15,16 +15,10 @@ import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 import 'support/color_vision_select.dart';
 import 'support/home_screen_harness.dart';
 import 'support/sample_image_generator.dart';
+import 'support/header_semantics.dart';
 
 /// 「2×2 で比較」の切替（#84）が、層の集合に色覚層があるときだけ出て（#122）、
 /// ON の間は Before / After の代わりに 2×2 を出すことの確認。
-Finder headerSemantics(String label) => find.byWidgetPredicate(
-    (w) =>
-        w is Semantics &&
-        w.properties.header == true &&
-        w.properties.label == label);
-
-// 見出し行は廃止し、見えない Semantics(header) だけが残る（#183）。
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 

@@ -24,6 +24,7 @@ import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/services/vision_filter_metadata.dart';
 
 import 'support/home_screen_harness.dart';
+import 'support/header_semantics.dart';
 
 Map<String, dynamic> _readArb(String name) {
   final file = File('lib/l10n/$name');
@@ -62,13 +63,6 @@ List<AppLocalizations> _allLocalizations() => [
         lookupAppLocalizations(locale),
     ];
 
-Finder headerSemantics(String label) => find.byWidgetPredicate(
-    (w) =>
-        w is Semantics &&
-        w.properties.header == true &&
-        w.properties.label == label);
-
-// 見出し行は廃止し、見えない Semantics(header) だけが残る（#183）。
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 

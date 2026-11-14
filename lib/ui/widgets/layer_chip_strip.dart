@@ -51,18 +51,27 @@ class LayerChipStrip extends StatefulWidget {
   /// スクロールバーのつまみの太さ（段の中に収まる。上下 1dp ずつ余白）。
   static const double scrollbarThickness = 4;
 
-  /// 文字拡大を考慮した帯の中身の高さ。チップの本文（bodyLarge の 1 行）と最小タップ目標
-  /// [chipHeight] の大きい方。右端の「2×2 で比較」の `FilterChip` は、文字倍率が
-  /// 文字つきの間（ラベルの 1 行 + 上下の余白と枠 18 ≦ 48 は、文字倍率が 1.2 未満で成り立つ）は
-  /// [chipHeight] に収まり、文字倍率が大きいときはアイコンだけ（48dp のタップ領域）に縮むので、高さの項に入れなくてよい
-  /// （layout テストが ×1.0・×1.19・×2.0 で帯に完全に収まることを確かめる）。
-  /// 層の種類・数・色覚の層の有無で帯の高さが動かない。
+  /// 文字拡大を考慮した帯の中身の高さ。チップの本文（bodyLarge の 1 行）・最小タップ目標
+  /// [chipHeight]・右端の「2×2 で比較」の**文字つきの** `FilterChip` の高さ（labelLarge の 1 行 +
+  /// 上下の余白と枠 18。実測: ×1.5 まで 48、×2.0 で 58、×3.0 で 78）の最大。文字つきの形のまま
+  /// 置くか、アイコンだけに縮むかは幅だけで決まり（層数で「すべて解除」が増えると変わる）、
+  /// 高さで決まるわけではない。だから高さは常に文字つきの形の分を確保し、層数・色覚の層の有無・
+  /// 縮み方で動かないようにする。
   static double chipHeightFor(BuildContext context) {
-    final body = Theme.of(context).textTheme.bodyLarge;
-    final line = MediaQuery.textScalerOf(context).scale(body?.fontSize ?? 16) *
-        (body?.height ?? 1.5);
-    return line > chipHeight ? line : chipHeight;
+    final theme = Theme.of(context);
+    final scaler = MediaQuery.textScalerOf(context);
+    final body = theme.textTheme.bodyLarge;
+    final label = theme.textTheme.labelLarge;
+    final line = scaler.scale(body?.fontSize ?? 16) * (body?.height ?? 1.5);
+    final compareChip =
+        scaler.scale(label?.fontSize ?? 14) * (label?.height ?? 1.43) +
+            filterChipVerticalExtra;
+    return [chipHeight, line, compareChip].reduce((a, b) => a > b ? a : b);
   }
+
+  /// `FilterChip` の縦の余白と枠の合計（上下パディング + 枠）。実測: ラベル 1 行の高さに足すと
+  /// チップの高さになる（×2.0: 40.04 + 18 = 58）。
+  static const double filterChipVerticalExtra = 18;
 
   /// 帯全体の高さ（チップ + スクロールバーの段）。層数に関わらず同じ値になる。
   static double heightFor(BuildContext context) =>
@@ -277,15 +286,21 @@ class _LayerChipStripState extends State<LayerChipStrip> {
         textScaler: scaler,
         maxLines: 1,
       )..layout();
-      return p.width;
+      final w = p.width;
+      p.dispose();
+      return w;
     }
 
-    // 「すべて解除」の TextButton.icon: 左右の余白 12 × 2 + アイコン 18 + 間隔 8 + 文字。
+    // 文字を除いた幅の見積り（実測の最大に余裕を足した定数。文字倍率で余白も伸び縮みするので、
+    // どの倍率でも実測以上になるようにした）:
+    //  - 「すべて解除」TextButton.icon: 実測 53.3（×1.0）/ 29.3（×2.0）→ 56
+    //  - 「2×2 で比較」FilterChip: **選択中（チェックつき）の形**で見積もる。実測 53.0（×1.0）/
+    //    65.0（×2.0）→ 70。未選択の実測（33.0 / 25.0）より広いので、ON/OFF の切替で
+    //    縮み方が変わらない。
     final clearAll =
-        hasClearAll ? 24 + 18 + 8 + textWidth(l10n.layerStripClearAll) : 0.0;
-    // FilterChip: 左右の余白 8 × 2 + 選択時のチェック 18 + 間隔 8 + 文字。
+        hasClearAll ? 56 + textWidth(l10n.layerStripClearAll) : 0.0;
     final label = widget.trailingLabel;
-    final trailing = label == null ? 0.0 : 16 + 18 + 8 + textWidth(label);
+    final trailing = label == null ? 0.0 : 70 + textWidth(label);
     final gaps = (hasClearAll ? 8 : 0) + (label == null ? 0 : 8);
     return width - clearAll - trailing - gaps < LayerChipStrip.minChipAreaWidth;
   }
