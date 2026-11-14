@@ -287,7 +287,7 @@ main.dart が `windowManager.show()` / `hide()` を `onShowLoupe` / `onHideLoupe
    `advancedFilters` / `categoryLabels` / `catalogNames` / `filterLabels` で、
    ARB（ja/en）から解決し `updateLocalization` で言語変更に追従する
 9. **フィルタをすべて解除** — `VisionFilterState.clear()`（重ねている全層・プリセットを
-   まとめて未選択へ戻す）。何も選ばれていないときにチェックが付く。ホットキー（フィルタ解除）も
+   まとめて未選択へ戻す）。何も選ばれていないときにチェックが付く。非常口ホットキーも
    同じく全層を外す（`test/hotkey_actions_test.dart`。新しいホットキーは足していない）
 10. (区切り線)
 11. **設定を開く…** — フィルタ選択 UI はメインウィンドウ内にあるため

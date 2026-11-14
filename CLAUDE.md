@@ -45,7 +45,7 @@ lib/
 │   │                                 # 検索・選択入口 toggleFilterListEntry・↑↓ の順送りの純粋ロジック（#72）
 │   ├── export_plan.dart             # 書き出しの計画（UI 非依存の純粋ロジック）: buildExportCaption / buildLayeredExportCaption（描画時点の値からキャプションを解決）・planExport（キャプション + ファイル名の症状 id + 強度。複数層は層ごとの行）。BeforeAfterView と 2×2 比較が共有（#159）。PNG のエンコード encodePngAndDispose / encodeImagePng は export_service.dart
 │   ├── export_layers.dart           # 書き出しが数える層 effectiveExportLayers（強度 > 0 のみ。表示の整数パーセントが 0 になる強度も除く）・描画時点の控え ExportLayer / exportLayersOf（#121）
-│   ├── hotkey_actions.dart          # グローバルホットキー4アクションの実処理（#63。フィルタ解除は全層を外す、#121 でテスト固定）
+│   ├── hotkey_actions.dart          # グローバルホットキー4アクションの実処理（#63。非常口は全層を外す、#121 でテスト固定）
 │   ├── hotkey_service.dart          # hotkey_manager 登録の副作用層（#63）
 │   ├── image_source_state.dart      # プレビュー原画（サンプル/ユーザー画像）の選択の唯一の正本（#78）
 │   ├── layer_consult_notice.dart    # 層 1 つ単体の受診喚起 layerConsultNotice（調整パネルの層ごとの節が使う、#120）
@@ -321,7 +321,7 @@ UI は多選択（#120）:
   ファイル名に数えない（画像だけが共有されたとき実際の見え方と食い違わないため）。「2×2 で比較」は色覚層があるとき
   だけ出し、他の層は土台として重ねる（#122）。
 - トレイ（#121）: 「高度なフィルタ」はチェック式。クリックはメイン画面の一覧と同じ入口（`toggleFilterListEntry`）を通り、チェックは層の集合から導く。
-  色覚 4 項目は排他（別の型で置き換え）、上限 5 で未選択の項目は灰色（色覚の置き換えは有効）。フィルタ解除（トレイ・ホットキー）は全層を外す。
+  色覚 4 項目は排他（別の型で置き換え）、上限 5 で未選択の項目は灰色（色覚の置き換えは有効）。フィルタ解除（トレイ）と非常口ホットキーは全層を外す。
 
 ### iOS非対応
 
