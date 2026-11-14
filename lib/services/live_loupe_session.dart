@@ -56,8 +56,10 @@ class LiveLoupeSession extends ChangeNotifier {
 
   static const String _prefsRestoreToken = 'liveCapture.restoreToken';
 
-  /// 窓の真下を撮るとき、除外を止めてから待つフレーム数。隠した直後の 1 枚目には
-  /// まだ窓が写っていることがあるため 2 枚待つ。
+  /// 窓の真下を撮るとき、**隠し終えた後に**待つフレーム数（画面が動いている場合）。
+  /// `windowManager.hide` は XWayland 経由で非同期なので、戻った直後の 1 枚目には
+  /// まだ窓が写っていることがあるため 2 枚待つ。隠す呼び出しの途中に届いた枚は
+  /// 数えない。
   static const int primeFrames = 2;
 
   final LoupeWindowController _loupeWindow;
@@ -127,13 +129,14 @@ class LiveLoupeSession extends ChangeNotifier {
 
   /// 窓を一瞬隠し、窓の真下が写ったフレームを待ってから戻す。
   ///
-  /// フレームは **除外を止めた時点**（[LiveCaptureBackend.setHidden] の戻り値）から
-  /// 数える。PipeWire は画面に変化（damage）があるときだけフレームを送るので、
-  /// 隠した後に読み直した番号から数えると、静止した画面では隠したことによる
-  /// 1〜2 枚がもう数え終わっていて、[_primeTimeout] まで窓が消えたままになる。
-  /// 終わる条件は次のどちらか:
-  /// - 除外を止めてから [primeFrames] 枚届き、かつ隠し終えた後にも 1 枚届いた
-  ///   （画面が動いている。隠す前の窓が写った枚だけで終わらない）。
+  /// PipeWire は画面に変化（damage）があるときだけフレームを送る。静止した画面では
+  /// 隠したことによる 1〜2 枚が隠す呼び出しの途中に届いて終わりなので、隠した後の
+  /// 枚数だけを条件にすると [_primeTimeout] まで窓が消えたままになる。そこで、
+  /// 除外を止めた時点（[LiveCaptureBackend.setHidden] の戻り値）からの到着と経過
+  /// 時間を合わせて見る。終わる条件は次のどちらか:
+  /// - 隠し終えた後（`hideWindow` から戻った時点の番号から）に [primeFrames] 枚届いた
+  ///   （画面が動いている）。隠す呼び出しの途中に届いた枚（まだ窓が写りうる）は
+  ///   数えないので、窓自身が写った枚で終わって控えに焼き付くことはない。
   /// - 除外を止めてから 1 枚以上届き、隠し終えてから [_primeSettle] 経った
   ///   （静止した画面。隠したことによる 1 枚で足りる）。
   ///
@@ -151,7 +154,7 @@ class LiveLoupeSession extends ChangeNotifier {
           !_disposed &&
           DateTime.now().isBefore(deadline)) {
         final sequence = await _backend.frameSequence();
-        final moving = sequence >= base + primeFrames && sequence > afterHide;
+        final moving = sequence >= afterHide + primeFrames;
         final settled = sequence > base && hidden.elapsed >= _primeSettle;
         if (moving || settled) break;
         await Future<void>.delayed(_pollInterval);
@@ -191,6 +194,14 @@ class LiveLoupeSession extends ChangeNotifier {
     // 設定窓へ戻す。setAppMode の通知で _sync が呼ばれるが、idle なので何もしない。
     await _loupeWindow.setAppMode(AppMode.settings);
     if (!_disposed) notifyListeners();
+  }
+
+  /// 共有中の描画（画素の画像化・GPU シェーダ）が失敗した（`LiveLoupeView` から）。
+  /// 描けないまま窓を出し続けないよう、共有を止めて [LiveCaptureError.failed] で
+  /// 設定窓へ戻す。共有中でなければ何もしない。
+  void reportRenderFailure() {
+    if (_state != LiveLoupeState.running) return;
+    unawaited(_fail(LiveCaptureError.failed));
   }
 
   void _handleStopped(String reason) {

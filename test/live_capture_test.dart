@@ -41,6 +41,9 @@ class _FakeBackend implements LiveCaptureBackend {
   /// true ならフレームが届かない（frameSequence が進まない）。
   bool frozen = false;
 
+  /// 空でなければ、frameSequence はこれを先頭から返す（届いた枚数を台本で決める）。
+  final List<int> scripted = [];
+
   @override
   set onStopped(void Function(String reason)? callback) =>
       stoppedCallback = callback;
@@ -71,6 +74,7 @@ class _FakeBackend implements LiveCaptureBackend {
 
   @override
   Future<int> frameSequence() async {
+    if (scripted.isNotEmpty) return scripted.removeAt(0);
     if (frozen) return sequence;
     // 呼ばれるたびに 1 枚届いたことにする。
     return sequence++;
@@ -361,6 +365,67 @@ void main() {
       expect(session.state, LiveLoupeState.running);
       expect(watch.elapsed, lessThan(const Duration(seconds: 5)));
       expect(window, ['hide', 'show']);
+      session.dispose();
+    });
+
+    test('隠す呼び出しの途中に届いた枚（窓が写りうる）では priming を終えない', () async {
+      // 除外を止めた時点の番号は 0。隠す呼び出しの途中に 2 枚届き（まだ窓が写りうる）、
+      // 隠し終えた後に 1 枚だけ届いて、以後は届かない。旧実装（除外を止めてから 2 枚、
+      // かつ隠し終えた後に 1 枚）はここで終わり、窓が写った枚が控えに残りえた。
+      final backend = _FakeBackend()..frozen = true;
+      final session = LiveLoupeSession(
+        loupeWindow: loupe,
+        backend: backend,
+        hideWindow: () async {
+          window.add('hide');
+          backend.sequence = 3;
+          // hide から戻った直後に読む番号は 2（途中の 2 枚）。その後 3 になる。
+          backend.scripted.add(2);
+        },
+        showWindow: () async => window.add('show'),
+        primeTimeout: const Duration(milliseconds: 150),
+        // 静止した画面の条件（落ち着き待ち）では終わらないよう長くする。
+        primeSettle: const Duration(seconds: 10),
+        pollInterval: const Duration(milliseconds: 5),
+      );
+      final watch = Stopwatch()..start();
+      await loupe.setAppMode(AppMode.loupe);
+      while (session.state != LiveLoupeState.running &&
+          watch.elapsed < const Duration(seconds: 3)) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      expect(session.state, LiveLoupeState.running);
+      // 隠し終えた後に 2 枚届かないので、待ち時間の上限まで終わらない。
+      expect(watch.elapsed,
+          greaterThanOrEqualTo(const Duration(milliseconds: 150)));
+      expect(window, ['hide', 'show']);
+      session.dispose();
+    });
+
+    test('隠し終えた後に 2 枚届けば、待ち時間を待たずに終える', () async {
+      final backend = _FakeBackend()..frozen = true;
+      final session = LiveLoupeSession(
+        loupeWindow: loupe,
+        backend: backend,
+        hideWindow: () async {
+          window.add('hide');
+          // 途中に 2 枚、隠し終えた後に 2 枚（2 → 3 → 4）。
+          backend.sequence = 4;
+          backend.scripted.addAll([2, 3]);
+        },
+        showWindow: () async => window.add('show'),
+        primeTimeout: const Duration(seconds: 10),
+        primeSettle: const Duration(seconds: 10),
+        pollInterval: const Duration(milliseconds: 5),
+      );
+      final watch = Stopwatch()..start();
+      await loupe.setAppMode(AppMode.loupe);
+      while (session.state != LiveLoupeState.running &&
+          watch.elapsed < const Duration(seconds: 3)) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      expect(session.state, LiveLoupeState.running);
+      expect(watch.elapsed, lessThan(const Duration(seconds: 3)));
       session.dispose();
     });
 

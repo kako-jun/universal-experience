@@ -114,7 +114,14 @@ class _LiveLoupeViewState extends State<LiveLoupeView> {
     _looping = true;
     try {
       while (mounted && _session?.state == LiveLoupeState.running) {
-        await _tick();
+        try {
+          await _tick();
+        } catch (_) {
+          // 描画の失敗（シェーダの読み込み・適用など）を未処理のまま捨ててループを
+          // 黙って終わらせない。共有を止めて failed で設定窓へ戻す（スナックバーで出る）。
+          _session?.reportRenderFailure();
+          break;
+        }
         if (!mounted) break;
         await SchedulerBinding.instance.endOfFrame;
       }

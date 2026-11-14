@@ -406,4 +406,80 @@ void main() {
     expect(session.state, LiveLoupeState.running);
     expect(find.byType(RawImage), findsNothing);
   });
+
+  testWidgets('描画（シェーダ）が失敗したら、ループを黙って止めず failed で設定窓へ戻す',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    liveUniformsProvider = ({
+      required VisionFilter filter,
+      required double strength,
+      required double time,
+      required int width,
+      required int height,
+    }) =>
+        throw StateError('shader failed');
+    final input = (await tester.runAsync(
+      () => _decodeFile('test/golden/protanopia_input.png'),
+    ))!;
+    final pixels = (await tester.runAsync(() => _rgba(input)))!;
+    final backend = _OneFrameBackend(LiveCaptureFrame(
+      sequence: 1,
+      width: input.width,
+      height: input.height,
+      pixels: pixels,
+      unprimed: false,
+    ));
+    final loupe = LoupeWindowController(loupeModeAvailable: true);
+    final vision = VisionFilterState();
+    selectColorVisionKey(vision, 'deuteranopia');
+    final session = LiveLoupeSession(
+      loupeWindow: loupe,
+      backend: backend,
+      hideWindow: () async {},
+      showWindow: () async {},
+      pollInterval: Duration.zero,
+    );
+    addTearDown(session.dispose);
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<VisionFilterState>.value(value: vision),
+          ChangeNotifierProvider<LoupeWindowController>.value(value: loupe),
+          ChangeNotifierProvider<LiveLoupeSession>.value(value: session),
+        ],
+        child: const MaterialApp(
+          locale: Locale('en'),
+          localizationsDelegates: [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: Stack(children: [Positioned.fill(child: LiveLoupeView())]),
+          ),
+        ),
+      ),
+    );
+
+    await tester.runAsync(() => loupe.setAppMode(AppMode.loupe));
+    for (var i = 0; i < 50 && loupe.appMode == AppMode.loupe; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
+    }
+    await tester.pump();
+
+    expect(loupe.appMode, AppMode.settings);
+    expect(session.state, LiveLoupeState.idle);
+    expect(find.byType(RawImage), findsNothing);
+    expect(
+      find.text(lookupAppLocalizations(const Locale('en'))
+          .liveCaptureErrorFailed),
+      findsOneWidget,
+    );
+    input.dispose();
+  });
 }
