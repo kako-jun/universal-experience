@@ -86,7 +86,8 @@ lib/
     │                                 # before_after_view（複数層は名前の要約見出し・書き出しは層ごとの行と併合した受診喚起、#120/#121）, loupe_hud,
     │                                 # preview_rendering（プレビュー描画の共有: before 読み込み・after 描画・書き出し合成の差し替え口
     │                                 # previewSourceImageLoader/afterImageRenderer/exportImageComposer と PreviewImageView・PreviewErrorPlaceholder。
-    │                                 # BeforeAfterView と 2×2 比較が共有し、互いを import しない、#159）,
+    │                                 # BeforeAfterView と 2×2 比較が共有し、互いを import しない、#159。描画が 500ms を越えて
+    │                                 # 続く間の「描画中…」PreviewBusyTracker/PreviewBusyBadge、#185）,
     │                                 # color_vision_compare_view（色覚 4 型の 2×2 比較と書き出し、#84。他の層の土台つき、#122）,
     │                                 # experience_presets（体験プリセットの行 ExperiencePresetTile）, filter_param_panel,
     │                                 # consult_notice_block（受診喚起の共有表示ウィジェット、#76）,

@@ -242,6 +242,96 @@ class _UiImagePainter extends CustomPainter {
       !identical(oldDelegate.image, image);
 }
 
+/// 描画がこの時間を越えて続いたら「描画中…」（[PreviewBusyBadge]）を出す（#185）。
+///
+/// CPU 描画は途中で止められず、組み合わせによっては 1 回に数十秒かかる（例: 明るい画像に
+/// 掛けた starbursts。sensus の starbursts は明るい画素の数に比例して重くなる）。その間は
+/// プレビューが変わらないので、止まっているのではなく描いている最中だと見せる。普段の
+/// 描画（数十〜数百 ms）では出ないよう、少し待ってから出す。
+const Duration kPreviewBusyThreshold = Duration(milliseconds: 500);
+
+/// 描画が [threshold] を越えて続いているかを数える（#185）。
+///
+/// 描画の列（実行中 + 保留）が始まったら [begin]、列が空になったら [end] を呼ぶ。
+/// [begin] から [threshold] 経っても [end] が来なければ [showing] が true になり、
+/// [onChanged] が呼ばれる（呼び出し側が `setState` する）。途中で [begin] が重なっても
+/// 時計は最初の [begin] から数える（保留の要求が続く間は出しっぱなし）。
+class PreviewBusyTracker {
+  PreviewBusyTracker(this.onChanged, {this.threshold = kPreviewBusyThreshold});
+
+  final VoidCallback onChanged;
+  final Duration threshold;
+
+  Timer? _timer;
+  bool _showing = false;
+
+  /// 「描画中…」を出すべきか。
+  bool get showing => _showing;
+
+  void begin() {
+    if (_timer != null || _showing) return;
+    _timer = Timer(threshold, () {
+      _timer = null;
+      _showing = true;
+      onChanged();
+    });
+  }
+
+  void end() {
+    _timer?.cancel();
+    _timer = null;
+    if (_showing) {
+      _showing = false;
+      onChanged();
+    }
+  }
+
+  void dispose() {
+    _timer?.cancel();
+    _timer = null;
+  }
+}
+
+/// 描画が長引いている間の「描画中…」の札（#185）。アニメーションはしない
+/// （widget test の pumpAndSettle を止めないため。「準備中」と同じ方針）。
+/// 現れたときに一度だけ読み上げる（liveRegion）。
+class PreviewBusyBadge extends StatelessWidget {
+  const PreviewBusyBadge({super.key, required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.hourglass_top, size: 16, color: scheme.onSurface),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: scheme.onSurface),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Shown in the "after" pane when the latest generation/render attempt
 /// failed. Colours come only from `colorScheme` roles
 /// (#72 の方針): the `error`/`onErrorContainer` family, not a hardcoded value.

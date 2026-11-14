@@ -123,6 +123,11 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
   /// 描画中に新しい要求が来たか。来ていたら進行中の描画は途中で打ち切る。
   bool _rebuildPending = false;
 
+  /// 描画の列が長引いている間の「描画中…」（#185。[BeforeAfterView] と同じ理由）。
+  late final PreviewBusyTracker _busy = PreviewBusyTracker(() {
+    if (mounted) setState(() {});
+  });
+
   int get _effectiveSampleSize =>
       widget.sampleSize ?? kCanonicalSampleSize;
 
@@ -154,6 +159,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       return;
     }
     _rebuildInFlight = true;
+    _busy.begin();
     unawaited(_runRebuild());
   }
 
@@ -162,11 +168,14 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       await _rebuild();
     } finally {
       _rebuildInFlight = false;
-    }
-    if (!mounted) return;
-    if (_rebuildPending) {
-      _rebuildPending = false;
-      _scheduleRebuild();
+      if (mounted) {
+        if (_rebuildPending) {
+          _rebuildPending = false;
+          _scheduleRebuild();
+        } else {
+          _busy.end();
+        }
+      }
     }
   }
 
@@ -347,6 +356,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
 
   @override
   void dispose() {
+    _busy.dispose();
     _before?.dispose();
     _baseImage?.dispose();
     final afters = _afters;
@@ -538,6 +548,12 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
                 ],
               ),
             ),
+            // 描画が長引いている間は「描画中…」（#185）。
+            if (_busy.showing)
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: PreviewBusyBadge(label: l10n.previewRendering),
+              ),
             // 書き出せるのは 4 セルそろって描けているときだけ。
             if (afters != null)
               IconButton(

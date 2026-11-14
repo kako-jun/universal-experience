@@ -1019,7 +1019,14 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   参照）。CPU `apply()` は GPU シェーダより重いため、`_scheduleRebuild` が
   `_rebuild` の実行を直列化し（同時に走るジョブは常に1本、#85）、
   スライダーを連続操作しても実ブリッジ呼び出しが積み上がらないようにしている
-  （#58 の世代管理・dispose・失敗表示の規約自体は変更していない）
+  （#58 の世代管理・dispose・失敗表示の規約自体は変更していない）。
+  ネイティブの描画は途中で止められないため、1 回が長いとその間は before / after とも
+  前の描画のまま変わらない（両方を 1 回の完了でそろえて差し替える）。sensus の starbursts は
+  閾値を超える明るい画素の数に比例して重く、明るいサンプル（info_board 等）に 1024px で掛けると
+  1 回に数十秒かかる（#185。推奨サンプルの夜景では数十 ms）。そこで描画の列（実行中 + 保留）が
+  `kPreviewBusyThreshold`（500ms）を越えて続いたら、after 側に「描画中…」
+  （`PreviewBusyBadge`、`PreviewBusyTracker` が計時。`preview_rendering.dart`）を重ね、
+  止まっているのではないことを見せる。保留中の要求は、描画が例外で終わっても流す
 - `ColorVisionCompareView`（`lib/ui/widgets/color_vision_compare_view.dart`、#84）: 色覚 4 型の
   2×2 比較。`HomeScreen` の「2×2 で比較」が ON（かつ色覚カテゴリ選択中）の間、`BeforeAfterView` の
   代わりに `ImageSourcePicker` の中へ出る。並べる型は `kColorVisionCompareEntries`
@@ -1043,7 +1050,8 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   `ColorVisionCompareView` は `baseSteps` / `baseLayers` を受け取り、`_rebuild` の先頭で
   `renderDefaultAfterPipeline` を **1 回だけ**呼んで土台を作り（空なら原画）、4 セルは土台の複製に色覚 1 段を適用する。
   土台は「steps・元画像・サイズ」をキーに保持し、色覚の強度だけが動いたときは作り直さない（層・強度・パラメータが
-  変わると `didUpdateWidget` が再構築し、既存の直列・最新優先に乗る）。描画時点の値（強さ・土台の層）は控え
+  変わると `didUpdateWidget` が再構築し、既存の直列・最新優先に乗る。描画が長引けば見出しの行に
+  「描画中…」を出す、#185）。描画時点の値（強さ・土台の層）は控え
   （`_afterStrength` / `_afterBaseLayers`）に固定し、書き出し（キャプションの症状名行・ファイル名）はその控えから作るので
   画像と食い違わない。土台があるときのキャプションは `buildLayeredExportCaption`（土台の層 + 色覚 1 層）、ファイル名は
   `exportSymptomId`（比較の印 → 土台の id、適用順、48 文字上限）。色覚だけのときは従来と同一。
@@ -1231,7 +1239,9 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   カタログ id・別名 id（`variantId`）→ `VisionFilter`・強度のマッピング契約（#57/#59 の不変条件）を
   検証する（実描画そのものは下記の実ブリッジ integration test が担う）。
   同ファイルは `_scheduleRebuild` が実行を直列化すること（同時に走るジョブは
-  常に1本、#85）も検証する。`cpu_vision_renderer_test.dart` は
+  常に1本、#85）も検証する。`preview_render_stall_test.dart` は、長い描画の間に「描画中…」が
+  出て終われば最新の選択に追いつくこと、付け外し等をシード固定でランダムに繰り返しても最後は
+  最新の入力に追いつくことを検証する（#185）。`cpu_vision_renderer_test.dart` は
   実ブリッジなしで検証できる部分（straight⇄premultiplied 変換の正しさ・
   `ImageDescriptor.raw` 経路のデコード失敗が例外として伝わること、#85）を担う
 - **GPU golden テスト**（`test/vision_filter_golden_test.dart` /

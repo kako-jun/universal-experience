@@ -227,6 +227,15 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// in-flight job finishes.
   int? _pendingRebuildSampleSize;
 
+  /// 描画の列（実行中 + 保留）が [kPreviewBusyThreshold] を越えて続いたら、after 側に
+  /// 「描画中…」を出す（#185）。ネイティブの描画は途中で止められず、明るい画像の
+  /// starbursts のように 1 回に数十秒かかることがある。その間 before / after は前の
+  /// 描画のまま（両方を 1 回の完了でそろえて差し替える）なので、止まっているのと
+  /// 見分けられるようにする。
+  late final PreviewBusyTracker _busy = PreviewBusyTracker(() {
+    if (mounted) setState(() {});
+  });
+
   /// The sample size to render at when [BeforeAfterView.sampleSize] isn't
   /// explicitly set — [kCanonicalSampleSize] in production;
   /// tests can override via the widget's `sampleSize` constructor param.
@@ -274,6 +283,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       return;
     }
     _rebuildInFlight = true;
+    _busy.begin();
     unawaited(_runRebuild(sampleSize));
   }
 
@@ -284,13 +294,17 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       // _rebuild が例外を投げても（現状は内部で catch して
       // いるため起きない想定だが）_rebuildInFlight が true のまま固着して
       // 以後の要求が永久に集約されたまま実行されなくなる事態を避ける。
+      // 保留中の要求も、例外のときでも流す（取りこぼすと次の操作まで追いつかない）。
       _rebuildInFlight = false;
-    }
-    if (!mounted) return;
-    final pending = _pendingRebuildSampleSize;
-    if (pending != null) {
-      _pendingRebuildSampleSize = null;
-      _scheduleRebuild(pending);
+      if (mounted) {
+        final pending = _pendingRebuildSampleSize;
+        if (pending != null) {
+          _pendingRebuildSampleSize = null;
+          _scheduleRebuild(pending);
+        } else {
+          _busy.end();
+        }
+      }
     }
   }
 
@@ -488,6 +502,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
 
   @override
   void dispose() {
+    _busy.dispose();
     _before?.dispose();
     // _after may alias _before (when filter == null); avoid double dispose.
     if (!identical(_after, _before)) {
@@ -633,7 +648,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         final afterName = multiLayer
             ? layerNamesSummary(l10n, layerNames)
             : visionFilterDisplayName(l10n, widget.variantId, widget.filterId);
-        final Widget afterChild = _failed
+        final Widget afterImage = _failed
             ? PreviewErrorPlaceholder(theme: theme, label: l10n.previewFailed)
             : PreviewImageView(
                 image: _after,
@@ -649,6 +664,22 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                         : l10n.previewImageFilteredSemantics(
                             multiLayer ? layerNames.join(' + ') : afterName),
               );
+        // 描画が長引いている間は、after の上に「描画中…」を重ねる（#185）。
+        final Widget afterChild = _busy.showing
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  afterImage,
+                  Align(
+                    alignment: Alignment.topCenter,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: PreviewBusyBadge(label: l10n.previewRendering),
+                    ),
+                  ),
+                ],
+              )
+            : afterImage;
         // #60: 時間依存の注記は widget.filterId（カタログ id）からカタログを
         // 引いて解決する。after ペインの見出しは widget.variantId が
         // あればそちらを優先する（#60: -omaly の名前を正しく出すため、

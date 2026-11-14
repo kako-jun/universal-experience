@@ -34,6 +34,7 @@
   "compareCellFailedSemanticsLabel": "{name}のシミュレーション、描画に失敗しました",
   "previewPreparing": "プレビューを準備中…",
   "previewFailed": "プレビューの描画に失敗しました",
+  "previewRendering": "描画中…",
   "previewStaticFrameNote": "時間の経過で変化する見え方です。プレビューは動きのない1コマの静止画で表示しています。",
 
   "changePattern": "パターンを変える",
