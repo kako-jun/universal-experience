@@ -189,7 +189,7 @@ Future<ui.Image?> renderDefaultAfterPipeline(
 /// view, #84). Shows a neutral placeholder box while [image] is null.
 ///
 /// [semanticLabel] は画像の代替テキスト（スクリーンリーダー向け、#45）。null なら
-/// 読み上げ対象にしない（周囲の文言が説明を担うとき）。
+/// 読み上げ対象にしない（周囲の文言が説明を担うとき）。[image] が null の間も読ませない。
 class PreviewImageView extends StatelessWidget {
   const PreviewImageView({super.key, required this.image, this.semanticLabel});
 
@@ -207,7 +207,9 @@ class PreviewImageView extends StatelessWidget {
           )
         : CustomPaint(painter: _UiImagePainter(img), size: Size.infinite);
     final label = semanticLabel;
-    if (label == null) return content;
+    // 画像がまだ無い（描画中の空の枠）ときは、画像として読ませない（#185: 元画像の読み込みを
+    // 描画から分けたので、after だけが空の時間がある。その間は「描画中…」の札が状態を伝える）。
+    if (label == null || img == null) return content;
     return Semantics(image: true, label: label, child: content);
   }
 }
