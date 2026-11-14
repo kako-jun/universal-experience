@@ -61,17 +61,25 @@ class AdjustPanel extends StatelessWidget {
                     ),
                   ),
                 ),
-                TextButton.icon(
-                  // 色覚・advanced・プリセットのどの選択でも、選択を丸ごと
-                  // 外す唯一の入口（`VisionFilterState.clear`）。
-                  onPressed: hasSelection
-                      ? () {
-                          state.clear();
-                          dismissWelcomeBannerOnUserChange(context);
-                        }
-                      : null,
-                  icon: const Icon(Icons.clear, size: 18),
-                  label: Text(l10n.clearFilter),
+                // 文言が長くても Row からはみ出さないよう、ボタン側を縮められる枠に入れる。
+                Flexible(
+                  flex: 3,
+                  child: TextButton.icon(
+                    // 色覚・advanced・プリセットのどの選択でも、選択を丸ごと
+                    // 外す唯一の入口（`VisionFilterState.clear`）。
+                    onPressed: hasSelection
+                        ? () {
+                            state.clear();
+                            dismissWelcomeBannerOnUserChange(context);
+                          }
+                        : null,
+                    icon: const Icon(Icons.clear, size: 18),
+                    label: Text(
+                      l10n.clearFilter,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ),
               ],
             ),
