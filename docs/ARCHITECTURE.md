@@ -884,7 +884,9 @@ HUD は、GPU シェーダの無い層を「この症状は静止画プレビュ
     共有を止めた等）も購読して `stopped` へ流す。可否の調査 `QueryPortalAvailable` は非同期（1 秒で諦める）。
     非同期の応答・`g_idle_add` の通知は破棄後に届いても `this` に触れない（`alive_` の弱参照）。
   - `backdrop.{h,cc}`: 全画面の「下の画面の控え」`Backdrop` と、窓の位置の履歴から除外矩形を決める
-    `ExclusionTracker`（GTK / PipeWire 非依存。`linux/test/backdrop_test.cc` で単体テスト）。
+    `ExclusionTracker`、1 回の共有ぶんの控え・除外・フレーム番号をまとめた `CaptureState`（`start` は
+    古いストリームを止めてから `BeginSession` で控えを空にし、止める直前に届いた古い共有のフレームは
+    番号の不一致で捨てる）。GTK / PipeWire 非依存で、`linux/test/backdrop_test.cc` で単体テスト。
   - `screen_capture_plugin.{h,cc}`: MethodChannel `universal_experience/live_capture`。
     `probe` / `start` / `stop` / `setHidden` / `frameSequence` / `readFrame`、ネイティブ → Dart は `stopped`。
     窓の位置は GDK（X11 / XWayland のルート座標）で取り、窓のいるモニタの範囲をフレームの大きさへ写す。
@@ -895,9 +897,10 @@ HUD は、GPU シェーダの無い層を「この症状は静止画プレビュ
 - **フィードバックの回避**: フレームごとに、窓の外形（枠込み）を 24px 広げた矩形・直近 300ms の位置・
   直近 2 件の四辺の変化量（移動と幅・高さの増減）からの外挿を除いて控えへ書き込む。窓の中には控えを映す。
   ルーペ窓に入った直後と「撮り直す」でだけ、除外を止めて窓を隠し、窓の真下が写ったフレームを待って
-  除外を戻してから窓を出す。フレームは除外を止めた時点（`setHidden(true)` の戻り値）から数え、
-  「2 枚届き、かつ隠し終えた後にも 1 枚届いた」か「1 枚以上届き、隠し終えて 120ms 経った（静止した画面）」で
-  終える（上限 1.5 秒）。途中で例外が出ても除外の再開と窓の表示は必ず通す。
+  除外を戻してから窓を出す。「隠し終えた後（`hide` から戻った時点の番号から）に 2 枚届いた」
+  （隠す呼び出しの途中に届いた、窓が写りうる枚は数えない）か、「除外を止めた時点（`setHidden(true)` の
+  戻り値）から 1 枚以上届き、隠し終えて 120ms 経った（静止した画面）」で終える（上限 1.5 秒）。
+  途中で例外が出ても除外の再開と窓の表示は必ず通す。
 - **Dart**:
   - `lib/services/live_capture_service.dart`: ネイティブ境界 `LiveCaptureBackend`（テストでフェイク化）と
     可否 `LiveCaptureAvailability`・失敗 `LiveCaptureError`・起動時の `probeLiveCapture`（Linux 以外は
@@ -913,7 +916,8 @@ HUD は、GPU シェーダの無い層を「この症状は静止画プレビュ
     `vision_uniforms`）。
   - `lib/ui/widgets/live_loupe_view.dart`: 表示のたびに `readFrame` → `decodeLiveRgba` →
     `previewPipelineSteps` の段で `applyLiveShaderPasses` → 窓いっぱいに描く。共有が止まって画像を
-    捨てた後に、読み込み中だった絵を書き戻さない。
+    捨てた後に、読み込み中だった絵を書き戻さない。描画が失敗したら
+    `LiveLoupeSession.reportRenderFailure` で共有を止め、`failed` で設定窓へ戻す。
 - **制約**: 窓の真下で動く内容は、窓を動かすか撮り直すまで止まって見える。ルーペ窓を全画面にすると
   窓の外が無いので、映る絵全体が開始時・撮り直し時の静止画になる。モニタは 1 台が前提。
   ネイティブ Wayland（`UE_ALLOW_WAYLAND=1`）では自分の窓の位置が分からないため使えない。
