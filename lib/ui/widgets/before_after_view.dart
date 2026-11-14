@@ -195,6 +195,15 @@ class _RenderInput {
 
   bool get heavy => previewInputIsHeavy(filter, steps);
 
+  /// 何も掛けない（after = 原画）入力か: 何も選んでいない・全層が強度 0・原画比較中
+  /// （複数層は空のステップ列、1 層は強度 0。`preview_selection.dart`）。強度 0 は
+  /// 「効果なし」として扱う（複数層の合成が強度 0 の層を除くのと同じ）。描画は要らない。
+  bool get isOriginal {
+    final steps = this.steps;
+    if (steps != null) return steps.isEmpty;
+    return filter == null || strength <= 0;
+  }
+
   Future<ui.Image?> render(ui.Image input) => steps == null
       ? renderPreviewAfter(input, filter, strength)
       : renderDefaultAfterPipeline(input, steps!);
@@ -215,6 +224,11 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// いまの [_after] が、重い描画の前に先に描いた低解像度の仮表示か（#185）。
   /// true の間は札に「低解像度の仮表示」と出し、書き出しは出さない。
   bool _afterProvisional = false;
+
+  /// いまの [_after] が原画そのもの（[_RenderInput.isOriginal] の入力で出したもの）か（#185）。
+  /// true の間は「〇〇を適用した画像」と読ませない（次の描画を待つ間に、新しいフィルタ名で
+  /// 原画を読み上げてしまわないように）。
+  bool _afterIsOriginal = false;
 
   /// [_before] を読み込んだ解像度と元画像（#58/#78）。[_before] と一緒にだけ変わる。
   int? _currentSampleSize;
@@ -413,12 +427,13 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
 
   // ── after の描画 ──
 
-  /// 描画の入口。まず描画結果のキャッシュ（#185 (b)）を見て、当たればすぐ表示する
+  /// 描画の入口。原画そのままの入力（全解除・原画比較）と描画結果のキャッシュ（#185 (b)）は、
+  /// 描画せずにすぐ表示する。キャッシュに当たればすぐ表示する
   /// （走っている描画があっても待たない。その結果は表示に使わず、キャッシュにだけ入る）。
   /// 外れたら、走っている描画があれば要求を保留に集約し（最新だけが残る）、無ければ始める。
   /// 保留は、走っている描画が終わった時点の `widget.*` で描く（古い控えでは描かない）。
   void _scheduleRebuild(int sampleSize) {
-    if (_applyFromCache(sampleSize)) {
+    if (_applyOriginal(sampleSize) || _applyFromCache(sampleSize)) {
       _pendingRebuildSampleSize = null;
       // 走っている描画の結果は古い入力のものなので、表示に使わせない。
       _generation++;
@@ -435,6 +450,22 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     }
     _rebuildInFlight = true;
     unawaited(_runRebuild(sampleSize));
+  }
+
+  /// いまの入力が原画そのまま（[_RenderInput.isOriginal]: 全解除・原画比較など）なら、
+  /// 描画せずに原画の複製をすぐ表示して true。重い描画が走っていても待たせない（#185。
+  /// 原画比較やフィルタの全解除が数十秒待たされると、固まったのと同じ見え方になる）。
+  bool _applyOriginal(int sampleSize) {
+    final before = _before;
+    if (!mounted ||
+        before == null ||
+        !_beforeMatches(widget.imageSource, sampleSize)) {
+      return false;
+    }
+    final input = _RenderInput(widget, widget.imageSource, sampleSize);
+    if (!input.isOriginal) return false;
+    _applyAfter(before.clone(), input, provisional: false);
+    return true;
   }
 
   /// いまの入力の描画結果がキャッシュにあれば表示して true。
@@ -511,6 +542,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     setState(() {
       _after = image;
       _afterProvisional = provisional;
+      _afterIsOriginal = input.isOriginal;
       _afterFilterId = input.filterId; // #60
       _afterVariantId = input.variantId; // #60
       _afterStrength = input.strength;
@@ -816,9 +848,11 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                 // `_after` がまだ無い（最初の描画中）ときは、[PreviewImageView] が代替テキストを
                 // 付けない。描画器が null を返した場合は `_rebuild` が失敗として扱い `_failed`
                 // 分岐に入る。
-                semanticLabel:
-                    widget.filterId == null && widget.variantId == null
-                        ? null
+                // 表示中の after が原画そのもの（全解除・原画比較、または次の描画を待っている
+                // 間の原画）のときも付けない（#185）。
+                semanticLabel: _afterIsOriginal ||
+                        (widget.filterId == null && widget.variantId == null)
+                    ? null
                         // 複数層の代替テキストは、まとめずに全部の名前を読ませる。
                         : l10n.previewImageFilteredSemantics(
                             multiLayer ? layerNames.join(' + ') : afterName),

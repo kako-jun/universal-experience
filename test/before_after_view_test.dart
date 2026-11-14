@@ -556,7 +556,7 @@ void main() {
       });
 
       testWidgets(
-          '_after を差し替えると旧 _after は dispose される。_before と同一なら dispose されない',
+          '_after を差し替えると旧 _after は dispose される。_before は dispose されない',
           (tester) async {
         late ui.Image before1, after1, after2;
         await tester.runAsync(() async {
@@ -566,9 +566,8 @@ void main() {
         });
         previewSourceImageLoader = (source, size) => Future.value(before1);
 
+        // phase1（filter=null）は描画器を呼ばず、原画の複製を after に出す（#185）。
         final responses = <Future<ui.Image?> Function(ui.Image)>[
-          (source) =>
-              Future.value(source), // phase1: filter=null → _after は _before と同一
           (source) => Future.value(after1), // phase2: 実描画（_before とは別物）
           (source) => Future.value(after2), // phase3: 再度差し替え
         ];
@@ -579,7 +578,7 @@ void main() {
           return response(source);
         };
 
-        // phase1: filter=null → _after は _before(before1) のエイリアス。
+        // phase1: filter=null → _after は _before(before1) の複製（描画器は呼ばない）。
         await tester.pumpWidget(localized(const BeforeAfterView(
           filter: null,
           filterId: null,
@@ -590,8 +589,8 @@ void main() {
         await tester.pump();
         await tester.pump();
 
-        // phase2: null → protanopia。旧 _after(=before1) は _before と同一なので
-        // dispose されてはいけない（_before として使われ続けている）。
+        // phase2: null → protanopia。旧 _after（before1 の複製）を捨てても、_before の
+        // before1 は dispose されてはいけない（_before として使われ続けている）。
         await tester.pumpWidget(localized(const BeforeAfterView(
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
@@ -680,14 +679,11 @@ void main() {
         var callIndex = 0;
         afterImageRenderer = (source, filter, strength) {
           callIndex++;
-          if (callIndex == 1) {
-            return Future.value(source); // filter=null 相当: そのまま返す
-          }
           capturedRendererInput = source;
           return Future.value(realAfter);
         };
 
-        // 1回目: filter=null で _before=_after=before1 を確定させる。
+        // 1回目: filter=null で _before=before1 を確定させる（描画器は呼ばない、#185）。
         await tester.pumpWidget(localized(const BeforeAfterView(
           filter: null,
           filterId: null,
@@ -711,6 +707,7 @@ void main() {
         await tester.pump();
         await tester.pump();
 
+        expect(callIndex, 1, reason: 'filter=null の回は描画器を呼ばない');
         expect(capturedRendererInput, isNotNull);
         expect(identical(capturedRendererInput, before1), isFalse,
             reason: '_before と同一オブジェクトを渡すと、await 中の dispose に対して無防備になる');

@@ -445,6 +445,56 @@ void main() {
     });
   });
 
+  group('原画をそのまま出す要求は、重い描画を待たない（#185、3 巡目レビュー）', () {
+    Future<HomeScreenHarness> startHeavy(
+        WidgetTester tester, List<String> ids) async {
+      installSlowFakes();
+      final h = await pumpHomeScreen(tester, size: wide);
+      h.imageSource.selectSample('info_board');
+      await settle(tester);
+      for (final id in ids) {
+        h.visionState.toggle(id);
+        await settle(tester);
+      }
+      return h;
+    }
+
+    void expectOriginalShown(WidgetTester tester) {
+      final images = shownImages(tester);
+      expect(images[1].isCloneOf(images[0]), isTrue,
+          reason: '適用後の枠に原画そのものが出ている');
+      expect(find.text(rendering), findsNothing);
+      expect(find.text(provisional), findsNothing);
+    }
+
+    final holder = Object();
+
+    testWidgets('starbursts のフル描画中に全解除すると、すぐ原画が出る', (tester) async {
+      final h = await startHeavy(tester, ['myopia', 'starbursts']);
+      h.visionState.clear();
+      await settle(tester);
+      expectOriginalShown(tester);
+      await tester.pump(const Duration(seconds: 3));
+      expectOriginalShown(tester);
+    });
+
+    testWidgets('複数層で starbursts のフル描画中に原画比較を保持すると、すぐ原画が出る', (tester) async {
+      final h = await startHeavy(tester, ['myopia', 'starbursts']);
+      h.visionState.acquireBypass(holder);
+      await settle(tester);
+      expectOriginalShown(tester);
+      await tester.pump(const Duration(seconds: 3));
+      expectOriginalShown(tester);
+    });
+
+    testWidgets('1 層の starbursts のフル描画中に原画比較を保持すると、すぐ原画が出る', (tester) async {
+      final h = await startHeavy(tester, ['starbursts']);
+      h.visionState.acquireBypass(holder);
+      await settle(tester);
+      expectOriginalShown(tester);
+    });
+  });
+
   group('元画像の読み込み（#185 (c)）', () {
     testWidgets('読み込みが長引いたら元画像側に札を出し、終われば消す', (tester) async {
       final gates = <PreviewImageSource, Completer<void>>{};

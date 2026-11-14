@@ -172,12 +172,44 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       [for (final l in layers) l.layer.strengthKey];
 
   void _scheduleRebuild() {
+    if (_applyOriginal()) return;
     if (_rebuildInFlight) {
       _rebuildPending = true;
       return;
     }
     _rebuildInFlight = true;
     unawaited(_runRebuild());
+  }
+
+  /// 原画比較中（強さ 0・土台なし、`colorVisionCompareInputOf`）は 4 セルとも原画そのまま
+  /// なので、描画せずに原画の複製をすぐ出して true（#185）。重い土台（starbursts など）の
+  /// 描画が走っていても待たせない。走っている描画の結果は世代で捨てる。
+  bool _applyOriginal() {
+    final before = _before;
+    if (!mounted ||
+        before == null ||
+        widget.strength > 0 ||
+        widget.baseSteps.isNotEmpty ||
+        _currentSampleSize != _effectiveSampleSize ||
+        _currentImageSource != widget.imageSource) {
+      return false;
+    }
+    final old = _afters;
+    _generation++;
+    _rebuildPending = false;
+    setState(() {
+      _afters = [for (final _ in kColorVisionCompareEntries) before.clone()];
+      _afterStrength = widget.strength;
+      _afterBaseLayers = effectiveExportLayers(widget.baseLayers);
+      _failed = false;
+    });
+    if (old != null) {
+      for (final image in old) {
+        image.dispose();
+      }
+    }
+    _busy.end();
+    return true;
   }
 
   Future<void> _runRebuild() async {

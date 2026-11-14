@@ -933,28 +933,34 @@ void main() {
       await settleCells(tester, fakes.cellCalls, 4);
       expect(fakes.baseReturned.single.debugDisposed, isFalse);
 
-      // 空 steps（強度 0・土台なし = バイパス中の入力）。
+      // 空 steps（強度 0・土台なし = バイパス中の入力）。4 セルとも原画そのままなので、
+      // 描画器を呼ばずに原画を出す（#185）。
       await tester.pumpWidget(
           localized(viewOf(const ColorVisionCompareInput(strength: 0))));
-      await settleCells(tester, fakes.cellCalls, 8);
+      await tester.pump();
+      expect(fakes.cellCalls.length, 4, reason: '原画比較中はセルを描かない');
       expect(fakes.baseCalls.length, 1, reason: '空の間は合成を呼ばない');
       expect(fakes.baseReturned.single.debugDisposed, isFalse,
           reason: 'ホールド中も土台は捨てずに保持する');
-      for (var i = 4; i < 8; i++) {
-        final id = kColorVisionCompareEntries[i - 4].id;
-        expect(await centerArgb(tester, fakes.cellReturned[i]),
-            tint(id, 0xFFFFFFFF),
-            reason: '$id は保持した土台ではなく原画から始まる');
+      final held = [
+        for (final v in tester
+            .widgetList<PreviewImageView>(find.byType(PreviewImageView)))
+          v.image!,
+      ];
+      expect(held, hasLength(4));
+      for (final image in held) {
+        expect(await centerArgb(tester, image), 0xFFFFFFFF,
+            reason: '保持した土台ではなく原画そのもの');
       }
 
       // 解除（同じ層）→ 再合成しない。保持した土台から描く。
       await tester
           .pumpWidget(localized(viewOf(inputOf(['myopia', 'protanopia']))));
-      await settleCells(tester, fakes.cellCalls, 12);
+      await settleCells(tester, fakes.cellCalls, 8);
       expect(fakes.baseCalls.length, 1, reason: '層が変わっていなければ CPU 再合成しない');
       expect(fakes.baseReturned.single.debugDisposed, isFalse);
-      for (var i = 8; i < 12; i++) {
-        final id = kColorVisionCompareEntries[i - 8].id;
+      for (var i = 4; i < 8; i++) {
+        final id = kColorVisionCompareEntries[i - 4].id;
         expect(await centerArgb(tester, fakes.cellReturned[i]),
             tint(id, baseArgb));
       }
@@ -974,18 +980,19 @@ void main() {
 
       await tester.pumpWidget(
           localized(viewOf(const ColorVisionCompareInput(strength: 0))));
-      await settleCells(tester, fakes.cellCalls, 8);
+      await tester.pump();
+      expect(fakes.cellCalls.length, 4, reason: '原画比較中はセルを描かない（#185）');
 
       final changed =
           inputOf(['myopia', 'protanopia'], strengths: {'myopia': 0.5});
       await tester.pumpWidget(localized(viewOf(changed)));
-      await settleCells(tester, fakes.cellCalls, 12);
+      await settleCells(tester, fakes.cellCalls, 8);
       expect(fakes.baseCalls.length, 2, reason: '層が変わっていたので 1 回だけ再合成');
       expect(fakes.baseCalls.last.single.strength, 0.5);
       expect(fakes.baseReturned.first.debugDisposed, isTrue,
           reason: '置き換えられた古い土台は破棄される');
-      for (var i = 8; i < 12; i++) {
-        final id = kColorVisionCompareEntries[i - 8].id;
+      for (var i = 4; i < 8; i++) {
+        final id = kColorVisionCompareEntries[i - 4].id;
         expect(await centerArgb(tester, fakes.cellReturned[i]),
             tint(id, changedBaseArgb),
             reason: '$id は新しい土台から作られる（古い土台ではない）');
@@ -1414,5 +1421,55 @@ void main() {
       expect(failed, isNot(contains('someone')));
       expect(failed, isNot(contains('secret')));
     });
+  });
+
+  testWidgets('重い土台の描画中に原画比較（強さ 0・土台なし）へ替えると、待たずに 4 セルとも原画を出す（#185）',
+      (tester) async {
+    final fakes = await installFakes(tester);
+    final baseGate = Completer<void>();
+    var baseCalls = 0;
+    CpuVisionRenderer.pipelineApplier = (source, steps) async {
+      baseCalls++;
+      await baseGate.future;
+      return source.clone();
+    };
+    const step = VisionStep(filter: VisionFilter.myopia(), strength: 0.5);
+    Widget withBase(double strength, List<VisionStep> steps) =>
+        ColorVisionCompareView(
+          strength: strength,
+          imageSource: const SamplePreviewImageSource('test'),
+          sampleSize: _kSize,
+          baseSteps: steps,
+        );
+    await tester.pumpWidget(localized(withBase(0.6, const [])));
+    await settle(tester);
+    final rendered = fakes.calls.length;
+
+    await tester.pumpWidget(localized(withBase(0.6, const [step])));
+    await settle(tester);
+    expect(baseCalls, 1, reason: '土台の描画が終わらない');
+
+    await tester.pumpWidget(localized(withBase(0, const [])));
+    await settle(tester);
+    final cells = [
+      for (final v in tester
+          .widgetList<PreviewImageView>(find.byType(PreviewImageView)))
+        v.image!,
+    ];
+    expect(cells, hasLength(4));
+    final en = lookupAppLocalizations(enLocale);
+    expect(find.text(en.compareSharedStrengthNote(0)), findsOneWidget);
+    for (var i = 1; i < 4; i++) {
+      expect(cells[i].isCloneOf(cells[0]), isTrue, reason: '4 セルとも同じ原画');
+    }
+    expect(fakes.calls.length, rendered, reason: '描画器を呼ばずに出す');
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text(en.previewRendering), findsNothing);
+
+    baseGate.complete();
+    await settle(tester);
+    expect(find.text(en.compareSharedStrengthNote(0)), findsOneWidget,
+        reason: '取り残された描画の結果で上書きしない');
+    expect(tester.takeException(), isNull);
   });
 }

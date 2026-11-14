@@ -294,7 +294,11 @@ void main() {
                 sampleSize: 32,
                 layerNames: names,
                 layerIds: const ['myopia', 'glaucoma', 'protanopia'],
-                steps: const [],
+                // 空のステップ列は「原画そのまま」で代替テキストを付けない（#185）ので、
+                // 実際に合成する層を渡す（合成はフェイク）。
+                steps: const [
+                  VisionStep(filter: VisionFilter.myopia(), strength: 1.0),
+                ],
               ),
             ),
           ),

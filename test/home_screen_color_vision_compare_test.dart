@@ -268,9 +268,8 @@ void main() {
     expect(view.baseSteps, isEmpty);
     expect(find.text(l10n.compareSharedStrengthNote(0)), findsOneWidget);
     expect(h.visionState.layers.length, 2, reason: '選択は残る');
-    expect(renderedStrengths.length, 4, reason: 'バイパス中は 4 セルとも描き直す');
-    expect(renderedStrengths, everyElement(0.0),
-        reason: 'バイパス中は 4 セルとも強度 0（原画）');
+    expect(renderedStrengths, isEmpty,
+        reason: 'バイパス中は 4 セルとも原画そのものなので、描画せずに原画を出す（#185）');
     expect(pipelineCalls.length, composedBeforeBypass,
         reason: 'バイパス中は土台を合成しない');
 
@@ -330,7 +329,7 @@ void main() {
     expect(find.text(l10n.compareSectionTitle), findsNothing);
   });
 
-  testWidgets('原画に戻す（bypass、強度 0）も 2×2 にそのまま効く（4 セルとも強さ 0 で描く）',
+  testWidgets('原画に戻す（bypass、強度 0）も 2×2 にそのまま効く（4 セルとも原画を描画せずに出す）',
       (tester) async {
     await installFakes(tester);
     final h = await pumpHomeScreen(tester, size: wide);
@@ -362,9 +361,8 @@ void main() {
           .strength,
       0.0,
     );
-    expect(renderedStrengths.length, 4);
-    expect(renderedStrengths, everyElement(0.0),
-        reason: '4 セルとも強さ 0（原画と同じ見え）で描き直す');
+    expect(renderedStrengths, isEmpty,
+        reason: '4 セルとも原画そのものなので、描画せずに原画を出す（#185）');
     expect(find.text(l10n.compareSharedStrengthNote(0)), findsOneWidget);
 
     // 解除すると元の強さに戻る。
