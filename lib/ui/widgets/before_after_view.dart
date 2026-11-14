@@ -11,6 +11,7 @@ import '../../models/vision_filter_catalog.dart';
 import '../../services/export_layers.dart';
 import '../../services/export_plan.dart';
 import '../../services/export_service.dart';
+import '../../services/preview_diagnostics.dart';
 import '../../src/rust/api/sensus_bridge.dart';
 import 'export_feedback.dart';
 import 'preview_rendering.dart';
@@ -236,6 +237,24 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     if (mounted) setState(() {});
   });
 
+  /// 描画 1 回が長時間終わらないとき診断ログへ残す（#185。リリースでも有効）。
+  final PreviewRenderWatchdog _watchdog =
+      PreviewRenderWatchdog(view: 'before_after');
+
+  /// 診断ログに添える入力の要約（カタログ id・層の数・強度・サンプル id。ユーザー画像は
+  /// `user` とだけ書く）。
+  Map<String, Object?> _diagFields(int sampleSize) {
+    final source = widget.imageSource;
+    return {
+      'filter': widget.layerIds?.join('+') ?? widget.filterId ?? 'none',
+      'steps': widget.steps?.length,
+      'strength': widget.strength.toStringAsFixed(2),
+      'sample':
+          source is SamplePreviewImageSource ? source.sampleId : 'user',
+      'size': sampleSize,
+    };
+  }
+
   /// The sample size to render at when [BeforeAfterView.sampleSize] isn't
   /// explicitly set — [kCanonicalSampleSize] in production;
   /// tests can override via the widget's `sampleSize` constructor param.
@@ -288,9 +307,17 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   }
 
   Future<void> _runRebuild(int sampleSize) async {
+    _watchdog.start(_diagFields(sampleSize));
+    var outcome = 'error';
     try {
       await _rebuild(sampleSize);
+      outcome = 'done';
+    } catch (e) {
+      PreviewDiagnostics.recordError(
+          'preview_error', e, {'view': 'before_after', ..._watchdog.fields});
+      rethrow;
     } finally {
+      _watchdog.finish(outcome);
       // _rebuild が例外を投げても（現状は内部で catch して
       // いるため起きない想定だが）_rebuildInFlight が true のまま固着して
       // 以後の要求が永久に集約されたまま実行されなくなる事態を避ける。
@@ -363,8 +390,11 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       before = _before!;
     } else {
       try {
+        _watchdog.stage = 'load';
         before = await loadPreviewImage(source, sampleSize);
       } catch (e, st) {
+        PreviewDiagnostics.recordError('preview_failed', e,
+            {'view': 'before_after', 'stage': 'load', ..._watchdog.fields});
         // 静かに握りつぶさず Flutter のエラー報告経路に
         // 乗せる（crash reporting 等が拾えるように）。
         FlutterError.reportError(FlutterErrorDetails(
@@ -407,6 +437,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
 
     ui.Image? after;
     try {
+      _watchdog.stage = 'render';
       after = steps == null
           ? await renderPreviewAfter(
               rendererInput,
@@ -415,6 +446,8 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
             )
           : await renderDefaultAfterPipeline(rendererInput, steps);
     } catch (e, st) {
+      PreviewDiagnostics.recordError('preview_failed', e,
+          {'view': 'before_after', 'stage': 'render', ..._watchdog.fields});
       // こちらも同様に報告する。
       FlutterError.reportError(FlutterErrorDetails(
         exception: e,
@@ -433,6 +466,12 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     // 描画器の型は null を許す（[AfterImageRenderer]）が、null は「after 画像が
     // 無い」状態で、空の枠を成功として出してしまう。例外と同じ失敗として扱う（#45）。
     if (after == null) {
+      PreviewDiagnostics.record('preview_failed', {
+        'view': 'before_after',
+        'stage': 'render',
+        'error': 'null_result',
+        ..._watchdog.fields,
+      });
       FlutterError.reportError(FlutterErrorDetails(
         exception: StateError('after renderer returned null'),
         library: 'before_after_view',
@@ -503,6 +542,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   @override
   void dispose() {
     _busy.dispose();
+    _watchdog.dispose();
     _before?.dispose();
     // _after may alias _before (when filter == null); avoid double dispose.
     if (!identical(_after, _before)) {

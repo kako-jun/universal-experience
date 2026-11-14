@@ -1026,7 +1026,15 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   1 回に数十秒かかる（#185。推奨サンプルの夜景では数十 ms）。そこで描画の列（実行中 + 保留）が
   `kPreviewBusyThreshold`（500ms）を越えて続いたら、after 側に「描画中…」
   （`PreviewBusyBadge`、`PreviewBusyTracker` が計時。`preview_rendering.dart`）を重ね、
-  止まっているのではないことを見せる。保留中の要求は、描画が例外で終わっても流す
+  止まっているのではないことを見せる。保留中の要求は、描画が例外で終わっても流す。
+  **診断ログ（#185）**: `lib/services/preview_diagnostics.dart`。`main()` がアプリのサポート
+  ディレクトリ（Linux は `~/.local/share/<アプリ id>/`）の `logs/preview-diagnostics.log` を書き込み先にし、
+  リリースでも有効。`BeforeAfterView` と `ColorVisionCompareView` が、描画の失敗（`preview_failed`。段 =
+  `load` / `render` / `base` / `cell:<id>`・例外の型・200 文字までのメッセージ）と、1 回の描画が 10 秒を越えて
+  終わらないこと（`preview_stalled`。止まっている段）・その後の完了（`preview_recovered`、かかった時間）を
+  1 行ずつ残す（`PreviewRenderWatchdog`）。添える値はフィルタのカタログ id・層の数・強度・サンプル id
+  （ユーザー画像は `user`）・サイズだけで、ファイル名・パス・画像は書かない（メッセージ中のホームは `~`）。
+  256 KiB を越えたら `.1` へ退避する（最大 2 ファイル）。テストでは書き込み先を設定しないので何も書かない
 - `ColorVisionCompareView`（`lib/ui/widgets/color_vision_compare_view.dart`、#84）: 色覚 4 型の
   2×2 比較。`HomeScreen` の「2×2 で比較」が ON（かつ色覚カテゴリ選択中）の間、`BeforeAfterView` の
   代わりに `ImageSourcePicker` の中へ出る。並べる型は `kColorVisionCompareEntries`

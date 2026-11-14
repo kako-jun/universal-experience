@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:io' show Platform;
@@ -21,6 +22,7 @@ import 'services/loupe_window_controller.dart';
 import 'services/tray_locale_sync.dart';
 import 'services/tray_service.dart';
 import 'services/native_bridge_service.dart';
+import 'services/preview_diagnostics.dart';
 import 'services/settings_service.dart';
 import 'services/vision_filter_store.dart';
 import 'ui/screens/home_screen.dart';
@@ -230,6 +232,12 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // #185: プレビュー描画の失敗・長時間未完了を、リリースでもアプリのサポート
+  // ディレクトリ（Linux は ~/.local/share/<アプリ id>/logs/）へ残す。起動は待たせない。
+  unawaited(getApplicationSupportDirectory()
+      .then(installPreviewDiagnosticsLog)
+      .catchError((Object _) {}));
 
   // macOS の Cmd+Q・メニューバーの「終了」・ログアウト等（window_manager の
   // クローズイベントを経由しない終了経路）でも選択・強度のデバウンス永続化

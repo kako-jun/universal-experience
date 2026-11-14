@@ -13,6 +13,7 @@ import '../../services/color_vision_compare.dart';
 import '../../services/export_layers.dart';
 import '../../services/export_plan.dart';
 import '../../services/export_service.dart';
+import '../../services/preview_diagnostics.dart';
 import '../../services/vision_layer.dart';
 import '../../src/rust/api/sensus_bridge.dart' show VisionStep;
 import 'preview_rendering.dart';
@@ -128,6 +129,23 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
     if (mounted) setState(() {});
   });
 
+  /// 描画 1 回が長時間終わらないとき診断ログへ残す（#185。リリースでも有効）。
+  final PreviewRenderWatchdog _watchdog =
+      PreviewRenderWatchdog(view: 'compare');
+
+  /// 診断ログに添える入力の要約（土台の層の数・強度・サンプル id。ユーザー画像は
+  /// `user` とだけ書く）。
+  Map<String, Object?> _diagFields() {
+    final source = widget.imageSource;
+    return {
+      'base_steps': widget.baseSteps.length,
+      'strength': widget.strength.toStringAsFixed(2),
+      'sample':
+          source is SamplePreviewImageSource ? source.sampleId : 'user',
+      'size': _effectiveSampleSize,
+    };
+  }
+
   int get _effectiveSampleSize =>
       widget.sampleSize ?? kCanonicalSampleSize;
 
@@ -164,9 +182,17 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
   }
 
   Future<void> _runRebuild() async {
+    _watchdog.start(_diagFields());
+    var outcome = 'error';
     try {
       await _rebuild();
+      outcome = 'done';
+    } catch (e) {
+      PreviewDiagnostics.recordError(
+          'preview_error', e, {'view': 'compare', ..._watchdog.fields});
+      rethrow;
     } finally {
+      _watchdog.finish(outcome);
       _rebuildInFlight = false;
       if (mounted) {
         if (_rebuildPending) {
@@ -180,6 +206,8 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
   }
 
   void _reportError(Object e, StackTrace st) {
+    PreviewDiagnostics.recordError('preview_failed', e,
+        {'view': 'compare', 'stage': _watchdog.stage, ..._watchdog.fields});
     FlutterError.reportError(
       FlutterErrorDetails(
         exception: e,
@@ -231,6 +259,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       before = _before!;
     } else {
       try {
+        _watchdog.stage = 'load';
         before = await loadPreviewImage(source, size);
       } catch (e, st) {
         _reportError(e, st);
@@ -274,6 +303,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       final input = before.clone();
       ui.Image? composed;
       try {
+        _watchdog.stage = 'base';
         composed = await renderDefaultAfterPipeline(input, baseSteps);
         if (composed == null) {
           throw StateError('Renderer returned no base image');
@@ -316,6 +346,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       final input = base.clone();
       ui.Image? after;
       try {
+        _watchdog.stage = 'cell:${entry.id}';
         after = await renderPreviewAfter(
           input,
           colorVisionCompareFilter(entry),
@@ -357,6 +388,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
   @override
   void dispose() {
     _busy.dispose();
+    _watchdog.dispose();
     _before?.dispose();
     _baseImage?.dispose();
     final afters = _afters;
