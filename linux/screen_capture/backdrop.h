@@ -60,7 +60,17 @@ class Backdrop {
   // 一度も書き込まれていない画素は不透明の黒。切り詰めた結果が空なら false。
   // out_rect には実際に切り出した矩形を返す。
   bool CropRgba(const Rect& rect, std::vector<uint8_t>* out,
-                Rect* out_rect) const;
+                Rect* out_rect) const {
+    return CropRgba(rect, 0, out, out_rect, nullptr, nullptr);
+  }
+
+  // 上と同じだが、切り詰めた矩形の画素数が max_pixels（0 以下なら無制限）を超える
+  // ときは、縦横を同じ整数 step（ceil(sqrt(画素数 / max_pixels))）で割った大きさ
+  // （切り捨て、最小 1）へ最近傍で間引いて書き出す。間引いた画素は切り出した矩形の
+  // 全幅・全高へ均等に割り付ける（右端・下端を取りこぼして縮尺がずれないように）。
+  // out_width / out_height には書き出した大きさを返す（null 可）。
+  bool CropRgba(const Rect& rect, int64_t max_pixels, std::vector<uint8_t>* out,
+                Rect* out_rect, int* out_width, int* out_height) const;
 
  private:
   void Reset(int width, int height, PixelOrder order);
@@ -76,9 +86,10 @@ class Backdrop {
 // 窓の位置の履歴から、フレームを控えへ書き込むときの除外矩形を決める。
 //
 // 合成器がフレームを描いた瞬間の窓の位置と、こちらが知っている位置は少しずれる
-// （移動中は特に）。そのため、直近 history_ms の間に窓があった矩形をすべて除外し、
-// さらに直近の移動量から次の位置を外挿した矩形も除外する。各矩形は margin だけ
-// 広げる（影・枠の取りこぼし対策）。
+// （移動中・リサイズ中は特に）。そのため、直近 history_ms の間に窓があった矩形を
+// すべて除外し、さらに直近 2 件の四辺それぞれの変化量（移動と幅・高さの増減）から
+// 次の矩形を外挿した矩形も除外する。各矩形は margin だけ広げる（影・枠の取りこぼし
+// 対策）。
 class ExclusionTracker {
  public:
   ExclusionTracker(int64_t history_ms, int margin)

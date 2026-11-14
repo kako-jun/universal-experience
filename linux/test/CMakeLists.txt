@@ -68,6 +68,11 @@ set(BACKDROP_CASES
   invalid_frame_is_ignored
   tracker_inflates_by_margin
   tracker_keeps_history_and_predicts
+  tracker_predicts_resize
+  tracker_predicts_move_and_resize_together
+  crop_under_limit_is_not_decimated
+  crop_decimates_across_full_extent
+  crop_decimates_offset_rect
   tracker_drops_old_but_keeps_latest
   tracker_hidden_excludes_nothing
 )

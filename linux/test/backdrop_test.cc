@@ -160,6 +160,101 @@ void TrackerKeepsHistoryAndPredicts() {
   assert(ex[0].x == 0 && ex[1].x == 20 && ex[2].x == 60);
 }
 
+void TrackerPredictsResize() {
+  ExclusionTracker t(300, 0);
+  // 左上は止まったまま、右端・下端だけが広がる（速いリサイズ）。
+  t.Record(1000, Rect{100, 100, 50, 40});
+  t.Record(1016, Rect{100, 100, 80, 60});
+  auto ex = t.Exclusions(1016);
+  assert(ex.size() == 3);
+  // 右端 180 → +30*2 = 240、下端 160 → +20*2 = 200。
+  const Rect& p = ex[2];
+  assert(p.x == 100 && p.y == 100);
+  assert(p.right() == 240 && p.bottom() == 200);
+}
+
+void TrackerPredictsMoveAndResizeTogether() {
+  ExclusionTracker t(300, 0);
+  // 左端を左へ引っ張るリサイズ（左上が動き、右端は止まる）。
+  t.Record(1000, Rect{100, 0, 50, 10});
+  t.Record(1016, Rect{90, 0, 60, 10});
+  auto ex = t.Exclusions(1016);
+  assert(ex.size() == 3);
+  assert(ex[2].x == 70 && ex[2].right() == 150);
+}
+
+void CropUnderLimitIsNotDecimated() {
+  Backdrop bd;
+  auto a = Solid(4, 4, 0, 0, 9);
+  bd.Merge(a.data(), 4, 4, 16, PixelOrder::kBgrx, {});
+  std::vector<uint8_t> out;
+  Rect got;
+  int w = 0;
+  int h = 0;
+  assert(bd.CropRgba(Rect{0, 0, 4, 4}, 16, &out, &got, &w, &h));
+  assert(w == 4 && h == 4 && out.size() == 4 * 4 * 4);
+}
+
+// 画素の R に x 座標、G に y 座標を入れた w x h のフレーム（BGRX）。
+std::vector<uint8_t> Coords(int w, int h) {
+  std::vector<uint8_t> v(static_cast<size_t>(w) * h * 4);
+  for (int y = 0; y < h; ++y) {
+    for (int x = 0; x < w; ++x) {
+      uint8_t* p = v.data() + (static_cast<size_t>(y) * w + x) * 4;
+      p[0] = 0;
+      p[1] = static_cast<uint8_t>(y);
+      p[2] = static_cast<uint8_t>(x);
+      p[3] = 0;
+    }
+  }
+  return v;
+}
+
+void CropDecimatesAcrossFullExtent() {
+  Backdrop bd;
+  // 幅 11 は step 2 で割り切れない（以前は右端の 1 列を落として縮尺がずれた）。
+  auto a = Coords(11, 7);
+  bd.Merge(a.data(), 11, 7, 44, PixelOrder::kBgrx, {});
+  std::vector<uint8_t> out;
+  Rect got;
+  int w = 0;
+  int h = 0;
+  // 77 画素 > 20 → step = ceil(sqrt(3.85)) = 2 → 5 x 3。
+  assert(bd.CropRgba(Rect{0, 0, 11, 7}, 20, &out, &got, &w, &h));
+  assert(got.width == 11 && got.height == 7);
+  assert(w == 5 && h == 3);
+  assert(out.size() == static_cast<size_t>(w) * h * 4);
+  // 各出力画素は、切り出した全幅・全高を均等に割った区間の中心を読む。
+  // x: (2i+1)*11/10 → 1, 3, 5, 7, 9。y: (2j+1)*7/6 → 1, 3, 5。
+  const int xs[5] = {1, 3, 5, 7, 9};
+  const int ys[3] = {1, 3, 5};
+  for (int j = 0; j < h; ++j) {
+    for (int i = 0; i < w; ++i) {
+      const uint8_t* p = out.data() + (static_cast<size_t>(j) * w + i) * 4;
+      assert(p[0] == xs[i]);
+      assert(p[1] == ys[j]);
+      assert(p[3] == 255);
+    }
+  }
+  // 右端・下端の近く（最後の区間）を必ず読む。
+  assert(out[(static_cast<size_t>(h - 1) * w + (w - 1)) * 4] >= 9);
+}
+
+void CropDecimatesOffsetRect() {
+  Backdrop bd;
+  auto a = Coords(20, 20);
+  bd.Merge(a.data(), 20, 20, 80, PixelOrder::kBgrx, {});
+  std::vector<uint8_t> out;
+  Rect got;
+  int w = 0;
+  int h = 0;
+  // (5,5) から 9x9 = 81 > 9 → step 3 → 3 x 3、読む列は 5 + (2i+1)*9/6 = 6, 9, 12。
+  assert(bd.CropRgba(Rect{5, 5, 9, 9}, 9, &out, &got, &w, &h));
+  assert(w == 3 && h == 3);
+  assert(out[0] == 6 && out[1] == 6);
+  assert(out[(2 * 3 + 2) * 4] == 12 && out[(2 * 3 + 2) * 4 + 1] == 12);
+}
+
 void TrackerDropsOldButKeepsLatest() {
   ExclusionTracker t(300, 0);
   t.Record(0, Rect{0, 0, 10, 10});
@@ -203,6 +298,12 @@ const Case kCases[] = {
     {"invalid_frame_is_ignored", InvalidFrameIsIgnored},
     {"tracker_inflates_by_margin", TrackerInflatesByMargin},
     {"tracker_keeps_history_and_predicts", TrackerKeepsHistoryAndPredicts},
+    {"tracker_predicts_resize", TrackerPredictsResize},
+    {"tracker_predicts_move_and_resize_together",
+     TrackerPredictsMoveAndResizeTogether},
+    {"crop_under_limit_is_not_decimated", CropUnderLimitIsNotDecimated},
+    {"crop_decimates_across_full_extent", CropDecimatesAcrossFullExtent},
+    {"crop_decimates_offset_rect", CropDecimatesOffsetRect},
     {"tracker_drops_old_but_keeps_latest", TrackerDropsOldButKeepsLatest},
     {"tracker_hidden_excludes_nothing", TrackerHiddenExcludesNothing},
 };

@@ -11,8 +11,10 @@
 
 #include <gio/gio.h>
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 
 #include "backdrop.h"
@@ -60,8 +62,11 @@ class ScreenCast {
   ScreenCast(const ScreenCast&) = delete;
   ScreenCast& operator=(const ScreenCast&) = delete;
 
-  // ポータルの ScreenCast がモニタの共有を提供しているか（同期で問い合わせる）。
-  static bool PortalAvailable();
+  // ポータルの ScreenCast がモニタの共有を提供しているかを非同期で問い合わせ、
+  // 結果を done へ渡す（メインスレッドで呼ばれる）。ポータルが応答しないときは
+  // kPortalProbeTimeoutMs で諦めて false。起動時に呼ぶのでメインループを止めない。
+  static void QueryPortalAvailable(std::function<void(bool)> done);
+  static constexpr int kPortalProbeTimeoutMs = 1000;
 
   // 共有を始める。parent_window はポータルのダイアログの親（"x11:<16進 XID>" か空）。
   // restore_token が有効なら、合成器は前回の選択を再利用してダイアログを省ける。
@@ -87,6 +92,8 @@ class ScreenCast {
   void OpenRemote(uint32_t node_id);
   bool StartStream(int fd, uint32_t node_id, std::string* error);
   void CloseSession();
+  void SubscribeSessionClosed();
+  void OnSessionClosed();
 
   // PipeWire のコールバック（static で受けて this へ転送する）。
   static void OnStreamStateChanged(void* data, int old_state, int state,
@@ -101,9 +108,15 @@ class ScreenCast {
   std::string parent_window_;
   std::string restore_token_;
   std::string new_restore_token_;
-  uint64_t generation_ = 0;  // Stop() で進め、古い応答を無視する。
+  // Stop() で進め、古い応答を無視する。PipeWire のスレッドからも読む。
+  std::atomic<uint64_t> generation_{0};
   int token_counter_ = 0;
+  uint64_t request_counter_ = 0;
   Request* pending_ = nullptr;
+  guint session_closed_subscription_ = 0;
+  // 破棄で false になる。非同期の D-Bus 応答・g_idle_add の通知はこれを弱参照で
+  // 持ち、破棄後に届いたら this に触れずに捨てる。
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
 
   FrameSink sink_;
   StartCallback on_started_;

@@ -33,8 +33,25 @@ constexpr int64_t kExclusionHistoryMs = 300;
 constexpr int kExclusionMargin = 24;
 
 struct Plugin {
+  ~Plugin() {
+    // ストリームのスレッドは下の mutex / backdrop を使う。メンバの破棄順（宣言の
+    // 逆順）では cast より先にそれらが壊れるので、先にスレッドを止める。
+    cast.Stop();
+    if (toplevel != nullptr) {
+      if (configure_handler != 0) {
+        g_signal_handler_disconnect(toplevel, configure_handler);
+      }
+      g_object_remove_weak_pointer(G_OBJECT(toplevel),
+                                   reinterpret_cast<gpointer*>(&toplevel));
+    }
+    g_clear_object(&pending_start);
+  }
+
   FlMethodChannel* channel = nullptr;
   FlView* view = nullptr;
+  // configure-event を繋いだ窓（弱参照。窓が先に壊れたら null になる）。
+  GtkWidget* toplevel = nullptr;
+  gulong configure_handler = 0;
   ScreenCast cast;
 
   std::mutex mutex;  // 以下はストリームのスレッドと共有する。
@@ -65,14 +82,27 @@ bool IsX11Backend(FlView* view) {
 bool WindowRects(Plugin* self, int frame_w, int frame_h, Rect* view_rect,
                  Rect* outer_rect) {
   GtkWidget* widget = GTK_WIDGET(self->view);
-  GdkWindow* window = gtk_widget_get_window(widget);
-  if (window == nullptr || frame_w <= 0 || frame_h <= 0) return false;
-  GdkWindow* toplevel = gdk_window_get_toplevel(window);
-  const int scale = gdk_window_get_scale_factor(window);
+  GtkWidget* toplevel_widget = gtk_widget_get_toplevel(widget);
+  if (toplevel_widget == nullptr || !gtk_widget_is_toplevel(toplevel_widget)) {
+    return false;
+  }
+  GdkWindow* toplevel = gtk_widget_get_window(toplevel_widget);
+  if (toplevel == nullptr || frame_w <= 0 || frame_h <= 0) return false;
+  const int scale = gdk_window_get_scale_factor(toplevel);
 
+  // FlView（GtkBox）は自分の GdkWindow を持たないので、gtk_widget_get_window は
+  // 窓全体の GdkWindow を返す。その原点に、窓の中でのビューの位置（GNOME の CSD の
+  // ヘッダーバー・影の分）を足して、ビューの左上のルート座標にする。
   int ox = 0;
   int oy = 0;
-  gdk_window_get_origin(window, &ox, &oy);
+  gdk_window_get_origin(toplevel, &ox, &oy);
+  int dx = 0;
+  int dy = 0;
+  if (gtk_widget_translate_coordinates(widget, toplevel_widget, 0, 0, &dx,
+                                       &dy)) {
+    ox += dx;
+    oy += dy;
+  }
   const int vw = gtk_widget_get_allocated_width(widget);
   const int vh = gtk_widget_get_allocated_height(widget);
   GdkRectangle frame;
@@ -203,9 +233,12 @@ void HandleStart(Plugin* self, FlMethodCall* call) {
 }
 
 // 窓の描画域ぶんの控えを RGBA で返す。前回から何も変わっていなければ null。
+// 大きすぎる窓（全画面など）は、切り出しと同時に間引いて Dart へ渡す量を抑える。
 FlValue* ReadFrame(Plugin* self, int64_t max_pixels) {
   std::vector<uint8_t> rgba;
   Rect got;
+  int out_w = 0;
+  int out_h = 0;
   int64_t sequence = 0;
   bool unprimed = false;
   {
@@ -227,36 +260,13 @@ FlValue* ReadFrame(Plugin* self, int64_t max_pixels) {
       return fl_value_new_null();
     }
     self->last_sent_rect = view_rect;
-    if (!self->backdrop.CropRgba(view_rect, &rgba, &got)) {
+    if (!self->backdrop.CropRgba(view_rect, max_pixels, &rgba, &got, &out_w,
+                                 &out_h)) {
       return fl_value_new_null();
     }
     unprimed = self->backdrop.has_unprimed();
   }
   self->last_sent_sequence = sequence;
-
-  // 大きすぎる窓（全画面など）は間引いて Dart へ渡す量を抑える。
-  int step = 1;
-  const int64_t pixels = static_cast<int64_t>(got.width) * got.height;
-  if (max_pixels > 0 && pixels > max_pixels) {
-    step = static_cast<int>(
-        std::ceil(std::sqrt(static_cast<double>(pixels) / max_pixels)));
-  }
-  int out_w = got.width;
-  int out_h = got.height;
-  if (step > 1) {
-    out_w = got.width / step;
-    out_h = got.height / step;
-    std::vector<uint8_t> small(static_cast<size_t>(out_w) * out_h * 4);
-    for (int y = 0; y < out_h; ++y) {
-      const uint8_t* src =
-          rgba.data() + (static_cast<size_t>(y) * step * got.width) * 4;
-      uint8_t* dst = small.data() + static_cast<size_t>(y) * out_w * 4;
-      for (int x = 0; x < out_w; ++x) {
-        std::memcpy(dst + x * 4, src + static_cast<size_t>(x) * step * 4, 4);
-      }
-    }
-    rgba.swap(small);
-  }
 
   FlValue* map = fl_value_new_map();
   fl_value_set_string_take(map, "sequence", fl_value_new_int(sequence));
@@ -266,6 +276,17 @@ FlValue* ReadFrame(Plugin* self, int64_t max_pixels) {
   fl_value_set_string_take(map, "pixels",
                            fl_value_new_uint8_list(rgba.data(), rgba.size()));
   return map;
+}
+
+// probe の応答。reason が null なら使える。
+void RespondProbe(FlMethodCall* call, const char* reason) {
+  g_autoptr(FlValue) map = fl_value_new_map();
+  fl_value_set_string_take(map, "available",
+                           fl_value_new_bool(reason == nullptr));
+  fl_value_set_string_take(
+      map, "reason",
+      reason != nullptr ? fl_value_new_string(reason) : fl_value_new_null());
+  Respond(call, map);
 }
 
 int64_t IntArg(FlValue* args, const char* key, int64_t fallback) {
@@ -286,19 +307,17 @@ void HandleMethodCall(FlMethodChannel*, FlMethodCall* call,
   FlValue* args = fl_method_call_get_args(call);
 
   if (std::strcmp(method, "probe") == 0) {
-    g_autoptr(FlValue) map = fl_value_new_map();
-    const char* reason = nullptr;
     if (!IsX11Backend(self->view)) {
-      reason = "unsupportedBackend";
-    } else if (!ScreenCast::PortalAvailable()) {
-      reason = "portalUnavailable";
+      RespondProbe(call, "unsupportedBackend");
+      return;
     }
-    fl_value_set_string_take(map, "available",
-                             fl_value_new_bool(reason == nullptr));
-    fl_value_set_string_take(
-        map, "reason",
-        reason != nullptr ? fl_value_new_string(reason) : fl_value_new_null());
-    Respond(call, map);
+    // ポータルへの問い合わせは非同期（起動時のメインループを止めない）。応答は
+    // call への参照だけで返すので、plugin が先に壊れても安全。
+    FlMethodCall* held = FL_METHOD_CALL(g_object_ref(call));
+    ScreenCast::QueryPortalAvailable([held](bool available) {
+      RespondProbe(held, available ? nullptr : "portalUnavailable");
+      g_object_unref(held);
+    });
   } else if (std::strcmp(method, "start") == 0) {
     HandleStart(self, call);
   } else if (std::strcmp(method, "stop") == 0) {
@@ -362,8 +381,12 @@ void screen_capture_plugin_register(FlPluginRegistrar* registrar) {
   if (self->view != nullptr) {
     GtkWidget* toplevel = gtk_widget_get_toplevel(GTK_WIDGET(self->view));
     if (toplevel != nullptr) {
-      g_signal_connect(toplevel, "configure-event", G_CALLBACK(OnConfigure),
-                       self);
+      // plugin の破棄（~Plugin）で切る。窓が先に壊れたら弱参照が null になる。
+      self->toplevel = toplevel;
+      g_object_add_weak_pointer(G_OBJECT(toplevel),
+                                reinterpret_cast<gpointer*>(&self->toplevel));
+      self->configure_handler = g_signal_connect(
+          toplevel, "configure-event", G_CALLBACK(OnConfigure), self);
     }
   }
 }

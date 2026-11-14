@@ -46,9 +46,9 @@ void EnsurePipeWireInit() {
 
 struct StoppedNotice {
   ScreenCast* self;
+  std::weak_ptr<bool> alive;
   uint64_t generation;
   std::string reason;
-  std::function<void(ScreenCast*, uint64_t, const std::string&)> deliver;
 };
 
 }  // namespace
@@ -70,6 +70,8 @@ const char* StartErrorName(StartError e) {
 struct ScreenCast::Request {
   ScreenCast* self = nullptr;
   uint64_t generation = 0;
+  uint64_t id = 0;
+  std::string path;
   guint subscription = 0;
   std::function<void(uint32_t, GVariant*)> on_response;
 };
@@ -78,23 +80,61 @@ ScreenCast::ScreenCast() = default;
 
 ScreenCast::~ScreenCast() {
   Stop();
+  // 以後に届く非同期の応答・通知は this に触れずに捨てる。
+  *alive_ = false;
+  alive_.reset();
   g_clear_object(&bus_);
 }
 
-bool ScreenCast::PortalAvailable() {
-  g_autoptr(GError) error = nullptr;
-  g_autoptr(GDBusConnection) bus =
-      g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, &error);
-  if (bus == nullptr) return false;
-  g_autoptr(GVariant) reply = g_dbus_connection_call_sync(
-      bus, kPortalBus, kPortalPath, "org.freedesktop.DBus.Properties", "Get",
-      g_variant_new("(ss)", kScreenCastIface, "AvailableSourceTypes"),
-      G_VARIANT_TYPE("(v)"), G_DBUS_CALL_FLAGS_NONE, 3000, nullptr, &error);
-  if (reply == nullptr) return false;
-  g_autoptr(GVariant) value = nullptr;
-  g_variant_get(reply, "(v)", &value);
-  if (!g_variant_is_of_type(value, G_VARIANT_TYPE_UINT32)) return false;
-  return (g_variant_get_uint32(value) & kSourceMonitor) != 0;
+namespace {
+
+struct PortalProbe {
+  std::function<void(bool)> done;
+};
+
+void FinishPortalProbe(PortalProbe* probe, bool available) {
+  probe->done(available);
+  delete probe;
+}
+
+}  // namespace
+
+void ScreenCast::QueryPortalAvailable(std::function<void(bool)> done) {
+  auto* probe = new PortalProbe{std::move(done)};
+  g_bus_get(
+      G_BUS_TYPE_SESSION, nullptr,
+      [](GObject*, GAsyncResult* res, gpointer user_data) {
+        auto* probe = static_cast<PortalProbe*>(user_data);
+        g_autoptr(GError) error = nullptr;
+        GDBusConnection* bus = g_bus_get_finish(res, &error);
+        if (bus == nullptr) {
+          FinishPortalProbe(probe, false);
+          return;
+        }
+        g_dbus_connection_call(
+            bus, kPortalBus, kPortalPath, "org.freedesktop.DBus.Properties",
+            "Get",
+            g_variant_new("(ss)", kScreenCastIface, "AvailableSourceTypes"),
+            G_VARIANT_TYPE("(v)"), G_DBUS_CALL_FLAGS_NONE,
+            kPortalProbeTimeoutMs, nullptr,
+            [](GObject* source, GAsyncResult* res, gpointer user_data) {
+              auto* probe = static_cast<PortalProbe*>(user_data);
+              g_autoptr(GError) error = nullptr;
+              g_autoptr(GVariant) reply = g_dbus_connection_call_finish(
+                  G_DBUS_CONNECTION(source), res, &error);
+              bool available = false;
+              if (reply != nullptr) {
+                g_autoptr(GVariant) value = nullptr;
+                g_variant_get(reply, "(v)", &value);
+                available = g_variant_is_of_type(value, G_VARIANT_TYPE_UINT32) &&
+                            (g_variant_get_uint32(value) & kSourceMonitor) != 0;
+              }
+              FinishPortalProbe(probe, available);
+            },
+            probe);
+        g_object_unref(bus);  // 呼び出しが参照を持つ。
+      },
+      probe);
 }
 
 void ScreenCast::Start(const std::string& parent_window,
@@ -150,27 +190,35 @@ namespace {
 
 struct CallContext {
   ScreenCast* self;
+  std::weak_ptr<bool> alive;
   uint64_t generation;
-  std::function<void(GError*)> on_error;
+  uint64_t request_id;
 };
+
+}  // namespace
+
+namespace {
+
+// Request の応答シグナルを path で購読する。
+guint SubscribeResponse(GDBusConnection* bus, const std::string& path,
+                        GDBusSignalCallback callback, gpointer user_data) {
+  return g_dbus_connection_signal_subscribe(
+      bus, kPortalBus, kRequestIface, "Response", path.c_str(), nullptr,
+      G_DBUS_SIGNAL_FLAGS_NO_MATCH_RULE, callback, user_data, nullptr);
+}
 
 }  // namespace
 
 void ScreenCast::CallWithRequest(
     const char* method, GVariant* parameters, const std::string& token,
     std::function<void(uint32_t, GVariant*)> on_response) {
+  // ポータル仕様（v0.9 以降）で決まるリクエストのパス。呼び出しの応答 (o) が
+  // これと違えば（古いポータル）、応答で返ったパスへ購読を移す。
   const std::string path = std::string(kPortalPath) + "/request/" +
                            SenderToPathElement(
                                g_dbus_connection_get_unique_name(bus_)) +
                            "/" + token;
-  auto* request = new Request();
-  request->self = this;
-  request->generation = generation_;
-  request->on_response = std::move(on_response);
-  // 応答シグナルは呼び出しより先に購読する（取りこぼし防止）。
-  request->subscription = g_dbus_connection_signal_subscribe(
-      bus_, kPortalBus, kRequestIface, "Response", path.c_str(), nullptr,
-      G_DBUS_SIGNAL_FLAGS_NO_MATCH_RULE,
+  static const GDBusSignalCallback on_signal =
       [](GDBusConnection* bus, const gchar*, const gchar*, const gchar*,
          const gchar*, GVariant* params, gpointer user_data) {
         auto* r = static_cast<Request*>(user_data);
@@ -185,11 +233,20 @@ void ScreenCast::CallWithRequest(
           if (results != nullptr) g_variant_unref(results);
         }
         delete r;
-      },
-      request, nullptr);
+      };
+
+  auto* request = new Request();
+  request->self = this;
+  request->generation = generation_;
+  request->id = ++request_counter_;
+  request->path = path;
+  request->on_response = std::move(on_response);
+  // 応答シグナルは呼び出しより先に購読する（取りこぼし防止）。購読は Stop() か
+  // 応答の受信で外すので、user_data の request は this より長生きしない。
+  request->subscription = SubscribeResponse(bus_, path, on_signal, request);
   pending_ = request;
 
-  auto* ctx = new CallContext{this, generation_, nullptr};
+  auto* ctx = new CallContext{this, alive_, generation_, request->id};
   g_dbus_connection_call(
       bus_, kPortalBus, kPortalPath, kScreenCastIface, method, parameters,
       G_VARIANT_TYPE("(o)"), G_DBUS_CALL_FLAGS_NONE, -1, nullptr,
@@ -198,10 +255,27 @@ void ScreenCast::CallWithRequest(
         g_autoptr(GError) error = nullptr;
         g_autoptr(GVariant) reply = g_dbus_connection_call_finish(
             G_DBUS_CONNECTION(source), res, &error);
-        if (reply == nullptr && c->generation == c->self->generation_) {
-          // ポータルが無い・インタフェースが無い等。
-          c->self->Fail(StartError::kUnavailable,
-                        error != nullptr ? error->message : "call failed");
+        auto alive = c->alive.lock();
+        ScreenCast* self = c->self;
+        if (alive && *alive && c->generation == self->generation_) {
+          if (reply == nullptr) {
+            // ポータルが無い・インタフェースが無い等。
+            self->Fail(StartError::kUnavailable,
+                       error != nullptr ? error->message : "call failed");
+          } else if (self->pending_ != nullptr &&
+                     self->pending_->id == c->request_id) {
+            // 応答のパスが購読したパスと違えば、そちらへ購読を移す。
+            const gchar* handle = nullptr;
+            g_variant_get(reply, "(&o)", &handle);
+            Request* r = self->pending_;
+            if (handle != nullptr && r->path != handle) {
+              g_dbus_connection_signal_unsubscribe(self->bus_,
+                                                   r->subscription);
+              r->path = handle;
+              r->subscription =
+                  SubscribeResponse(self->bus_, r->path, on_signal, r);
+            }
+          }
         }
         delete c;
       },
@@ -221,6 +295,7 @@ void ScreenCast::OnSessionCreated(uint32_t response, GVariant* results) {
     return;
   }
   session_handle_ = handle;
+  SubscribeSessionClosed();
 
   const std::string token = "ue_select_" + std::to_string(++token_counter_);
   GVariantBuilder options;
@@ -291,10 +366,11 @@ void ScreenCast::OpenRemote(uint32_t node_id) {
   g_variant_builder_init(&options, G_VARIANT_TYPE_VARDICT);
   struct OpenContext {
     ScreenCast* self;
+    std::weak_ptr<bool> alive;
     uint64_t generation;
     uint32_t node_id;
   };
-  auto* ctx = new OpenContext{this, generation_, node_id};
+  auto* ctx = new OpenContext{this, alive_, generation_, node_id};
   g_dbus_connection_call_with_unix_fd_list(
       bus_, kPortalBus, kPortalPath, kScreenCastIface, "OpenPipeWireRemote",
       g_variant_new("(oa{sv})", session_handle_.c_str(), &options),
@@ -307,7 +383,9 @@ void ScreenCast::OpenRemote(uint32_t node_id) {
             g_dbus_connection_call_with_unix_fd_list_finish(
                 G_DBUS_CONNECTION(source), &fds, res, &error);
         ScreenCast* self = c->self;
-        const bool current = c->generation == self->generation_;
+        auto alive = c->alive.lock();
+        const bool current =
+            alive && *alive && c->generation == self->generation_;
         int fd = -1;
         if (reply != nullptr && fds != nullptr) {
           gint32 index = 0;
@@ -367,8 +445,12 @@ bool ScreenCast::StartStream(int fd, uint32_t node_id, std::string* error) {
     return false;
   }
   pw_thread_loop_lock(loop_);
-  core_ = pw_context_connect_fd(context_, fd, nullptr, 0);  // fd は所有が移る
+  // 成功すれば fd の所有は core へ移る。失敗したときは閉じられない（PipeWire 1.x の
+  // 実装: core_new の失敗は fd に触れず、プロトコルへの接続の失敗も close しない。
+  // ヘッダの「error で閉じる」は実装と食い違う）ので、こちらで閉じる。
+  core_ = pw_context_connect_fd(context_, fd, nullptr, 0);
   if (core_ == nullptr) {
+    close(fd);
     pw_thread_loop_unlock(loop_);
     *error = "pw_context_connect_fd failed";
     return false;
@@ -515,13 +597,16 @@ void ScreenCast::OnStreamProcess(void* data) {
 }
 
 void ScreenCast::NotifyStoppedFromStreamThread(const std::string& reason) {
-  auto* notice = new StoppedNotice{this, generation_, reason, nullptr};
+  // alive_ はメインスレッドの破棄より前に Stop() がこのスレッドを止めるので、
+  // ここで読んでも競合しない。
+  auto* notice = new StoppedNotice{this, alive_, generation_, reason};
   g_idle_add(
       [](gpointer user_data) -> gboolean {
         auto* n = static_cast<StoppedNotice*>(user_data);
         ScreenCast* self = n->self;
-        if (n->generation == self->generation_ && self->stream_ != nullptr &&
-            !self->stop_notified_) {
+        auto alive = n->alive.lock();
+        if (alive && *alive && n->generation == self->generation_ &&
+            self->stream_ != nullptr && !self->stop_notified_) {
           self->stop_notified_ = true;
           StoppedCallback cb = self->on_stopped_;
           self->Stop();
@@ -533,7 +618,44 @@ void ScreenCast::NotifyStoppedFromStreamThread(const std::string& reason) {
       notice);
 }
 
+void ScreenCast::SubscribeSessionClosed() {
+  if (bus_ == nullptr || session_handle_.empty()) return;
+  // 合成器・ポータル側で共有が終わった（利用者がパネルから止めた等）ら Closed が
+  // 来る。購読は CloseSession() で外すので、user_data の this より長生きしない。
+  session_closed_subscription_ = g_dbus_connection_signal_subscribe(
+      bus_, kPortalBus, kSessionIface, "Closed", session_handle_.c_str(),
+      nullptr, G_DBUS_SIGNAL_FLAGS_NO_MATCH_RULE,
+      [](GDBusConnection*, const gchar*, const gchar*, const gchar*,
+         const gchar*, GVariant*, gpointer user_data) {
+        static_cast<ScreenCast*>(user_data)->OnSessionClosed();
+      },
+      this, nullptr);
+}
+
+void ScreenCast::OnSessionClosed() {
+  // ポータルがもう閉じたセッションへ Close を送らない。
+  if (bus_ != nullptr && session_closed_subscription_ != 0) {
+    g_dbus_connection_signal_unsubscribe(bus_, session_closed_subscription_);
+    session_closed_subscription_ = 0;
+  }
+  session_handle_.clear();
+  if (on_started_) {
+    // 開始の途中で閉じられた（ダイアログの取り消し等）。
+    Fail(StartError::kDenied, "session closed");
+    return;
+  }
+  if (stop_notified_) return;
+  stop_notified_ = true;
+  StoppedCallback cb = on_stopped_;
+  Stop();
+  if (cb) cb("session closed");
+}
+
 void ScreenCast::CloseSession() {
+  if (bus_ != nullptr && session_closed_subscription_ != 0) {
+    g_dbus_connection_signal_unsubscribe(bus_, session_closed_subscription_);
+    session_closed_subscription_ = 0;
+  }
   if (bus_ != nullptr && !session_handle_.empty()) {
     g_dbus_connection_call(bus_, kPortalBus, session_handle_.c_str(),
                            kSessionIface, "Close", nullptr, nullptr,

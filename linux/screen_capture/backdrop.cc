@@ -1,6 +1,7 @@
 #include "backdrop.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 namespace ue_capture {
@@ -94,19 +95,43 @@ void Backdrop::Merge(const uint8_t* src, int width, int height, int stride,
   }
 }
 
-bool Backdrop::CropRgba(const Rect& rect, std::vector<uint8_t>* out,
-                        Rect* out_rect) const {
+bool Backdrop::CropRgba(const Rect& rect, int64_t max_pixels,
+                        std::vector<uint8_t>* out, Rect* out_rect,
+                        int* out_width, int* out_height) const {
   const Rect c = Intersect(rect, Rect{0, 0, width_, height_});
   if (c.empty() || out == nullptr) return false;
-  out->resize(static_cast<size_t>(c.width) * c.height * 4);
+
+  int step = 1;
+  const int64_t pixels = static_cast<int64_t>(c.width) * c.height;
+  if (max_pixels > 0 && pixels > max_pixels) {
+    step = static_cast<int>(
+        std::ceil(std::sqrt(static_cast<double>(pixels) / max_pixels)));
+  }
+  const int ow = std::max(1, c.width / step);
+  const int oh = std::max(1, c.height / step);
+  // 出力の各列・各行が読む控えの列・行。間引かないときは恒等。間引くときは
+  // 出力の画素の中心を切り出した矩形の全幅・全高へ均等に写す。
+  std::vector<int> cols(static_cast<size_t>(ow));
+  for (int x = 0; x < ow; ++x) {
+    cols[x] = c.x + static_cast<int>((static_cast<int64_t>(2 * x + 1) *
+                                      c.width) /
+                                     (2 * static_cast<int64_t>(ow)));
+  }
+
+  out->resize(static_cast<size_t>(ow) * oh * 4);
   uint8_t* dst = out->data();
   const bool bgr = order_ == PixelOrder::kBgrx;
-  for (int y = c.y; y < c.bottom(); ++y) {
-    const size_t row_start = static_cast<size_t>(y) * width_ + c.x;
-    const uint8_t* src = pixels_.data() + row_start * 4;
-    const uint8_t* primed = primed_.data() + row_start;
-    for (int x = 0; x < c.width; ++x) {
-      if (primed[x]) {
+  for (int oy = 0; oy < oh; ++oy) {
+    const int y = c.y + static_cast<int>((static_cast<int64_t>(2 * oy + 1) *
+                                          c.height) /
+                                         (2 * static_cast<int64_t>(oh)));
+    const size_t row_start = static_cast<size_t>(y) * width_;
+    const uint8_t* src_row = pixels_.data() + row_start * 4;
+    const uint8_t* primed_row = primed_.data() + row_start;
+    for (int ox = 0; ox < ow; ++ox) {
+      const int x = cols[ox];
+      const uint8_t* src = src_row + static_cast<size_t>(x) * 4;
+      if (primed_row[x]) {
         dst[0] = bgr ? src[2] : src[0];
         dst[1] = src[1];
         dst[2] = bgr ? src[0] : src[2];
@@ -114,11 +139,12 @@ bool Backdrop::CropRgba(const Rect& rect, std::vector<uint8_t>* out,
         dst[0] = dst[1] = dst[2] = 0;
       }
       dst[3] = 255;
-      src += 4;
       dst += 4;
     }
   }
   if (out_rect != nullptr) *out_rect = c;
+  if (out_width != nullptr) *out_width = ow;
+  if (out_height != nullptr) *out_height = oh;
   return true;
 }
 
@@ -137,18 +163,26 @@ std::vector<Rect> ExclusionTracker::Exclusions(int64_t now_ms) const {
     if (&s != &samples_.back() && s.at_ms < now_ms - history_ms_) continue;
     out.push_back(Inflate(s.rect, margin_));
   }
-  // 直近 2 件の移動量から次の位置を外挿する（移動中の先端の取りこぼし対策）。
+  // 直近 2 件の四辺の変化量から次の矩形を外挿する（移動中の先端・速いリサイズで
+  // 広がる辺の取りこぼし対策）。左上の移動だけでなく、右端・下端の移動（幅・高さの
+  // 増減）も別々に見込む。
   if (samples_.size() >= 2) {
     const Rect& a = samples_[samples_.size() - 2].rect;
     const Rect& b = samples_.back().rect;
-    const int dx = b.x - a.x;
-    const int dy = b.y - a.y;
-    if (dx != 0 || dy != 0) {
-      Rect predicted = b;
+    const int dl = b.x - a.x;
+    const int dt = b.y - a.y;
+    const int dr = b.right() - a.right();
+    const int db = b.bottom() - a.bottom();
+    if (dl != 0 || dt != 0 || dr != 0 || db != 0) {
       // 2 回分先まで見込む（合成器の 1〜2 フレームの先行を覆う）。
-      predicted.x += dx * 2;
-      predicted.y += dy * 2;
-      out.push_back(Inflate(predicted, margin_));
+      const int left = b.x + dl * 2;
+      const int top = b.y + dt * 2;
+      const int right = b.right() + dr * 2;
+      const int bottom = b.bottom() + db * 2;
+      if (right > left && bottom > top) {
+        out.push_back(
+            Inflate(Rect{left, top, right - left, bottom - top}, margin_));
+      }
     }
   }
   return out;
