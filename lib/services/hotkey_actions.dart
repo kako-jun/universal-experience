@@ -15,8 +15,16 @@ class HotkeyActions {
     required this.showAndFocusLoupe,
     required this.toggleLoupeVisible,
     required this.setLoupeVisible,
+    this.onHoldOriginalEvent,
     DateTime Function() now = DateTime.now,
   }) : _now = now;
+
+  /// 「押している間だけ原画」で原画比較が切り替わったとき（キーリピートの判定の後）と、
+  /// keyUp が届いたときに呼ばれる（#185 の切り分け用。main.dart が診断ログへ流す）。
+  /// 値は `down_acquire` / `down_release`（keyUp が届かない環境のトグル）/ `up`。
+  /// リピートで無視した keyDown・すでに確保済みの keyDown では呼ばない（長押しでログを
+  /// 埋めないため）。
+  final void Function(String event)? onHoldOriginalEvent;
 
   final DateTime Function() _now;
 
@@ -88,7 +96,10 @@ class HotkeyActions {
   ///   連続送出する環境でも 1 回のトグルにしかならないようにする、#63）。
   void holdOriginalKeyDown() {
     if (_keyUpSeen) {
-      if (!isBypassHeldByHotkey()) acquireBypass();
+      if (!isBypassHeldByHotkey()) {
+        acquireBypass();
+        onHoldOriginalEvent?.call('down_acquire');
+      }
       return;
     }
     final now = _now();
@@ -100,12 +111,15 @@ class HotkeyActions {
     _lastKeyDownAt = now;
     if (isBypassHeldByHotkey()) {
       releaseBypass();
+      onHoldOriginalEvent?.call('down_release');
     } else {
       acquireBypass();
+      onHoldOriginalEvent?.call('down_acquire');
     }
   }
 
   void holdOriginalKeyUp() {
+    onHoldOriginalEvent?.call('up');
     _keyUpSeen = true;
     _lastKeyDownAt = null;
     if (isBypassHeldByHotkey()) releaseBypass();

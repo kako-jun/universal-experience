@@ -52,6 +52,8 @@ lib/
 │   ├── loupe_rect_source.dart       # ルーペ矩形決定元のインターフェース（#44 向け seam、#63）
 │   ├── loupe_window_controller.dart # ルーペ窓のモード/透過/最前面/クリックスルー（#63）。ルーペ窓モードの可否は LoupeWindowPolicy.loupeModeAvailable の 1 箇所（キャプチャ未実装の間は false、#156）
 │   ├── native_bridge_service.dart   # flutter_rust_bridge（sensus-core）の bootstrap 初期化
+│   ├── preview_diagnostics.dart     # プレビュー描画の診断ログ（失敗・10 秒超の未完了・原画比較の切替を ~/.local/share/<アプリ id>/logs/ へ。
+│   │                                 # リリースでも有効・256 KiB で退避・個人情報なし・UE_PREVIEW_DIAGNOSTICS=0 で無効、#185）
 │   ├── preview_selection.dart       # プレビュー強度の出どころを一本化する判定（#60/#63）・
 │   │                                 # 複数層のプレビューに渡すステップ列 previewPipelineSteps（#119）
 │   ├── settings_service.dart        # テーマ・言語・welcomeBannerDismissed（#78）。選択状態は持たない（VisionFilterStore が正本、#124）
@@ -86,7 +88,9 @@ lib/
     │                                 # before_after_view（複数層は名前の要約見出し・書き出しは層ごとの行と併合した受診喚起、#120/#121）, loupe_hud,
     │                                 # preview_rendering（プレビュー描画の共有: before 読み込み・after 描画・書き出し合成の差し替え口
     │                                 # previewSourceImageLoader/afterImageRenderer/exportImageComposer と PreviewImageView・PreviewErrorPlaceholder。
-    │                                 # BeforeAfterView と 2×2 比較が共有し、互いを import しない、#159）,
+    │                                 # BeforeAfterView と 2×2 比較が共有し、互いを import しない、#159。1 回の描画が 500ms を越えた
+    │                                 # 間の「描画中…」PreviewBusyTracker/PreviewBusyBadge、低解像度の仮表示・描画結果の LRU
+    │                                 # PreviewRenderCache、#185）,
     │                                 # color_vision_compare_view（色覚 4 型の 2×2 比較と書き出し、#84。他の層の土台つき、#122）,
     │                                 # experience_presets（体験プリセットの行 ExperiencePresetTile）, filter_param_panel,
     │                                 # consult_notice_block（受診喚起の共有表示ウィジェット、#76）,

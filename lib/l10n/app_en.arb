@@ -128,6 +128,18 @@
   "@previewFailed": {
     "description": "Shown in the 'after' pane when generating or rendering the latest preview failed (#58)."
   },
+  "previewRendering": "Rendering…",
+  "@previewRendering": {
+    "description": "Badge shown on the preview while a render has been running for a while (some filter combinations take many seconds on the CPU), so the user can tell it is still working rather than frozen (#185)."
+  },
+  "previewRenderingProvisional": "Rendering… (low-resolution preview)",
+  "@previewRenderingProvisional": {
+    "description": "Badge shown on the after image while a quick low-resolution preview is displayed and the full-resolution render of a heavy filter combination is still running (#185). The export button is disabled meanwhile."
+  },
+  "previewLoadingSource": "Loading image…",
+  "@previewLoadingSource": {
+    "description": "Badge shown on the original (before) image when loading the newly selected sample or image takes a while (#185)."
+  },
   "previewStaticFrameNote": "This is a time-based effect; the preview shows a single still frame rather than the motion.",
   "@previewStaticFrameNote": {
     "description": "Shown under the preview panes when the selected filter is time-dependent (e.g. vertigo, BPPV rotation) and the static preview can't show its motion (#60)."

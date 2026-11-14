@@ -13,6 +13,7 @@ import '../../services/color_vision_compare.dart';
 import '../../services/export_layers.dart';
 import '../../services/export_plan.dart';
 import '../../services/export_service.dart';
+import '../../services/preview_diagnostics.dart';
 import '../../services/vision_layer.dart';
 import '../../src/rust/api/sensus_bridge.dart' show VisionStep;
 import 'preview_rendering.dart';
@@ -123,6 +124,28 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
   /// 描画中に新しい要求が来たか。来ていたら進行中の描画は途中で打ち切る。
   bool _rebuildPending = false;
 
+  /// 描画 1 回が長引いている間の「描画中…」（#185。[BeforeAfterView] と同じ理由）。
+  late final PreviewBusyTracker _busy = PreviewBusyTracker(() {
+    if (mounted) setState(() {});
+  });
+
+  /// 描画 1 回が長時間終わらないとき診断ログへ残す（#185。リリースでも有効）。
+  final PreviewRenderWatchdog _watchdog =
+      PreviewRenderWatchdog(view: 'compare');
+
+  /// 診断ログに添える入力の要約（土台の層の数・強度・サンプル id。ユーザー画像は
+  /// `user` とだけ書く）。
+  Map<String, Object?> _diagFields() {
+    final source = widget.imageSource;
+    return {
+      'base_steps': widget.baseSteps.length,
+      'strength': widget.strength.toStringAsFixed(2),
+      'sample':
+          source is SamplePreviewImageSource ? source.sampleId : 'user',
+      'size': _effectiveSampleSize,
+    };
+  }
+
   int get _effectiveSampleSize =>
       widget.sampleSize ?? kCanonicalSampleSize;
 
@@ -149,28 +172,83 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       [for (final l in layers) l.layer.strengthKey];
 
   void _scheduleRebuild() {
+    if (_applyOriginal()) return;
     if (_rebuildInFlight) {
       _rebuildPending = true;
+      // 走っている描画が終わるまでこの要求は描けない。札の時計が止まっていれば動かす
+      // （原画比較で札を消した後に戻したときも「描画中…」を出す、#185。BeforeAfterView と同じ）。
+      _busy.resume();
       return;
     }
     _rebuildInFlight = true;
     unawaited(_runRebuild());
   }
 
+  /// 原画比較中（強さ 0・土台なし、`colorVisionCompareInputOf`）は 4 セルとも原画そのまま
+  /// なので、描画せずに原画の複製をすぐ出して true（#185）。重い土台（starbursts など）の
+  /// 描画が走っていても待たせない。走っている描画の結果は世代で捨てる。
+  bool _applyOriginal() {
+    final before = _before;
+    if (!mounted ||
+        before == null ||
+        widget.strength > 0 ||
+        widget.baseSteps.isNotEmpty ||
+        _currentSampleSize != _effectiveSampleSize ||
+        _currentImageSource != widget.imageSource) {
+      return false;
+    }
+    final old = _afters;
+    _generation++;
+    _rebuildPending = false;
+    setState(() {
+      _afters = [for (final _ in kColorVisionCompareEntries) before.clone()];
+      _afterStrength = widget.strength;
+      _afterBaseLayers = effectiveExportLayers(widget.baseLayers);
+      _failed = false;
+    });
+    if (old != null) {
+      for (final image in old) {
+        image.dispose();
+      }
+    }
+    _busy.end();
+    return true;
+  }
+
   Future<void> _runRebuild() async {
+    _busy.begin();
+    _watchdog.start(_diagFields());
+    var outcome = 'error';
     try {
       await _rebuild();
+      outcome = 'done';
+    } catch (e, st) {
+      // 描画の段取りそのものの例外。unawaited の未処理例外にせず報告へ流す。
+      PreviewDiagnostics.recordError(
+          'preview_error', e, {'view': 'compare', ..._watchdog.fields});
+      FlutterError.reportError(FlutterErrorDetails(
+        exception: e,
+        stack: st,
+        library: 'color_vision_compare_view',
+      ));
     } finally {
+      _watchdog.finish(outcome);
       _rebuildInFlight = false;
-    }
-    if (!mounted) return;
-    if (_rebuildPending) {
-      _rebuildPending = false;
-      _scheduleRebuild();
+      if (mounted) {
+        if (_rebuildPending) {
+          _rebuildPending = false;
+          _busy.pause();
+          _scheduleRebuild();
+        } else {
+          _busy.end();
+        }
+      }
     }
   }
 
   void _reportError(Object e, StackTrace st) {
+    PreviewDiagnostics.recordError('preview_failed', e,
+        {'view': 'compare', 'stage': _watchdog.stage, ..._watchdog.fields});
     FlutterError.reportError(
       FlutterErrorDetails(
         exception: e,
@@ -222,6 +300,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       before = _before!;
     } else {
       try {
+        _watchdog.stage = 'load';
         before = await loadPreviewImage(source, size);
       } catch (e, st) {
         _reportError(e, st);
@@ -265,6 +344,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       final input = before.clone();
       ui.Image? composed;
       try {
+        _watchdog.stage = 'base';
         composed = await renderDefaultAfterPipeline(input, baseSteps);
         if (composed == null) {
           throw StateError('Renderer returned no base image');
@@ -276,16 +356,20 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       } finally {
         if (!identical(composed, input)) input.dispose();
       }
-      if (generation != _generation || !mounted) {
+      if (!mounted) {
         composed.dispose();
         return;
       }
+      // 作り終えた土台は、この回が追い越されていても保持する（世代がずれるのは、描画中に
+      // 原画比較で原画を出したとき [_applyOriginal] だけ。入力の変化は [_rebuildPending] で扱う）。土台は (steps, 元画像, サイズ) で引くので、別の入力に誤って使われることは
+      // なく、原画比較を解除して同じ層に戻ったときに重い再合成をしなくて済む（#122/#185）。
       final old = _baseImage;
       _baseImage = composed;
       _baseImageSteps = baseSteps;
       _baseImageSize = size;
       _baseImageSource = source;
       old?.dispose();
+      if (generation != _generation) return;
       base = composed;
     }
 
@@ -297,8 +381,9 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
     }
 
     for (final entry in kColorVisionCompareEntries) {
-      // 新しい要求が来ている（またはビューが外れた）なら、残りは描かずに捨てる。
-      if (_rebuildPending || !mounted) {
+      // 新しい要求が来ている・追い越された（原画比較で原画を出した）・ビューが外れたなら、
+      // 残りは描かずに捨てる。
+      if (_rebuildPending || generation != _generation || !mounted) {
         discardProduced();
         return;
       }
@@ -307,6 +392,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       final input = base.clone();
       ui.Image? after;
       try {
+        _watchdog.stage = 'cell:${entry.id}';
         after = await renderPreviewAfter(
           input,
           colorVisionCompareFilter(entry),
@@ -347,6 +433,8 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
 
   @override
   void dispose() {
+    _busy.dispose();
+    _watchdog.dispose();
     _before?.dispose();
     _baseImage?.dispose();
     final afters = _afters;
@@ -538,6 +626,12 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
                 ],
               ),
             ),
+            // 描画が長引いている間は「描画中…」（#185）。
+            if (_busy.showing)
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: PreviewBusyBadge(label: l10n.previewRendering),
+              ),
             // 書き出せるのは 4 セルそろって描けているときだけ。
             if (afters != null)
               IconButton(

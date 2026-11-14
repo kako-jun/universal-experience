@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:io' show Platform;
@@ -21,6 +22,7 @@ import 'services/loupe_window_controller.dart';
 import 'services/tray_locale_sync.dart';
 import 'services/tray_service.dart';
 import 'services/native_bridge_service.dart';
+import 'services/preview_diagnostics.dart';
 import 'services/settings_service.dart';
 import 'services/vision_filter_store.dart';
 import 'ui/screens/home_screen.dart';
@@ -231,6 +233,12 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // #185: プレビュー描画の失敗・長時間未完了を、リリースでもアプリのサポート
+  // ディレクトリ（Linux は ~/.local/share/<アプリ id>/logs/）へ残す。起動は待たせない。
+  unawaited(getApplicationSupportDirectory()
+      .then(installPreviewDiagnosticsLog)
+      .catchError((Object _) {}));
+
   // macOS の Cmd+Q・メニューバーの「終了」・ログアウト等（window_manager の
   // クローズイベントを経由しない終了経路）でも選択・強度のデバウンス永続化
   // （#57, #65）を取りこぼさないための保険。トレイ・ウィンドウクローズ
@@ -309,6 +317,13 @@ void main() async {
       },
     )..start();
 
+    // #185 の切り分け: 原画比較の開始・解除を診断ログへ残す（1 回押しただけで原画表示が
+    // 残ると「フィルタが反映されない」と同じ見え方になるため）。
+    watchBypassForDiagnostics(
+      visionFilterState,
+      isHeldByHotkey: () => visionFilterState.isHeldBy(_hotkeyBypassSource),
+    );
+
     // グローバルホットキー (#63)。トレイ初期化の後に登録する
     // （非常口アクションがトレイ経由の showAndFocusLoupe を使うため）。
     hotkeyService = HotkeyService();
@@ -328,6 +343,10 @@ void main() async {
       showAndFocusLoupe: trayService.onShowLoupe,
       toggleLoupeVisible: trayService.toggleLoupeVisible,
       setLoupeVisible: trayService.setLoupeVisible,
+      // #185 の切り分け: keyUp が届く環境かを後から確かめられるよう、原画比較の切り替えと
+      // keyUp を診断ログへ残す（キーリピートは書かない。どのキーかも書かない）。
+      onHoldOriginalEvent: (event) => PreviewDiagnostics.record(
+          'hotkey_hold_original', {'event': event}),
     );
     await hotkeyService.init({
       AppHotkeyAction.toggleClickThrough: HotkeyHandlers(
