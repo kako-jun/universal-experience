@@ -70,6 +70,8 @@ import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart';
 import 'package:universal_experience/ui/theme/app_theme.dart';
+import 'package:universal_experience/ui/widgets/bypass_badge.dart';
+import 'package:universal_experience/ui/widgets/layer_chip_strip.dart';
 import 'package:universal_experience/ui/widgets/export_feedback.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/image_source_picker.dart';
@@ -677,6 +679,135 @@ void main() {
       ),
       skip: !screenshotsEnabled,
     );
+  }
+
+  // 実フォントでの、帯の右端の「2×2 で比較」（文字つき）の高さ（#183）。テスト用フォント（Ahem）では
+  // ja の余白の差（×3 で実測 82.0）が出ないので、実フォントでだけ確かめる。チップが帯の中身
+  // （スクロールバーの段を除く）に収まる（収まらないと親の高さに潰されて余白が削られる）。
+  for (final locale in const ['ja', 'en']) {
+    for (final scale in const [1.0, 2.0, 3.0]) {
+      testWidgets(
+        'real fonts: 帯の「2×2 で比較」は帯の中身に収まる $locale x$scale',
+        (tester) async {
+          tester.view.physicalSize = const Size(1400, 400);
+          tester.view.devicePixelRatio = 1.0;
+          addTearDown(tester.view.reset);
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final state = VisionFilterState()..toggle('protanopia');
+          await tester.pumpWidget(
+            ChangeNotifierProvider<VisionFilterState>.value(
+              value: state,
+              child: MaterialApp(
+                theme: themed(AppTheme.lightTheme),
+                locale: Locale(locale),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: Scaffold(
+                  body: Align(
+                    alignment: Alignment.topLeft,
+                    child: SizedBox(
+                      width: 1300,
+                      child: Builder(
+                        builder: (context) {
+                          final l10n = AppLocalizations.of(context)!;
+                          return LayerChipStrip(
+                            trailingLabel: l10n.compareToggleLabel,
+                            trailingBuilder: (context, compact) => FilterChip(
+                              label: compact
+                                  ? const Icon(Icons.compare)
+                                  : Text(l10n.compareToggleLabel),
+                              selected: true,
+                              onSelected: (_) {},
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pump();
+          final strip = tester.getRect(find.byType(LayerChipStrip));
+          final chip = tester.getRect(find.byType(FilterChip));
+          expect(find.byIcon(Icons.compare), findsNothing, reason: '幅が十分なので文字つき');
+          expect(chip.height,
+              lessThanOrEqualTo(strip.height - LayerChipStrip.scrollbarLane),
+              reason: 'チップ ${chip.height} が帯の中身 '
+                  '${strip.height - LayerChipStrip.scrollbarLane} に収まる');
+          // 帯の中のチップは親の高さの制約に潰されるだけで溢れないので、単体の高さと同じ
+          // （余白を削られていない）ことも確かめる。
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: themed(AppTheme.lightTheme),
+              locale: Locale(locale),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Scaffold(
+                body: Align(
+                  alignment: Alignment.topLeft,
+                  child: Builder(
+                    builder: (context) => FilterChip(
+                      label: Text(
+                          AppLocalizations.of(context)!.compareToggleLabel),
+                      selected: true,
+                      onSelected: (_) {},
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          final natural = tester.getSize(find.byType(FilterChip)).height;
+          expect(chip.height, natural,
+              reason: '帯の中 ${chip.height} と単体 $natural は同じ高さ');
+        },
+        skip: !screenshotsEnabled,
+      );
+    }
+  }
+
+  // 実フォントでの、「原画表示中」バッジの文字つきの形の大きさの見積り（`BypassBadge.textFormSize`）が
+  // 実測以上（見積りが小さいと文字の端が切れる、#183）。Ahem では差が出ないので実フォントで確かめる。
+  for (final locale in const ['ja', 'en']) {
+    for (final scale in const [1.0, 1.1, 1.19, 1.5, 2.0, 3.0]) {
+      testWidgets(
+        'real fonts: 原画表示中バッジの見積りは実測以上 $locale x$scale',
+        (tester) async {
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          late Size estimate;
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: themed(AppTheme.lightTheme),
+              locale: Locale(locale),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: Scaffold(
+                body: Align(
+                  alignment: Alignment.topLeft,
+                  child: Builder(
+                    builder: (context) {
+                      estimate = BypassBadge.textFormSize(context);
+                      return const BypassBadge();
+                    },
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pump();
+          final actual = tester.getSize(find.byType(Chip));
+          expect(estimate.width, greaterThanOrEqualTo(actual.width),
+              reason: '幅: 見積り ${estimate.width} ≧ 実測 ${actual.width}');
+          expect(estimate.height, greaterThanOrEqualTo(actual.height),
+              reason: '高さ: 見積り ${estimate.height} ≧ 実測 ${actual.height}');
+        },
+        skip: !screenshotsEnabled,
+      );
+    }
   }
 
   // 低い広幅（1280x480。画像は下限 160dp）で 5 層でも、複数層の After 見出し（名前 + 「…（+N）」）と

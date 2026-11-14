@@ -53,7 +53,7 @@ class LayerChipStrip extends StatefulWidget {
 
   /// 文字拡大を考慮した帯の中身の高さ。チップの本文（bodyLarge の 1 行）・最小タップ目標
   /// [chipHeight]・右端の「2×2 で比較」の**文字つきの** `FilterChip` の高さ（labelLarge の 1 行 +
-  /// 上下の余白と枠 22 の見積り。実測: ×1.5 まで 48、×2.0 で en 58 / ja 61、×3.0 で 78 以上）の最大。文字つきの形のまま
+  /// 上下の余白と枠 24 の見積り。実測: ×1.5 まで 48、×2.0 で en 58 / ja 61、×3.0 で 78 以上）の最大。文字つきの形のまま
   /// 置くか、アイコンだけに縮むかは幅だけで決まり（層数で「すべて解除」が増えると変わる）、
   /// 高さで決まるわけではない。だから高さは常に文字つきの形の分を確保し、層数・色覚の層の有無・
   /// 縮み方で動かないようにする。
@@ -70,9 +70,11 @@ class LayerChipStrip extends StatefulWidget {
   }
 
   /// `FilterChip` の縦の余白と枠の合計（上下パディング + 枠）の見積り。実測: ラベル 1 行の高さに
-  /// 足すとチップの高さになる（×2.0: en 58 = 40.04 + 18、ja 61 = 40.04 + 21）。フォントで 3dp 違うので
-  /// 大きい方（22）を取る。
-  static const double filterChipVerticalExtra = 22;
+  /// 足すとチップの高さになる（×2.0: en 58 = 40.04 + 18、ja 61 = 40.04 + 21。ja ×3 は実測 82.0 =
+  /// 60.06 + 22）。フォントで数 dp 違うので、実測の最大（22）に余裕 2 を足した 24 にする。
+  /// テスト用フォント（Ahem）では差が出ないので、実フォントでの確認は UE_SCREENSHOTS の
+  /// `home_screenshots_test.dart`（帯の「2×2 で比較」が帯の中身に収まる）で行う。
+  static const double filterChipVerticalExtra = 24;
 
   /// 帯全体の高さ（チップ + スクロールバーの段）。層数に関わらず同じ値になる。
   static double heightFor(BuildContext context) =>

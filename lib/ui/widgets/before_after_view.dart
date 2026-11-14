@@ -602,7 +602,15 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
             height: 180,
             child: Stack(children: [
               if (widget.bypassed)
-                const Positioned(left: 4, bottom: 4, child: BypassBadge()),
+                const Positioned(
+                  left: 4,
+                  right: 4,
+                  bottom: 4,
+                  child: Align(
+                    alignment: Alignment.bottomLeft,
+                    child: BypassBadge(),
+                  ),
+                ),
               Center(
                 // 「準備中」が現れた瞬間だけ読み上げられる（#45）。完了すると
                 // この liveRegion のノード自体が消えるので、完了は読まれない

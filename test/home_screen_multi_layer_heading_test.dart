@@ -7,6 +7,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
@@ -207,9 +208,10 @@ void main() {
 
   group('見出しは複数層でも 1 行で省略し、名前の長さで画像の位置が動かない（#183）', () {
     // 横並びになる最小幅（420）の半分のペインで、長い名前 3 つ。
-    Future<void> pumpPanes(WidgetTester tester, List<String> names) async {
+    Future<void> pumpPanes(WidgetTester tester, List<String> names,
+        {double width = 440}) async {
       await installFakes(tester);
-      tester.view.physicalSize = const Size(440, 900);
+      tester.view.physicalSize = Size(width, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
       await tester.pumpWidget(
@@ -236,6 +238,37 @@ void main() {
       await settle(tester);
     }
 
+    // 名前と「…（+N）」の間に空白が出ない。名前の Text の矩形は接尾辞と Row で隣り合うので、
+    // 矩形のすき間は常に 0 になり退行を検出できない。**見える最後の文字の右端**で測る
+    // （softWrap が有効だと、空白の位置で折り返して 2 行目が切り捨てられ、1 行目の終わりが矩形の
+    // 右端よりずっと手前になる）。
+    for (final name in [
+      'WwwwwWwwww WwwwwWwwww WwwwwWwwww WwwwwWwwww',
+      'WwwwwWwwww WwwwwWwwww WwwwwWwwww WwwwwWwwww WwwwwWwwww WwwwwWwwww WwwwwWwwww WwwwwWwwww',
+    ]) {
+      testWidgets('空白入りの名前（${name.length} 文字）: 見える最後の文字と「…（+N）」が離れない',
+          (tester) async {
+        // 幅 800 の半分のペイン（約 380dp）で、名前の領域が約 17 文字ぶん（Ahem）。10 文字の単語 2 つは入らず、
+        // 空白の位置で折り返しが起きる（折り返すと 1 行目の終わりが矩形の右端より手前）。
+        await pumpPanes(tester, [name, name, name], width: 800);
+        final head = layerNamesHead([name, name, name]);
+        final paragraph = tester.renderObject<RenderParagraph>(find.text(head));
+        final boxes = paragraph.getBoxesForSelection(
+            TextSelection(baseOffset: 0, extentOffset: head.length));
+        expect(boxes, isNotEmpty);
+        final lastRight = boxes
+            .map((b) => paragraph.localToGlobal(Offset(b.right, 0)).dx)
+            .reduce((a, b) => a > b ? a : b);
+        final nameRight = tester.getRect(find.text(head)).right;
+        // 見える右端 = 文字の右端と矩形の右端（切り捨て）の小さい方。
+        final visibleRight = lastRight < nameRight ? lastRight : nameRight;
+        final suffixLeft = tester.getRect(find.text(' … (+1)')).left;
+        // 接尾辞の先頭の空白 1 文字分（Ahem では 14dp）+ 数 dp の範囲に収まる。
+        expect(suffixLeft - visibleRight, lessThanOrEqualTo(20),
+            reason: '見える最後の文字の右端 $visibleRight と接尾辞の左端 $suffixLeft');
+      });
+    }
+
     double? baseTop;
     for (final length in [10, 40, 120]) {
       testWidgets('名前の長さ $length 文字: 画像の上端は短い名前のときと同じで、左右も揃う', (tester) async {
@@ -257,10 +290,6 @@ void main() {
             lessThanOrEqualTo(
                 tester.getRect(find.byType(BeforeAfterView)).right));
         expect(tester.getSize(heading).height, lessThanOrEqualTo(48));
-        // 名前と「…（+N）」の間に大きな空白が出ない（名前の Text が幅いっぱいを取って接尾辞が
-        // 右へ離れる退行）。
-        final gap = tester.getRect(suffix).left - tester.getRect(heading).right;
-        expect(gap, lessThanOrEqualTo(12), reason: '名前と接尾辞の間隔 $gap');
         baseTop ??= top;
         expect(top, baseTop, reason: '名前の長さに依らない');
       });

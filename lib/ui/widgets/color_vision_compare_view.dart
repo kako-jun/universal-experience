@@ -477,7 +477,15 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
         child: Stack(
           children: [
             if (widget.bypassed)
-              const Positioned(left: 4, bottom: 4, child: BypassBadge()),
+              const Positioned(
+                left: 4,
+                right: 4,
+                bottom: 4,
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: BypassBadge(),
+                ),
+              ),
             Center(
               child: Text(
                 l10n.previewPreparing,
