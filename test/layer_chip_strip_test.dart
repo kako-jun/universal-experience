@@ -3,6 +3,7 @@
 // 1 層以上で出る・0 層でも同じ高さを確保する（#183）・適用順の番号・チップで「調整中」が移る・✕ で 1 層だけ外れる・
 // 「すべて解除」で全部外れる・別名（-omaly）のチップが variantId の表示名になる、を確認する。
 
+import 'dart:math' as math;
 import 'dart:ui' show Tristate;
 
 import 'package:flutter/material.dart';
@@ -12,6 +13,7 @@ import 'package:provider/provider.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
+import 'package:universal_experience/ui/theme/app_theme.dart';
 import 'package:universal_experience/ui/widgets/layer_chip_strip.dart';
 
 import 'support/home_screen_harness.dart';
@@ -57,7 +59,7 @@ void main() {
     testWidgets('0 層ではチップも「すべて解除」も出ない（領域だけ確保）', (tester) async {
       await pumpStrip(tester);
       expect(clearAll, findsNothing);
-      expect(tester.getSize(find.byType(LayerChipStrip)).height, 48);
+      expect(tester.getSize(find.byType(LayerChipStrip)).height, 52);
     });
 
     testWidgets('0 層には淡い案内文が出る', (tester) async {
@@ -92,11 +94,14 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('1 層でチップと「すべて解除」が出る', (tester) async {
+    testWidgets('1 層でチップが出る。「すべて解除」は 2 層以上のときだけ', (tester) async {
       await pumpStrip(tester);
       state.toggle('myopia');
       await tester.pump();
       expect(chip('myopia'), findsOneWidget);
+      expect(clearAll, findsNothing);
+      state.toggle('glaucoma');
+      await tester.pump();
       expect(clearAll, findsOneWidget);
     });
 
@@ -213,15 +218,6 @@ void main() {
       expect(chip('myopia'), findsNothing);
     });
 
-    testWidgets('1 層でも「すべて解除」で外れる', (tester) async {
-      await pumpStrip(tester);
-      state.toggle('myopia');
-      await tester.pump();
-      await tester.tap(clearAll);
-      await tester.pump();
-      expect(state.layers, isEmpty);
-    });
-
     testWidgets('✕ で 1 層に減ってもチップ帯は残る', (tester) async {
       await pumpStrip(tester);
       state.toggle('myopia');
@@ -231,7 +227,7 @@ void main() {
       await tester.pump();
       expect(state.layers.map((l) => l.id), ['myopia']);
       expect(chip('myopia'), findsOneWidget);
-      expect(clearAll, findsOneWidget);
+      expect(clearAll, findsNothing);
     });
 
     testWidgets('「すべて解除」で全部外れる', (tester) async {
@@ -309,6 +305,39 @@ void main() {
       expect(tester.getSize(chip('myopia')).height, greaterThanOrEqualTo(48));
     });
 
+    testWidgets('0 層の案内文は面の上で 4.5:1 以上のコントラスト（明・暗・高コントラスト）', (tester) async {
+      double lum(Color c) {
+        double ch(double v) => v <= 0.03928
+            ? v / 12.92
+            : math.pow((v + 0.055) / 1.055, 2.4).toDouble();
+        return 0.2126 * ch(c.r) + 0.7152 * ch(c.g) + 0.0722 * ch(c.b);
+      }
+
+      for (final theme in [
+        AppTheme.lightTheme,
+        AppTheme.darkTheme,
+        AppTheme.highContrastTheme,
+        AppTheme.highContrastDarkTheme,
+      ]) {
+        final scheme = theme.colorScheme;
+        // プレビューのカード面（cardTheme.color = surfaceContainerHighest）の上に描く。
+        final a = lum(scheme.onSurfaceVariant) + 0.05;
+        final b = lum(scheme.surfaceContainerHighest) + 0.05;
+        final ratio = a > b ? a / b : b / a;
+        expect(ratio, greaterThanOrEqualTo(4.5), reason: '${theme.brightness}');
+      }
+    });
+
+    testWidgets('スクロールバーの段はチップの下（チップの枠と重ならない）', (tester) async {
+      await pumpStrip(tester, width: 280);
+      state.toggle('myopia');
+      state.toggle('glaucoma');
+      await tester.pump();
+      final strip = tester.getRect(find.byType(LayerChipStrip));
+      expect(tester.getRect(chip('myopia')).bottom,
+          lessThanOrEqualTo(strip.bottom - LayerChipStrip.scrollbarLane));
+    });
+
     testWidgets('狭幅でも溢れず、1 行のまま横スクロールで末尾に届く', (tester) async {
       await pumpStrip(tester, width: 280);
       for (final id in ['myopia', 'glaucoma', 'cataract', 'floaters']) {
@@ -316,7 +345,7 @@ void main() {
       }
       await tester.pump();
       expect(tester.takeException(), isNull);
-      expect(tester.getSize(find.byType(LayerChipStrip)).height, 48);
+      expect(tester.getSize(find.byType(LayerChipStrip)).height, 52);
       // 「すべて解除」は帯の外（右端固定）なので、スクロールせずに常に見えて押せる。
       expect(tester.getTopLeft(clearAll).dx, lessThan(280));
       expect(tester.getRect(clearAll).right, lessThanOrEqualTo(280));
