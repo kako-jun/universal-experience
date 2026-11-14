@@ -427,6 +427,10 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     }
     if (_rebuildInFlight) {
       _pendingRebuildSampleSize = sampleSize;
+      // 走っている描画（キャッシュ命中で表示には使わなくなったものを含む）が終わるまで、
+      // この要求は描けない。札の時計が止まっていれば動かす（キャッシュ命中で札を消した後に
+      // 来た要求でも「描画中…」を出す、#185）。
+      _busy.resume();
       return;
     }
     _rebuildInFlight = true;
@@ -557,6 +561,9 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         !mounted ||
         _pendingRebuildSampleSize != null;
 
+    // 仮表示はキャッシュに入れない（フル解像度の結果だけを覚える）。A → B → A のように
+    // フル解像度が描き上がる前に行き来すると、低解像度を描き直すことになるが、512px は
+    // フル解像度の 1/8 程度なので許容する。
     final slowLast = (_lastFullRender ?? Duration.zero) >= kProvisionalRenderAfter;
     if (key != null &&
         sampleSize > kProvisionalPreviewSize &&
@@ -577,6 +584,9 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         if (!identical(low, small)) small.dispose();
       }
       if (low != null) {
+        // 仮表示を描いている間に追い越された（新しい要求・キャッシュからの表示）ら貼らない。
+        // 貼ると、キャッシュから出した新しい表示を古い低解像度の画像（札つき・書き出し無し）で
+        // 上書きしてしまう。
         if (superseded()) {
           low.dispose();
         } else {
@@ -628,7 +638,15 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     if (!identical(after, fullInput)) fullInput.dispose();
     _lastFullRender = watch.elapsed;
     // 外された後はキャッシュ（dispose で空にした）へ入れない（入れると誰も捨てない）。
-    if (key != null && mounted) _cache.store(key, after);
+    // 読み込んだ画像（ユーザー画像）から描いた結果は、その画像がまだ選ばれているときだけ
+    // 入れる（別の画像へ替えた後に遅れて終わった描画を残さない。替えたときの破棄は
+    // [_loadBefore] の retainWhere）。
+    if (key != null &&
+        mounted &&
+        (key.source is! UserPreviewImageSource ||
+            key.source == widget.imageSource)) {
+      _cache.store(key, after);
+    }
 
     if (generation != _generation || !mounted) {
       // 追い越された・外された。表示には使わない（キャッシュには入れた）。
@@ -780,14 +798,12 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
             child: PreviewImageView(image: _before),
           ),
         );
-        // 最新世代が失敗した場合は _failed が立ち、
-        // _after は null にされている。stale/不整合な画像を出し続けるより
-        // 失敗を明示する。全 30 種が実描画対応済み（#59/#85 で CPU 経路に切替、
-        // #60 で advanced カタログ・プリセットも結線）なので、失敗以外で
-        // `_after` が null のまま安定することはない（一度も成功して
-        // いなければこの分岐に来る前に上の `_loading` ガードで preparing 表示に
-        // なる）。それでも [PreviewImageView] 自身が null を安全に扱うため、二分岐で
-        // 十分（「描画は近日対応」プレースホルダは #86 で YAGNI と判断して撤去）。
+        // 最新世代が失敗した場合は _failed が立ち、_after は null にされている。stale/不整合な
+        // 画像を出し続けるより失敗を明示する。失敗以外で _after が null なのは、元画像は読み込めて
+        // 最初の after の描画がまだ終わっていない間だけ（#185 (c) で元画像の読み込みを描画から
+        // 分けたため。元画像もまだのときは上の `_before == null` ガードで「準備中」になる）。
+        // その間 [PreviewImageView] は空の枠を出し、画像としては読ませない。長引けば
+        // [PreviewBusyOverlay] の「描画中…」が状態を伝える。
         final afterName = multiLayer
             ? layerNamesSummary(l10n, layerNames)
             : visionFilterDisplayName(l10n, widget.variantId, widget.filterId);
@@ -797,9 +813,9 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                 image: _after,
                 // 何も選んでいないとき after は原画と同じで、見出し（afterName）が
                 // 説明を担うので付けない（二重読み上げの回避）。
-                // （`_after` は成功時にだけ非 null で代入され、描画器が null を返した
-                // 場合も `_rebuild` が失敗として扱い `_failed` 分岐に入るので、
-                // ここで画像が無いことはない。）
+                // `_after` がまだ無い（最初の描画中）ときは、[PreviewImageView] が代替テキストを
+                // 付けない。描画器が null を返した場合は `_rebuild` が失敗として扱い `_failed`
+                // 分岐に入る。
                 semanticLabel:
                     widget.filterId == null && widget.variantId == null
                         ? null

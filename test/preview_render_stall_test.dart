@@ -371,6 +371,80 @@ void main() {
     });
   });
 
+  group('キャッシュ命中と走っている描画が重なるとき（#185、2 巡目レビュー）', () {
+    testWidgets('キャッシュ命中で札を消した後に来た要求でも、走っている描画を待つ間は「描画中…」を出し、最後は追いつく',
+        (tester) async {
+      final fakes = installSlowFakes();
+      final h = await pumpHomeScreen(tester, size: wide);
+      final vs = h.visionState;
+      h.imageSource.selectSample('info_board'); // 手動で選ぶと推奨サンプルへの追従が止まる
+      await settle(tester);
+      vs.toggle('myopia');
+      await settle(tester);
+
+      // 近視 + starbursts のフル解像度の描画が走ったまま、starbursts を外す（キャッシュ命中で
+      // 近視だけの結果がすぐ出る）。
+      vs.toggle('starbursts');
+      await settle(tester);
+      expect(fakes.slow, hasLength(1));
+      vs.remove('starbursts');
+      await settle(tester);
+      expect(find.text(rendering), findsNothing);
+
+      // キャッシュに無い強度へ変える。走っている描画が終わるまで描けないので、札を出す。
+      vs.setLayerStrength('myopia', 0.35);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 3));
+      expect(find.text(rendering), findsOneWidget,
+          reason: '走っている描画を待つ間も「描画中…」を出す（出ないと #185 の再発）');
+
+      fakes.slow.removeAt(0).complete();
+      await settle(tester);
+      expect(find.text(rendering), findsNothing);
+      expect(afterTag[shownImages(tester)[1]], expectedAfterTag(h));
+      expect(expectedAfterTag(h), (const VisionFilter.myopia(), 0.35));
+    });
+
+    testWidgets('低解像度の仮表示を描いている間にキャッシュから表示したら、後から届いた仮表示で上書きしない',
+        (tester) async {
+      final provisionalGate = Completer<void>();
+      previewSourceImageLoader = (source, size) async => fixturePreviewImage();
+      afterImageRenderer = (source, filter, strength) async {
+        if (filter == null) return source;
+        final img = fixturePreviewImage();
+        afterTag[img] = (filter, strength);
+        return img;
+      };
+      CpuVisionRenderer.pipelineApplier = (source, steps) async {
+        if (isProvisional(source)) await provisionalGate.future;
+        final img = fixturePreviewImage();
+        afterTag[img] = List<VisionStep>.of(steps);
+        return img;
+      };
+      final h = await pumpHomeScreen(tester, size: wide);
+      final vs = h.visionState;
+      h.imageSource.selectSample('info_board');
+      await settle(tester);
+      vs.toggle('myopia');
+      await settle(tester);
+      final myopiaOnly = expectedAfterTag(h);
+
+      vs.toggle('starbursts'); // 仮表示の描画が終わらない
+      await settle(tester);
+      vs.remove('starbursts'); // キャッシュ命中で近視だけを表示
+      await settle(tester);
+      expect(afterTag[shownImages(tester)[1]], myopiaOnly);
+
+      provisionalGate.complete();
+      await settle(tester);
+      expect(afterTag[shownImages(tester)[1]], myopiaOnly,
+          reason: '古い入力の仮表示でキャッシュからの表示を上書きしない');
+      expect(find.text(provisional), findsNothing);
+      expect(exportButton, findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
   group('元画像の読み込み（#185 (c)）', () {
     testWidgets('読み込みが長引いたら元画像側に札を出し、終われば消す', (tester) async {
       final gates = <PreviewImageSource, Completer<void>>{};
