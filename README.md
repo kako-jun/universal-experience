@@ -334,7 +334,7 @@ before/after プレビューの原画は、内蔵のサンプル画像集（8 �
 
 - 中身は、時刻・出来事（`preview_failed` / `preview_stalled` / `preview_recovered` / `preview_error` /
   `app_start` / 原画比較の開始・解除 `bypass_on` / `bypass_off` / ホットキー「押している間だけ原画」の
-  押下・解放 `hotkey_hold_original`）・描画の段・フィルタの id・重ねている層の数・強度・サンプルの id
+  切り替えと keyUp `hotkey_hold_original`。押しっぱなしのキーリピートは書きません）・描画の段・フィルタの id・重ねている層の数・強度・サンプルの id
   （読み込んだ画像は `user`）・画像の寸法・かかった時間・例外の種類（型名）だけです。
   **ファイル名・パス・画像・例外のメッセージは書きません**。端末の外へ送ることもありません。
   例: `2026-11-14T10:51:53Z preview_stalled view=before_after stage=render elapsed_ms=10006 filter=myopia+starbursts steps=2 strength=0.40 sample=info_board size=1024`
