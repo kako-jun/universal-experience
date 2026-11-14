@@ -45,12 +45,13 @@ const double kMinPreviewPaneSide = 160;
 /// プレビューカードのうち、画像以外が縦に使う高さ（dp、#130）。カード上端から画像の上端
 /// まで（余白・見出しの行 + 「2×2 で比較」・画像の見出し行 48・余白）と、画像の下端から選択欄の
 /// 下端まで（`ImageSourcePicker`。サンプルのチップが 3 行ほど折り返す）、選択欄の下の余白 16 の
-/// 合計。実フォントでの実測は日本語で約 324、英語（チップが長く折り返しが 1 行増える）で約 348。
+/// 合計。チップ帯（高さ 48 + 上の余白 12 = 60、常に確保、#183）を含む。実フォントでの実測は
+/// 日本語で約 384、英語（チップが長く折り返しが 1 行増える）で約 408（帯なしの旧実測 324/348 + 60）。
 /// この値は実測に余裕（英語で約 12）を足した値で、実測の最大より大きくしてある。
 /// 画像の一辺は「本体領域の高さ - この値」までに抑えて、既定のウィンドウ（800x600）でも選択欄の
 /// 下端が最初のビューポートに収まるようにする。
 /// 実測を超えてチップが折り返す（文字サイズ拡大など）ときは、選択欄が下にはみ出し、スクロールで届く。
-const double _kPreviewChromeHeight = 360;
+const double _kPreviewChromeHeight = 420;
 
 /// ウィンドウ（本体領域）の高さ [viewportHeight] に収まる、プレビュー画像の一辺の上限（#130）。
 /// 下限は [kMinPreviewPaneSide]。余裕のある高さでは画像の自然な大きさより大きい値になり、
@@ -433,11 +434,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                   ],
                 ),
-                // 重ねている層のチップ帯（#120）。2 層以上のときだけ出る（1 層以下は高さ 0）。
-                if (visionState.layers.length > 1) ...[
-                  const SizedBox(height: 12),
-                  const LayerChipStrip(),
-                ],
+                // 重ねている層のチップ帯（#120）。1 層以上でチップを出し、0 層のときも同じ高さを
+                // 確保する（層が増えても下がずれない、#183）。
+                const SizedBox(height: 12),
+                const LayerChipStrip(),
                 const SizedBox(height: 12),
                 ImageSourcePicker(
                   child: comparing

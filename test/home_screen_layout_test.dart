@@ -98,16 +98,16 @@ void main() {
   }
 
   group('previewPaneSideFor（#130）', () {
-    // 画像以外の高さ 360 を引いた残りが一辺。下限は kMinPreviewPaneSide。
-    test('下限 + 画像以外の高さ（520）ちょうどで下限、1 足すと 1 増える', () {
-      expect(previewPaneSideFor(520), kMinPreviewPaneSide);
-      expect(previewPaneSideFor(521), kMinPreviewPaneSide + 1);
-      expect(previewPaneSideFor(519), kMinPreviewPaneSide);
+    // 画像以外の高さ 420（チップ帯 60 を含む、#183）を引いた残りが一辺。下限は kMinPreviewPaneSide。
+    test('下限 + 画像以外の高さ（580）ちょうどで下限、1 足すと 1 増える', () {
+      expect(previewPaneSideFor(580), kMinPreviewPaneSide);
+      expect(previewPaneSideFor(581), kMinPreviewPaneSide + 1);
+      expect(previewPaneSideFor(579), kMinPreviewPaneSide);
     });
 
     test('小数の高さは切り捨てる', () {
-      expect(previewPaneSideFor(544), 184);
-      expect(previewPaneSideFor(544.9), 184);
+      expect(previewPaneSideFor(604), 184);
+      expect(previewPaneSideFor(604.9), 184);
     });
 
     test('負・0・極端に小さい高さは下限になる', () {
@@ -135,14 +135,13 @@ void main() {
       return paneSide(tester);
     }
 
-    testWidgets('既定 800x600: 画像は下限より大きく、選択欄の下に余白が残る', (tester) async {
+    testWidgets('既定 800x600: チップ帯の領域を常に確保するぶん、画像は下限まで縮む（選択欄はスクロールで届く、#183）', (tester) async {
       final side = await sideAt(tester, defaultWindow);
-      expect(side, greaterThan(kMinPreviewPaneSide));
-      // 本体領域の高さ 544（600 - AppBar 56）から、画像以外の高さ 360 を引いた値。
-      expect(side, closeTo(184, 0.01));
-      final picker = tester.getRect(find.byType(ImageSourcePicker));
-      expect(picker.bottom, lessThanOrEqualTo(defaultWindow.height - 8),
-          reason: '選択欄の下端がウィンドウの縁に貼り付かない');
+      // 本体領域の高さ 544（600 - AppBar 56）から、画像以外の高さ 420 を引くと 124 で下限を割るため、
+      // 下限になる。
+      expect(side, closeTo(kMinPreviewPaneSide, 0.01));
+      expect(find.byType(ImageSourcePicker), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('高さが足りなくても画像は下限（kMinPreviewPaneSide）を割らない（狭幅 800x400）',
@@ -157,8 +156,8 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('余裕のある高さでは縮めない: 狭幅 800x700 は従来の 256', (tester) async {
-      expect(await sideAt(tester, narrow), closeTo(256, 0.01));
+    testWidgets('余裕のある高さでは縮めない: 狭幅 800x760 は従来の 256', (tester) async {
+      expect(await sideAt(tester, const Size(800, 760)), closeTo(256, 0.01));
     });
 
     testWidgets('余裕のある高さでは縮めない: 広幅 1280x800 は中央カラムの幅いっぱい（従来どおり）',
@@ -169,7 +168,7 @@ void main() {
       expect(side * 2 + 12, closeTo(preview.width, 0.01));
     });
 
-    for (final (low, high) in [(560.0, 600.0), (600.0, 640.0)]) {
+    for (final (low, high) in [(620.0, 680.0), (680.0, 720.0)]) {
       testWidgets('高さに追従する: ${low.toInt()} より ${high.toInt()} の方が大きい',
           (tester) async {
         final small = await sideAt(tester, Size(800, low));

@@ -1,6 +1,6 @@
 // 重ねているフィルタのチップ帯（#120）の widget test。
 //
-// 2 層以上のときだけ出る・適用順の番号・チップで「調整中」が移る・✕ で 1 層だけ外れる・
+// 1 層以上で出る・0 層でも同じ高さを確保する（#183）・適用順の番号・チップで「調整中」が移る・✕ で 1 層だけ外れる・
 // 「すべて解除」で全部外れる・別名（-omaly）のチップが variantId の表示名になる、を確認する。
 
 import 'dart:ui' show Tristate;
@@ -54,13 +54,72 @@ void main() {
   final clearAll = find.byKey(const ValueKey('layer_strip_clear_all'));
 
   group('表示条件', () {
-    testWidgets('0 層・1 層では何も出ない（単一選択の見た目を変えない）', (tester) async {
+    testWidgets('0 層ではチップも「すべて解除」も出ない（領域だけ確保）', (tester) async {
       await pumpStrip(tester);
       expect(clearAll, findsNothing);
+      expect(tester.getSize(find.byType(LayerChipStrip)).height, 48);
+    });
+
+    testWidgets('1 層でチップと「すべて解除」が出る', (tester) async {
+      await pumpStrip(tester);
       state.toggle('myopia');
       await tester.pump();
-      expect(chip('myopia'), findsNothing);
-      expect(clearAll, findsNothing);
+      expect(chip('myopia'), findsOneWidget);
+      expect(clearAll, findsOneWidget);
+    });
+
+    testWidgets('0/1/2/5 層で帯の高さが同一', (tester) async {
+      await pumpStrip(tester, width: 400);
+      final heights = <double>[];
+      final ids = ['myopia', 'glaucoma', 'cataract', 'floaters', 'hyperopia'];
+      for (var n = 0; n <= 5; n++) {
+        if (n > 0) state.toggle(ids[n - 1]);
+        await tester.pump();
+        expect(state.layers.length, n);
+        if (n == 0 || n == 1 || n == 2 || n == 5) {
+          heights.add(tester.getSize(find.byType(LayerChipStrip)).height);
+        }
+      }
+      expect(heights.toSet().length, 1, reason: '$heights');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('0→1→2 層で帯の下のウィジェットの位置が動かない', (tester) async {
+      tester.view.physicalSize = const Size(600, 600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      state = VisionFilterState();
+      await tester.pumpWidget(
+        ChangeNotifierProvider<VisionFilterState>.value(
+          value: state,
+          child: const MaterialApp(
+            locale: Locale('ja'),
+            localizationsDelegates: [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: Column(
+                children: [
+                  LayerChipStrip(),
+                  SizedBox(key: ValueKey('below'), height: 10),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      final below = find.byKey(const ValueKey('below'));
+      final dy0 = tester.getTopLeft(below).dy;
+      state.toggle('myopia');
+      await tester.pump();
+      expect(tester.getTopLeft(below).dy, dy0);
+      state.toggle('glaucoma');
+      await tester.pump();
+      expect(tester.getTopLeft(below).dy, dy0);
     });
 
     testWidgets('2 層で適用順のチップと「すべて解除」が出る', (tester) async {
@@ -112,7 +171,26 @@ void main() {
       expect(chip('glaucoma'), findsNothing);
     });
 
-    testWidgets('✕ で 1 層に減るとチップ帯が消える', (tester) async {
+    testWidgets('1 層でも ✕ でそのフィルタが外れる', (tester) async {
+      await pumpStrip(tester);
+      state.toggle('myopia');
+      await tester.pump();
+      await tester.tap(remove('myopia'));
+      await tester.pump();
+      expect(state.layers, isEmpty);
+      expect(chip('myopia'), findsNothing);
+    });
+
+    testWidgets('1 層でも「すべて解除」で外れる', (tester) async {
+      await pumpStrip(tester);
+      state.toggle('myopia');
+      await tester.pump();
+      await tester.tap(clearAll);
+      await tester.pump();
+      expect(state.layers, isEmpty);
+    });
+
+    testWidgets('✕ で 1 層に減ってもチップ帯は残る', (tester) async {
       await pumpStrip(tester);
       state.toggle('myopia');
       state.toggle('glaucoma');
@@ -120,7 +198,8 @@ void main() {
       await tester.tap(remove('glaucoma'));
       await tester.pump();
       expect(state.layers.map((l) => l.id), ['myopia']);
-      expect(clearAll, findsNothing);
+      expect(chip('myopia'), findsOneWidget);
+      expect(clearAll, findsOneWidget);
     });
 
     testWidgets('「すべて解除」で全部外れる', (tester) async {
@@ -198,13 +277,17 @@ void main() {
       expect(tester.getSize(chip('myopia')).height, greaterThanOrEqualTo(48));
     });
 
-    testWidgets('狭幅でも溢れずに折り返す', (tester) async {
+    testWidgets('狭幅でも溢れず、1 行のまま横スクロールで末尾に届く', (tester) async {
       await pumpStrip(tester, width: 280);
       for (final id in ['myopia', 'glaucoma', 'cataract', 'floaters']) {
         state.toggle(id);
       }
       await tester.pump();
       expect(tester.takeException(), isNull);
+      expect(tester.getSize(find.byType(LayerChipStrip)).height, 48);
+      await tester.ensureVisible(clearAll);
+      await tester.pump();
+      expect(tester.getTopLeft(clearAll).dx, lessThan(280));
     });
   });
 }

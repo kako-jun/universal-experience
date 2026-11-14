@@ -15,11 +15,36 @@ import 'filter_list_tile.dart' show LayerOrderBadge;
 /// パネルで展開される層・推奨サンプル #78 の追従先・←→ の対象と同じ `focusedId`）。✕ は
 /// その 1 層だけを外し、末尾の「すべて解除」は全部を外す。
 ///
-/// 層が 2 つ以上のときだけ出す（1 つだけのときは従来どおり、調整パネルの「フィルタを解除」が
-/// 入口で、見た目を変えない）。状態は形で伝える: 調整中のチップは塗り + 太い枠、それ以外は細い枠
-/// （色だけに頼らない、DESIGN §7）。
-class LayerChipStrip extends StatelessWidget {
+/// 層が 1 つ以上のときにチップと「すべて解除」を出す（1 つ目から ✕ で外せる）。層が 0 個のときも
+/// 同じ高さの空き領域を確保し、層数が変わっても下のレイアウトがずれない（高さは [stripHeight]
+/// で固定）。高さを固定するため折り返さず 1 行の横スクロールにする（フォーカスが移ると
+/// 自動でスクロールして見える位置に来る。マウスはドラッグ・スクロールバーで動かせる）。
+/// 状態は形で伝える: 調整中のチップは塗り + 太い枠、それ以外は細い枠（色だけに頼らない、DESIGN §7）。
+class LayerChipStrip extends StatefulWidget {
   const LayerChipStrip({super.key});
+
+  /// 帯の高さ（チップの最小タップ目標 48dp に等しい）。文字拡大時は [heightFor] で伸びるが、
+  /// 層数には依存しない。
+  static const double stripHeight = 48;
+
+  /// 文字サイズ拡大を考慮した帯の高さ。層数に関わらず同じ値になる。
+  static double heightFor(BuildContext context) {
+    final scaled = MediaQuery.textScalerOf(context).scale(16) * 1.5 + 8;
+    return scaled > stripHeight ? scaled : stripHeight;
+  }
+
+  @override
+  State<LayerChipStrip> createState() => _LayerChipStripState();
+}
+
+class _LayerChipStripState extends State<LayerChipStrip> {
+  final ScrollController _controller = ScrollController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,38 +52,54 @@ class LayerChipStrip extends StatelessWidget {
     return Consumer<VisionFilterState>(
       builder: (context, state, _) {
         final layers = state.layers;
-        if (layers.length < 2) return const SizedBox.shrink();
+        final height = LayerChipStrip.heightFor(context);
+        // 層 0 個: 同じ高さの空き領域（レイアウトがずれないように）。
+        if (layers.isEmpty) return SizedBox(height: height);
         return Semantics(
           container: true,
           label: l10n.layerStripSemantics,
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              for (var i = 0; i < layers.length; i++)
-                _LayerChip(
-                  key: ValueKey('layer_chip_${layers[i].id}'),
-                  id: layers[i].id,
-                  order: i + 1,
-                  name: visionLayerDisplayName(l10n, layers[i]),
-                  focused: layers[i].id == state.focusedId,
-                  onFocus: () => state.focusLayer(layers[i].id),
-                  onRemove: () {
-                    state.remove(layers[i].id);
-                    dismissWelcomeBannerOnUserChange(context);
-                  },
+          child: SizedBox(
+            height: height,
+            child: Scrollbar(
+              controller: _controller,
+              child: SingleChildScrollView(
+                controller: _controller,
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (var i = 0; i < layers.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 8),
+                      // 名前が長くても 1 チップが帯を占有しないよう、幅に上限を置く（超過は省略）。
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 280),
+                        child: _LayerChip(
+                          key: ValueKey('layer_chip_${layers[i].id}'),
+                          id: layers[i].id,
+                          order: i + 1,
+                          name: visionLayerDisplayName(l10n, layers[i]),
+                          focused: layers[i].id == state.focusedId,
+                          onFocus: () => state.focusLayer(layers[i].id),
+                          onRemove: () {
+                            state.remove(layers[i].id);
+                            dismissWelcomeBannerOnUserChange(context);
+                          },
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      key: const ValueKey('layer_strip_clear_all'),
+                      onPressed: () {
+                        state.clear();
+                        dismissWelcomeBannerOnUserChange(context);
+                      },
+                      icon: const Icon(Icons.clear, size: 18),
+                      label: Text(l10n.layerStripClearAll),
+                    ),
+                  ],
                 ),
-              TextButton.icon(
-                key: const ValueKey('layer_strip_clear_all'),
-                onPressed: () {
-                  state.clear();
-                  dismissWelcomeBannerOnUserChange(context);
-                },
-                icon: const Icon(Icons.clear, size: 18),
-                label: Text(l10n.layerStripClearAll),
               ),
-            ],
+            ),
           ),
         );
       },
@@ -123,6 +164,8 @@ class _LayerChip extends StatelessWidget {
                         Flexible(
                           child: Text(
                             name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodyLarge?.copyWith(
                               fontWeight:
                                   focused ? FontWeight.w600 : FontWeight.w400,
