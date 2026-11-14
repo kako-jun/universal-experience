@@ -29,8 +29,8 @@ lib/
 │   ├── cpu_vision_renderer.dart     # sensus CPU apply() 経由、プレビュー描画の正本（#85）。
 │   │                                 # 複数ステップ版 applyPipeline（sensus Pipeline、#118）も持つ
 │   ├── color_matrices.g.dart        # sensus 由来 Machado 11段テーブルの生成物（GPU 経路専用）
-│   ├── shader_filter.dart           # sensus 由来 GLSL → Impeller FragmentProgram 適用
-│   │                                 # （ライブ画面キャプチャ向けに残置、現状 production 未使用）
+│   ├── shader_filter.dart           # sensus 由来 GLSL → Impeller FragmentProgram 適用（Linux のライブのルーペが使う、#180）
+│   ├── live_filter_plan.dart        # ライブのルーペの層 → シェーダの段（20 種。シェーダの無い 10 種は飛ばす、#180）
 │   └── image_fit.dart               # 任意画像を正準サイズの正方形へレターボックス（#78）
 ├── services/
 │   ├── app_shortcuts.dart           # アプリ内キー操作（/, ↑↓, ←→, Esc, Cmd/Ctrl+V）の Intent 定義（#63/#72/#97/#120）
@@ -50,7 +50,10 @@ lib/
 │   ├── image_source_state.dart      # プレビュー原画（サンプル/ユーザー画像）の選択の唯一の正本（#78）
 │   ├── layer_consult_notice.dart    # 層 1 つ単体の受診喚起 layerConsultNotice（調整パネルの層ごとの節が使う、#120）
 │   ├── loupe_rect_source.dart       # ルーペ矩形決定元のインターフェース（#44 向け seam、#63）
-│   ├── loupe_window_controller.dart # ルーペ窓のモード/透過/最前面/クリックスルー（#63）。ルーペ窓モードの可否は LoupeWindowPolicy.loupeModeAvailable の 1 箇所（キャプチャ未実装の間は false、#156）
+│   ├── loupe_window_controller.dart # ルーペ窓のモード/透過/最前面/クリックスルー（#63）。ルーペ窓モードの可否は LoupeWindowPolicy.loupeModeAvailable の 1 箇所
+│   │                                 # （= 起動時の probeLiveCapture の結果。いまは Linux の X11/XWayland + ポータルだけ true、#156/#180）
+│   ├── live_capture_service.dart    # ライブ画面キャプチャのネイティブ境界（MethodChannel universal_experience/live_capture）・可否・失敗の分類（#180）
+│   ├── live_loupe_session.dart      # ルーペ窓モードと共有の寿命（開始・窓の真下の撮影・拒否/停止で設定窓へ戻す・restore token、#180）
 │   ├── native_bridge_service.dart   # flutter_rust_bridge（sensus-core）の bootstrap 初期化
 │   ├── preview_selection.dart       # プレビュー強度の出どころを一本化する判定（#60/#63）・
 │   │                                 # 複数層のプレビューに渡すステップ列 previewPipelineSteps（#119）
@@ -84,6 +87,7 @@ lib/
     │                                 # layer_chip_strip（プレビュー上の適用順チップ帯・✕・すべて解除、#120）,
     │                                 # adjust_panel（右カラム「調整」: 2 層以上は層ごとの節、#72/#120）,
     │                                 # before_after_view（複数層は名前の要約見出し・書き出しは層ごとの行と併合した受診喚起、#120/#121）, loupe_hud,
+    │                                 # live_loupe_view（ルーペ窓で窓の下の画面をフィルタして映す・共有失敗のスナックバー、#180）,
     │                                 # preview_rendering（プレビュー描画の共有: before 読み込み・after 描画・書き出し合成の差し替え口
     │                                 # previewSourceImageLoader/afterImageRenderer/exportImageComposer と PreviewImageView・PreviewErrorPlaceholder。
     │                                 # BeforeAfterView と 2×2 比較が共有し、互いを import しない、#159）,
@@ -133,6 +137,9 @@ linux/                       # Linux ランナー（現行対応）
                              # + backend_policy.{h,cc}（Wayland で XWayland を優先する GDK_BACKEND 判定の純関数、#178）
                              # + test/（その単体テスト。Flutter ビルドとは独立した CMake プロジェクト）
                              # 判断は docs/adr/2026-11-14-prefer-xwayland-on-linux-wayland.md
+                             # + screen_capture/（ルーペ窓のライブ画面キャプチャ。portal ScreenCast + PipeWire・
+                             #   下の画面の控え backdrop・MethodChannel、#180。test/backdrop_test.cc で単体テスト。
+                             #   判断は docs/adr/2026-11-14-linux-live-capture-portal-pipewire.md）
 android/                     # Android ランナー（API 29+。cargokit が Rust .so を arm64-v8a / armeabi-v7a / x86_64 の
                              # universal APK へ同梱。入力はシステム
                              # フォト/ドキュメントピッカー、PNG は MediaStore の Pictures/Universal Experience へ保存）
@@ -162,6 +169,8 @@ test/
 ├── home_screen_slash_key_test.dart # `/` のガードはテキスト入力中だけ: チップ・ボタン・スライダー・一覧の行にフォーカスがあっても検索欄へ移り全選択・検索欄の中では奪わない・↑↓←→ のガードは不変（#141）
 ├── home_screen_search_down_key_test.dart # 検索欄の ↓ で先頭のフォーカス可能な行へ（選択は不変・空/絞り込み/上限無効/可視 0 件/プリセットのみは奪わず入力欄がキャレットを末尾へ/狭幅）・先頭行（上限で無効なら最初の有効行）の ↑ で検索欄へ戻る（折り返さない・キャレット維持）・IME 変換中は奪わない・検索欄の ↑←→Home/End`/`Ctrl+V・チップ/スライダー上の ↓ は不変（#141）
 ├── filter_list_selection_test.dart # 統合一覧の純粋ロジック（#72）
+├── live_capture_test.dart         # ライブのルーペ: フィルタ → シェーダアセット（20 種・pubspec と一致）・段の計画・ネイティブ応答の読み取り・LiveLoupeSession（窓の真下の撮影順・token・拒否/停止で設定窓へ・再試行）（#180）
+├── live_loupe_view_test.dart      # ライブのルーペの描画: フェイクのネイティブから受けた画面を段のシェーダに通し、sensus 参照（deuteranopia_ref）と一致・設定窓では描かない（#180）
 ├── color_vision_compare_test.dart  # 2×2 比較で並べる型の順・色覚層の検出・土台と強度（colorVisionCompareInputOf）・フィルタの対応表（#84/#122）
 ├── color_vision_compare_view_test.dart # 2×2 の描画・Semantics（失敗文言・描画済みの強さ）・直列最新優先・失敗（控えがある間は出さない）・書き出し PNG の実画素・土台（1 回だけ合成・色覚の強度だけ動かしても再合成しない・4 セルが土台 + 各型とバイト一致・層の名前つきキャプション／ファイル名）（#84/#122）
 ├── home_screen_color_vision_compare_test.dart # 「2×2 で比較」の切替が色覚層のあるときだけ出て（他の層と重ねていても出る・色覚が無ければ出ない）Before / After・見出しと入れ替わる／Tab で操作できる／行からの → は高さによらず受け口／bypass（#84）
@@ -252,9 +261,9 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 歴史的記録として `docs/PLATFORM_APIS.md` に残す。
 
 現在の before/after プレビューは sensus の CPU `apply()`（`CpuVisionRenderer`、#85）が
-描画する。GPU シェーダ（`ShaderFilter`）はライブ画面キャプチャ（他アプリ含む全画面。
-未実装、`docs/adr/2026-09-26-loupe-as-single-render-unit.md`）向けに残置してあるが、
-現状 production コードからは呼ばれない。
+描画する。GPU シェーダ（`ShaderFilter`）は Linux のルーペ窓のライブ描画（#180、
+`docs/adr/2026-11-14-linux-live-capture-portal-pipewire.md`）が使う。他 OS のライブ
+キャプチャは未実装。
 
 ## 設計判断
 
@@ -396,7 +405,7 @@ Android は次の4つの Repository Secrets から keystore を一時生成し�
 
 `linux-build`（runs-on: ubuntu-latest、#55）は Linux 側の cargokit 同梱経路
 （`flutter build linux --debug`、`.so` がバンドルされることを ls/test -f で
-確認）と、Linux backend_policy unit test（`linux/test/`、#178）、xvfb 上での実ブリッジ integration test を検証する。`Swatinem/rust-cache`
+確認）と、Linux backend_policy / backdrop unit test（`linux/test/`、#178/#180）、xvfb 上での実ブリッジ integration test を検証する。`Swatinem/rust-cache`
 によるキャッシュ対象は両ジョブで異なり、`linux-build` は cargokit のビルド出力も
 含めるが、`check`（macOS）は `rust/`（cargo target）+ crates.io 依存のみキャッシュする。
 
@@ -428,8 +437,7 @@ PR の CI 時間は増えない（必須チェックにはしない前提）。�
 > 同じ 30 種への 3 つの選び方に過ぎない）は #60 で advanced カタログ・体験
 > プリセットの UI 結線が完了し、いずれの選び方でも before/after プレビューが
 > 実描画される。プレビューの描画対象は `VisionFilterState` の現在の選択を
-> 唯一の正本にする。GPU は将来のライブ画面キャプチャ向けに残置してあるが
-> 現状未使用。
+> 唯一の正本にする。GPU シェーダは Linux のルーペ窓のライブ描画（#180）が使う。
 
 ## やらないこと
 

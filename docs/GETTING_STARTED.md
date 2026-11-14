@@ -46,11 +46,12 @@ CI ビルドを対象とし、実機の操作確認が残っています。
 - pkg-config
 - libayatana-appindicator3 development headers（タスクトレイ、#15）
 - libkeybinder-3.0 development headers（グローバルホットキー、#63）
+- libpipewire-0.3 development headers（ルーペ窓のライブ画面キャプチャ、#180）
 
 ビルド時は `-dev` パッケージ、実行時はそれぞれの共有ライブラリ本体が必要。Ubuntu では
-`sudo apt-get install libayatana-appindicator3-dev libkeybinder-3.0-dev`。実行時の共有
+`sudo apt-get install libayatana-appindicator3-dev libkeybinder-3.0-dev libpipewire-0.3-dev`。実行時の共有
 ライブラリは通常 `-dev` パッケージの依存で一緒に入る。配布物だけを動かす場合の実行時パッケージは
-（Ubuntu 24.04）`libgtk-3-0t64 libayatana-appindicator3-1 libkeybinder-3.0-0`。
+（Ubuntu 24.04）`libgtk-3-0t64 libayatana-appindicator3-1 libkeybinder-3.0-0 libpipewire-0.3-0t64`。
 
 #### Android開発
 - Android Studio

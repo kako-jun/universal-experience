@@ -8,6 +8,9 @@
 > 由来の GPU シェーダ（`lib/rendering/shader_filter.dart`）で画像にフィルタを適用する。
 > ライブ画面キャプチャ経路（#1/#3/#4）が入った段階で、本調査の Magnification API /
 > AccessibilityService / ガンマテーブル等が改めて参照される想定。
+>
+> **追記（#180）**: Linux のライブ画面キャプチャは、本書の「Compositor 連携」ではなく
+> xdg-desktop-portal ScreenCast + PipeWire で実装した（下の「Linux Implementation」冒頭）。
 
 各プラットフォームでのシステム全体への色覚フィルタ適用のための技術調査結果。
 
@@ -227,6 +230,25 @@ func applyColorFilter(type: ColorVisionType) {
 
 ## Linux Implementation
 
+### 実装済み（#180）: xdg-desktop-portal ScreenCast + PipeWire
+
+ルーペ窓のライブ画面キャプチャは、合成器の拡張ではなく標準のポータルで取る。
+判断は `docs/adr/2026-11-14-linux-live-capture-portal-pipewire.md`、実装は `linux/screen_capture/`。
+
+| 項目 | 使うもの |
+|---|---|
+| 共有の許可・ストリームの取得 | D-Bus `org.freedesktop.portal.ScreenCast`（v4 以上で `persist_mode`・`restore_token`）: `CreateSession` → `SelectSources`（`types=1` モニタ、`cursor_mode=1` 非表示、`persist_mode=2`）→ `Start`（親窓 `x11:<XID>`）→ `OpenPipeWireRemote`（fd） |
+| フレーム | `libpipewire-0.3`（`pw_context_connect_fd` → `pw_stream_connect`。`video/raw` の BGRx/RGBx/BGRA/RGBA、共有メモリ `MemFd`/`MemPtr`） |
+| 自分の窓の位置 | GDK（X11 / XWayland のルート座標。`gdk_window_get_origin`・`gdk_window_get_frame_extents`） |
+| 権限 | 利用者がポータルのダイアログで画面を選ぶ（初回）。拒否は `Response` の 1 |
+
+- 自分の窓を除外して撮る標準手段は無い。窓の下は「控え」で映す（ADR 参照）。
+- ネイティブ Wayland のクライアントは自分の窓の絶対位置を取れないため、X11（XWayland）
+  バックエンドで動くときだけ使う（#178 で Wayland セッションでも XWayland を優先している）。
+- COSMIC（xdg-desktop-portal-cosmic）で ScreenCast v5 を確認（2026-11-14）。
+
+以下は system-wide フィルタを目指していた当時の調査（歴史的記録）。
+
 ### アプローチ: Display Server別対応
 
 Linuxは複数のディスプレイサーバーが存在するため、それぞれに対応が必要：
@@ -340,6 +362,8 @@ void applyGamma(Display* display) {
 ### Linux
 - Compositorの性能に依存
 - GLXシェーダーは高速
+- ポータル + PipeWire（#180）: 4K のフレームを全画面ぶん控えへ行コピーする（1 枚 33MB）。
+  Dart へは窓の描画域だけを渡し、2560x1440 を超える窓は間引く
 
 ---
 
