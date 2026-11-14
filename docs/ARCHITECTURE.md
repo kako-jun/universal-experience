@@ -9,11 +9,10 @@
 > 消費する（`lib/src/rust/`、詳細は `docs/sensus-integration.md`）。プレビュー
 > （静止画）は sensus の CPU `apply()`（`lib/rendering/cpu_vision_renderer.dart`
 > の `CpuVisionRenderer`、#85）が担う。GPU シェーダ（`lib/rendering/
-> shader_filter.dart`）は将来のライブ画面キャプチャ（#1/#3/#4）向けに残置して
-> あるが、現状 production コードから呼ばれることはなく、GPU golden テスト
-> （`test/vision_filter_golden_test.dart` 等）だけが検証のために使う。
-> 選択状態は `VisionFilterState` の 1 系統（#124）。他アプリ含む全画面への適用は
-> 画面キャプチャ経路（#1/#3/#4）の実装後。
+> shader_filter.dart`）は Linux のライブのルーペ（#180、本書「ルーペ窓のライブ
+> キャプチャ (Linux, #180)」）が使い、GPU golden テスト（`test/vision_filter_golden_test.dart`
+> 等）も検証に使う。選択状態は `VisionFilterState` の 1 系統（#124）。他 OS の
+> 画面キャプチャ（#3/#4、Windows）は未実装。
 >
 > **追補（現状）**: 以下も実装済み。多言語化（#18・`flutter_localizations` +
 > ARB、ja/en、`lib/l10n/`）、sensus の複合体験 API の FRB 公開（#10・
@@ -107,16 +106,19 @@
 (window_manager ラッパ + 純粋ロジック `LoupeWindowPolicy`) と `lib/main.dart` の配線。
 画面キャプチャ (#3/#4/#5)・ライブ適用・描画 (#1)・フィルタ UI (#16)・トレイ (#15) は本節のスコープ外。
 
-### ルーペ窓モードの可用性 (#156)
+### ルーペ窓モードの可用性 (#156、#180 で Linux を解禁)
 
-ライブ画面キャプチャ（#1/#3/#5）が入るまで、ルーペ窓モード（`AppMode.loupe`）は選べない。
-可否は `LoupeWindowPolicy.loupeModeAvailable`（現状 `false`）の 1 箇所で決め、
+ルーペ窓モード（`AppMode.loupe`）は、ライブ画面キャプチャが使える環境でだけ選べる。
+可否は `LoupeWindowPolicy.loupeModeAvailable`（= `LoupeWindowPolicy.liveCapture.available`。
+`main()` が起動時に `probeLiveCapture` の結果を入れる。既定は使えない側）の 1 箇所で決め、
 `LoupeWindowPolicy.resolveAppMode` が要求モードを実効モードへ解決する。`LoupeWindowController`
 は保存値の復元（`load`）と `setAppMode` の両方でこれを通すため、保存済み設定・UI・トレイ・
 ホットキーのどの経路でも透明背景＋クリックスルーの状態に入らない（`setClickThrough` は
 設定窓モードで拒否する既存の不変条件による）。フォールバック中は保存値のルーペ窓を上書きしない。
-UI は起動モードのルーペ窓を無効表示にして理由を出し（`windowModeLoupeUnavailableNote`）、
-トレイの項目も無効にする。キャプチャ実装時は `loupeModeAvailable` を `true` にすれば戻る。
+UI は起動モードのルーペ窓を無効表示にして理由を出し（`loupeUnavailableNote`。理由は
+`LoupeWindowController.loupeUnavailableReason`: 未実装の OS / ネイティブ Wayland バックエンド /
+ポータルの ScreenCast なし、#180）、トレイの項目も無効にする。使える環境（いまは Linux の X11 /
+XWayland でポータルがあるとき）では保存値どおりルーペ窓で起動する。
 
 対象アプリ指定モード（ルーペ窓の自動配置モード）の設計判断・要検証事項・OS ごとの
 提供可否は `docs/adr/2026-09-26-loupe-as-single-render-unit.md` 参照。
@@ -553,9 +555,9 @@ XWayland を優先する（無ければ Wayland にフォールバック）。`U
 プロジェクト、assert ベース）にあり、CI の `linux-build` ジョブで実行する:
 
 ```sh
-cmake -S linux/test -B build/backend_policy_test
-cmake --build build/backend_policy_test
-ctest --test-dir build/backend_policy_test
+cmake -S linux/test -B build/linux_native_test
+cmake --build build/linux_native_test
+ctest --test-dir build/linux_native_test   # backend_policy と screen_capture/backdrop の両方
 ```
 
 `WindowModePanel` のホットキーヒントのテストは `LoupeWindowPolicy.environmentProvider`
@@ -594,10 +596,8 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
 `preview_selection.dart` の `previewStrength()` に集約する（bypassed なら
 常に 0.0 を返す）。
 
-> **未配線の注意**: `VisionFilterState.bypassed` は before/after プレビュー（`previewStrength()`
-> 経由）には配線済みだが、ルーペ窓のライブ画面キャプチャ描画（#1 以降、未実装）には
-> まだ配線先が無い。ライブ描画が実装されたら、そちらでも bypassed を見て原画へフォール
-> バックする必要がある。
+> `VisionFilterState.bypassed` は、ルーペ窓のライブ描画（#180）でも `previewPipelineSteps()`
+> 経由で効く（原画比較中は段が空になり、窓の下の画面をそのまま映す）。
 
 > **実機未検証の注意**: Windows で `Ctrl+Alt+Shift+Esc`（`emergencyExit` の既定キー）が
 > OS 標準や他アプリのショートカットと衝突しないかは、Windows 実機でまだ
@@ -862,14 +862,71 @@ provider seam 越しに行う — `vision_filter_metadata.dart` の
 `visionFilterUrgencyProvider` 等と同じパターンで、widget test から差し替え
 可能にするため。
 
-### 将来のライブキャプチャ（#1）に向けた前提
+### ライブキャプチャ（#180）との関係
 
-`LoupeHud` はキャプチャ対象・フィルタ対象から**除外する必要がある**（HUD 自体を
-フィルタ加工したりキャプチャに写り込ませたりしてはいけない）。現状ライブ
-キャプチャは実装されていないため実際の除外処理は無いが、`LoupeHud` を常に
-独立した最上位レイヤ（`main.dart` の `Stack`）として置くことで、#1 実装時に
-「キャプチャ対象の矩形から HUD の矩形を差し引く」または「キャプチャそのものを
-HUD より下のレイヤだけに限定する」実装がしやすい構造にしてある。
+`LoupeHud` はキャプチャ対象・フィルタ対象から除外する必要がある。Linux の実装では、
+自分の窓の外形ごとキャプチャの控えへの書き込みから除外する（次節）ので、HUD も
+`LiveLoupeView` の描画も撮り込まない。`main.dart` の `Stack` は
+`HomeScreen` → `LiveLoupeView`（ルーペ窓モードのときだけ窓いっぱい）→ `LoupeHud` の順。
+HUD は、GPU シェーダの無い層を「この症状は静止画プレビューのみ: 名前」と出し
+（`liveShaderAssetFor` が null の層）、共有中は「窓の下を撮り直す」ボタン
+（`LiveLoupeSession.refreshBackdrop`）を出す。
+
+## ルーペ窓のライブキャプチャ (Linux, #180)
+
+判断・代替案は `docs/adr/2026-11-14-linux-live-capture-portal-pipewire.md`。
+
+- **ネイティブ（`linux/screen_capture/`、ランナーに直接組み込む）**:
+  - `screen_cast.{h,cc}`: xdg-desktop-portal ScreenCast（GDBus。CreateSession → SelectSources
+    （モニタ 1 つ・カーソル非表示・`persist_mode=2`・restore token）→ Start → OpenPipeWireRemote）と、
+    PipeWire のストリーム（`pw_thread_loop`、BGRx/RGBx 系の共有メモリだけを受ける）。Request の応答は
+    呼び出しの応答 `(o)` のパスと照合し、違えばそちらへ購読を移す。セッションの `Closed`（パネルから
+    共有を止めた等）も購読して `stopped` へ流す。可否の調査 `QueryPortalAvailable` は非同期（1 秒で諦める）。
+    非同期の応答・`g_idle_add` の通知は破棄後に届いても `this` に触れない（`alive_` の弱参照）。
+  - `backdrop.{h,cc}`: 全画面の「下の画面の控え」`Backdrop` と、窓の位置の履歴から除外矩形を決める
+    `ExclusionTracker`、1 回の共有ぶんの控え・除外・フレーム番号をまとめた `CaptureState`（`start` は
+    古いストリームを止めてから `BeginSession` で控えを空にし、止める直前に届いた古い共有のフレームは
+    番号の不一致で捨てる）。GTK / PipeWire 非依存で、`linux/test/backdrop_test.cc` で単体テスト。
+  - `screen_capture_plugin.{h,cc}`: MethodChannel `universal_experience/live_capture`。
+    `probe` / `start` / `stop` / `setHidden` / `frameSequence` / `readFrame`、ネイティブ → Dart は `stopped`。
+    窓の位置は GDK（X11 / XWayland のルート座標）で取り、窓のいるモニタの範囲をフレームの大きさへ写す。
+    FlView は自分の GdkWindow を持たないので、窓の原点に `gtk_widget_translate_coordinates` の
+    オフセット（GNOME の CSD のヘッダーバー・影の分）を足して描画域の左上にする。
+    `readFrame` は窓の描画域（FlView）ぶんを RGBA で返し、2560x1440 を超える窓は切り出しと同時に
+    整数 step で間引く（`Backdrop::CropRgba`。出力の画素を切り出した全幅・全高へ均等に割り付ける）。
+- **フィードバックの回避**: フレームごとに、窓の外形（枠込み）を 24px 広げた矩形・直近 300ms の位置・
+  直近 2 件の四辺の変化量（移動と幅・高さの増減）からの外挿を除いて控えへ書き込む。窓の中には控えを映す。
+  ルーペ窓に入った直後と「撮り直す」でだけ、除外を止めて窓を隠し、窓の真下が写ったフレームを待って
+  除外を戻してから窓を出す。「隠し終えた後（`hide` から戻った時点の番号から）に 2 枚届いた」
+  （隠す呼び出しの途中に届いた、窓が写りうる枚は数えない）か、「除外を止めた時点（`setHidden(true)` の
+  戻り値）から 1 枚以上届き、隠し終えて 120ms 経った（静止した画面）」で終える（上限 1.5 秒）。
+  途中で例外が出ても除外の再開と窓の表示は必ず通す。
+- **Dart**:
+  - `lib/services/live_capture_service.dart`: ネイティブ境界 `LiveCaptureBackend`（テストでフェイク化）と
+    可否 `LiveCaptureAvailability`・失敗 `LiveCaptureError`・起動時の `probeLiveCapture`（Linux 以外は
+    ネイティブを呼ばない）。
+  - `lib/services/live_loupe_session.dart`: `LiveLoupeSession`。`LoupeWindowController.appMode` を見て
+    共有の開始・停止・窓の真下の撮影（`idle → starting → priming → running`）。拒否・失敗・途中停止は
+    設定窓へ戻して `lastError` に残す（`LiveLoupeView` がスナックバーで出す）。ネイティブの例外も
+    `failed` として同じく設定窓へ戻す。restore token は `SharedPreferences` の `liveCapture.restoreToken`。
+  - `lib/rendering/live_filter_plan.dart`: フィルタ → シェーダアセット（20 種）と、層の段の計画
+    `planLiveFilters`（段順。シェーダの無い 10 種は飛ばす）。
+  - `lib/rendering/live_filter_renderer.dart`: 描画の段取り。`decodeLiveRgba`（画素 → `ui.Image`）と
+    `applyLiveShaderPasses`（段を順に `ShaderFilter.applyColorFilterGpu`、uniform は sensus の
+    `vision_uniforms`）。
+  - `lib/ui/widgets/live_loupe_view.dart`: 表示のたびに `readFrame` → `decodeLiveRgba` →
+    `previewPipelineSteps` の段で `applyLiveShaderPasses` → 窓いっぱいに描く。共有が止まって画像を
+    捨てた後に、読み込み中だった絵を書き戻さない。描画が失敗したら
+    `LiveLoupeSession.reportRenderFailure` で共有を止め、`failed` で設定窓へ戻す。
+- **制約**: 窓の真下で動く内容は、窓を動かすか撮り直すまで止まって見える。ルーペ窓を全画面にすると
+  窓の外が無いので、映る絵全体が開始時・撮り直し時の静止画になる。モニタは 1 台が前提。
+  ネイティブ Wayland（`UE_ALLOW_WAYLAND=1`）では自分の窓の位置が分からないため使えない。
+- **実機確認手順**（COSMIC / XWayland。共有ダイアログの承認は人の手が要る）:
+  1. 設定窓 → 起動モード → ルーペ窓。「画面を共有」ダイアログで画面を選んで共有する。
+  2. 窓が一瞬消えたあと、窓の枠の向こうの画面がフィルタ済みで映る（自分の窓が入れ子に映らない）。
+  3. 窓をドラッグすると、映る範囲が追従する。原画比較ボタンで原画に戻る。
+  4. 2 層以上（例: 近視 + 1 型色覚）で段順に掛かる。めまい等を足すと HUD に「静止画プレビューのみ」。
+  5. ダイアログをキャンセル → 設定窓に戻り、スナックバーで理由が出る。もう一度ルーペ窓を選べる。
 
 ## `LoupeRectSource` (#63、#44 向けの差し替え可能な seam)
 
@@ -890,10 +947,8 @@ HUD より下のレイヤだけに限定する」実装がしやすい構造に�
 
 ### 実機目視について
 
-透過・クリックスルー・最大化時の縁などの GUI 目視確認は、Wayland/grim 制約と
-ライブキャプチャ（#1）の実装前のため本実装段階では未実施。`flutter analyze` /
-`flutter test` / `flutter build linux --debug` で静的・ビルド確認のみ。実機目視は
-#1 の実装後に行う。
+ルーペ窓の実機確認は「ルーペ窓のライブキャプチャ (Linux, #180)」の手順で行う。
+クリックスルー時に下のアプリへ入力が通るか・最大化時の縁は、Linux 実機での確認が残る。
 
 ## システムアーキテクチャ（現行）
 
@@ -1099,10 +1154,8 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   severity テーブルを `resolveSeverityMatrix()` で区分線形補間して解決する
   （グリッドは `lib/rendering/color_matrices.g.dart`、sensus-core からの生成物）。
   **プレビューの描画経路は #85 で `CpuVisionRenderer`（CPU `apply()`）に
-  置き換え済み**。`ShaderFilter` は将来のライブ画面キャプチャ（#1/#3/#4、
-  ルーペ窓 `loupe_window_controller.dart` での実描画を想定）向けに残置して
-  あるが、その機能自体が未実装のため**現状 production コードから呼ばれることは
-  ない**。GPU と CPU の等価性は `test/vision_filter_golden_test.dart` 等の
+  置き換え済み**。`ShaderFilter.applyColorFilterGpu` は Linux のライブのルーペ
+  （`LiveLoupeView`、#180）が 20 種のシェーダで使う。GPU と CPU の等価性は `test/vision_filter_golden_test.dart` 等の
   GPU golden テストが（production の呼び出しとは独立に）担保する
 - 複数層の書き出し（#121）: `BeforeAfterView` は画像を描画した時点の層の列を `ExportLayer`
   （`lib/services/export_layers.dart`。層・構築済みフィルタ・強度）として控え、書き出しはその控えから

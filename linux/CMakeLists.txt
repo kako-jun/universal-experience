@@ -53,6 +53,9 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 # System-level dependencies.
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)
+# ルーペ窓のライブ画面キャプチャ（#180）: ポータルの fd 受け渡しと PipeWire。
+pkg_check_modules(GIO_UNIX REQUIRED IMPORTED_TARGET gio-unix-2.0)
+pkg_check_modules(PIPEWIRE REQUIRED IMPORTED_TARGET libpipewire-0.3)
 
 add_definitions(-DAPPLICATION_ID="${APPLICATION_ID}")
 
@@ -64,6 +67,9 @@ add_executable(${BINARY_NAME}
   "main.cc"
   "backend_policy.cc"
   "my_application.cc"
+  "screen_capture/backdrop.cc"
+  "screen_capture/screen_cast.cc"
+  "screen_capture/screen_capture_plugin.cc"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
 )
 
@@ -74,6 +80,9 @@ apply_standard_settings(${BINARY_NAME})
 # Add dependency libraries. Add any application-specific dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter)
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GTK)
+target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GIO_UNIX PkgConfig::PIPEWIRE)
+# 控えの書き込み・切り出しは毎フレーム全画面ぶん回るので、Debug でも最適化する。
+set_source_files_properties("screen_capture/backdrop.cc" PROPERTIES COMPILE_OPTIONS "-O2")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)

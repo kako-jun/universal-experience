@@ -24,9 +24,9 @@
   "@aboutPhases": {
     "description": "Roadmap paragraph of the About dialog. Newline-separated phase list."
   },
-  "aboutLiveCaptureNote": "Filters are currently applied only to the before/after preview. Applying them to the live screen will follow once the screen-capture path is implemented.",
+  "aboutLiveCaptureNote": "Applying filters to the live screen (the loupe window) is currently available on Linux only. On other systems, filters are applied only to the before/after preview.",
   "@aboutLiveCaptureNote": {
-    "description": "Caution paragraph of the About dialog: the filter is not applied to the live screen yet."
+    "description": "Caution paragraph of the About dialog: live-screen application (loupe window) is Linux-only for now (#180)."
   },
 
   "themeTooltipSystem": "Theme: System",
@@ -360,9 +360,9 @@
   "@trayTooltip": {
     "description": "Tray icon tooltip."
   },
-  "trayAppModeLoupeUnavailable": "Loupe window (coming soon)",
+  "trayAppModeLoupeUnavailable": "Loupe window (unavailable here)",
   "@trayAppModeLoupeUnavailable": {
-    "description": "Tray menu label of the loupe app mode item while it is disabled because live screen capture is not implemented yet (#156)."
+    "description": "Tray menu label of the loupe app mode item while it is disabled because live screen capture is not available in this environment (#156/#180)."
   },
   "trayShowLoupe": "Show window",
   "@trayShowLoupe": {
@@ -509,9 +509,17 @@
   "@windowModeLoupe": {
     "description": "Label for the loupe app mode (transparent, held up to the screen) in the mode switch."
   },
-  "windowModeLoupeUnavailableNote": "The loupe window is coming soon. It can't be selected yet because screen capture isn't implemented.",
-  "@windowModeLoupeUnavailableNote": {
-    "description": "Note shown under the app mode switch while the loupe window mode is disabled because live screen capture (#1/#3/#5) is not implemented yet (#156)."
+  "windowModeLoupeUnavailablePlatform": "The live loupe window is only available on Linux for now. Screen capture on this OS is coming soon.",
+  "@windowModeLoupeUnavailablePlatform": {
+    "description": "Note under the app mode switch when the loupe window is disabled because live screen capture is not implemented on this OS (#156/#180)."
+  },
+  "windowModeLoupeUnavailableBackend": "The loupe window only works when running on X11 (XWayland). Restart without UE_ALLOW_WAYLAND.",
+  "@windowModeLoupeUnavailableBackend": {
+    "description": "Note under the app mode switch when the app runs on the native Wayland GDK backend, where it cannot know its own window position (#180)."
+  },
+  "windowModeLoupeUnavailablePortal": "The loupe window can't be used because screen sharing (xdg-desktop-portal ScreenCast) isn't available.",
+  "@windowModeLoupeUnavailablePortal": {
+    "description": "Note under the app mode switch when the xdg-desktop-portal ScreenCast interface is missing (#180)."
   },
   "alwaysOnTopLabel": "Always on top",
   "@alwaysOnTopLabel": {
@@ -592,6 +600,41 @@
   "hudOpenSettingsTooltip": "Open settings",
   "@hudOpenSettingsTooltip": {
     "description": "Tooltip/semantics label for the loupe HUD's settings button (#79). Switches LoupeWindowController.appMode back to AppMode.settings."
+  },
+  "hudRefreshBackdropTooltip": "Re-capture what's under the window",
+  "@hudRefreshBackdropTooltip": {
+    "description": "Loupe HUD button that briefly hides the window to capture the screen directly beneath it again (#180)."
+  },
+  "hudLiveStillOnlyNote": "Still-image preview only: {names}",
+  "@hudLiveStillOnlyNote": {
+    "description": "Loupe HUD note listing selected symptoms that the live loupe cannot draw (no GPU shader); they are skipped (#1/#180).",
+    "placeholders": {
+      "names": {"type": "String"}
+    }
+  },
+  "liveLoupeWaiting": "Waiting for screen sharing…\nWhen asked, choose the screen to show.",
+  "@liveLoupeWaiting": {
+    "description": "Shown in the loupe window until the first captured frame arrives (#180)."
+  },
+  "liveLoupeImageLabel": "Screen under the window (filtered)",
+  "@liveLoupeImageLabel": {
+    "description": "Semantics label of the live filtered image in the loupe window (#180)."
+  },
+  "liveCaptureErrorDenied": "Screen sharing wasn't allowed, so the settings window is back.",
+  "@liveCaptureErrorDenied": {
+    "description": "Snack bar when the user cancels/denies the screen sharing dialog (#180)."
+  },
+  "liveCaptureErrorUnavailable": "Screen sharing (portal) isn't responding, so the settings window is back.",
+  "@liveCaptureErrorUnavailable": {
+    "description": "Snack bar when the xdg-desktop-portal call fails (#180)."
+  },
+  "liveCaptureErrorFailed": "Screen capture couldn't start, so the settings window is back.",
+  "@liveCaptureErrorFailed": {
+    "description": "Snack bar when capture fails for another reason, e.g. PipeWire (#180)."
+  },
+  "liveCaptureErrorStopped": "Screen sharing ended, so the settings window is back.",
+  "@liveCaptureErrorStopped": {
+    "description": "Snack bar when an active screen share stops (#180)."
   },
 
   "sampleRouteMap": "Transit map",

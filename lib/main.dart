@@ -17,6 +17,8 @@ import 'services/image_source_state.dart';
 import 'services/vision_filter_state.dart';
 import 'services/hotkey_actions.dart';
 import 'services/hotkey_service.dart';
+import 'services/live_capture_service.dart';
+import 'services/live_loupe_session.dart';
 import 'services/loupe_window_controller.dart';
 import 'services/tray_locale_sync.dart';
 import 'services/tray_service.dart';
@@ -25,12 +27,21 @@ import 'services/settings_service.dart';
 import 'services/vision_filter_store.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/theme/app_theme.dart';
+import 'ui/widgets/live_loupe_view.dart';
 import 'ui/widgets/loupe_hud.dart';
 
 /// ルーペ窓の挙動 (#14) を集約したコントローラ。
 /// 最小サイズ・状態遷移(normal/maximized/fullscreen)・枠ポリシー・
 /// 透過/最前面/クリックスルーの責務を持つ (詳細は docs/ARCHITECTURE.md)。
 final LoupeWindowController loupeWindow = LoupeWindowController();
+
+/// ライブ画面キャプチャのネイティブ境界 (#180)。起動時の可否の調査と、ルーペ窓での
+/// 共有に同じインスタンスを使う（ネイティブからの「止まった」通知の受け口を 1 つにする）。
+final LiveCaptureBackend liveCaptureBackend = MethodChannelLiveCaptureBackend();
+
+/// ルーペ窓モードとライブキャプチャの寿命を結ぶ (#180)。ルーペ窓が使える環境でだけ
+/// [main] が作る（使えない環境・widget test では null）。
+LiveLoupeSession? liveLoupeSession;
 
 /// トレイとウィンドウ UI で共有する VisionFilterState（プレビューの選択の
 /// 唯一の正本、#60, #124）。色覚のクイック選択も advanced も体験プリセットも、
@@ -262,6 +273,12 @@ void main() async {
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();
 
+    // ルーペ窓のライブ画面キャプチャが使えるか (#180)。ルーペ窓モードの可否は
+    // これだけで決まる（LoupeWindowPolicy.loupeModeAvailable）。load() が保存値を
+    // 実効モードへ解決するので、その前に調べる。
+    LoupeWindowPolicy.liveCapture =
+        await probeLiveCapture(backend: liveCaptureBackend);
+
     // 永続化済みのアプリモード・最前面固定・クリックスルー (#63) を復元する。
     // WindowOptions の backgroundColor 構築より前に読む必要がある。
     await loupeWindow.load();
@@ -350,7 +367,19 @@ void main() async {
     // 自体は変えていない。
     await loupeWindow.restorePersistedClickThrough();
 
+    // ルーペ窓に入ったら画面の共有を始め、出たら止める (#180)。保存値がルーペ窓なら
+    // ここで共有を求める（窓を表示した後なので、ポータルのダイアログの親にできる）。
+    if (loupeWindow.loupeModeAvailable) {
+      liveLoupeSession = LiveLoupeSession(
+        loupeWindow: loupeWindow,
+        backend: liveCaptureBackend,
+        hideWindow: windowManager.hide,
+        showWindow: windowManager.show,
+      );
+    }
+
     runApp(UniversalExperienceApp(
+      liveLoupeSession: liveLoupeSession,
       settings: settings,
       trayAvailable: trayService.isAvailable,
       hotkeyStatus: HotkeyStatus(
@@ -430,6 +459,7 @@ class UniversalExperienceApp extends StatelessWidget {
     this.trayAvailable = false,
     this.hotkeyStatus = const HotkeyStatus(),
     this.loupeWindowOverride,
+    this.liveLoupeSession,
   });
 
   /// Pre-loaded settings service (theme mode / last filter type / locale).
@@ -448,6 +478,10 @@ class UniversalExperienceApp extends StatelessWidget {
   /// モードが使えない間（#156）にそのモードを前提とするテストが、使える設定の
   /// コントローラを渡すための差し込み口（本番では渡さない）。
   final LoupeWindowController? loupeWindowOverride;
+
+  /// ルーペ窓のライブキャプチャ (#180)。null（ルーペ窓が使えない環境・widget test）
+  /// なら、窓の下の画面を映す層（[LiveLoupeView]）を置かない。
+  final LiveLoupeSession? liveLoupeSession;
 
   @override
   Widget build(BuildContext context) {
@@ -476,6 +510,10 @@ class UniversalExperienceApp extends StatelessWidget {
         ),
         // トレイ/ホットキーの可用性 (#63)。汎用的な Provider<bool> は他の bool
         // provider と衝突しうるため使わず、専用の値オブジェクトにまとめて供給する。
+        if (liveLoupeSession != null)
+          ChangeNotifierProvider<LiveLoupeSession>.value(
+            value: liveLoupeSession!,
+          ),
         Provider<WindowModeUiContext>.value(
           value: WindowModeUiContext(
             trayAvailable: trayAvailable,
@@ -519,10 +557,15 @@ class UniversalExperienceApp extends StatelessWidget {
             // 重ねる。将来のライブキャプチャ（#1）がキャプチャ・フィルタ対象
             // から HUD を除外しやすいよう、意図的に独立させてある
             // （`lib/ui/widgets/loupe_hud.dart` の module doc 参照）。
-            home: const Stack(
+            // #180: ルーペ窓モードでは LiveLoupeView が HomeScreen を覆い、窓の下の
+            // 画面をフィルタして映す。HUD はその上（キャプチャの控えには窓ごと
+            // 写らないので、HUD を描いても撮り込まない）。
+            home: Stack(
               children: [
-                HomeScreen(),
-                LoupeHud(),
+                const HomeScreen(),
+                if (liveLoupeSession != null)
+                  const Positioned.fill(child: LiveLoupeView()),
+                const LoupeHud(),
               ],
             ),
             debugShowCheckedModeBanner: false,

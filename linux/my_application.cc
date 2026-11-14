@@ -6,6 +6,7 @@
 #endif
 
 #include "flutter/generated_plugin_registrant.h"
+#include "screen_capture/screen_capture_plugin.h"
 
 struct _MyApplication {
   GtkApplication parent_instance;
@@ -58,6 +59,11 @@ static void my_application_activate(GApplication* application) {
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+  // ルーペ窓のライブ画面キャプチャ（#180、linux/screen_capture/）。
+  g_autoptr(FlPluginRegistrar) capture_registrar =
+      fl_plugin_registry_get_registrar_for_plugin(FL_PLUGIN_REGISTRY(view),
+                                                  "ScreenCapturePlugin");
+  screen_capture_plugin_register(capture_registrar);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

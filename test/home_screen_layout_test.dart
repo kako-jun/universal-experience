@@ -967,13 +967,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsNothing);
   });
-  testWidgets('このアプリについてで「ライブ画面にはまだ適用されない」注意を読める', (tester) async {
+  testWidgets('このアプリについてで「ライブ画面への適用は Linux だけ」の注意を読める（#180）', (tester) async {
     await pumpHomeScreen(tester, size: wide);
 
     await tester.tap(find.byTooltip('このアプリについて'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('ライブ画面への適用は'), findsOneWidget);
+    expect(find.textContaining('ライブ画面への適用（ルーペ窓）は'), findsOneWidget);
     expect(find.textContaining('プレビューにだけ適用されます'), findsOneWidget);
   });
 
