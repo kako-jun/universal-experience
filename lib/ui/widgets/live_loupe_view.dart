@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -8,33 +7,21 @@ import 'package:provider/provider.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../rendering/live_filter_plan.dart';
-import '../../rendering/shader_filter.dart';
+import '../../rendering/live_filter_renderer.dart';
 import '../../services/live_capture_service.dart';
 import '../../services/live_loupe_session.dart';
 import '../../services/loupe_window_controller.dart';
 import '../../services/preview_selection.dart';
 import '../../services/vision_filter_state.dart';
-import '../../src/rust/api/sensus_bridge.dart';
-
-/// 層の uniform の供給源（既定は sensus の [visionUniforms]）。widget test は Rust
-/// ブリッジを読み込まないので、正本から汲み出した値（`test/golden/color_uniforms.json`）
-/// を返すフェイクに差し替える。
-@visibleForTesting
-Float32List Function({
-  required VisionFilter filter,
-  required double strength,
-  required double time,
-  required int width,
-  required int height,
-}) liveUniformsProvider = visionUniforms;
 
 /// ルーペ窓モードで、窓の下の画面をフィルタして窓いっぱいに映す (#180)。
 ///
 /// [LiveLoupeSession] が共有中（[LiveLoupeState.running]）の間、表示のたびに
 /// ネイティブから窓の描画域ぶんの画面（下の画面の控え）を受け取り、
 /// [previewPipelineSteps]（段順・強度 0 を除く・原画比較中は空）を
-/// [planLiveFilters] で GPU シェーダの段に分けて順に通す。GPU で描けない層は
-/// 飛ばす（HUD が「静止画プレビューのみ」と出す）。
+/// [planLiveFilters] で GPU シェーダの段に分けて順に通す（段取りは
+/// `lib/rendering/live_filter_renderer.dart`）。GPU で描けない層は飛ばす（HUD が
+/// 「静止画プレビューのみ」と出す）。
 ///
 /// ルーペ窓モード以外では何も描かない。共有の失敗はスナックバーで知らせる。
 class LiveLoupeView extends StatefulWidget {
@@ -55,6 +42,10 @@ class _LiveLoupeViewState extends State<LiveLoupeView> {
   ui.Image? _raw;
   ui.Image? _shown;
   bool _filterDirty = false;
+
+  /// 画像を捨てるたびに進める。走っていた [_tick] は、自分が始めた時の値と違えば
+  /// 結果を書き戻さない（idle で捨てた後に古い絵が残らないように）。
+  int _epoch = 0;
 
   @override
   void didChangeDependencies() {
@@ -110,6 +101,7 @@ class _LiveLoupeViewState extends State<LiveLoupeView> {
       };
 
   void _clearImages() {
+    ++_epoch;
     _raw?.dispose();
     _raw = null;
     _shown?.dispose();
@@ -135,6 +127,12 @@ class _LiveLoupeViewState extends State<LiveLoupeView> {
     final session = _session;
     final visionState = _visionState;
     if (session == null || visionState == null) return;
+    final epoch = _epoch;
+    // await の後で、画像を捨てた（idle 等）・破棄されたなら結果を使わない。
+    bool stale() =>
+        !mounted ||
+        epoch != _epoch ||
+        session.state != LiveLoupeState.running;
     LiveCaptureFrame? frame;
     try {
       frame =
@@ -142,10 +140,11 @@ class _LiveLoupeViewState extends State<LiveLoupeView> {
     } catch (_) {
       frame = null;
     }
-    if (!mounted) return;
+    if (stale()) return;
     if (frame != null) {
-      final image = await _decode(frame);
-      if (!mounted) {
+      final image =
+          await decodeLiveRgba(frame.pixels, frame.width, frame.height);
+      if (stale()) {
         image.dispose();
         return;
       }
@@ -157,8 +156,8 @@ class _LiveLoupeViewState extends State<LiveLoupeView> {
     if (raw == null || !_filterDirty) return;
     _filterDirty = false;
     final plan = planLiveFilters(previewPipelineSteps(visionState));
-    final filtered = await _applyPasses(raw, plan.passes);
-    if (!mounted) {
+    final filtered = await applyLiveShaderPasses(raw, plan.passes);
+    if (stale()) {
       if (!identical(filtered, raw)) filtered.dispose();
       return;
     }
@@ -167,44 +166,6 @@ class _LiveLoupeViewState extends State<LiveLoupeView> {
       _shown = identical(filtered, raw) ? raw.clone() : filtered;
       old?.dispose();
     });
-  }
-
-  static Future<ui.Image> _decode(LiveCaptureFrame frame) {
-    final completer = Completer<ui.Image>();
-    ui.decodeImageFromPixels(
-      frame.pixels,
-      frame.width,
-      frame.height,
-      ui.PixelFormat.rgba8888,
-      completer.complete,
-    );
-    return completer.future;
-  }
-
-  /// [passes] を段順に通す。途中の画像は破棄し、[src] は破棄しない。段が無ければ
-  /// [src] をそのまま返す。
-  static Future<ui.Image> _applyPasses(
-    ui.Image src,
-    List<LiveShaderPass> passes,
-  ) async {
-    var current = src;
-    for (final pass in passes) {
-      final uniforms = liveUniformsProvider(
-        filter: pass.filter,
-        strength: pass.strength,
-        time: 0,
-        width: current.width,
-        height: current.height,
-      );
-      final next = await ShaderFilter.applyColorFilterGpu(
-        current,
-        pass.asset,
-        uniforms.toList(),
-      );
-      if (!identical(current, src)) current.dispose();
-      current = next;
-    }
-    return current;
   }
 
   @override

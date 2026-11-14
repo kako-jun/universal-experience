@@ -38,6 +38,7 @@ class LiveLoupeSession extends ChangeNotifier {
     required Future<void> Function() showWindow,
     Future<SharedPreferences> Function()? prefs,
     Duration primeTimeout = const Duration(milliseconds: 1500),
+    Duration primeSettle = const Duration(milliseconds: 120),
     Duration pollInterval = const Duration(milliseconds: 30),
   })  : _loupeWindow = loupeWindow,
         _backend = backend,
@@ -45,6 +46,7 @@ class LiveLoupeSession extends ChangeNotifier {
         _showWindow = showWindow,
         _prefs = prefs ?? SharedPreferences.getInstance,
         _primeTimeout = primeTimeout,
+        _primeSettle = primeSettle,
         _pollInterval = pollInterval {
     _backend.onStopped = _handleStopped;
     _loupeWindow.addListener(_sync);
@@ -54,7 +56,7 @@ class LiveLoupeSession extends ChangeNotifier {
 
   static const String _prefsRestoreToken = 'liveCapture.restoreToken';
 
-  /// 窓の真下を撮るとき、隠してから待つフレーム数。隠した直後の 1 枚目には
+  /// 窓の真下を撮るとき、除外を止めてから待つフレーム数。隠した直後の 1 枚目には
   /// まだ窓が写っていることがあるため 2 枚待つ。
   static const int primeFrames = 2;
 
@@ -64,6 +66,7 @@ class LiveLoupeSession extends ChangeNotifier {
   final Future<void> Function() _showWindow;
   final Future<SharedPreferences> Function() _prefs;
   final Duration _primeTimeout;
+  final Duration _primeSettle;
   final Duration _pollInterval;
 
   LiveLoupeState _state = LiveLoupeState.idle;
@@ -98,46 +101,83 @@ class LiveLoupeSession extends ChangeNotifier {
     final generation = ++_generation;
     _lastError = null;
     _set(LiveLoupeState.starting);
-    final prefs = await _prefs();
-    final token = prefs.getString(_prefsRestoreToken) ?? '';
-    final result = await _backend.start(restoreToken: token);
-    if (generation != _generation || _disposed) return;
-    if (!result.ok) {
-      await _fail(result.error!);
-      return;
+    try {
+      final prefs = await _prefs();
+      final token = prefs.getString(_prefsRestoreToken) ?? '';
+      final result = await _backend.start(restoreToken: token);
+      if (generation != _generation || _disposed) return;
+      if (!result.ok) {
+        await _fail(result.error!);
+        return;
+      }
+      if (result.restoreToken.isNotEmpty) {
+        await prefs.setString(_prefsRestoreToken, result.restoreToken);
+      }
+      if (generation != _generation || _disposed) return;
+      await _prime(generation);
+      if (generation != _generation || _disposed) return;
+      _set(LiveLoupeState.running);
+    } catch (_) {
+      // ネイティブ・保存の例外（PlatformException 等）でも復帰不能にしない。
+      if (generation == _generation && !_disposed) {
+        await _fail(LiveCaptureError.failed);
+      }
     }
-    if (result.restoreToken.isNotEmpty) {
-      await prefs.setString(_prefsRestoreToken, result.restoreToken);
-    }
-    if (generation != _generation) return;
-    await _prime(generation);
-    if (generation != _generation || _disposed) return;
-    _set(LiveLoupeState.running);
   }
 
-  /// 窓を一瞬隠し、窓の真下が写ったフレームを [primeFrames] 枚待ってから戻す。
+  /// 窓を一瞬隠し、窓の真下が写ったフレームを待ってから戻す。
+  ///
+  /// フレームは **除外を止めた時点**（[LiveCaptureBackend.setHidden] の戻り値）から
+  /// 数える。PipeWire は画面に変化（damage）があるときだけフレームを送るので、
+  /// 隠した後に読み直した番号から数えると、静止した画面では隠したことによる
+  /// 1〜2 枚がもう数え終わっていて、[_primeTimeout] まで窓が消えたままになる。
+  /// 終わる条件は次のどちらか:
+  /// - 除外を止めてから [primeFrames] 枚届き、かつ隠し終えた後にも 1 枚届いた
+  ///   （画面が動いている。隠す前の窓が写った枚だけで終わらない）。
+  /// - 除外を止めてから 1 枚以上届き、隠し終えてから [_primeSettle] 経った
+  ///   （静止した画面。隠したことによる 1 枚で足りる）。
+  ///
+  /// 途中で例外が出ても、除外の再開と窓の表示は必ず通す（窓が隠れたまま・
+  /// 除外が止まったままにしない）。例外は呼び出し元へ投げ直す。
   Future<void> _prime(int generation) async {
     _set(LiveLoupeState.priming);
-    await _backend.setHidden(true);
-    await _hideWindow();
-    final base = await _backend.frameSequence();
-    final deadline = DateTime.now().add(_primeTimeout);
-    while (generation == _generation &&
-        !_disposed &&
-        DateTime.now().isBefore(deadline)) {
-      if (await _backend.frameSequence() >= base + primeFrames) break;
-      await Future<void>.delayed(_pollInterval);
+    try {
+      final base = await _backend.setHidden(true);
+      await _hideWindow();
+      final afterHide = await _backend.frameSequence();
+      final hidden = Stopwatch()..start();
+      final deadline = DateTime.now().add(_primeTimeout);
+      while (generation == _generation &&
+          !_disposed &&
+          DateTime.now().isBefore(deadline)) {
+        final sequence = await _backend.frameSequence();
+        final moving = sequence >= base + primeFrames && sequence > afterHide;
+        final settled = sequence > base && hidden.elapsed >= _primeSettle;
+        if (moving || settled) break;
+        await Future<void>.delayed(_pollInterval);
+      }
+    } finally {
+      // 窓を戻す前に除外を再開する（戻した窓を撮り込まない）。
+      try {
+        await _backend.setHidden(false);
+      } finally {
+        await _showWindow();
+      }
     }
-    // 窓を戻す前に除外を再開する（戻した窓を撮り込まない）。
-    await _backend.setHidden(false);
-    await _showWindow();
   }
 
   /// 窓の真下を撮り直す（HUD のボタン）。共有中でなければ何もしない。
   Future<void> refreshBackdrop() async {
     if (_state != LiveLoupeState.running) return;
     final generation = _generation;
-    await _prime(generation);
+    try {
+      await _prime(generation);
+    } catch (_) {
+      if (generation == _generation && !_disposed) {
+        await _fail(LiveCaptureError.failed);
+      }
+      return;
+    }
     if (generation == _generation && !_disposed) {
       _set(LiveLoupeState.running);
     }
@@ -147,7 +187,7 @@ class LiveLoupeSession extends ChangeNotifier {
     ++_generation;
     _lastError = error;
     _set(LiveLoupeState.idle);
-    await _backend.stop();
+    await _stopBackend();
     // 設定窓へ戻す。setAppMode の通知で _sync が呼ばれるが、idle なので何もしない。
     await _loupeWindow.setAppMode(AppMode.settings);
     if (!_disposed) notifyListeners();
@@ -161,7 +201,14 @@ class LiveLoupeSession extends ChangeNotifier {
   Future<void> _stop() async {
     ++_generation;
     _set(LiveLoupeState.idle);
-    await _backend.stop();
+    await _stopBackend();
+  }
+
+  /// 共有を止める。止める側の失敗は握る（呼び出し元は idle・設定窓へ戻るだけ）。
+  Future<void> _stopBackend() async {
+    try {
+      await _backend.stop();
+    } catch (_) {}
   }
 
   /// [lastError] を通知済みにする（同じ失敗を二度出さない）。
@@ -175,7 +222,7 @@ class LiveLoupeSession extends ChangeNotifier {
     _loupeWindow.removeListener(_sync);
     _backend.onStopped = null;
     ++_generation;
-    unawaited(_backend.stop());
+    unawaited(_stopBackend());
     super.dispose();
   }
 }
