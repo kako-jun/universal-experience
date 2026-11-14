@@ -20,6 +20,9 @@
 # - 比較・復元の対象は lib/src/rust/ と rust/src/frb_generated.rs のみ。codegen が
 #   それ以外（rust/src/lib.rs の `mod frb_generated;` 追記など）を書き換えても
 #   検出できず、復元もされない。
+# - FRB が先頭に書く「These function(s) are ignored because ...」の情報コメントは
+#   比較対象外。ここに並ぶ関数名は rustc の derive 展開（`assert_fields_are_eq` の
+#   有無など）に依存し、CI の rustc は stable 浮動のため API が同じでも揺れる（#195）。
 # - 比較が終わったら（差分の有無に関わらず）対象を実行前の内容に戻す。
 #
 # 使い方: tools/check_frb_drift.sh  （差分があれば非 0 で終了）
@@ -45,7 +48,7 @@ flutter_rust_bridge_codegen generate --no-build-runner </dev/null
 
 # 空白を全て除き、閉じ括弧の直前の `,` を除く。
 normalize() {
-  tr -d ' \t\r\n' <"$1" | sed -E 's/,([])}])/\1/g'
+  grep -v -E '^// These functions? (is|are) ignored because' "$1" | tr -d ' \t\r\n' | sed -E 's/,([])}])/\1/g'
 }
 
 status=0

@@ -39,9 +39,13 @@ endif()
 # Be cautious about adding new options here, as plugins use this function by
 # default. In most cases, you should add new options to specific targets instead
 # of modifying this function.
+#
+# -Werror はここに置かない: この関数はサードパーティプラグインにも適用され、
+# runner の clang/GTK 更新で新しい警告（deprecated 等）が出るとプラグインの
+# ビルドが落ちる（#195）。-Werror は下でアプリ自身のターゲットにだけ付ける。
 function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_features(${TARGET} PUBLIC cxx_std_14)
-  target_compile_options(${TARGET} PRIVATE -Wall -Werror)
+  target_compile_options(${TARGET} PRIVATE -Wall)
   target_compile_options(${TARGET} PRIVATE "$<$<NOT:$<CONFIG:Debug>>:-O3>")
   target_compile_definitions(${TARGET} PRIVATE "$<$<NOT:$<CONFIG:Debug>>:NDEBUG>")
 endfunction()
@@ -70,6 +74,8 @@ add_executable(${BINARY_NAME}
 # Apply the standard set of build settings. This can be removed for applications
 # that need different build settings.
 apply_standard_settings(${BINARY_NAME})
+# アプリ自身のコードだけ警告をエラーにする（プラグインは対象外、上記参照）。
+target_compile_options(${BINARY_NAME} PRIVATE -Werror)
 
 # Add dependency libraries. Add any application-specific dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter)
