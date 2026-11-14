@@ -555,9 +555,9 @@ XWayland を優先する（無ければ Wayland にフォールバック）。`U
 プロジェクト、assert ベース）にあり、CI の `linux-build` ジョブで実行する:
 
 ```sh
-cmake -S linux/test -B build/backend_policy_test
-cmake --build build/backend_policy_test
-ctest --test-dir build/backend_policy_test
+cmake -S linux/test -B build/linux_native_test
+cmake --build build/linux_native_test
+ctest --test-dir build/linux_native_test   # backend_policy と screen_capture/backdrop の両方
 ```
 
 `WindowModePanel` のホットキーヒントのテストは `LoupeWindowPolicy.environmentProvider`
@@ -879,30 +879,43 @@ HUD は、GPU シェーダの無い層を「この症状は静止画プレビュ
 - **ネイティブ（`linux/screen_capture/`、ランナーに直接組み込む）**:
   - `screen_cast.{h,cc}`: xdg-desktop-portal ScreenCast（GDBus。CreateSession → SelectSources
     （モニタ 1 つ・カーソル非表示・`persist_mode=2`・restore token）→ Start → OpenPipeWireRemote）と、
-    PipeWire のストリーム（`pw_thread_loop`、BGRx/RGBx 系の共有メモリだけを受ける）。
+    PipeWire のストリーム（`pw_thread_loop`、BGRx/RGBx 系の共有メモリだけを受ける）。Request の応答は
+    呼び出しの応答 `(o)` のパスと照合し、違えばそちらへ購読を移す。セッションの `Closed`（パネルから
+    共有を止めた等）も購読して `stopped` へ流す。可否の調査 `QueryPortalAvailable` は非同期（1 秒で諦める）。
+    非同期の応答・`g_idle_add` の通知は破棄後に届いても `this` に触れない（`alive_` の弱参照）。
   - `backdrop.{h,cc}`: 全画面の「下の画面の控え」`Backdrop` と、窓の位置の履歴から除外矩形を決める
     `ExclusionTracker`（GTK / PipeWire 非依存。`linux/test/backdrop_test.cc` で単体テスト）。
   - `screen_capture_plugin.{h,cc}`: MethodChannel `universal_experience/live_capture`。
     `probe` / `start` / `stop` / `setHidden` / `frameSequence` / `readFrame`、ネイティブ → Dart は `stopped`。
     窓の位置は GDK（X11 / XWayland のルート座標）で取り、窓のいるモニタの範囲をフレームの大きさへ写す。
-    `readFrame` は窓の描画域（FlView）ぶんを RGBA で返し、2560x1440 を超える窓は間引く。
+    FlView は自分の GdkWindow を持たないので、窓の原点に `gtk_widget_translate_coordinates` の
+    オフセット（GNOME の CSD のヘッダーバー・影の分）を足して描画域の左上にする。
+    `readFrame` は窓の描画域（FlView）ぶんを RGBA で返し、2560x1440 を超える窓は切り出しと同時に
+    整数 step で間引く（`Backdrop::CropRgba`。出力の画素を切り出した全幅・全高へ均等に割り付ける）。
 - **フィードバックの回避**: フレームごとに、窓の外形（枠込み）を 24px 広げた矩形・直近 300ms の位置・
-  移動量からの外挿を除いて控えへ書き込む。窓の中には控えを映す。ルーペ窓に入った直後と「撮り直す」でだけ、
-  除外を止めて窓を隠し、2 フレーム待って除外を戻してから窓を出す。
+  直近 2 件の四辺の変化量（移動と幅・高さの増減）からの外挿を除いて控えへ書き込む。窓の中には控えを映す。
+  ルーペ窓に入った直後と「撮り直す」でだけ、除外を止めて窓を隠し、窓の真下が写ったフレームを待って
+  除外を戻してから窓を出す。フレームは除外を止めた時点（`setHidden(true)` の戻り値）から数え、
+  「2 枚届き、かつ隠し終えた後にも 1 枚届いた」か「1 枚以上届き、隠し終えて 120ms 経った（静止した画面）」で
+  終える（上限 1.5 秒）。途中で例外が出ても除外の再開と窓の表示は必ず通す。
 - **Dart**:
   - `lib/services/live_capture_service.dart`: ネイティブ境界 `LiveCaptureBackend`（テストでフェイク化）と
     可否 `LiveCaptureAvailability`・失敗 `LiveCaptureError`・起動時の `probeLiveCapture`（Linux 以外は
     ネイティブを呼ばない）。
   - `lib/services/live_loupe_session.dart`: `LiveLoupeSession`。`LoupeWindowController.appMode` を見て
     共有の開始・停止・窓の真下の撮影（`idle → starting → priming → running`）。拒否・失敗・途中停止は
-    設定窓へ戻して `lastError` に残す（`LiveLoupeView` がスナックバーで出す）。restore token は
-    `SharedPreferences` の `liveCapture.restoreToken`。
+    設定窓へ戻して `lastError` に残す（`LiveLoupeView` がスナックバーで出す）。ネイティブの例外も
+    `failed` として同じく設定窓へ戻す。restore token は `SharedPreferences` の `liveCapture.restoreToken`。
   - `lib/rendering/live_filter_plan.dart`: フィルタ → シェーダアセット（20 種）と、層の段の計画
     `planLiveFilters`（段順。シェーダの無い 10 種は飛ばす）。
-  - `lib/ui/widgets/live_loupe_view.dart`: 表示のたびに `readFrame` → `decodeImageFromPixels` →
-    `previewPipelineSteps` の段順に `ShaderFilter.applyColorFilterGpu`（uniform は sensus の
-    `vision_uniforms`）→ 窓いっぱいに描く。
-- **制約**: 窓の真下で動く内容は、窓を動かすか撮り直すまで止まって見える。モニタは 1 台が前提。
+  - `lib/rendering/live_filter_renderer.dart`: 描画の段取り。`decodeLiveRgba`（画素 → `ui.Image`）と
+    `applyLiveShaderPasses`（段を順に `ShaderFilter.applyColorFilterGpu`、uniform は sensus の
+    `vision_uniforms`）。
+  - `lib/ui/widgets/live_loupe_view.dart`: 表示のたびに `readFrame` → `decodeLiveRgba` →
+    `previewPipelineSteps` の段で `applyLiveShaderPasses` → 窓いっぱいに描く。共有が止まって画像を
+    捨てた後に、読み込み中だった絵を書き戻さない。
+- **制約**: 窓の真下で動く内容は、窓を動かすか撮り直すまで止まって見える。ルーペ窓を全画面にすると
+  窓の外が無いので、映る絵全体が開始時・撮り直し時の静止画になる。モニタは 1 台が前提。
   ネイティブ Wayland（`UE_ALLOW_WAYLAND=1`）では自分の窓の位置が分からないため使えない。
 - **実機確認手順**（COSMIC / XWayland。共有ダイアログの承認は人の手が要る）:
   1. 設定窓 → 起動モード → ルーペ窓。「画面を共有」ダイアログで画面を選んで共有する。
