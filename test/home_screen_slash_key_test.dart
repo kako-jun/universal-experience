@@ -217,7 +217,7 @@ void main() {
         LogicalKeyboardKey.arrowRight,
         LogicalKeyboardKey.arrowLeft,
       ]) {
-        // チップは等幅グリッド（#184）で、左右キーは標準の方向フォーカス移動になり
+        // チップは行ごとに幅を伸ばして並ぶ（#184）ので、左右キーは標準の方向フォーカス移動になり
         // 端のチップではペインの外へ出る。キーごとにチップへ戻してから確かめる。
         await focusInside(tester, chip);
         final before = h.visionState.strength;

@@ -4,13 +4,18 @@
 // 行の左右端を揃える（layoutCategoryChips）。省略は原則しない。48dp のタップ目標、
 // 行優先の Tab 順、一覧が潰れないこと、チップ余白の見積もりが実物と一致することを確かめる。
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
+import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
+import 'package:universal_experience/ui/theme/app_theme.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
 
 import 'support/home_screen_harness.dart';
@@ -94,33 +99,55 @@ void main() {
     return rows;
   }
 
-  group('チップ余白の見積もりが実物の ChoiceChip と一致する', () {
-    testWidgets('未選択 = 文字幅 + base、選択 = さらに check ぶん', (tester) async {
-      Future<double> chipMinusText(bool selected) async {
-        await tester.pumpWidget(MaterialApp(
-          home: Scaffold(
-            body: Align(
-              alignment: Alignment.topLeft,
-              child: ChoiceChip(
-                label: const Text('abcd'),
-                selected: selected,
-                showCheckmark: true,
-                onSelected: (_) {},
+  group('チップ余白の見積もりが実物の ChoiceChip と一致する（AppTheme・各倍率）', () {
+    for (final scale in [1.0, 1.3, 1.5, 2.0]) {
+      testWidgets('文字倍率 $scale', (tester) async {
+        Future<List<double>> measure(bool selected) async {
+          await tester.pumpWidget(MaterialApp(
+            theme: AppTheme.lightTheme,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: TextScaler.linear(scale)),
+              child: child!,
+            ),
+            home: Scaffold(
+              body: Align(
+                alignment: Alignment.topLeft,
+                child: ChoiceChip(
+                  label: const Text('abcd'),
+                  selected: selected,
+                  showCheckmark: true,
+                  onSelected: (_) {},
+                ),
               ),
             ),
-          ),
-        ));
-        await tester.pumpAndSettle();
-        return tester.getSize(find.byType(ChoiceChip)).width -
-            tester.getSize(find.text('abcd')).width;
-      }
+          ));
+          await tester.pumpAndSettle();
+          final text = tester.getSize(find.text('abcd'));
+          return [
+            tester.getSize(find.byType(ChoiceChip)).width - text.width,
+            text.height,
+          ];
+        }
 
-      expect(await chipMinusText(false), closeTo(kCategoryChipBaseChrome, 0.5));
-      expect(
-        await chipMinusText(true),
-        closeTo(kCategoryChipBaseChrome + kCategoryChipCheckReserve, 0.5),
-      );
-    });
+        final unselected = await measure(false);
+        final selected = await measure(true);
+        final height = unselected[1];
+        final check = math.max(kCategoryChipCheckReserve, height);
+        // 見積もりは「実物以上」（安全側）で、等倍では一致する。
+        expect(unselected[0], lessThanOrEqualTo(kCategoryChipBaseChrome + 0.5));
+        expect(selected[0],
+            lessThanOrEqualTo(kCategoryChipBaseChrome + check + 0.5),
+            reason: '選択中の余白（チェック込み）を見積もりが下回らない');
+        if (scale == 1.0) {
+          expect(unselected[0], closeTo(kCategoryChipBaseChrome, 0.5));
+          expect(
+              selected[0],
+              closeTo(
+                  kCategoryChipBaseChrome + kCategoryChipCheckReserve, 0.5));
+        }
+      });
+    }
   });
 
   group('layoutCategoryChips', () {
@@ -194,6 +221,18 @@ void main() {
         expect(rows.expand((r) => r.indices), hasLength(n));
         expectJustified(rows, 300);
       }
+    });
+
+    test('幅が有限でないときは折り返さず 1 行（自然幅のまま）', () {
+      final rows = layoutCategoryChips(
+          labelWidths: en, availableWidth: double.infinity, chrome: 50);
+      expect(rows, hasLength(1));
+      expect(rows.single.widths.first, closeTo(en.first + 50, 0.001));
+    });
+
+    test('幅 0 でも例外なく、全チップが並ぶ', () {
+      final rows = layoutCategoryChips(labelWidths: en, availableWidth: 0);
+      expect(rows.expand((r) => r.indices), hasLength(8));
     });
 
     test('1 チップが幅を超える極端な狭幅では、そのチップが幅いっぱいに縮む', () {
@@ -285,4 +324,50 @@ void main() {
       expect(b.top > a.top + 1 || (b.top == a.top && b.left > a.left), isTrue);
     }
   });
+
+  // 文字倍率が上がるとラベル左右の余白は縮み、チェックの幅は文字の高さぶん広がる。
+  // どのカテゴリを選択中にしても、ラベルが省略されない（省略されるなら必ずツールチップ付き）。
+  Future<void> expectNoSilentEllipsis(WidgetTester tester) async {
+    for (var c = 0; c <= 7; c++) {
+      controller
+          .setCategory(c == 0 ? null : VisionFilterCategory.values[c - 1]);
+      await tester.pump();
+      for (final e in find.byType(ChoiceChip).evaluate()) {
+        final chipFinder = find.byWidget(e.widget);
+        final textFinder =
+            find.descendant(of: chipFinder, matching: find.byType(Text));
+        final paragraph =
+            tester.renderObject<RenderParagraph>(textFinder.first);
+        if (paragraph.didExceedMaxLines) {
+          expect(
+            find.ancestor(of: chipFinder, matching: find.byType(Tooltip)),
+            findsOneWidget,
+            reason: '省略されるチップにはツールチップ',
+          );
+        }
+      }
+    }
+  }
+
+  for (final scale in [1.3, 2.0]) {
+    for (final locale in ['ja', 'en']) {
+      for (final width in locale == 'ja' ? [332.0, 600.0] : [900.0, 1400.0]) {
+        testWidgets('倍率 $scale $locale 幅$width: 選択を切り替えても省略されない',
+            (tester) async {
+          await pumpBrowser(tester,
+              width: width, locale: locale, textScale: scale);
+          await expectNoSilentEllipsis(tester);
+          // この幅は全チップが入る幅なので、ツールチップも出ない。
+          expect(find.byType(Tooltip), findsNothing);
+          expect(chipBandErrors(), isEmpty);
+        });
+      }
+    }
+
+    testWidgets('倍率 $scale 極端な狭幅: 省略されるチップ（選択中含む）にツールチップが付く', (tester) async {
+      await pumpBrowser(tester, width: 300, locale: 'en', textScale: scale);
+      await expectNoSilentEllipsis(tester);
+      expect(chipBandErrors(), isEmpty);
+    });
+  }
 }

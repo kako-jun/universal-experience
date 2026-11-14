@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -248,11 +250,13 @@ class _SearchField extends StatelessWidget {
 }
 
 /// `ChoiceChip`（Material 3 の既定）の、ラベル以外の幅: 左右のパディングとラベル余白。
-/// 実物との一致は test/filter_browser_category_chip_grid_test.dart で確かめる
+/// 実物との一致は test/filter_browser_category_chip_rows_test.dart で確かめる
 /// （Flutter 側の既定が変わったらそのテストが落ちる）。
 const double kCategoryChipBaseChrome = 34;
 
-/// 選択時に出るチェックの幅。選択の有無で改行位置が動かないよう、常に見込んで測る。
+/// 選択時に出るチェックの幅の下限。実際の幅はラベルの行の高さと同じで、文字が大きいほど
+/// 広がる（描画側は `max(この値, ラベルの高さ)` で見込む）。選択の有無で改行位置が動かない
+/// よう、常に見込んで測る。ラベル左右の余白は倍率が上がると縮むので、34 は安全側。
 const double kCategoryChipCheckReserve = 20;
 
 /// カテゴリチップ帯の 1 行ぶん: 何番目のチップが、何 dp の幅で並ぶか。
@@ -265,8 +269,9 @@ class CategoryChipRow {
 
 /// ラベル幅 [labelWidths] のチップを、[availableWidth] に**行ごとに端を揃えて**並べる。
 ///
-/// 改行位置は `Wrap` と同じ（各チップの自然幅 = ラベル幅 + 余白 を左から積んで、入らなく
-/// なったら次の行）。各行は余った幅を自然幅に比例して配り、左右の端をぴったり揃える。
+/// 改行位置は「全チップを選択中（チェックぶんの幅を含む）とみなした `Wrap`」と同じ（各チップの
+/// 自然幅 = ラベル幅 + 余白 を左から積んで、入らなくなったら次の行）。[availableWidth] が
+/// 有限でないときは折り返さず 1 行（自然幅のまま）にする。各行は余った幅を自然幅に比例して配り、左右の端をぴったり揃える。
 /// 省略は原則しない。1 つのチップの自然幅が [availableWidth] を超える極端な狭幅のときだけ、
 /// そのチップを幅いっぱいにして（描画側でラベルを省略する）。
 @visibleForTesting
@@ -299,7 +304,7 @@ List<CategoryChipRow> layoutCategoryChips({
         final room = availableWidth - spacing * (line.length - 1);
         // 余りを自然幅に比例して配る。自然幅の合計が room を超える（= 1 チップだけで
         // 幅を超える）ときは room に収める。
-        final scale = room / sum;
+        final scale = availableWidth.isFinite ? room / sum : 1.0;
         return CategoryChipRow(
           line,
           [for (final i in line) natural[i] * scale],
@@ -332,6 +337,7 @@ class _CategoryChips extends StatelessWidget {
       l10n.filterCategoryAll,
       for (final c in VisionFilterCategory.values) visionCategoryName(l10n, c),
     ];
+    var textHeight = 0.0;
     double measure(String text) {
       final painter = TextPainter(
         text: TextSpan(text: text, style: labelStyle),
@@ -340,11 +346,14 @@ class _CategoryChips extends StatelessWidget {
         maxLines: 1,
       )..layout();
       final width = painter.width;
+      textHeight = painter.height;
       painter.dispose();
       return width;
     }
 
     final textWidths = [for (final l in labels) measure(l)];
+    // チェックの幅はラベルの行の高さと同じ（文字が大きいほど広がる）。
+    final checkWidth = math.max(kCategoryChipCheckReserve, textHeight);
     return Semantics(
       container: true,
       label: l10n.filterCategoryLabel,
@@ -361,14 +370,17 @@ class _CategoryChips extends StatelessWidget {
                 labelWidths: textWidths,
                 availableWidth: constraints.maxWidth,
                 spacing: _spacing,
+                chrome: kCategoryChipBaseChrome + checkWidth,
               );
               Widget chip(int i, double width) {
                 final isAll = i == 0;
                 final category =
                     isAll ? null : VisionFilterCategory.values[i - 1];
-                // 余白を除いた幅にラベルが入らない（= 極端な狭幅）ときだけ省略する。
+                // ラベルが入らない（= 極端な狭幅）ときだけ省略する。選択中はチェックぶん
+                // 狭くなるので、選択中になりうるチップは未選択のうちからツールチップを付ける。
                 final truncated =
-                    textWidths[i] + kCategoryChipBaseChrome > width;
+                    textWidths[i] + kCategoryChipBaseChrome + checkWidth >
+                        width;
                 final built = ChoiceChip(
                   // チップはラベルの幅で縮むので、無限幅のラベルでセル幅まで伸ばし、
                   // 文字は中央に置く。
@@ -405,10 +417,16 @@ class _CategoryChips extends StatelessWidget {
                         for (var k = 0; k < row.indices.length; k++) ...[
                           if (k > 0) const SizedBox(width: _spacing),
                           // 幅の比で配る（行の合計がぴったり幅に収まる）。
-                          Expanded(
-                            flex: (row.widths[k] * 1000).round(),
-                            child: chip(row.indices[k], row.widths[k]),
-                          ),
+                          if (constraints.hasBoundedWidth)
+                            Expanded(
+                              flex: math.max(1, (row.widths[k] * 1000).round()),
+                              child: chip(row.indices[k], row.widths[k]),
+                            )
+                          else
+                            SizedBox(
+                              width: row.widths[k],
+                              child: chip(row.indices[k], row.widths[k]),
+                            ),
                         ],
                       ],
                     ),
