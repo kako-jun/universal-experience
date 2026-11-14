@@ -780,6 +780,10 @@
       "count": { "type": "int" }
     }
   },
+  "layerStripEmptyHint": "Selected filters line up here",
+  "@layerStripEmptyHint": {
+    "description": "Faint placeholder in the empty chip strip above the preview, shown while no filter is selected (#183)."
+  },
   "layerStripSemantics": "Applied filters, in order",
   "@layerStripSemantics": {
     "description": "Screen-reader name of the chip strip above the preview that lists the stacked filters in application order (#120)."

@@ -60,6 +60,38 @@ void main() {
       expect(tester.getSize(find.byType(LayerChipStrip)).height, 48);
     });
 
+    testWidgets('0 層には淡い案内文が出る', (tester) async {
+      await pumpStrip(tester);
+      expect(find.text('選んだフィルタがここに並びます'), findsOneWidget);
+      state.toggle('myopia');
+      await tester.pump();
+      expect(find.text('選んだフィルタがここに並びます'), findsNothing);
+    });
+
+    testWidgets('層を足すと、調整中になったチップが見える位置へスクロールする', (tester) async {
+      await pumpStrip(tester, width: 280);
+      for (final id in ['myopia', 'glaucoma', 'cataract', 'floaters']) {
+        state.toggle(id);
+        await tester.pump();
+        await tester.pump();
+      }
+      expect(tester.getRect(chip('floaters')).right, lessThanOrEqualTo(280));
+      expect(tester.getRect(chip('floaters')).left, greaterThanOrEqualTo(0));
+    });
+
+    testWidgets('文字 x2 でも帯の高さが層数に依らない', (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await pumpStrip(tester, width: 600);
+      final h0 = tester.getSize(find.byType(LayerChipStrip)).height;
+      for (final id in ['myopia', 'glaucoma', 'cataract']) {
+        state.toggle(id);
+        await tester.pump();
+        expect(tester.getSize(find.byType(LayerChipStrip)).height, h0);
+      }
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('1 層でチップと「すべて解除」が出る', (tester) async {
       await pumpStrip(tester);
       state.toggle('myopia');
@@ -285,9 +317,13 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull);
       expect(tester.getSize(find.byType(LayerChipStrip)).height, 48);
-      await tester.ensureVisible(clearAll);
-      await tester.pump();
+      // 「すべて解除」は帯の外（右端固定）なので、スクロールせずに常に見えて押せる。
       expect(tester.getTopLeft(clearAll).dx, lessThan(280));
+      expect(tester.getRect(clearAll).right, lessThanOrEqualTo(280));
+      // 末尾のチップはスクロールで届く。
+      await tester.ensureVisible(chip('floaters'));
+      await tester.pump();
+      expect(tester.getRect(chip('floaters')).right, lessThanOrEqualTo(280));
     });
   });
 }

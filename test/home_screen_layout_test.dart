@@ -33,6 +33,7 @@ import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
 import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 import 'package:universal_experience/ui/widgets/image_source_picker.dart';
+import 'package:universal_experience/ui/widgets/layer_chip_strip.dart';
 import 'package:universal_experience/ui/widgets/welcome_banner.dart';
 import 'package:universal_experience/ui/widgets/language_dialog.dart';
 import 'package:universal_experience/ui/widgets/window_mode_panel.dart';
@@ -98,16 +99,16 @@ void main() {
   }
 
   group('previewPaneSideFor（#130）', () {
-    // 画像以外の高さ 420（チップ帯 60 を含む、#183）を引いた残りが一辺。下限は kMinPreviewPaneSide。
-    test('下限 + 画像以外の高さ（580）ちょうどで下限、1 足すと 1 増える', () {
-      expect(previewPaneSideFor(580), kMinPreviewPaneSide);
-      expect(previewPaneSideFor(581), kMinPreviewPaneSide + 1);
-      expect(previewPaneSideFor(579), kMinPreviewPaneSide);
+    // 画像以外の高さ 360 を引いた残りが一辺。下限は kMinPreviewPaneSide。
+    test('下限 + 画像以外の高さ（520）ちょうどで下限、1 足すと 1 増える', () {
+      expect(previewPaneSideFor(520), kMinPreviewPaneSide);
+      expect(previewPaneSideFor(521), kMinPreviewPaneSide + 1);
+      expect(previewPaneSideFor(519), kMinPreviewPaneSide);
     });
 
     test('小数の高さは切り捨てる', () {
-      expect(previewPaneSideFor(604), 184);
-      expect(previewPaneSideFor(604.9), 184);
+      expect(previewPaneSideFor(544), 184);
+      expect(previewPaneSideFor(544.9), 184);
     });
 
     test('負・0・極端に小さい高さは下限になる', () {
@@ -135,13 +136,21 @@ void main() {
       return paneSide(tester);
     }
 
-    testWidgets('既定 800x600: チップ帯の領域を常に確保するぶん、画像は下限まで縮む（選択欄はスクロールで届く、#183）', (tester) async {
-      final side = await sideAt(tester, defaultWindow);
-      // 本体領域の高さ 544（600 - AppBar 56）から、画像以外の高さ 420 を引くと 124 で下限を割るため、
-      // 下限になる。
-      expect(side, closeTo(kMinPreviewPaneSide, 0.01));
-      expect(find.byType(ImageSourcePicker), findsOneWidget);
-      expect(tester.takeException(), isNull);
+    testWidgets('既定 800x600: 画像は下限より大きく、選択欄の下に余白が残る（初回起動と同じ色覚 1 層）',
+        (tester) async {
+      // 見積り（_kPreviewChromeHeight）が測っている最悪の状態 = 初回起動の色覚層
+      //（見出し行に「2×2 で比較」が出て、チップ帯と同じ 48dp の行になる）。
+      loadPreviewImages();
+      await pumpHomeScreen(tester,
+          size: defaultWindow,
+          select: (s) => selectColorVisionKey(s, 'deuteranomaly'));
+      final side = paneSide(tester);
+      expect(side, greaterThan(kMinPreviewPaneSide));
+      // 本体領域の高さ 544（600 - AppBar 56）から、画像以外の高さ 360 を引いた値。
+      expect(side, closeTo(184, 0.01));
+      final picker = tester.getRect(find.byType(ImageSourcePicker));
+      expect(picker.bottom, lessThanOrEqualTo(defaultWindow.height - 8),
+          reason: '選択欄の下端がウィンドウの縁に貼り付かない');
     });
 
     testWidgets('高さが足りなくても画像は下限（kMinPreviewPaneSide）を割らない（狭幅 800x400）',
@@ -156,8 +165,8 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('余裕のある高さでは縮めない: 狭幅 800x760 は従来の 256', (tester) async {
-      expect(await sideAt(tester, const Size(800, 760)), closeTo(256, 0.01));
+    testWidgets('余裕のある高さでは縮めない: 狭幅 800x700 は従来の 256', (tester) async {
+      expect(await sideAt(tester, narrow), closeTo(256, 0.01));
     });
 
     testWidgets('余裕のある高さでは縮めない: 広幅 1280x800 は中央カラムの幅いっぱい（従来どおり）',
@@ -168,7 +177,7 @@ void main() {
       expect(side * 2 + 12, closeTo(preview.width, 0.01));
     });
 
-    for (final (low, high) in [(620.0, 680.0), (680.0, 720.0)]) {
+    for (final (low, high) in [(560.0, 600.0), (600.0, 640.0)]) {
       testWidgets('高さに追従する: ${low.toInt()} より ${high.toInt()} の方が大きい',
           (tester) async {
         final small = await sideAt(tester, Size(800, low));
@@ -1001,5 +1010,52 @@ void main() {
     availableExperiences();
     expect(otherCalls, 1);
     expect(calls, 1);
+  });
+
+  // チップ帯（#183）: 層の数が変わっても、帯より下（Before/After・選択欄）の位置が動かない。
+  group('チップ帯は層の数でレイアウトをずらさない（#183）', () {
+    const ids = ['myopia', 'glaucoma', 'cataract', 'floaters', 'hyperopia'];
+    for (final (label, size) in [
+      ('広幅 1280x800', wide),
+      ('既定 800x600', defaultWindow),
+      ('狭いカード 480x800（見出し行の下に回る）', const Size(480, 800)),
+    ]) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets('$label・文字 x$scale: 0/1/2/5 層で位置と帯の高さが同一', (tester) async {
+          loadPreviewImages();
+          final h = await pumpHomeScreen(tester, size: size);
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          await tester.pump();
+          // 帯の上端からの距離（層が 0 → 1 でバナー等の上の部分が変わっても、帯より下は動かない）。
+          double top(Type t) =>
+              tester.getTopLeft(find.byType(t).first).dy -
+              tester.getTopLeft(find.byType(LayerChipStrip)).dy;
+          final baseView = top(BeforeAfterView);
+          final basePicker = top(ImageSourcePicker);
+          final baseStrip = tester.getSize(find.byType(LayerChipStrip)).height;
+          for (var n = 1; n <= 5; n++) {
+            h.visionState.toggle(ids[n - 1]);
+            await tester.pump();
+            if (n == 1 || n == 2 || n == 5) {
+              expect(top(BeforeAfterView), baseView, reason: '$n 層');
+              expect(top(ImageSourcePicker), basePicker, reason: '$n 層');
+              expect(
+                  tester.getSize(find.byType(LayerChipStrip)).height, baseStrip,
+                  reason: '$n 層');
+            }
+          }
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+
+    testWidgets('既定 800x600 / 1 層でも選択欄の下に余白 8 が残る（#130）', (tester) async {
+      loadPreviewImages();
+      await pumpHomeScreen(tester,
+          size: defaultWindow, select: (s) => s.toggle('myopia'));
+      final picker = tester.getRect(find.byType(ImageSourcePicker));
+      expect(picker.bottom, lessThanOrEqualTo(defaultWindow.height - 8));
+    });
   });
 }
