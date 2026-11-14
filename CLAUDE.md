@@ -124,7 +124,7 @@ tools/                       # シェーダ codegen（sensus の .frag → Impel
                               #   samples-sync / font-atlas-sync ワークフローが生成物との一致を検証（#115）
                               # + fonts/（Noto Sans / Noto Sans JP 由来のビットマップフォント。OFL の
                               #   全文・著作権表示・出典は fonts/README.md、#99）
-                              # + check_frb_drift.sh（FRB 生成物のドリフト検証。CI の check job が実行、#88）
+                              # + check_frb_drift.sh（FRB 生成物のドリフト検証。CI の check job が実行、#88。「ignored because」情報コメントは rustc 依存で揺れるため比較除外、#195）
 shaders/                     # 変換済み .frag（ビルド時 impellerc がコンパイル）
 assets/samples/              # サンプル画像集（図形は自作・手続き生成、#78。文字は OFL フォント、#99）。出典は README.md
 
