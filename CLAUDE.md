@@ -149,6 +149,7 @@ test/
 ├── tap_target_size_test.dart       # macOS 指定で操作領域が 48dp 以上（padded + standard・言語ダイアログの選択肢、#72/#82）
 ├── filter_browser_test.dart        # 統合一覧の検索・カテゴリ切替・行の選択（#72）
 ├── filter_browser_multi_select_test.dart # 統合一覧のチェック式・番号バッジが段順・色覚の排他置き換え・上限で未選択の行が無効（色覚置き換え行とプリセットは有効）・プリセット置換と一致時だけ強調・行フォーカス移動（#120）
+├── filter_browser_category_chip_rows_test.dart # カテゴリチップ帯の行ごと伸ばす並び（#184）: 改行は選択中とみなした Wrap と同じ・各行の左右端が揃う・省略なし（極端な狭幅だけ省略+ツールチップ）・文字倍率 1.3/2.0 で全選択でも省略なし・48dp・Tab が行優先・余白定数が実物と一致
 ├── filter_browser_category_chip_search_test.dart # 検索語があるあいだカテゴリチップを全て非選択表示（チェック・選択色なし）にし、消すと元の選択へ戻る・内部カテゴリ不変・チップ押下で検索語が消えてカテゴリ選択・検索中の文字色が通常の非選択チップと同じであることとコントラスト 4 テーマ（#143）
 ├── welcome_banner_auto_dismiss_test.dart # ウェルカムバナーの自動 dismiss: 行・プリセット・✕/すべて解除・調整パネルの解除・サンプル切替・写真の読込/貼付/閉じる・おすすめに戻すで閉じ永続化／seed・プログラム変更・起動復元・ピッカーキャンセルでは残る／Provider 無しでも例外なし（#143）
 ├── layer_chip_strip_test.dart      # チップ帯: 2 層以上で出る・チップで調整中が移る・✕ で 1 層除去・すべて解除・状態が形で分かる（#120）
@@ -273,7 +274,7 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 
 色覚 7 型・advanced 30 フィルタ・体験プリセットを 1 つの検索できる一覧に統合し、広幅は
 選ぶ / 見る / 調整の 3 カラム、狭幅は縦積み。起動モード等は AppBar のダイアログへ移した。
-カテゴリ切替を `NavigationRail` でなく `ChoiceChip` の `Wrap` にした理由と代替案（`NavigationRail`・
+カテゴリ切替を `NavigationRail` でなく `ChoiceChip`（当初 `Wrap`、#184 で行ごとに幅を伸ばして端を揃える形）にした理由と代替案（`NavigationRail`・
 ボトムシート）、ハイコントラスト対応は `docs/adr/2026-09-30-home-screen-unified-list-and-three-columns.md`。
 
 ### 色覚 4 型の 2×2 比較

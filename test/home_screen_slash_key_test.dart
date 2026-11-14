@@ -212,12 +212,14 @@ void main() {
       h.visionState.setStrength(0.5);
       await tester.pump();
       final chip = find.widgetWithText(ChoiceChip, '色覚');
-      await focusInside(tester, chip);
 
       for (final key in [
         LogicalKeyboardKey.arrowRight,
         LogicalKeyboardKey.arrowLeft,
       ]) {
+        // チップは行ごとに幅を伸ばして並ぶ（#184）ので、左右キーは標準の方向フォーカス移動になり
+        // 端のチップではペインの外へ出る。キーごとにチップへ戻してから確かめる。
+        await focusInside(tester, chip);
         final before = h.visionState.strength;
         await tester.sendKeyEvent(key);
         await tester.pump();
