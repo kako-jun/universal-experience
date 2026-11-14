@@ -62,6 +62,13 @@ List<AppLocalizations> _allLocalizations() => [
         lookupAppLocalizations(locale),
     ];
 
+Finder headerSemantics(String label) => find.byWidgetPredicate(
+    (w) =>
+        w is Semantics &&
+        w.properties.header == true &&
+        w.properties.label == label);
+
+// 見出し行は廃止し、見えない Semantics(header) だけが残る（#183）。
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -301,7 +308,7 @@ void main() {
       final ja = lookupAppLocalizations(const Locale('ja'));
       expect(find.text(ja.filterListHeading), findsOneWidget);
       expect(find.text(ja.adjustHeading), findsOneWidget);
-      expect(find.text(ja.previewSectionTitle), findsOneWidget);
+      expect(headerSemantics(ja.previewSectionTitle), findsOneWidget);
       expect(find.text(ja.selectionEmptyTitle), findsOneWidget);
       expect(find.text(ja.filterSearchLabel), findsOneWidget);
       // 旧セクション見出し・英語ハードコードが残っていないこと（退行検出）。
@@ -314,7 +321,7 @@ void main() {
       final en = lookupAppLocalizations(const Locale('en'));
       expect(find.text(en.filterListHeading), findsOneWidget);
       expect(find.text(en.adjustHeading), findsOneWidget);
-      expect(find.text(en.previewSectionTitle), findsOneWidget);
+      expect(headerSemantics(en.previewSectionTitle), findsOneWidget);
       expect(find.text(en.selectionEmptyTitle), findsOneWidget);
       expect(find.text(en.filterSearchLabel), findsOneWidget);
       // 旧ハードコードの日本語ヒーローが残っていないこと。

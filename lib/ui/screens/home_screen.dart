@@ -40,33 +40,20 @@ const double _kNarrowPreviewMaxWidth = 560;
 
 /// プレビュー画像（Before / After 各 1 枚の正方形）の一辺の下限（#130）。高さが足りなくても
 /// これより小さくはしない（使い物にならない小ささになるより、縦にスクロールさせる）。
-/// チップ帯（#183）の高さを取り戻すため 160 から下げた（800x600 の画像は 184 → 144）。
-const double kMinPreviewPaneSide = 120;
+const double kMinPreviewPaneSide = 160;
 
-/// プレビューカードのうち、画像以外が縦に使う高さ（dp、#130）。カード上端から画像の上端
-/// まで（余白・見出しの行 + 「2×2 で比較」・画像の見出し行 48・余白）と、画像の下端から選択欄の
-/// 下端まで（`ImageSourcePicker`。サンプルのチップが 3 行ほど折り返す）、選択欄の下の余白 16 の
-/// 合計。チップ帯（高さ 52 = チップ 48 + スクロールバーの段 4、常に確保、#183）を含み、帯と画像の
-/// 見出し行の間の余白 12 は削った（差し引き +40）。帯なしの旧実測は日本語で約 324、英語で約 348（チップが長く
-/// 折り返しが 1 行増える）。+40 を足した見積りが 800x600 で収まることは UE_SCREENSHOTS の
-/// default-window（ja/en・明暗）の expectPickerFits で確かめる。
+/// プレビューカードのうち、画像以外が縦に使う高さ（dp、#130）。カード上端の余白 16、チップ帯
+/// （#183。チップ 48 + スクロールバーの段 6 = 54。「2×2 で比較」「原画表示中」も帯の右端に入る）、
+/// 画像の見出し行 48（書き出しボタン）と余白、画像の下端から選択欄の下端まで（`ImageSourcePicker`。
+/// サンプルのチップが 3 行ほど折り返す）、選択欄の下の余白 16 の合計。
+/// 実フォントでの実測は日本語で約 318、英語（チップが長く折り返しが 1 行増える）で約 342
+/// （帯の前の旧実測 324/348 から、廃止した見出し行 48 と余白 12 を引き、帯 54 を足した値）。
 /// この値は実測に余裕（英語で約 12）を足した値で、実測の最大より大きくしてある。
 /// 画像の一辺は「本体領域の高さ - この値」までに抑えて、既定のウィンドウ（800x600）でも選択欄の
-/// 下端が最初のビューポートに収まるようにする。
+/// 下端が最初のビューポートに収まるようにする（UE_SCREENSHOTS の default-window の
+/// expectPickerFits で確かめる）。
 /// 実測を超えてチップが折り返す（文字サイズ拡大など）ときは、選択欄が下にはみ出し、スクロールで届く。
-const double _kPreviewChromeHeight = 400;
-
-/// プレビューの見出し行の最小の高さ（#183）。「2×2 で比較」の `FilterChip`（ラベル 1 行 + 上下の
-/// 余白と枠 18。最小タップ領域 48）が出入りしても、文字倍率が変わっても、行の高さが動かないように、
-/// チップ帯と同じ高さ・「2×2 で比較」の高さの大きい方にする。
-double _headingRowMinHeight(BuildContext context) {
-  final label = Theme.of(context).textTheme.labelLarge;
-  final chip = MediaQuery.textScalerOf(context).scale(label?.fontSize ?? 14) *
-          (label?.height ?? 1.43) +
-      18;
-  final strip = LayerChipStrip.chipHeightFor(context);
-  return chip > strip ? chip : strip;
-}
+const double _kPreviewChromeHeight = 354;
 
 /// ウィンドウ（本体領域）の高さ [viewportHeight] に収まる、プレビュー画像の一辺の上限（#130）。
 /// 下限は [kMinPreviewPaneSide]。余裕のある高さでは画像の自然な大きさより大きい値になり、
@@ -414,58 +401,56 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // 見出し行。最小の高さをチップ帯と同じにして、色覚の層の有無（「2×2 で比較」が出る）
-                // や文字倍率で行の高さが動かないようにする（#183）。
-                ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: _headingRowMinHeight(context),
-                  ),
-                  child: Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    // 折り返さない 1 行（Wrap だと色覚の層の有無で「2×2 で比較」が次の行へ回り、
-                    // 行の高さが動く）。足りない幅は見出しの省略で受ける。
-                    child: Row(
-                      spacing: 12,
-                      children: [
-                        Flexible(
-                          child: Semantics(
-                            header: true,
-                            child: Text(
-                              // 2×2 の間は Before / After ではないので、見出しも実態に合わせる。
-                              comparing
-                                  ? l10n.compareSectionTitle
-                                  : l10n.previewSectionTitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium,
-                            ),
-                          ),
-                        ),
-                        if (visionState.bypassed) ...[
-                          Chip(
-                            label: Text(l10n.bypassedBadgeLabel),
-                            backgroundColor:
-                                theme.colorScheme.secondaryContainer,
-                            labelStyle: theme.textTheme.labelLarge?.copyWith(
-                              color: theme.colorScheme.onSecondaryContainer,
-                            ),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ],
-                        if (canCompare)
-                          FilterChip(
-                            label: Text(l10n.compareToggleLabel),
-                            tooltip: l10n.compareToggleTooltip,
-                            selected: _compareColorVision,
-                            onSelected: (value) =>
-                                setState(() => _compareColorVision = value),
-                          ),
-                      ],
+                // 見出し行は廃止した（#183）: 下の画像の見出し（「元の画像」/ フィルタ名）と内容が重複し、
+                // 48dp を食うため。「2×2 で比較」と「原画表示中」は帯の右端の固定枠へ移した。
+                // 見出しの読み上げは、見えない 1dp の Semantics(header) で残す（高さは足さない）。
+                Stack(
+                  children: [
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      width: 1,
+                      height: 1,
+                      child: Semantics(
+                        header: true,
+                        // 2×2 の間は Before / After ではないので、見出しも実態に合わせる。
+                        label: comparing
+                            ? l10n.compareSectionTitle
+                            : l10n.previewSectionTitle,
+                      ),
                     ),
-                  ),
+                    LayerChipStrip(
+                      trailing: (visionState.bypassed || canCompare)
+                          ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              spacing: 8,
+                              children: [
+                                if (visionState.bypassed)
+                                  Chip(
+                                    label: Text(l10n.bypassedBadgeLabel),
+                                    backgroundColor:
+                                        theme.colorScheme.secondaryContainer,
+                                    labelStyle:
+                                        theme.textTheme.labelLarge?.copyWith(
+                                      color: theme
+                                          .colorScheme.onSecondaryContainer,
+                                    ),
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                if (canCompare)
+                                  FilterChip(
+                                    label: Text(l10n.compareToggleLabel),
+                                    tooltip: l10n.compareToggleTooltip,
+                                    selected: _compareColorVision,
+                                    onSelected: (value) => setState(
+                                        () => _compareColorVision = value),
+                                  ),
+                              ],
+                            )
+                          : null,
+                    ),
+                  ],
                 ),
-                // 重ねている層のチップ帯（#120/#183）。常に見出し行の下に置く（層が 0 でも同じ高さ）。
-                const LayerChipStrip(),
                 ImageSourcePicker(
                   child: comparing
                       ? ColorVisionCompareView(

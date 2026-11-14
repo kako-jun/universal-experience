@@ -25,22 +25,47 @@ import 'filter_list_tile.dart' show LayerOrderBadge;
 /// （ドラッグは許可しない: 数 px のぶれでチップのタップを奪うため）。
 /// 状態は形で伝える: 調整中のチップは塗り + 太い枠、それ以外は細い枠（色だけに頼らない、DESIGN §7）。
 class LayerChipStrip extends StatefulWidget {
-  const LayerChipStrip({super.key});
+  const LayerChipStrip({super.key, this.trailing});
+
+  /// 帯の右端に固定で置く操作（スクロールの外）。ホームでは「原画表示中」のバッジと
+  /// 「2×2 で比較」の切替を入れる（#183。プレビューの見出し行を廃止して帯へ移した）。
+  final Widget? trailing;
 
   /// チップの最小の高さ（最小タップ目標 48dp）。
   static const double chipHeight = 48;
 
-  /// スクロールバーの太さ。チップの下に専用の段を取り、チップの枠と重ならないようにする。
-  static const double scrollbarLane = 4;
+  /// スクロールバーの段の高さ。チップの下に専用の段を取り、チップの枠と重ならないようにする。
+  static const double scrollbarLane = 6;
 
-  /// 文字拡大を考慮したチップの高さ（チップの本文 = bodyLarge の 1 行の高さ、最小 [chipHeight]）。
-  /// 見出し行の最小の高さにも使い、層の種類・数で行の高さが動かないようにする。
+  /// スクロールバーのつまみの太さ（段の中に収まる。上下 1dp ずつ余白）。
+  static const double scrollbarThickness = 4;
+
+  /// Material 3 の `FilterChip`（「2×2 で比較」）の縦の余白と枠の合計: 上下パディング 8 × 2 +
+  /// 枠 1 × 2 = 18。ラベルの 1 行の高さに足すと実際のチップの高さになる（×2.0 で実測 58 = 40.04 + 18）。
+  static const double filterChipVerticalExtra = 18;
+
+  /// 文字拡大を考慮した帯の中身の高さ。チップの本文（bodyLarge の 1 行）、最小タップ目標 [chipHeight]、
+  /// 右端の「2×2 で比較」の `FilterChip`（labelLarge の 1 行 + [filterChipVerticalExtra]）のうち最大。
+  /// 層の種類・数・色覚の層の有無で帯の高さが動かないよう、右端の操作が出ないときも同じ値にする。
   static double chipHeightFor(BuildContext context) {
-    final style = Theme.of(context).textTheme.bodyLarge;
-    final line = MediaQuery.textScalerOf(context).scale(style?.fontSize ?? 16) *
-        (style?.height ?? 1.5);
-    return line > chipHeight ? line : chipHeight;
+    final theme = Theme.of(context);
+    final scaler = MediaQuery.textScalerOf(context);
+    final body = theme.textTheme.bodyLarge;
+    final label = theme.textTheme.labelLarge;
+    final line = scaler.scale(body?.fontSize ?? 16) * (body?.height ?? 1.5);
+    final chip = scaler.scale(label?.fontSize ?? 14) * (label?.height ?? 1.43) +
+        filterChipVerticalExtra;
+    return [chipHeight, line, chip].reduce((a, b) => a > b ? a : b);
   }
+
+  /// スクロールバーのつまみの色。カード面の上で非テキストの 3:1 以上を取る
+  /// （`onSurfaceVariant`。テストで測る）。
+  static Color thumbColorOf(ThemeData theme) =>
+      theme.colorScheme.onSurfaceVariant;
+
+  /// 0 層の案内文の色。カード面の上で 4.5:1 以上を取る（テストで測る）。
+  static Color emptyHintColorOf(ThemeData theme) =>
+      theme.colorScheme.onSurfaceVariant;
 
   /// 帯全体の高さ（チップ + スクロールバーの段）。層数に関わらず同じ値になる。
   static double heightFor(BuildContext context) =>
@@ -72,7 +97,9 @@ class _LayerChipStripState extends State<LayerChipStrip> {
       final atStart = viewport.getOffsetToReveal(box, 0).offset;
       final atEnd = viewport.getOffsetToReveal(box, 1).offset;
       final pos = _controller.position;
-      final target = pos.pixels.clamp(atEnd, atStart);
+      // チップが帯より広いときは、先頭（左端）を合わせる。
+      final target =
+          atEnd > atStart ? atStart : pos.pixels.clamp(atEnd, atStart);
       final clamped = target.clamp(pos.minScrollExtent, pos.maxScrollExtent);
       if (clamped != pos.pixels) _controller.jumpTo(clamped);
     });
@@ -92,16 +119,25 @@ class _LayerChipStripState extends State<LayerChipStrip> {
           final theme = Theme.of(context);
           return SizedBox(
             height: height,
-            child: Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: Text(
-                l10n.layerStripEmptyHint,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                // onSurfaceVariant は面の上で 4.5:1 以上を取る前提の色（テストで測る）。
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      l10n.layerStripEmptyHint,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                          color: LayerChipStrip.emptyHintColorOf(theme)),
+                    ),
+                  ),
+                ),
+                if (widget.trailing != null) ...[
+                  const SizedBox(width: 8),
+                  widget.trailing!,
+                ],
+              ],
             ),
           );
         }
@@ -121,41 +157,51 @@ class _LayerChipStripState extends State<LayerChipStrip> {
                   child: ScrollConfiguration(
                     behavior: ScrollConfiguration.of(context)
                         .copyWith(scrollbars: false),
-                    child: Scrollbar(
-                      controller: _controller,
-                      thumbVisibility: true,
-                      thickness: LayerChipStrip.scrollbarLane - 1,
-                      child: SingleChildScrollView(
+                    child: ScrollbarTheme(
+                      data: ScrollbarThemeData(
+                        thumbColor: WidgetStatePropertyAll(
+                            LayerChipStrip.thumbColorOf(Theme.of(context))),
+                        radius: const Radius.circular(2),
+                        crossAxisMargin: 1,
+                      ),
+                      child: Scrollbar(
                         controller: _controller,
-                        scrollDirection: Axis.horizontal,
-                        // チップの下にスクロールバーの段を空ける（枠と重ならない）。
-                        padding: const EdgeInsets.only(
-                            bottom: LayerChipStrip.scrollbarLane),
-                        child: Row(
-                          children: [
-                            for (var i = 0; i < layers.length; i++) ...[
-                              if (i > 0) const SizedBox(width: 8),
-                              // 名前が長くても 1 チップが帯を占有しないよう、幅に上限を置く。
-                              ConstrainedBox(
-                                key: _keys.putIfAbsent(
-                                    layers[i].id, () => GlobalKey()),
-                                constraints:
-                                    const BoxConstraints(maxWidth: 280),
-                                child: _LayerChip(
-                                  key: ValueKey('layer_chip_${layers[i].id}'),
-                                  id: layers[i].id,
-                                  order: i + 1,
-                                  name: visionLayerDisplayName(l10n, layers[i]),
-                                  focused: layers[i].id == state.focusedId,
-                                  onFocus: () => state.focusLayer(layers[i].id),
-                                  onRemove: () {
-                                    state.remove(layers[i].id);
-                                    dismissWelcomeBannerOnUserChange(context);
-                                  },
+                        thumbVisibility: true,
+                        thickness: LayerChipStrip.scrollbarThickness,
+                        child: SingleChildScrollView(
+                          controller: _controller,
+                          scrollDirection: Axis.horizontal,
+                          // チップの下にスクロールバーの段を空ける（枠と重ならない）。
+                          padding: const EdgeInsets.only(
+                              bottom: LayerChipStrip.scrollbarLane),
+                          child: Row(
+                            children: [
+                              for (var i = 0; i < layers.length; i++) ...[
+                                if (i > 0) const SizedBox(width: 8),
+                                // 名前が長くても 1 チップが帯を占有しないよう、幅に上限を置く。
+                                ConstrainedBox(
+                                  key: _keys.putIfAbsent(
+                                      layers[i].id, () => GlobalKey()),
+                                  constraints:
+                                      const BoxConstraints(maxWidth: 280),
+                                  child: _LayerChip(
+                                    key: ValueKey('layer_chip_${layers[i].id}'),
+                                    id: layers[i].id,
+                                    order: i + 1,
+                                    name:
+                                        visionLayerDisplayName(l10n, layers[i]),
+                                    focused: layers[i].id == state.focusedId,
+                                    onFocus: () =>
+                                        state.focusLayer(layers[i].id),
+                                    onRemove: () {
+                                      state.remove(layers[i].id);
+                                      dismissWelcomeBannerOnUserChange(context);
+                                    },
+                                  ),
                                 ),
-                              ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
                     ),
@@ -172,6 +218,10 @@ class _LayerChipStripState extends State<LayerChipStrip> {
                     icon: const Icon(Icons.clear, size: 18),
                     label: Text(l10n.layerStripClearAll),
                   ),
+                ],
+                if (widget.trailing != null) ...[
+                  const SizedBox(width: 8),
+                  widget.trailing!,
                 ],
               ],
             ),

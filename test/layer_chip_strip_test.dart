@@ -4,9 +4,13 @@
 // 「すべて解除」で全部外れる・別名（-omaly）のチップが variantId の表示名になる、を確認する。
 
 import 'dart:math' as math;
-import 'dart:ui' show Tristate;
+import 'dart:ui' show PointerDeviceKind, Tristate;
 
+import 'package:flutter/foundation.dart'
+    show debugDefaultTargetPlatformOverride;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -59,7 +63,7 @@ void main() {
     testWidgets('0 層ではチップも「すべて解除」も出ない（領域だけ確保）', (tester) async {
       await pumpStrip(tester);
       expect(clearAll, findsNothing);
-      expect(tester.getSize(find.byType(LayerChipStrip)).height, 52);
+      expect(tester.getSize(find.byType(LayerChipStrip)).height, 54);
     });
 
     testWidgets('0 層には淡い案内文が出る', (tester) async {
@@ -305,12 +309,18 @@ void main() {
       expect(tester.getSize(chip('myopia')).height, greaterThanOrEqualTo(48));
     });
 
-    testWidgets('0 層の案内文は面の上で 4.5:1 以上のコントラスト（明・暗・高コントラスト）', (tester) async {
+    testWidgets('部品の実際の色（案内文・スクロールバーのつまみ）が面の上で十分なコントラスト', (tester) async {
       double lum(Color c) {
         double ch(double v) => v <= 0.03928
             ? v / 12.92
             : math.pow((v + 0.055) / 1.055, 2.4).toDouble();
         return 0.2126 * ch(c.r) + 0.7152 * ch(c.g) + 0.0722 * ch(c.b);
+      }
+
+      double ratio(Color a, Color b) {
+        final x = lum(a) + 0.05;
+        final y = lum(b) + 0.05;
+        return x > y ? x / y : y / x;
       }
 
       for (final theme in [
@@ -319,13 +329,67 @@ void main() {
         AppTheme.highContrastTheme,
         AppTheme.highContrastDarkTheme,
       ]) {
-        final scheme = theme.colorScheme;
-        // プレビューのカード面（cardTheme.color = surfaceContainerHighest）の上に描く。
-        final a = lum(scheme.onSurfaceVariant) + 0.05;
-        final b = lum(scheme.surfaceContainerHighest) + 0.05;
-        final ratio = a > b ? a / b : b / a;
-        expect(ratio, greaterThanOrEqualTo(4.5), reason: '${theme.brightness}');
+        // プレビューのカード面（cardTheme.color）の上に描かれる。
+        final surface = theme.cardTheme.color!;
+        expect(ratio(LayerChipStrip.emptyHintColorOf(theme), surface),
+            greaterThanOrEqualTo(4.5),
+            reason: '案内文 ${theme.brightness}');
+        expect(ratio(LayerChipStrip.thumbColorOf(theme), surface),
+            greaterThanOrEqualTo(3.0),
+            reason: 'つまみ（非テキスト 3:1） ${theme.brightness}');
       }
+    });
+
+    testWidgets('マウス（Linux）: Shift+ホイールとスクロールバーのつまみのドラッグで末尾へ届く',
+        (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await pumpStrip(tester, width: 280);
+      for (final id in ['myopia', 'glaucoma', 'cataract', 'floaters']) {
+        state.toggle(id);
+      }
+      await tester.pump();
+      final scrollable = find.descendant(
+          of: find.byType(LayerChipStrip), matching: find.byType(Scrollable));
+      double offset() =>
+          tester.state<ScrollableState>(scrollable.first).position.pixels;
+      // 末尾の層が調整中なので、最後のチップが見える位置にいる。先頭へ戻してから確かめる。
+      expect(offset(), greaterThan(0));
+      tester.state<ScrollableState>(scrollable.first).position.jumpTo(0);
+      await tester.pump();
+      expect(offset(), 0);
+
+      // Shift+ホイール（縦のホイールを横へ）。
+      final strip = tester.getRect(find.byType(LayerChipStrip));
+      final mouse = TestPointer(1, PointerDeviceKind.mouse);
+      await tester.sendEventToBinding(
+          mouse.hover(strip.topLeft + const Offset(20, 20)));
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendEventToBinding(mouse.scroll(const Offset(0, 80)));
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendEventToBinding(mouse.removePointer());
+      await tester.pump();
+      final afterWheel = offset();
+      expect(afterWheel, greaterThan(0), reason: 'Shift+ホイールで横へ動く');
+
+      // スクロールバーのつまみ（チップの下の段）を掴んで右へドラッグ（先頭へ戻して、つまみが左端にある状態から）。
+      tester.state<ScrollableState>(scrollable.first).position.jumpTo(0);
+      await tester.pump();
+      // つまみは表示のフェードインが終わってから掴める。
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+      final grab = Offset(strip.left + 12, strip.bottom - 3);
+      final g = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await g.addPointer(location: grab);
+      await tester.pump();
+      await g.moveTo(grab);
+      await tester.pump(const Duration(milliseconds: 100));
+      await g.down(grab);
+      await tester.pump(const Duration(milliseconds: 300));
+      await g.moveBy(const Offset(40, 0));
+      await tester.pump();
+      await g.up();
+      await tester.pump();
+      expect(offset(), greaterThan(0), reason: 'つまみのドラッグで動く');
     });
 
     testWidgets('スクロールバーの段はチップの下（チップの枠と重ならない）', (tester) async {
@@ -345,7 +409,7 @@ void main() {
       }
       await tester.pump();
       expect(tester.takeException(), isNull);
-      expect(tester.getSize(find.byType(LayerChipStrip)).height, 52);
+      expect(tester.getSize(find.byType(LayerChipStrip)).height, 54);
       // 「すべて解除」は帯の外（右端固定）なので、スクロールせずに常に見えて押せる。
       expect(tester.getTopLeft(clearAll).dx, lessThan(280));
       expect(tester.getRect(clearAll).right, lessThanOrEqualTo(280));

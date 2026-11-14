@@ -636,6 +636,35 @@ void main() {
     );
   }
 
+  // 既定ウィンドウ（800x600）で 5 層（上限）でも、選択欄が最初のビューポートに収まる（#183。
+  // 層数で画像・選択欄がずれないことの実フォント検査）。ファイル名は
+  // default-window-light-{ja|en}-multi5.png。
+  for (final locale in const ['ja', 'en']) {
+    testWidgets(
+      'screenshot default-window/light/$locale multi5',
+      (tester) => shoot(
+        tester,
+        widthLabel: 'default-window',
+        width: 800,
+        height: 600,
+        dark: false,
+        locale: locale,
+        suffix: '-multi5',
+        // 時間依存の層（vertigo）は静止フレームの注記が出て見積り外なので入れない。
+        extraLayers: const ['myopia', 'glaucoma', 'cataract', 'night_blindness'],
+        layerStrengths: const {
+          'myopia': 0.6,
+          'glaucoma': 0.4,
+          'cataract': 0.8,
+          'night_blindness': 0.5,
+        },
+        focusId: 'myopia',
+        expectPickerFits: true,
+      ),
+      skip: !screenshotsEnabled,
+    );
+  }
+
   // 起動モードのダイアログ（ルーペ窓は準備中で無効、#156）。ファイル名は
   // wide-light-ja-dialog.png。
   testWidgets(

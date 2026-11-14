@@ -230,8 +230,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// The sample size to render at when [BeforeAfterView.sampleSize] isn't
   /// explicitly set — [kCanonicalSampleSize] in production;
   /// tests can override via the widget's `sampleSize` constructor param.
-  int get _effectiveSampleSize =>
-      widget.sampleSize ?? kCanonicalSampleSize;
+  int get _effectiveSampleSize => widget.sampleSize ?? kCanonicalSampleSize;
 
   @override
   void initState() {
@@ -617,7 +616,6 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         final multiLayer = layerNames != null && layerNames.length > 1;
         final beforePane = _Pane(
           label: l10n.previewPaneOriginal,
-          wrapLabel: multiLayer,
           // 見出し「元の画像」が説明を担うので、画像には代替テキストを付けない
           // （同じ文言の二重読み上げを避ける、#45）。
           child: PreviewImageView(image: _before),
@@ -659,15 +657,14 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
             ? layerIds.any(
                 (id) => kVisionFilterCatalogById[id]?.isTimeDependent ?? false)
             : (widget.filterId == null
-                    ? null
-                    : kVisionFilterCatalogById[widget.filterId])
-                ?.isTimeDependent ??
+                        ? null
+                        : kVisionFilterCatalogById[widget.filterId])
+                    ?.isTimeDependent ??
                 false;
         final afterPane = _Pane(
           label: afterName,
-          // 複数層の見出しは切らずに折り返す。両ペインとも折り返し方式にして、
-          // ラベルの縦位置を揃える（[_Pane.wrapLabel]）。
-          wrapLabel: multiLayer,
+          // 複数層の見出しも 1 行で省略する（#183）。折り返すと層数で画像の位置が動くため。
+          // 全部の名前は帯のチップと画像の代替テキストに出る。
           // Export is only meaningful when a real "after" image exists.
           // The failed state (null _after) gets no button.
           // 複数層でも書き出せる（キャプションは層ごとの行、#121）。
@@ -754,13 +751,10 @@ class _Pane extends StatelessWidget {
     required this.label,
     required this.child,
     this.trailing,
-    this.wrapLabel = false,
   });
 
   final String label;
 
-  /// 見出しを切らずに折り返す（複数層の見出し、#120）。false なら 1 行で省略記号。
-  final bool wrapLabel;
   final Widget child;
 
   /// Optional action shown to the right of the label (e.g. the export button).
@@ -775,27 +769,15 @@ class _Pane extends StatelessWidget {
     final text = Text(
       label,
       style: theme.textTheme.labelLarge,
-      overflow: wrapLabel ? null : TextOverflow.ellipsis,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
     return ConstrainedBox(
-      constraints: BoxConstraints(
-        minHeight: 48,
-        maxHeight: wrapLabel ? double.infinity : 48,
-      ),
+      constraints: const BoxConstraints(minHeight: 48, maxHeight: 48),
       child: Row(
-        // 折り返す見出し（複数層）は、ラベルの先頭行を左右で同じ高さに置く。左右で行数が違っても
-        // 縦位置がずれない。1 行の見出しは 48dp の中央（上下 14dp = (48 - 行高 20) / 2）。
-        crossAxisAlignment:
-            wrapLabel ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Expanded(
-            child: wrapLabel
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    child: text,
-                  )
-                : text,
-          ),
+          Expanded(child: text),
           if (trailing != null) trailing!,
         ],
       ),
@@ -826,4 +808,3 @@ class _Pane extends StatelessWidget {
     );
   }
 }
-
