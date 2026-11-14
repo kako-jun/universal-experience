@@ -165,7 +165,7 @@ Key filterListTileKey(FilterListEntry entry) =>
 ///
 /// - 検索は日本語名・英語名のどちらでも当たる。検索語があるあいだは
 ///   カテゴリを無視して全体から探す。
-/// - カテゴリは「すべて」+ 7 カテゴリの `ChoiceChip` を等幅グリッドに並べる（選択中は色とチェックで示す）。
+/// - カテゴリは「すべて」+ 7 カテゴリの `ChoiceChip` を行ごとに幅を伸ばして端を揃えて並べる（選択中は色とチェックで示す）。
 ///   一覧のスクロール領域の先頭に置く（見出しと検索欄だけが固定）。
 /// - 呼び出し側は**高さの制約が有限**の場所に置く（一覧は内側でスクロールする）。
 class FilterBrowser extends StatelessWidget {
@@ -200,7 +200,7 @@ class FilterBrowser extends StatelessWidget {
         _SearchField(controller: controller),
         const SizedBox(height: 8),
         // カテゴリのチップは一覧のスクロール領域の先頭に入れる（固定にすると、
-        // 低い画面でチップの Wrap が高さを食い潰して一覧が潰れる）。
+        // 低い画面でチップ帯（折り返して数行）が高さを食い潰して一覧が潰れる）。
         Expanded(
           child: ListenableBuilder(
             listenable: controller,
@@ -247,33 +247,71 @@ class _SearchField extends StatelessWidget {
   }
 }
 
-/// カテゴリチップの 1 個ぶんの見た目の幅の内訳（ChoiceChip の既定の左右パディング + ラベル余白 +
-/// 選択時のチェック）。列数を決めるときの「最長ラベルが入るか」の見積もりに使う。
-const double _kChipChromeWidth = 16 + 16 + 26;
+/// `ChoiceChip`（Material 3 の既定）の、ラベル以外の幅: 左右のパディングとラベル余白。
+/// 実物との一致は test/filter_browser_category_chip_grid_test.dart で確かめる
+/// （Flutter 側の既定が変わったらそのテストが落ちる）。
+const double kCategoryChipBaseChrome = 34;
 
-/// チップ帯の列数。[count] 個を端数行なしで並べられるよう、約数のうち最長ラベルが
-/// 収まる最大の列にする（8 個なら 4 / 2 / 1）。収まる列が無ければ 1 列。
+/// 選択時に出るチェックの幅。選択の有無で改行位置が動かないよう、常に見込んで測る。
+const double kCategoryChipCheckReserve = 20;
+
+/// カテゴリチップ帯の 1 行ぶん: 何番目のチップが、何 dp の幅で並ぶか。
 @visibleForTesting
-int categoryChipColumns({
-  required double availableWidth,
-  required double widestLabel,
-  required int count,
-  double spacing = 8,
-}) {
-  for (var columns = count; columns > 1; columns--) {
-    if (count % columns != 0) continue;
-    final cell = (availableWidth - spacing * (columns - 1)) / columns;
-    if (cell >= widestLabel + _kChipChromeWidth) return columns;
-  }
-  // どの列数でも最長ラベルは収まらない。2 列まで許し（省略 + ツールチップ）、極端に狭いときだけ 1 列。
-  if (count % 2 == 0 && availableWidth >= 240) return 2;
-  return 1;
+class CategoryChipRow {
+  const CategoryChipRow(this.indices, this.widths);
+  final List<int> indices;
+  final List<double> widths;
 }
 
-/// 左ペイン上部のカテゴリ切替。「すべて」+ 7 カテゴリを**等幅グリッド**に並べ、
-/// 行ごとに左右の端を揃える（自由折り返しの `Wrap` だと改行位置が不揃いで空きが出た）。
-/// 列数は幅と最長ラベルから決める（[categoryChipColumns]）。ラベルがセルに入らないときは
-/// 省略（…）し、全文をツールチップで出す。
+/// ラベル幅 [labelWidths] のチップを、[availableWidth] に**行ごとに端を揃えて**並べる。
+///
+/// 改行位置は `Wrap` と同じ（各チップの自然幅 = ラベル幅 + 余白 を左から積んで、入らなく
+/// なったら次の行）。各行は余った幅を自然幅に比例して配り、左右の端をぴったり揃える。
+/// 省略は原則しない。1 つのチップの自然幅が [availableWidth] を超える極端な狭幅のときだけ、
+/// そのチップを幅いっぱいにして（描画側でラベルを省略する）。
+@visibleForTesting
+List<CategoryChipRow> layoutCategoryChips({
+  required List<double> labelWidths,
+  required double availableWidth,
+  double spacing = 8,
+  double chrome = kCategoryChipBaseChrome + kCategoryChipCheckReserve,
+}) {
+  final natural = [for (final w in labelWidths) w + chrome];
+  final lines = <List<int>>[];
+  var current = <int>[];
+  var used = 0.0;
+  for (var i = 0; i < natural.length; i++) {
+    final needed = current.isEmpty ? natural[i] : used + spacing + natural[i];
+    if (current.isNotEmpty && needed > availableWidth) {
+      lines.add(current);
+      current = <int>[];
+      used = 0;
+    }
+    used = current.isEmpty ? natural[i] : used + spacing + natural[i];
+    current.add(i);
+  }
+  if (current.isNotEmpty) lines.add(current);
+
+  return [
+    for (final line in lines)
+      () {
+        final sum = line.fold<double>(0, (a, i) => a + natural[i]);
+        final room = availableWidth - spacing * (line.length - 1);
+        // 余りを自然幅に比例して配る。自然幅の合計が room を超える（= 1 チップだけで
+        // 幅を超える）ときは room に収める。
+        final scale = room / sum;
+        return CategoryChipRow(
+          line,
+          [for (final i in line) natural[i] * scale],
+        );
+      }(),
+  ];
+}
+
+/// 左ペイン上部のカテゴリ切替。「すべて」+ 7 カテゴリを、**行ごとに幅を伸ばして左右の端を
+/// 揃えて**並べる（[layoutCategoryChips]）。自由折り返しの `Wrap` だと行末が不揃いで空きが
+/// 出た。全ラベルを省略せず読める。1 チップが幅を超える極端な狭幅だけ省略（…）し、
+/// ツールチップに全文を出す。
 class _CategoryChips extends StatelessWidget {
   const _CategoryChips({required this.controller});
 
@@ -284,8 +322,9 @@ class _CategoryChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final labelStyle = Theme.of(context).chipTheme.labelStyle ??
-        Theme.of(context).textTheme.labelLarge ??
+    final theme = Theme.of(context);
+    final labelStyle = theme.chipTheme.labelStyle ??
+        theme.textTheme.labelLarge ??
         const TextStyle();
     final scaler = MediaQuery.textScalerOf(context);
     final direction = Directionality.of(context);
@@ -300,11 +339,12 @@ class _CategoryChips extends StatelessWidget {
         textScaler: scaler,
         maxLines: 1,
       )..layout();
-      return painter.width;
+      final width = painter.width;
+      painter.dispose();
+      return width;
     }
 
-    final widths = [for (final l in labels) measure(l)];
-    final widest = widths.reduce((a, b) => a > b ? a : b);
+    final textWidths = [for (final l in labels) measure(l)];
     return Semantics(
       container: true,
       label: l10n.filterCategoryLabel,
@@ -317,22 +357,21 @@ class _CategoryChips extends StatelessWidget {
           // どれも非選択表示（チェック・選択色なし。通常の非選択チップと同じ見た目）にする（#143）。内部のカテゴリは保つ。
           return LayoutBuilder(
             builder: (context, constraints) {
-              final columns = categoryChipColumns(
+              final rows = layoutCategoryChips(
+                labelWidths: textWidths,
                 availableWidth: constraints.maxWidth,
-                widestLabel: widest,
-                count: labels.length,
                 spacing: _spacing,
               );
-              final cell =
-                  (constraints.maxWidth - _spacing * (columns - 1)) / columns;
-              Widget chip(int i) {
+              Widget chip(int i, double width) {
                 final isAll = i == 0;
                 final category =
                     isAll ? null : VisionFilterCategory.values[i - 1];
-                final truncated = widths[i] + _kChipChromeWidth > cell;
-                return ChoiceChip(
-                  // 幅いっぱいに広げる（チップはラベルの幅で縮むので、無限幅のラベルで
-                  // セル幅まで伸ばし、文字は中央に置く）。
+                // 余白を除いた幅にラベルが入らない（= 極端な狭幅）ときだけ省略する。
+                final truncated =
+                    textWidths[i] + kCategoryChipBaseChrome > width;
+                final built = ChoiceChip(
+                  // チップはラベルの幅で縮むので、無限幅のラベルでセル幅まで伸ばし、
+                  // 文字は中央に置く。
                   label: SizedBox(
                     width: double.infinity,
                     child: Text(
@@ -343,31 +382,37 @@ class _CategoryChips extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  tooltip: truncated ? labels[i] : null,
                   selected: !dimmed && current == category,
                   showCheckmark: true,
                   onSelected: (_) => controller.setCategory(category),
                 );
+                // ツールチップはラベルと同じ文言なので、読み上げでは二重にしない。
+                return truncated
+                    ? Tooltip(
+                        message: labels[i],
+                        excludeFromSemantics: true,
+                        child: built,
+                      )
+                    : built;
               }
 
-              final rows = <Widget>[];
-              for (var start = 0; start < labels.length; start += columns) {
-                rows.add(
-                  Row(
-                    children: [
-                      for (var i = start;
-                          i < start + columns && i < labels.length;
-                          i++) ...[
-                        if (i > start) const SizedBox(width: _spacing),
-                        Expanded(child: chip(i)),
-                      ],
-                    ],
-                  ),
-                );
-              }
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: rows,
+                children: [
+                  for (final row in rows)
+                    Row(
+                      children: [
+                        for (var k = 0; k < row.indices.length; k++) ...[
+                          if (k > 0) const SizedBox(width: _spacing),
+                          // 幅の比で配る（行の合計がぴったり幅に収まる）。
+                          Expanded(
+                            flex: (row.widths[k] * 1000).round(),
+                            child: chip(row.indices[k], row.widths[k]),
+                          ),
+                        ],
+                      ],
+                    ),
+                ],
               );
             },
           );
