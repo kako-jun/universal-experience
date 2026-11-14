@@ -378,7 +378,7 @@ void main() {
       );
       expect(find.text('何も選択されていません'), findsNothing);
 
-      await tester.tap(find.widgetWithText(TextButton, 'フィルタを解除'));
+      await tester.tap(find.widgetWithText(TextButton, 'フィルタをすべて解除'));
       await tester.pump();
 
       expect(h.visionState.selectedId, isNull);

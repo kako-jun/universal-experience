@@ -51,27 +51,40 @@ class AdjustPanel extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(
+              // 見出しは左、解除ボタンは右端（main と同じ見た目）。
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                  child: Semantics(
-                    header: true,
-                    child: Text(
-                      l10n.adjustHeading,
-                      style: theme.textTheme.titleMedium,
-                    ),
+                // 見出しは縮めない（単語の途中で折れない）。足りない分はボタン側が吸収する。
+                Semantics(
+                  header: true,
+                  child: Text(
+                    l10n.adjustHeading,
+                    style: theme.textTheme.titleMedium,
                   ),
                 ),
-                TextButton.icon(
-                  // 色覚・advanced・プリセットのどの選択でも、選択を丸ごと
-                  // 外す唯一の入口（`VisionFilterState.clear`）。
-                  onPressed: hasSelection
-                      ? () {
-                          state.clear();
-                          dismissWelcomeBannerOnUserChange(context);
-                        }
-                      : null,
-                  icon: const Icon(Icons.clear, size: 18),
-                  label: Text(l10n.clearFilter),
+                // 文言が長い・文字が大きいときは、はみ出さずボタン側が折り返す。
+                Flexible(
+                  child: Tooltip(
+                    message: l10n.clearFilter,
+                    // ボタンのラベルと同じ文言なので、読み上げは 1 回だけにする（#79 と同じ扱い）。
+                    excludeFromSemantics: true,
+                    child: TextButton.icon(
+                      // 色覚・advanced・プリセットのどの選択でも、選択を丸ごと
+                      // 外す唯一の入口（`VisionFilterState.clear`）。
+                      onPressed: hasSelection
+                          ? () {
+                              state.clear();
+                              dismissWelcomeBannerOnUserChange(context);
+                            }
+                          : null,
+                      icon: const Icon(Icons.clear, size: 18),
+                      label: Text(
+                        l10n.clearFilter,
+                        maxLines: 2,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
