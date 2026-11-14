@@ -46,3 +46,31 @@ set(CASES
 foreach(c ${CASES})
   add_test(NAME ${c} COMMAND backend_policy_test ${c})
 endforeach()
+
+# screen_capture/backdrop の単体テスト (#180)。PipeWire / GTK 不要。
+add_executable(backdrop_test
+  backdrop_test.cc
+  ../screen_capture/backdrop.cc
+)
+target_compile_features(backdrop_test PRIVATE cxx_std_14)
+target_compile_options(backdrop_test PRIVATE -Wall -Werror -UNDEBUG)
+target_include_directories(backdrop_test PRIVATE ..)
+
+set(BACKDROP_CASES
+  merge_without_exclusion_copies_and_swizzles
+  rgbx_order_is_kept
+  excluded_pixels_keep_previous_frame
+  overlapping_exclusions_are_merged
+  unprimed_pixels_are_black_until_captured
+  size_change_resets
+  stride_larger_than_row_is_honoured
+  crop_is_clipped_to_bounds
+  invalid_frame_is_ignored
+  tracker_inflates_by_margin
+  tracker_keeps_history_and_predicts
+  tracker_drops_old_but_keeps_latest
+  tracker_hidden_excludes_nothing
+)
+foreach(c ${BACKDROP_CASES})
+  add_test(NAME backdrop_${c} COMMAND backdrop_test ${c})
+endforeach()
