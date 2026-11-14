@@ -317,6 +317,13 @@ void main() async {
       },
     )..start();
 
+    // #185 の切り分け: 原画比較の開始・解除を診断ログへ残す（1 回押しただけで原画表示が
+    // 残ると「フィルタが反映されない」と同じ見え方になるため）。
+    watchBypassForDiagnostics(
+      visionFilterState,
+      isHeldByHotkey: () => visionFilterState.isHeldBy(_hotkeyBypassSource),
+    );
+
     // グローバルホットキー (#63)。トレイ初期化の後に登録する
     // （非常口アクションがトレイ経由の showAndFocusLoupe を使うため）。
     hotkeyService = HotkeyService();
@@ -341,9 +348,17 @@ void main() async {
       AppHotkeyAction.toggleClickThrough: HotkeyHandlers(
         onKeyDown: () => unawaited(hotkeyActions.toggleClickThrough()),
       ),
+      // #185 の切り分け: keyUp が届く環境かを後から確かめられるよう、押下・解放を
+      // 診断ログへ残す（どのキーかも書かない。出来事だけ）。
       AppHotkeyAction.holdOriginal: HotkeyHandlers(
-        onKeyDown: hotkeyActions.holdOriginalKeyDown,
-        onKeyUp: hotkeyActions.holdOriginalKeyUp,
+        onKeyDown: () {
+          PreviewDiagnostics.record('hotkey_hold_original', {'key': 'down'});
+          hotkeyActions.holdOriginalKeyDown();
+        },
+        onKeyUp: () {
+          PreviewDiagnostics.record('hotkey_hold_original', {'key': 'up'});
+          hotkeyActions.holdOriginalKeyUp();
+        },
       ),
       AppHotkeyAction.emergencyExit: HotkeyHandlers(
         onKeyDown: () => unawaited(hotkeyActions.emergencyExit()),

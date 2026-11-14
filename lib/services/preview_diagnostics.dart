@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'vision_filter_state.dart';
+
 /// プレビュー描画の診断ログ（#185）。
 ///
 /// 実機で「プレビューが固まる」不具合が起きたとき、リリースビルドでも後から原因を
@@ -14,9 +16,13 @@ import 'package:flutter/foundation.dart';
 ///   （`main()` だけが呼ぶ。テストでは呼ばないので何も書かない）。
 /// - 容量: [kPreviewDiagnosticsMaxBytes] を越えたら `.1` へ退避して新しく始める
 ///   （最大で 2 ファイル分）。
-/// - 中身: 時刻・出来事の種類・描画の段・フィルタのカタログ id・層の数・サンプル id
-///   （ユーザー画像は `user` とだけ書く）・例外の型と短いメッセージ。ファイル名・
-///   パス・画像の中身は書かない（メッセージ中のホームディレクトリは `~` に置き換える）。
+/// - 中身: 時刻・出来事の種類・描画の段・フィルタのカタログ id・層の数・強度・
+///   サンプル id（ユーザー画像は `user` とだけ書く）・寸法・例外の型名。例外の
+///   メッセージは書かない（パスやファイル名を含みうるため）。値は英数字と `_.+:-` だけに
+///   絞り、それ以外の文字（パス区切り・空白など）は `_` に置き換える。
+/// - 無効化: 環境変数 `UE_PREVIEW_DIAGNOSTICS=0` で起動すると書かない
+///   （[installPreviewDiagnosticsLog]）。判断の記録は
+///   `docs/adr/2026-11-14-preview-diagnostics-log.md`。
 /// - 失敗は握りつぶす（診断のために本体を止めない）。
 class PreviewDiagnostics {
   PreviewDiagnostics._();
@@ -42,27 +48,22 @@ class PreviewDiagnostics {
     s.write(buf.toString());
   }
 
-  /// 例外を記録する。型と、短く切ったメッセージだけを残す（スタックは残さない）。
+  /// 例外を記録する。型名だけを残す（メッセージ・スタックは残さない。メッセージには
+  /// ファイルのパスや名前が入りうるため）。
   static void recordError(
     String event,
     Object error, [
     Map<String, Object?> fields = const {},
   ]) {
-    var message = error.toString();
-    if (message.length > 200) message = '${message.substring(0, 200)}…';
-    record(event, {
-      ...fields,
-      'error': error.runtimeType,
-      'message': message,
-    });
+    record(event, {...fields, 'error': error.runtimeType});
   }
 
+  /// 値を英数字と `_.+:-` だけにする（それ以外は `_`）。長さは 80 文字まで。
+  /// 書くのはこちらで組み立てた id・数値だけの想定だが、万一パスや自由な文字列が
+  /// 渡っても、区切り文字ごと崩して読めないようにする。
   static String _sanitize(String value) {
-    var out = value.replaceAll(RegExp(r'[\r\n\t]+'), ' ');
-    final home = Platform.environment['HOME'];
-    if (home != null && home.isNotEmpty) out = out.replaceAll(home, '~');
-    // 値の中の空白は区切りと紛れるので詰めて引用する。
-    return out.contains(' ') ? '"${out.replaceAll('"', "'")}"' : out;
+    final out = value.replaceAll(RegExp(r'[^A-Za-z0-9_.+:\-]'), '_');
+    return out.length > 80 ? out.substring(0, 80) : out;
   }
 }
 
@@ -103,9 +104,19 @@ class FilePreviewDiagnosticsSink implements PreviewDiagnosticsSink {
   }
 }
 
+/// 診断ログを無効にする環境変数（値が `0` のとき無効）。
+const String kPreviewDiagnosticsEnvVar = 'UE_PREVIEW_DIAGNOSTICS';
+
+/// [environment] で診断ログが無効にされているか（[kPreviewDiagnosticsEnvVar] が `0`）。
+bool previewDiagnosticsDisabled(Map<String, String> environment) =>
+    environment[kPreviewDiagnosticsEnvVar]?.trim() == '0';
+
 /// [supportDir]（アプリのサポートディレクトリ）の `logs/preview-diagnostics.log` を
 /// 診断ログの書き込み先にする。失敗しても例外は出さない（ログなしで続ける）。
-Future<void> installPreviewDiagnosticsLog(Directory supportDir) async {
+/// [kPreviewDiagnosticsEnvVar] が `0` なら何もしない（ファイルも作らない）。
+Future<void> installPreviewDiagnosticsLog(Directory supportDir,
+    {Map<String, String>? environment}) async {
+  if (previewDiagnosticsDisabled(environment ?? Platform.environment)) return;
   try {
     final dir = Directory('${supportDir.path}/logs');
     await dir.create(recursive: true);
@@ -177,4 +188,31 @@ class PreviewRenderWatchdog {
     _timer?.cancel();
     _timer = null;
   }
+}
+
+/// 原画比較（bypass）の切り替わりを診断ログへ残す（#185 の切り分け）。
+///
+/// ホットキー「押している間だけ原画」は、keyUp が届かない環境では押すたびに
+/// 切り替わる（`hotkey_actions.dart`）。1 回押しただけで原画表示が残ると、
+/// 「フィルタが反映されない」と同じ見え方になるが、描画は止まらないので描画の記録には
+/// 出ない。そこで `bypass_on` / `bypass_off`（on のときはホットキーが持っているか）を
+/// 残す。誰が持っているかは [isHeldByHotkey] でだけ見る（ほかの情報は書かない）。
+/// 戻り値を呼ぶと見張りをやめる。
+VoidCallback watchBypassForDiagnostics(
+  VisionFilterState state, {
+  required bool Function() isHeldByHotkey,
+}) {
+  var last = state.bypassed;
+  void listener() {
+    final now = state.bypassed;
+    if (now == last) return;
+    last = now;
+    PreviewDiagnostics.record(
+      now ? 'bypass_on' : 'bypass_off',
+      now ? {'hotkey': isHeldByHotkey()} : const {},
+    );
+  }
+
+  state.addListener(listener);
+  return () => state.removeListener(listener);
 }
