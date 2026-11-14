@@ -165,7 +165,7 @@ Key filterListTileKey(FilterListEntry entry) =>
 ///
 /// - 検索は日本語名・英語名のどちらでも当たる。検索語があるあいだは
 ///   カテゴリを無視して全体から探す。
-/// - カテゴリは「すべて」+ 7 カテゴリの `ChoiceChip`（選択中は色とチェックで示す）。
+/// - カテゴリは「すべて」+ 7 カテゴリの `ChoiceChip` を等幅グリッドに並べる（選択中は色とチェックで示す）。
 ///   一覧のスクロール領域の先頭に置く（見出しと検索欄だけが固定）。
 /// - 呼び出し側は**高さの制約が有限**の場所に置く（一覧は内側でスクロールする）。
 class FilterBrowser extends StatelessWidget {
@@ -247,14 +247,64 @@ class _SearchField extends StatelessWidget {
   }
 }
 
+/// カテゴリチップの 1 個ぶんの見た目の幅の内訳（ChoiceChip の既定の左右パディング + ラベル余白 +
+/// 選択時のチェック）。列数を決めるときの「最長ラベルが入るか」の見積もりに使う。
+const double _kChipChromeWidth = 16 + 16 + 26;
+
+/// チップ帯の列数。[count] 個を端数行なしで並べられるよう、約数のうち最長ラベルが
+/// 収まる最大の列にする（8 個なら 4 / 2 / 1）。収まる列が無ければ 1 列。
+@visibleForTesting
+int categoryChipColumns({
+  required double availableWidth,
+  required double widestLabel,
+  required int count,
+  double spacing = 8,
+}) {
+  for (var columns = count; columns > 1; columns--) {
+    if (count % columns != 0) continue;
+    final cell = (availableWidth - spacing * (columns - 1)) / columns;
+    if (cell >= widestLabel + _kChipChromeWidth) return columns;
+  }
+  // どの列数でも最長ラベルは収まらない。2 列まで許し（省略 + ツールチップ）、極端に狭いときだけ 1 列。
+  if (count % 2 == 0 && availableWidth >= 240) return 2;
+  return 1;
+}
+
+/// 左ペイン上部のカテゴリ切替。「すべて」+ 7 カテゴリを**等幅グリッド**に並べ、
+/// 行ごとに左右の端を揃える（自由折り返しの `Wrap` だと改行位置が不揃いで空きが出た）。
+/// 列数は幅と最長ラベルから決める（[categoryChipColumns]）。ラベルがセルに入らないときは
+/// 省略（…）し、全文をツールチップで出す。
 class _CategoryChips extends StatelessWidget {
   const _CategoryChips({required this.controller});
 
   final FilterBrowserController controller;
 
+  static const double _spacing = 8;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final labelStyle = Theme.of(context).chipTheme.labelStyle ??
+        Theme.of(context).textTheme.labelLarge ??
+        const TextStyle();
+    final scaler = MediaQuery.textScalerOf(context);
+    final direction = Directionality.of(context);
+    final labels = <String>[
+      l10n.filterCategoryAll,
+      for (final c in VisionFilterCategory.values) visionCategoryName(l10n, c),
+    ];
+    double measure(String text) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: labelStyle),
+        textDirection: direction,
+        textScaler: scaler,
+        maxLines: 1,
+      )..layout();
+      return painter.width;
+    }
+
+    final widths = [for (final l in labels) measure(l)];
+    final widest = widths.reduce((a, b) => a > b ? a : b);
     return Semantics(
       container: true,
       label: l10n.filterCategoryLabel,
@@ -265,23 +315,61 @@ class _CategoryChips extends StatelessWidget {
           final dimmed = controller.isSearching;
           // 検索語があるあいだは一覧がカテゴリを無視して全体から探すので、チップは
           // どれも非選択表示（チェック・選択色なし。通常の非選択チップと同じ見た目）にする（#143）。内部のカテゴリは保つ。
-          return Wrap(
-            spacing: 8,
-            children: [
-              ChoiceChip(
-                label: Text(l10n.filterCategoryAll),
-                selected: !dimmed && current == null,
-                showCheckmark: true,
-                onSelected: (_) => controller.setCategory(null),
-              ),
-              for (final category in VisionFilterCategory.values)
-                ChoiceChip(
-                  label: Text(visionCategoryName(l10n, category)),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = categoryChipColumns(
+                availableWidth: constraints.maxWidth,
+                widestLabel: widest,
+                count: labels.length,
+                spacing: _spacing,
+              );
+              final cell =
+                  (constraints.maxWidth - _spacing * (columns - 1)) / columns;
+              Widget chip(int i) {
+                final isAll = i == 0;
+                final category =
+                    isAll ? null : VisionFilterCategory.values[i - 1];
+                final truncated = widths[i] + _kChipChromeWidth > cell;
+                return ChoiceChip(
+                  // 幅いっぱいに広げる（チップはラベルの幅で縮むので、無限幅のラベルで
+                  // セル幅まで伸ばし、文字は中央に置く）。
+                  label: SizedBox(
+                    width: double.infinity,
+                    child: Text(
+                      labels[i],
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  tooltip: truncated ? labels[i] : null,
                   selected: !dimmed && current == category,
                   showCheckmark: true,
                   onSelected: (_) => controller.setCategory(category),
-                ),
-            ],
+                );
+              }
+
+              final rows = <Widget>[];
+              for (var start = 0; start < labels.length; start += columns) {
+                rows.add(
+                  Row(
+                    children: [
+                      for (var i = start;
+                          i < start + columns && i < labels.length;
+                          i++) ...[
+                        if (i > start) const SizedBox(width: _spacing),
+                        Expanded(child: chip(i)),
+                      ],
+                    ],
+                  ),
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: rows,
+              );
+            },
           );
         },
       ),

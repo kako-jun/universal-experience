@@ -273,7 +273,7 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 
 色覚 7 型・advanced 30 フィルタ・体験プリセットを 1 つの検索できる一覧に統合し、広幅は
 選ぶ / 見る / 調整の 3 カラム、狭幅は縦積み。起動モード等は AppBar のダイアログへ移した。
-カテゴリ切替を `NavigationRail` でなく `ChoiceChip` の `Wrap` にした理由と代替案（`NavigationRail`・
+カテゴリ切替を `NavigationRail` でなく `ChoiceChip`（当初 `Wrap`、#184 で等幅グリッド）にした理由と代替案（`NavigationRail`・
 ボトムシート）、ハイコントラスト対応は `docs/adr/2026-09-30-home-screen-unified-list-and-three-columns.md`。
 
 ### 色覚 4 型の 2×2 比較
