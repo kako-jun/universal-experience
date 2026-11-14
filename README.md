@@ -310,6 +310,38 @@ before/after プレビューの原画は、内蔵のサンプル画像集（8 �
   ため、カテゴリのチップはどれも非選択（チェック・選択色なし。通常の非選択チップと同じ見た目）で表示します。検索語を消すと
   元のカテゴリ選択に戻り、チップを押すと検索語が消えてそのカテゴリを選びます。
 
+### 描画が長引くとき・診断ログ
+
+明るい画像に一部のフィルタ（特に starbursts）を掛けると、プレビューの描画に数十秒かかることが
+あります（#185）。その間は止まって見えないよう、次のようにします。
+
+- 1 回の描画が 0.5 秒を越えたら、適用後の画像の上に「描画中…」を出します。
+- 重い組み合わせは、先に低解像度（512px）で描いて「描画中…（低解像度の仮表示）」として見せ、
+  フル解像度（1024px）が描けたら差し替えます。仮表示の間は書き出しボタンを出しません。
+- 描いた結果を最大 6 件（約 24 MiB）メモリに覚えておき、フィルタを付ける → 外す → 付けるのように
+  同じ組み合わせへ戻ったときは描き直さずにすぐ見せます（ディスクには書きません。読み込んだ画像の分は、
+  別の画像に替えたときに捨てます）。
+- サンプルを切り替えたとき、元の画像は適用後の描画を待たずにすぐ替わります。
+
+**診断ログ**: プレビューが固まったときに原因を辿れるよう、描画の失敗と、1 回の描画が 10 秒を越えて
+終わらなかったこと（とその後の完了）を、端末の次のファイルに 1 行ずつ残します（リリース版でも有効）。
+
+| OS | 置き場所 |
+|---|---|
+| Linux | `~/.local/share/com.example.universal_experience/logs/preview-diagnostics.log` |
+| macOS | `~/Library/Containers/com.example.universalExperience/Data/Library/Application Support/com.example.universalExperience/logs/preview-diagnostics.log` |
+| Windows | `%APPDATA%\com.example\universal_experience\logs\preview-diagnostics.log` |
+
+- 中身は、時刻・出来事（`preview_failed` / `preview_stalled` / `preview_recovered` / `preview_error` /
+  `app_start` / 原画比較の開始・解除 `bypass_on` / `bypass_off` / ホットキー「押している間だけ原画」の
+  押下・解放 `hotkey_hold_original`）・描画の段・フィルタの id・重ねている層の数・強度・サンプルの id
+  （読み込んだ画像は `user`）・画像の寸法・かかった時間・例外の種類（型名）だけです。
+  **ファイル名・パス・画像・例外のメッセージは書きません**。端末の外へ送ることもありません。
+  例: `2026-11-14T10:51:53Z preview_stalled view=before_after stage=render elapsed_ms=10006 filter=myopia+starbursts steps=2 strength=0.40 sample=info_board size=1024`
+- 256 KiB を越えたら `.1` に退避して新しく始めます（最大 2 ファイル）。
+- 書かないようにするには、環境変数 `UE_PREVIEW_DIAGNOSTICS=0` を付けて起動します。
+- 判断の記録: [`docs/adr/2026-11-14-preview-diagnostics-log.md`](docs/adr/2026-11-14-preview-diagnostics-log.md)
+
 ### 多言語（i18n）
 
 UI は **日本語 / 英語** に対応しています（`flutter_localizations` + ARB）。

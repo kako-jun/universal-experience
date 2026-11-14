@@ -1020,21 +1020,42 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   `_rebuild` の実行を直列化し（同時に走るジョブは常に1本、#85）、
   スライダーを連続操作しても実ブリッジ呼び出しが積み上がらないようにしている
   （#58 の世代管理・dispose・失敗表示の規約自体は変更していない）。
-  ネイティブの描画は途中で止められないため、1 回が長いとその間は before / after とも
-  前の描画のまま変わらない（両方を 1 回の完了でそろえて差し替える）。sensus の starbursts は
-  閾値を超える明るい画素の数に比例して重く、明るいサンプル（info_board 等）に 1024px で掛けると
-  1 回に数十秒かかる（#185。推奨サンプルの夜景では数十 ms）。そこで描画の列（実行中 + 保留）が
-  `kPreviewBusyThreshold`（500ms）を越えて続いたら、after 側に「描画中…」
-  （`PreviewBusyBadge`、`PreviewBusyTracker` が計時。`preview_rendering.dart`）を重ね、
-  止まっているのではないことを見せる。保留中の要求は、描画が例外で終わっても流す。
+  ネイティブの描画は途中で止められないため、1 回が長いとその間は after が前の描画のまま
+  変わらない。sensus の starbursts は閾値を超える明るい画素の数に比例して重く、明るいサンプル
+  （info_board 等）に 1024px で掛けると 1 回に数十秒かかる（#185。推奨サンプルの夜景では数十 ms。
+  sensus 側の高速化は kako-jun/sensus#196）。そこで次のようにしている（#185）。
+  - **描画中の札**: 1 回の描画が `kPreviewBusyThreshold`（500ms）を越えたら、after 側に「描画中…」
+    （`PreviewBusyBadge` を `PreviewBusyOverlay` で重ねる。after 側は札の有無に関わらず常に Stack）。
+    計時は `PreviewBusyTracker`（`preview_rendering.dart`）で、数えるのは**1 回の描画**の時間（列全体
+    ではない。速い描画が続くスライダーのドラッグでは出さない）。一度出たら列が空になるまで出したまま。
+  - **低解像度の仮表示（(a)）**: 重い入力（`previewInputIsHeavy` = starbursts を含む、または直前の
+    フル解像度の描画が `kProvisionalRenderAfter`（2 秒）を越えた）は、先に `kProvisionalPreviewSize`
+    （512px）へ縮めた入力で描いて仮表示し（札は「描画中…（低解像度の仮表示）」、書き出しボタンは出さない）、
+    続けてフル解像度で描いて差し替える。仮表示の後に新しい要求が来ていれば、フル解像度は描かずに譲る。
+  - **描画結果のキャッシュ（(b)）**: `PreviewRenderCache`（LRU、`kPreviewRenderCacheCapacity` = 6 件、
+    1024px で約 24 MiB）。鍵 `PreviewRenderKey` は元画像・解像度・描画の入力（複数層は合成ステップ列、
+    1 層はフィルタ + 強度）。`_scheduleRebuild` はまずキャッシュを見て、当たれば走っている描画を待たずに
+    すぐ表示する（走っている描画の結果は表示に使わず、キャッシュにだけ入る）。メモリだけでディスクには
+    書かない。ユーザー画像の分は元画像を替えたら捨て、ビューが外れたら全部捨てる。何も掛けない入力は覚えない。
+  - **元画像の読み込みを分ける（(c)）**: before の読み込み（`_requestBefore` / `_loadBefore`）は after の
+    直列描画とは別に走り、終わったらすぐ before を差し替えて after の描画を頼み直す。after の重い描画の
+    最中にサンプルを替えても、元画像側は固まらない（その間 after は前の描画のまま、札つき）。読み込みが
+    500ms を越えたら before 側に「画像を読み込み中…」。描画器には常に before の複製を渡す。
+  - 描画の段取りそのものが例外で終わっても（`_runRebuild` の catch。未処理例外にせず
+    `FlutterError.reportError` へ流す）、保留中の要求を流す。
   **診断ログ（#185）**: `lib/services/preview_diagnostics.dart`。`main()` がアプリのサポート
   ディレクトリ（Linux は `~/.local/share/<アプリ id>/`）の `logs/preview-diagnostics.log` を書き込み先にし、
-  リリースでも有効。`BeforeAfterView` と `ColorVisionCompareView` が、描画の失敗（`preview_failed`。段 =
-  `load` / `render` / `base` / `cell:<id>`・例外の型・200 文字までのメッセージ）と、1 回の描画が 10 秒を越えて
-  終わらないこと（`preview_stalled`。止まっている段）・その後の完了（`preview_recovered`、かかった時間）を
-  1 行ずつ残す（`PreviewRenderWatchdog`）。添える値はフィルタのカタログ id・層の数・強度・サンプル id
-  （ユーザー画像は `user`）・サイズだけで、ファイル名・パス・画像は書かない（メッセージ中のホームは `~`）。
-  256 KiB を越えたら `.1` へ退避する（最大 2 ファイル）。テストでは書き込み先を設定しないので何も書かない
+  リリースでも有効（判断は `docs/adr/2026-11-14-preview-diagnostics-log.md`。環境変数
+  `UE_PREVIEW_DIAGNOSTICS=0` で無効）。`BeforeAfterView` と `ColorVisionCompareView` が、描画の失敗
+  （`preview_failed`。段 = `load` / `provisional` / `render` / `base` / `cell:<id>`・例外の**型名だけ**）と、1 回の
+  描画が 10 秒を越えて終わらないこと（`preview_stalled`。止まっている段）・その後の完了（`preview_recovered`、
+  かかった時間）を 1 行ずつ残す（`PreviewRenderWatchdog`）。添える値はフィルタのカタログ id・層の数・強度・
+  サンプル id（ユーザー画像は `user`）・サイズだけ。例外のメッセージ・ファイル名・パス・画像は書かず、値は
+  英数字と `_.+:-` に絞る（それ以外は `_`）。切り分け用に、原画比較の開始・解除（`watchBypassForDiagnostics`）と
+  ホットキー「押している間だけ原画」の押下・解放も残す（keyUp が届かない環境では押すたびに切り替わり、
+  1 回押しただけで原画表示が残ると「フィルタが反映されない」と同じ見え方になるため。フィルタの付け外し・
+  強度変更は原画比較を解除する）。256 KiB を越えたら `.1` へ退避する（最大 2 ファイル）。テストでは
+  書き込み先を設定しないので何も書かない
 - `ColorVisionCompareView`（`lib/ui/widgets/color_vision_compare_view.dart`、#84）: 色覚 4 型の
   2×2 比較。`HomeScreen` の「2×2 で比較」が ON（かつ色覚カテゴリ選択中）の間、`BeforeAfterView` の
   代わりに `ImageSourcePicker` の中へ出る。並べる型は `kColorVisionCompareEntries`
@@ -1248,8 +1269,10 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   検証する（実描画そのものは下記の実ブリッジ integration test が担う）。
   同ファイルは `_scheduleRebuild` が実行を直列化すること（同時に走るジョブは
   常に1本、#85）も検証する。`preview_render_stall_test.dart` は、長い描画の間に「描画中…」が
-  出て終われば最新の選択に追いつくこと、付け外し等をシード固定でランダムに繰り返しても最後は
-  最新の入力に追いつくことを検証する（#185）。`cpu_vision_renderer_test.dart` は
+  出て終われば最新の選択に追いつくこと、低解像度の仮表示・描画結果のキャッシュ・元画像の読み込みの
+  分離、描画の段取りの例外の後も保留が流れること、付け外し等をシード固定でランダムに繰り返しても最後は
+  最新の入力に追いつくこと（`UE_SLOW_TESTS=1` で 8 シード × 300 手、通常は 2 × 120）を検証する（#185）。
+  `preview_render_cache_test.dart` は LRU（#185）を検証する。`cpu_vision_renderer_test.dart` は
   実ブリッジなしで検証できる部分（straight⇄premultiplied 変換の正しさ・
   `ImageDescriptor.raw` 経路のデコード失敗が例外として伝わること、#85）を担う
 - **GPU golden テスト**（`test/vision_filter_golden_test.dart` /
