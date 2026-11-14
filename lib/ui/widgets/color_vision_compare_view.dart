@@ -175,6 +175,9 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
     if (_applyOriginal()) return;
     if (_rebuildInFlight) {
       _rebuildPending = true;
+      // 走っている描画が終わるまでこの要求は描けない。札の時計が止まっていれば動かす
+      // （原画比較で札を消した後に戻したときも「描画中…」を出す、#185。BeforeAfterView と同じ）。
+      _busy.resume();
       return;
     }
     _rebuildInFlight = true;
@@ -357,8 +360,8 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
         composed.dispose();
         return;
       }
-      // 作り終えた土台は、この回が追い越されていても（原画比較へ替えた・入力が変わった）
-      // 保持する。土台は (steps, 元画像, サイズ) で引くので、別の入力に誤って使われることは
+      // 作り終えた土台は、この回が追い越されていても保持する（世代がずれるのは、描画中に
+      // 原画比較で原画を出したとき [_applyOriginal] だけ。入力の変化は [_rebuildPending] で扱う）。土台は (steps, 元画像, サイズ) で引くので、別の入力に誤って使われることは
       // なく、原画比較を解除して同じ層に戻ったときに重い再合成をしなくて済む（#122/#185）。
       final old = _baseImage;
       _baseImage = composed;
@@ -378,7 +381,6 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
     }
 
     for (final entry in kColorVisionCompareEntries) {
-      // 新しい要求が来ている（またはビューが外れた）なら、残りは描かずに捨てる。
       // 新しい要求が来ている・追い越された（原画比較で原画を出した）・ビューが外れたなら、
       // 残りは描かずに捨てる。
       if (_rebuildPending || generation != _generation || !mounted) {

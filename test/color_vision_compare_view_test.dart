@@ -1534,4 +1534,44 @@ void main() {
     expect(find.text(en.compareSharedStrengthNote(0)), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('土台の描画中に原画比較へ替えて戻したら、走っている描画を待つ間も「描画中…」を出す（#185）',
+      (tester) async {
+    await installFakes(tester);
+    final baseGate = Completer<void>();
+    CpuVisionRenderer.pipelineApplier = (source, steps) async {
+      await baseGate.future;
+      return source.clone();
+    };
+    const step = VisionStep(filter: VisionFilter.myopia(), strength: 0.5);
+    Widget withBase(double strength, List<VisionStep> steps) =>
+        ColorVisionCompareView(
+          strength: strength,
+          imageSource: const SamplePreviewImageSource('test'),
+          sampleSize: _kSize,
+          baseSteps: steps,
+        );
+    final en = lookupAppLocalizations(enLocale);
+    await tester.pumpWidget(localized(withBase(0.6, const [])));
+    await settle(tester);
+
+    await tester.pumpWidget(localized(withBase(0.6, const [step])));
+    await settle(tester);
+    await tester.pumpWidget(localized(withBase(0, const []))); // 原画比較: 札を消す
+    await settle(tester);
+    expect(find.text(en.previewRendering), findsNothing);
+    await tester.pumpWidget(localized(withBase(0.6, const [step]))); // 戻す
+    await tester.pump();
+    await tester.pump(kPreviewBusyThreshold ~/ 2);
+    expect(find.text(en.previewRendering), findsNothing);
+    await tester.pump(kPreviewBusyThreshold);
+    expect(find.text(en.previewRendering), findsOneWidget,
+        reason: '走っている土台の描画を待つ間も札を出す');
+
+    baseGate.complete();
+    await settle(tester);
+    expect(find.text(en.previewRendering), findsNothing);
+    expect(find.text(en.compareSharedStrengthNote(60)), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
