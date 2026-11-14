@@ -1472,4 +1472,66 @@ void main() {
         reason: '取り残された描画の結果で上書きしない');
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('土台を作っている最中に原画比較へ替えて戻しても、作り終えた土台を使い、再合成しない（#122/#185）',
+      (tester) async {
+    final fakes = await installFakes(tester);
+    final baseGate = Completer<void>();
+    var baseCalls = 0;
+    CpuVisionRenderer.pipelineApplier = (source, steps) async {
+      baseCalls++;
+      await baseGate.future;
+      return source.clone();
+    };
+    const step = VisionStep(filter: VisionFilter.myopia(), strength: 0.5);
+    Widget withBase(double strength, List<VisionStep> steps) =>
+        ColorVisionCompareView(
+          strength: strength,
+          imageSource: const SamplePreviewImageSource('test'),
+          sampleSize: _kSize,
+          baseSteps: steps,
+        );
+    await tester.pumpWidget(localized(withBase(0.6, const [])));
+    await settle(tester);
+    final cellsBefore = fakes.calls.length;
+
+    // 土台の描画を止めておく → 原画比較 → 元に戻す → 止めていた描画を流す。
+    await tester.pumpWidget(localized(withBase(0.6, const [step])));
+    await settle(tester);
+    expect(baseCalls, 1);
+    await tester.pumpWidget(localized(withBase(0, const [])));
+    await settle(tester);
+    await tester.pumpWidget(localized(withBase(0.6, const [step])));
+    await settle(tester);
+    baseGate.complete();
+    await settle(tester);
+
+    expect(baseCalls, 1, reason: '作り終えた土台を捨てず、戻したときに使う');
+    final en = lookupAppLocalizations(enLocale);
+    expect(find.text(en.compareSharedStrengthNote(60)), findsOneWidget);
+    expect(fakes.calls.length, cellsBefore + 4,
+        reason: '追い越された回のセルは描かず、最新の入力で 4 セルだけ描く');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('セルを描いている最中に原画比較へ替えたら、残りのセルは描かない（#185）', (tester) async {
+    final gate = Completer<void>();
+    final fakes =
+        await installFakes(tester, gate: (n) => n == 5 ? gate.future : null);
+    await tester.pumpWidget(localized(view(0.6)));
+    await settle(tester);
+    expect(fakes.calls, hasLength(4));
+
+    await tester.pumpWidget(localized(view(0.3))); // 5 回目（1 セル目）で止まる
+    await settle(tester);
+    expect(fakes.calls, hasLength(5));
+    await tester.pumpWidget(localized(view(0))); // 原画比較: 描かずに原画
+    await settle(tester);
+    gate.complete();
+    await settle(tester);
+    expect(fakes.calls, hasLength(5), reason: '追い越された回の残り 3 セルは描かない');
+    final en = lookupAppLocalizations(enLocale);
+    expect(find.text(en.compareSharedStrengthNote(0)), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

@@ -353,16 +353,20 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       } finally {
         if (!identical(composed, input)) input.dispose();
       }
-      if (generation != _generation || !mounted) {
+      if (!mounted) {
         composed.dispose();
         return;
       }
+      // 作り終えた土台は、この回が追い越されていても（原画比較へ替えた・入力が変わった）
+      // 保持する。土台は (steps, 元画像, サイズ) で引くので、別の入力に誤って使われることは
+      // なく、原画比較を解除して同じ層に戻ったときに重い再合成をしなくて済む（#122/#185）。
       final old = _baseImage;
       _baseImage = composed;
       _baseImageSteps = baseSteps;
       _baseImageSize = size;
       _baseImageSource = source;
       old?.dispose();
+      if (generation != _generation) return;
       base = composed;
     }
 
@@ -375,7 +379,9 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
 
     for (final entry in kColorVisionCompareEntries) {
       // 新しい要求が来ている（またはビューが外れた）なら、残りは描かずに捨てる。
-      if (_rebuildPending || !mounted) {
+      // 新しい要求が来ている・追い越された（原画比較で原画を出した）・ビューが外れたなら、
+      // 残りは描かずに捨てる。
+      if (_rebuildPending || generation != _generation || !mounted) {
         discardProduced();
         return;
       }
