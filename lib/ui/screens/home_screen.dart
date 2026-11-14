@@ -420,75 +420,86 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     LayerChipStrip(
-                      trailing: (visionState.bypassed || canCompare)
-                          ? Row(
-                              mainAxisSize: MainAxisSize.min,
-                              spacing: 8,
-                              children: [
-                                if (visionState.bypassed)
-                                  Chip(
-                                    label: Text(l10n.bypassedBadgeLabel),
-                                    backgroundColor:
-                                        theme.colorScheme.secondaryContainer,
-                                    labelStyle:
-                                        theme.textTheme.labelLarge?.copyWith(
-                                      color: theme
-                                          .colorScheme.onSecondaryContainer,
-                                    ),
-                                    visualDensity: VisualDensity.compact,
-                                  ),
-                                if (canCompare)
-                                  FilterChip(
-                                    label: Text(l10n.compareToggleLabel),
-                                    tooltip: l10n.compareToggleTooltip,
-                                    selected: _compareColorVision,
-                                    onSelected: (value) => setState(
-                                        () => _compareColorVision = value),
-                                  ),
-                              ],
-                            )
+                      trailingLabel:
+                          canCompare ? l10n.compareToggleLabel : null,
+                      trailingBuilder: canCompare
+                          ? (context, compact) => FilterChip(
+                                // 文字が大きい・幅が狭いときは、アイコンだけ + tooltip にして
+                                // 帯のチップの領域を潰さない（#183）。
+                                label: compact
+                                    ? Icon(
+                                        Icons.compare,
+                                        size: 20,
+                                        semanticLabel: l10n.compareToggleLabel,
+                                      )
+                                    : Text(l10n.compareToggleLabel),
+                                tooltip: l10n.compareToggleTooltip,
+                                selected: _compareColorVision,
+                                onSelected: (value) =>
+                                    setState(() => _compareColorVision = value),
+                              )
                           : null,
                     ),
                   ],
                 ),
                 ImageSourcePicker(
-                  child: comparing
-                      ? ColorVisionCompareView(
-                          strength: compareInput.strength,
-                          baseSteps: compareInput.baseSteps,
-                          baseLayers: compareInput.baseLayers,
-                          imageSource: imageSourceState.current,
-                        )
-                      : BeforeAfterView(
-                          filter: visionState.build(),
-                          filterId: visionState.selectedId,
-                          strength: strength,
-                          variantId: visionState.focusedVariantId,
-                          // 層が複数のときだけ合成経路（#119）。1 層以下は従来の
-                          // 単一フィルタ経路のまま。
-                          steps: visionState.layers.length > 1
-                              ? previewPipelineSteps(visionState)
-                              : null,
-                          // 複数層の見出し・HUD は名前の要約にする（#120）。
-                          layerNames: visionState.layers.length > 1
-                              ? [
-                                  for (final layer in visionState.layers)
-                                    visionLayerDisplayName(l10n, layer),
-                                ]
-                              : null,
-                          layerIds: visionState.layers.length > 1
-                              ? [
-                                  for (final layer in visionState.layers)
-                                    layer.id,
-                                ]
-                              : null,
-                          // 書き出しは全層の値から作る（#121）。
-                          exportLayers: visionState.layers.length > 1
-                              ? exportLayersOf(visionState)
-                              : null,
-                          imageSource: imageSourceState.current,
-                          maxPaneSide: maxPaneSide,
+                  // 原画表示中のバッジ（#183。見出し行を廃止したので、高さを足さずプレビューの
+                  // 右下に重ねる）。
+                  child: Stack(
+                    children: [
+                      comparing
+                          ? ColorVisionCompareView(
+                              strength: compareInput.strength,
+                              baseSteps: compareInput.baseSteps,
+                              baseLayers: compareInput.baseLayers,
+                              imageSource: imageSourceState.current,
+                            )
+                          : BeforeAfterView(
+                              filter: visionState.build(),
+                              filterId: visionState.selectedId,
+                              strength: strength,
+                              variantId: visionState.focusedVariantId,
+                              // 層が複数のときだけ合成経路（#119）。1 層以下は従来の
+                              // 単一フィルタ経路のまま。
+                              steps: visionState.layers.length > 1
+                                  ? previewPipelineSteps(visionState)
+                                  : null,
+                              // 複数層の見出し・HUD は名前の要約にする（#120）。
+                              layerNames: visionState.layers.length > 1
+                                  ? [
+                                      for (final layer in visionState.layers)
+                                        visionLayerDisplayName(l10n, layer),
+                                    ]
+                                  : null,
+                              layerIds: visionState.layers.length > 1
+                                  ? [
+                                      for (final layer in visionState.layers)
+                                        layer.id,
+                                    ]
+                                  : null,
+                              // 書き出しは全層の値から作る（#121）。
+                              exportLayers: visionState.layers.length > 1
+                                  ? exportLayersOf(visionState)
+                                  : null,
+                              imageSource: imageSourceState.current,
+                              maxPaneSide: maxPaneSide,
+                            ),
+                      if (visionState.bypassed)
+                        Positioned(
+                          right: 4,
+                          bottom: 4,
+                          child: Chip(
+                            label: Text(l10n.bypassedBadgeLabel),
+                            backgroundColor:
+                                theme.colorScheme.secondaryContainer,
+                            labelStyle: theme.textTheme.labelLarge?.copyWith(
+                              color: theme.colorScheme.onSecondaryContainer,
+                            ),
+                            visualDensity: VisualDensity.compact,
+                          ),
                         ),
+                    ],
+                  ),
                 ),
               ],
             ),

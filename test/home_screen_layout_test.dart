@@ -1023,7 +1023,8 @@ void main() {
       ('広幅 1600x900', const Size(1600, 900)),
       ('既定 800x600', defaultWindow),
     ]) {
-      for (final scale in [1.0, 2.0]) {
+      // 1.19 = 「2×2 で比較」が文字つきの最大（実測でチップの領域が足りる）、2.0 = アイコンだけに縮む。
+      for (final scale in [1.0, 1.19, 2.0]) {
         for (final locale in [const Locale('ja'), const Locale('en')]) {
           testWidgets(
               '$label・文字 x$scale・${locale.languageCode}: 0/1/2/5 層で位置が同一',
@@ -1032,52 +1033,97 @@ void main() {
             tester.platformDispatcher.textScaleFactorTestValue = scale;
             addTearDown(
                 tester.platformDispatcher.clearTextScaleFactorTestValue);
-            final h = await pumpHomeScreen(tester, size: size, locale: locale);
-            final firstSampleChip = find
-                .descendant(
-                    of: find.byType(ImageSourcePicker),
-                    matching: find.byType(ChoiceChip))
-                .first;
-            Map<String, Object> measure() {
-              final img = tester.getRect(find.byType(PreviewImageView).first);
-              return {
-                'strip': tester.getRect(find.byType(LayerChipStrip)),
-                'image': img,
-                'sampleChipTop': tester.getTopLeft(firstSampleChip).dy,
-              };
-            }
-
-            void expectNoPageScroll() {
-              final scrollables = find.ancestor(
-                of: find.byType(LayerChipStrip),
-                matching: find.byType(Scrollable),
-              );
-              for (final e in scrollables.evaluate()) {
-                final st = (e as StatefulElement).state as ScrollableState;
-                expect(st.position.pixels, 0, reason: '縦ページスクロールは動かない');
+            // 全ての例外を集める（最初の 1 件しか見ない takeException では、一覧の既存の溢れに
+            // 隠れて帯の溢れを見逃す）。帯（layer_chip_strip.dart）由来があれば失敗にする。
+            final errors = <String>[];
+            final previousOnError = FlutterError.onError;
+            // 木が生きているうちに文字にする（後からだと「無効な要素」で文字にできない）。
+            FlutterError.onError = (d) => errors.add(d.toString());
+            try {
+              final h =
+                  await pumpHomeScreen(tester, size: size, locale: locale);
+              // 「原画表示中」も出した状態で測る（右端の固定枠が帯を潰さないこと）。
+              h.visionState.acquireBypass(Object());
+              final firstSampleChip = find
+                  .descendant(
+                      of: find.byType(ImageSourcePicker),
+                      matching: find.byType(ChoiceChip))
+                  .first;
+              Map<String, Object> measure() {
+                final img = tester.getRect(find.byType(PreviewImageView).first);
+                return {
+                  'strip': tester.getRect(find.byType(LayerChipStrip)),
+                  'image': img,
+                  'sampleChipTop': tester.getTopLeft(firstSampleChip).dy,
+                };
               }
-            }
 
-            final base = measure();
-            expectNoPageScroll();
-            for (var n = 1; n <= 5; n++) {
-              h.visionState.toggle(ids[n - 1]);
-              await tester.pump();
-              await tester.pump();
-              if (n == 1 || n == 2 || n == 5) {
-                expect(measure(), base, reason: '$n 層');
-                expectNoPageScroll();
+              void expectNoPageScroll() {
+                final scrollables = find.ancestor(
+                  of: find.byType(LayerChipStrip),
+                  matching: find.byType(Scrollable),
+                );
+                for (final e in scrollables.evaluate()) {
+                  final st = (e as StatefulElement).state as ScrollableState;
+                  expect(st.position.pixels, 0, reason: '縦ページスクロールは動かない');
+                }
               }
+
+              // 「2×2 で比較」が出ているときは、帯の中に完全に収まり、チップの領域は最小幅以上。
+              void expectStripContents(String reason) {
+                final strip = tester.getRect(find.byType(LayerChipStrip));
+                final chipArea = tester.getSize(find
+                    .descendant(
+                        of: find.byType(LayerChipStrip),
+                        matching: find.byType(Scrollable))
+                    .first);
+                final layers = h.visionState.layers;
+                if (layers.isNotEmpty) {
+                  expect(chipArea.width,
+                      greaterThanOrEqualTo(LayerChipStrip.minChipAreaWidth),
+                      reason: '$reason: チップの領域の幅');
+                }
+                final compare = find.descendant(
+                    of: find.byType(LayerChipStrip),
+                    matching: find.byType(FilterChip));
+                if (layers.any((l) => l.id == 'protanopia')) {
+                  expect(compare, findsOneWidget, reason: reason);
+                  final r = tester.getRect(compare);
+                  expect(r.left, greaterThanOrEqualTo(strip.left),
+                      reason: '$reason: 「2×2 で比較」が帯の左に収まる');
+                  expect(r.right, lessThanOrEqualTo(strip.right),
+                      reason: '$reason: 「2×2 で比較」が帯の右に収まる');
+                  expect(r.top, greaterThanOrEqualTo(strip.top),
+                      reason: '$reason: 「2×2 で比較」が帯の上に収まる');
+                  expect(r.bottom, lessThanOrEqualTo(strip.bottom),
+                      reason: '$reason: 「2×2 で比較」が帯の下に収まる');
+                }
+              }
+
+              final base = measure();
+              expectNoPageScroll();
+              for (var n = 1; n <= 5; n++) {
+                h.visionState.toggle(ids[n - 1]);
+                await tester.pump();
+                await tester.pump();
+                if (n == 1 || n == 2 || n == 5) {
+                  expect(measure(), base, reason: '$n 層');
+                  expectNoPageScroll();
+                  expectStripContents('$n 層');
+                }
+              }
+              h.visionState.clear();
+              await tester.pump();
+              expect(measure(), base, reason: '全解除して 0 層');
+            } finally {
+              FlutterError.onError = previousOnError;
             }
-            h.visionState.clear();
-            await tester.pump();
-            expect(measure(), base, reason: '全解除して 0 層');
-            // ×2.0 では一覧の行（ExperimentalBadge）が溢れる既知の例外が出る。帯が原因でないことだけ確かめる。
-            Object? e;
-            while ((e = tester.takeException()) != null) {
-              expect(e.toString(), isNot(contains('layer_chip_strip')));
-              expect(e.toString(), isNot(contains('LayerChipStrip')));
-            }
+            final fromStrip = errors
+                .where((e) =>
+                    e.contains('layer_chip_strip') ||
+                    e.contains('LayerChipStrip'))
+                .toList();
+            expect(fromStrip, isEmpty, reason: '帯由来の例外: $fromStrip');
           });
         }
       }
@@ -1089,13 +1135,17 @@ void main() {
     testWidgets('既定 800x600: 5 層でも選択欄が収まり、画像は 1 層のときと同じ大きさ（ja）',
         (tester) async {
       loadPreviewImages();
-      await pumpHomeScreen(tester,
-          size: defaultWindow,
-          select: (s) {
-            for (final id in ['myopia', 'protanopia', 'glaucoma', 'cataract']) {
-              s.toggle(id);
-            }
-          });
+      await pumpHomeScreen(tester, size: defaultWindow, select: (s) {
+        for (final id in [
+          'myopia',
+          'protanopia',
+          'glaucoma',
+          'cataract',
+          'night_blindness',
+        ]) {
+          s.toggle(id);
+        }
+      });
       final picker = tester.getRect(find.byType(ImageSourcePicker));
       expect(picker.bottom, lessThanOrEqualTo(defaultWindow.height - 8));
       expect(tester.getRect(find.byType(PreviewImageView).first).width,

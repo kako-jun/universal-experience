@@ -661,8 +661,13 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                         : kVisionFilterCatalogById[widget.filterId])
                     ?.isTimeDependent ??
                 false;
+        // 複数層の見出しは、名前だけを省略し「…（+N）」の接尾辞は常に見せる（#183）。
+        final afterSuffix =
+            multiLayer ? layerNamesSuffix(l10n, layerNames) : null;
         final afterPane = _Pane(
-          label: afterName,
+          label: multiLayer ? layerNamesHead(layerNames) : afterName,
+          labelSuffix: afterSuffix,
+          semanticsLabel: afterName,
           // 複数層の見出しも 1 行で省略する（#183）。折り返すと層数で画像の位置が動くため。
           // 全部の名前は帯のチップと画像の代替テキストに出る。
           // Export is only meaningful when a real "after" image exists.
@@ -751,9 +756,17 @@ class _Pane extends StatelessWidget {
     required this.label,
     required this.child,
     this.trailing,
+    this.labelSuffix,
+    this.semanticsLabel,
   });
 
   final String label;
+
+  /// 名前の省略に巻き込まず常に見せる接尾辞（「…（+N）」）。
+  final String? labelSuffix;
+
+  /// 見出しの読み上げ（ラベルと接尾辞を分けて出すときの、つなげた全文）。
+  final String? semanticsLabel;
 
   final Widget child;
 
@@ -766,12 +779,29 @@ class _Pane extends StatelessWidget {
     // 書き出しボタン（after 側だけ）を含む行は 48dp（タップ領域の下限、#45）。
     // before 側にも同じ高さを使うのは、左右の見出し行の高さを揃えて
     // 画像の上端をずらさないため。
-    final text = Text(
+    final head = Text(
       label,
       style: theme.textTheme.labelLarge,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
     );
+    final text = labelSuffix == null
+        ? head
+        : Semantics(
+            label: semanticsLabel,
+            excludeSemantics: true,
+            child: Row(
+              children: [
+                Flexible(child: head),
+                Text(
+                  ' $labelSuffix',
+                  style: theme.textTheme.labelLarge,
+                  maxLines: 1,
+                  softWrap: false,
+                ),
+              ],
+            ),
+          );
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 48, maxHeight: 48),
       child: Row(

@@ -9,7 +9,7 @@ import '../../services/settings_service.dart'
 import '../../services/vision_filter_state.dart';
 import 'filter_list_tile.dart' show LayerOrderBadge;
 
-/// プレビューの見出し行の下に並べる、重ねているフィルタのチップ帯（#120、#183）。
+/// プレビューカードの先頭に並べる、重ねているフィルタのチップ帯（#120、#183）。
 ///
 /// 適用順（= 一覧の番号バッジ・調整パネルの層の並びと同じ）にチップを並べ、各チップに ✕ を
 /// 付ける。チップを押すとそのフィルタが「調整中」になる（[VisionFilterState.focusLayer]。調整
@@ -25,11 +25,22 @@ import 'filter_list_tile.dart' show LayerOrderBadge;
 /// （ドラッグは許可しない: 数 px のぶれでチップのタップを奪うため）。
 /// 状態は形で伝える: 調整中のチップは塗り + 太い枠、それ以外は細い枠（色だけに頼らない、DESIGN §7）。
 class LayerChipStrip extends StatefulWidget {
-  const LayerChipStrip({super.key, this.trailing});
+  const LayerChipStrip({super.key, this.trailingBuilder, this.trailingLabel});
 
-  /// 帯の右端に固定で置く操作（スクロールの外）。ホームでは「原画表示中」のバッジと
-  /// 「2×2 で比較」の切替を入れる（#183。プレビューの見出し行を廃止して帯へ移した）。
-  final Widget? trailing;
+  /// 帯の右端に固定で置く操作（スクロールの外）。ホームでは「2×2 で比較」の切替を入れる
+  /// （#183。プレビューの見出し行を廃止して帯へ移した）。`compact` が true のときは、
+  /// 文字が大きい・幅が狭いので、文字を出さないアイコン + tooltip の小さい形にする
+  /// （チップの領域を [minChipAreaWidth] 以上に保つため）。
+  final Widget Function(BuildContext context, bool compact)? trailingBuilder;
+
+  /// [trailingBuilder] が出す操作の文字つきの形のラベル。右端の固定枠が文字つきの形だと
+  /// チップの領域が [minChipAreaWidth] を割るかどうかを、実際のフォント・文字倍率で測って
+  /// （TextPainter）決めるために使う。
+  final String? trailingLabel;
+
+  /// 右端の固定枠を除いた、チップのスクロール領域の最小幅。これを割りそうなとき（大きい文字・
+  /// 狭いカード）は、右端の操作（「すべて解除」「2×2 で比較」）を文字なしのアイコン + tooltip に縮める。
+  static const double minChipAreaWidth = 140;
 
   /// チップの最小の高さ（最小タップ目標 48dp）。
   static const double chipHeight = 48;
@@ -40,23 +51,22 @@ class LayerChipStrip extends StatefulWidget {
   /// スクロールバーのつまみの太さ（段の中に収まる。上下 1dp ずつ余白）。
   static const double scrollbarThickness = 4;
 
-  /// Material 3 の `FilterChip`（「2×2 で比較」）の縦の余白と枠の合計: 上下パディング 8 × 2 +
-  /// 枠 1 × 2 = 18。ラベルの 1 行の高さに足すと実際のチップの高さになる（×2.0 で実測 58 = 40.04 + 18）。
-  static const double filterChipVerticalExtra = 18;
-
-  /// 文字拡大を考慮した帯の中身の高さ。チップの本文（bodyLarge の 1 行）、最小タップ目標 [chipHeight]、
-  /// 右端の「2×2 で比較」の `FilterChip`（labelLarge の 1 行 + [filterChipVerticalExtra]）のうち最大。
-  /// 層の種類・数・色覚の層の有無で帯の高さが動かないよう、右端の操作が出ないときも同じ値にする。
+  /// 文字拡大を考慮した帯の中身の高さ。チップの本文（bodyLarge の 1 行）と最小タップ目標
+  /// [chipHeight] の大きい方。右端の「2×2 で比較」の `FilterChip` は、文字倍率が
+  /// 文字つきの間（ラベルの 1 行 + 上下の余白と枠 18 ≦ 48 は、文字倍率が 1.2 未満で成り立つ）は
+  /// [chipHeight] に収まり、文字倍率が大きいときはアイコンだけ（48dp のタップ領域）に縮むので、高さの項に入れなくてよい
+  /// （layout テストが ×1.0・×1.19・×2.0 で帯に完全に収まることを確かめる）。
+  /// 層の種類・数・色覚の層の有無で帯の高さが動かない。
   static double chipHeightFor(BuildContext context) {
-    final theme = Theme.of(context);
-    final scaler = MediaQuery.textScalerOf(context);
-    final body = theme.textTheme.bodyLarge;
-    final label = theme.textTheme.labelLarge;
-    final line = scaler.scale(body?.fontSize ?? 16) * (body?.height ?? 1.5);
-    final chip = scaler.scale(label?.fontSize ?? 14) * (label?.height ?? 1.43) +
-        filterChipVerticalExtra;
-    return [chipHeight, line, chip].reduce((a, b) => a > b ? a : b);
+    final body = Theme.of(context).textTheme.bodyLarge;
+    final line = MediaQuery.textScalerOf(context).scale(body?.fontSize ?? 16) *
+        (body?.height ?? 1.5);
+    return line > chipHeight ? line : chipHeight;
   }
+
+  /// 帯全体の高さ（チップ + スクロールバーの段）。層数に関わらず同じ値になる。
+  static double heightFor(BuildContext context) =>
+      chipHeightFor(context) + scrollbarLane;
 
   /// スクロールバーのつまみの色。カード面の上で非テキストの 3:1 以上を取る
   /// （`onSurfaceVariant`。テストで測る）。
@@ -66,10 +76,6 @@ class LayerChipStrip extends StatefulWidget {
   /// 0 層の案内文の色。カード面の上で 4.5:1 以上を取る（テストで測る）。
   static Color emptyHintColorOf(ThemeData theme) =>
       theme.colorScheme.onSurfaceVariant;
-
-  /// 帯全体の高さ（チップ + スクロールバーの段）。層数に関わらず同じ値になる。
-  static double heightFor(BuildContext context) =>
-      chipHeightFor(context) + scrollbarLane;
 
   @override
   State<LayerChipStrip> createState() => _LayerChipStripState();
@@ -108,127 +114,180 @@ class _LayerChipStripState extends State<LayerChipStrip> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Consumer<VisionFilterState>(
-      builder: (context, state, _) {
-        final layers = state.layers;
-        final height = LayerChipStrip.heightFor(context);
-        _keys.removeWhere((id, _) => !layers.any((l) => l.id == id));
-        // 層 0 個: 同じ高さの空き領域に淡い案内を出す（レイアウトがずれないように）。
-        if (layers.isEmpty) {
-          _lastFocusedId = null;
-          final theme = Theme.of(context);
-          return SizedBox(
-            height: height,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: Text(
-                      l10n.layerStripEmptyHint,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                          color: LayerChipStrip.emptyHintColorOf(theme)),
-                    ),
-                  ),
-                ),
-                if (widget.trailing != null) ...[
-                  const SizedBox(width: 8),
-                  widget.trailing!,
-                ],
-              ],
-            ),
-          );
-        }
-        final focusedId = state.focusedId;
-        if (focusedId != _lastFocusedId) {
-          _lastFocusedId = focusedId;
-          if (focusedId != null) _reveal(focusedId);
-        }
-        return Semantics(
-          container: true,
-          label: l10n.layerStripSemantics,
-          child: SizedBox(
-            height: height,
-            child: Row(
-              children: [
-                Expanded(
-                  child: ScrollConfiguration(
-                    behavior: ScrollConfiguration.of(context)
-                        .copyWith(scrollbars: false),
-                    child: ScrollbarTheme(
-                      data: ScrollbarThemeData(
-                        thumbColor: WidgetStatePropertyAll(
-                            LayerChipStrip.thumbColorOf(Theme.of(context))),
-                        radius: const Radius.circular(2),
-                        crossAxisMargin: 1,
-                      ),
-                      child: Scrollbar(
-                        controller: _controller,
-                        thumbVisibility: true,
-                        thickness: LayerChipStrip.scrollbarThickness,
-                        child: SingleChildScrollView(
-                          controller: _controller,
-                          scrollDirection: Axis.horizontal,
-                          // チップの下にスクロールバーの段を空ける（枠と重ならない）。
-                          padding: const EdgeInsets.only(
-                              bottom: LayerChipStrip.scrollbarLane),
-                          child: Row(
-                            children: [
-                              for (var i = 0; i < layers.length; i++) ...[
-                                if (i > 0) const SizedBox(width: 8),
-                                // 名前が長くても 1 チップが帯を占有しないよう、幅に上限を置く。
-                                ConstrainedBox(
-                                  key: _keys.putIfAbsent(
-                                      layers[i].id, () => GlobalKey()),
-                                  constraints:
-                                      const BoxConstraints(maxWidth: 280),
-                                  child: _LayerChip(
-                                    key: ValueKey('layer_chip_${layers[i].id}'),
-                                    id: layers[i].id,
-                                    order: i + 1,
-                                    name:
-                                        visionLayerDisplayName(l10n, layers[i]),
-                                    focused: layers[i].id == state.focusedId,
-                                    onFocus: () =>
-                                        state.focusLayer(layers[i].id),
-                                    onRemove: () {
-                                      state.remove(layers[i].id);
-                                      dismissWelcomeBannerOnUserChange(context);
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ],
+    return LayoutBuilder(
+      builder: (context, box) {
+        final width = box.maxWidth;
+        return Consumer<VisionFilterState>(
+          builder: (context, state, _) {
+            final layers = state.layers;
+            final height = LayerChipStrip.heightFor(context);
+            final compact =
+                _needsCompact(context, width, layers.length >= 2, l10n);
+            _keys.removeWhere((id, _) => !layers.any((l) => l.id == id));
+            // 層 0 個: 同じ高さの空き領域に淡い案内を出す（レイアウトがずれないように）。
+            if (layers.isEmpty) {
+              _lastFocusedId = null;
+              final theme = Theme.of(context);
+              return SizedBox(
+                height: height,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        // 見えない見出しの Semantics と混ざらないよう、自分のノードにする。
+                        child: Semantics(
+                          container: true,
+                          child: Text(
+                            l10n.layerStripEmptyHint,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                                color: LayerChipStrip.emptyHintColorOf(theme)),
                           ),
                         ),
                       ),
                     ),
-                  ),
+                    if (widget.trailingBuilder != null) ...[
+                      const SizedBox(width: 8),
+                      widget.trailingBuilder!(context, compact),
+                    ],
+                  ],
                 ),
-                if (layers.length >= 2) ...[
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    key: const ValueKey('layer_strip_clear_all'),
-                    onPressed: () {
-                      state.clear();
-                      dismissWelcomeBannerOnUserChange(context);
-                    },
-                    icon: const Icon(Icons.clear, size: 18),
-                    label: Text(l10n.layerStripClearAll),
-                  ),
-                ],
-                if (widget.trailing != null) ...[
-                  const SizedBox(width: 8),
-                  widget.trailing!,
-                ],
-              ],
-            ),
-          ),
+              );
+            }
+            final focusedId = state.focusedId;
+            if (focusedId != _lastFocusedId) {
+              _lastFocusedId = focusedId;
+              if (focusedId != null) _reveal(focusedId);
+            }
+            return Semantics(
+              container: true,
+              label: l10n.layerStripSemantics,
+              child: SizedBox(
+                height: height,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ScrollConfiguration(
+                        behavior: ScrollConfiguration.of(context)
+                            .copyWith(scrollbars: false),
+                        child: ScrollbarTheme(
+                          data: ScrollbarThemeData(
+                            thumbColor: WidgetStatePropertyAll(
+                                LayerChipStrip.thumbColorOf(Theme.of(context))),
+                            radius: const Radius.circular(2),
+                            crossAxisMargin: 1,
+                          ),
+                          child: Scrollbar(
+                            controller: _controller,
+                            thumbVisibility: true,
+                            thickness: LayerChipStrip.scrollbarThickness,
+                            child: SingleChildScrollView(
+                              controller: _controller,
+                              scrollDirection: Axis.horizontal,
+                              // チップの下にスクロールバーの段を空ける（枠と重ならない）。
+                              padding: const EdgeInsets.only(
+                                  bottom: LayerChipStrip.scrollbarLane),
+                              child: Row(
+                                children: [
+                                  for (var i = 0; i < layers.length; i++) ...[
+                                    if (i > 0) const SizedBox(width: 8),
+                                    // 名前が長くても 1 チップが帯を占有しないよう、幅に上限を置く。
+                                    ConstrainedBox(
+                                      key: _keys.putIfAbsent(
+                                          layers[i].id, () => GlobalKey()),
+                                      constraints:
+                                          const BoxConstraints(maxWidth: 280),
+                                      child: _LayerChip(
+                                        key: ValueKey(
+                                            'layer_chip_${layers[i].id}'),
+                                        id: layers[i].id,
+                                        order: i + 1,
+                                        name: visionLayerDisplayName(
+                                            l10n, layers[i]),
+                                        focused:
+                                            layers[i].id == state.focusedId,
+                                        onFocus: () =>
+                                            state.focusLayer(layers[i].id),
+                                        onRemove: () {
+                                          state.remove(layers[i].id);
+                                          dismissWelcomeBannerOnUserChange(
+                                              context);
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (layers.length >= 2) ...[
+                      const SizedBox(width: 8),
+                      if (compact)
+                        IconButton(
+                          key: const ValueKey('layer_strip_clear_all'),
+                          tooltip: l10n.layerStripClearAll,
+                          onPressed: () {
+                            state.clear();
+                            dismissWelcomeBannerOnUserChange(context);
+                          },
+                          icon: const Icon(Icons.clear),
+                        )
+                      else
+                        TextButton.icon(
+                          key: const ValueKey('layer_strip_clear_all'),
+                          onPressed: () {
+                            state.clear();
+                            dismissWelcomeBannerOnUserChange(context);
+                          },
+                          icon: const Icon(Icons.clear, size: 18),
+                          label: Text(l10n.layerStripClearAll),
+                        ),
+                    ],
+                    if (widget.trailingBuilder != null) ...[
+                      const SizedBox(width: 8),
+                      widget.trailingBuilder!(context, compact),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
+  }
+
+  /// 右端の固定枠を文字つきの形で置くと、チップの領域が [LayerChipStrip.minChipAreaWidth] を
+  /// 割るか。実際のフォント・文字倍率で、「すべて解除」（2 層以上）と [LayerChipStrip.trailingLabel] の
+  /// 文字つきの形の幅を測る。
+  bool _needsCompact(BuildContext context, double width, bool hasClearAll,
+      AppLocalizations l10n) {
+    if (widget.trailingBuilder == null && !hasClearAll) return false;
+    final style = Theme.of(context).textTheme.labelLarge;
+    final scaler = MediaQuery.textScalerOf(context);
+    double textWidth(String t) {
+      final p = TextPainter(
+        text: TextSpan(text: t, style: style),
+        textDirection: Directionality.of(context),
+        textScaler: scaler,
+        maxLines: 1,
+      )..layout();
+      return p.width;
+    }
+
+    // 「すべて解除」の TextButton.icon: 左右の余白 12 × 2 + アイコン 18 + 間隔 8 + 文字。
+    final clearAll =
+        hasClearAll ? 24 + 18 + 8 + textWidth(l10n.layerStripClearAll) : 0.0;
+    // FilterChip: 左右の余白 8 × 2 + 選択時のチェック 18 + 間隔 8 + 文字。
+    final label = widget.trailingLabel;
+    final trailing = label == null ? 0.0 : 16 + 18 + 8 + textWidth(label);
+    final gaps = (hasClearAll ? 8 : 0) + (label == null ? 0 : 8);
+    return width - clearAll - trailing - gaps < LayerChipStrip.minChipAreaWidth;
   }
 }
 

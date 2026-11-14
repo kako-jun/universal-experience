@@ -90,9 +90,13 @@ void main() {
       h.visionState.toggle('vertigo');
       await pumpEn(tester, h);
 
-      expect(find.textContaining('… (+1)'), findsOneWidget);
-      final heading = tester.widget<Text>(find.textContaining('… (+1)'));
-      expect(heading.data, matches(RegExp(r'^.+ \+ .+ … \(\+1\)$')));
+      // 名前の部分（省略してよい）と「…（+N）」（常に見せる）は別の Text（#183）。
+      expect(find.text(' … (+1)'), findsOneWidget);
+      final names = tester
+          .widget<BeforeAfterView>(find.byType(BeforeAfterView))
+          .layerNames!;
+      expect(find.text(layerNamesHead(names)), findsOneWidget);
+      expect(layerNamesHead(names), matches(RegExp(r'^.+ \+ .+$')));
     });
 
     testWidgets('日本語: 「…（+N）」の全角括弧', (tester) async {
@@ -243,10 +247,15 @@ void main() {
         final top = tester.getTopLeft(images.at(0)).dy;
         expect(tester.getTopLeft(images.at(1)).dy, top);
         // 見出しは 48dp の 1 行 + 余白 8 の上に画像が来る（折り返しで伸びない）。
-        final heading = find.text(layerNamesSummary(
-            AppLocalizations.of(tester.element(find.byType(BeforeAfterView)))!,
-            [name, name, name]));
+        final heading = find.text(layerNamesHead([name, name, name]));
         expect(heading, findsOneWidget);
+        // 名前が長くても「…（+N）」は省略されず見える。
+        final suffix = find.text(' … (+1)');
+        expect(suffix, findsOneWidget);
+        expect(
+            tester.getRect(suffix).right,
+            lessThanOrEqualTo(
+                tester.getRect(find.byType(BeforeAfterView)).right));
         expect(tester.getSize(heading).height, lessThanOrEqualTo(48));
         baseTop ??= top;
         expect(top, baseTop, reason: '名前の長さに依らない');

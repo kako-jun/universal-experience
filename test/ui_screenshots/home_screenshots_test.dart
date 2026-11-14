@@ -343,6 +343,9 @@ void main() {
       await tester.pump();
     }
 
+    // 帯のスクロールバーのつまみはフェードインするので、撮る前に時計を進めて出す（#183）。
+    await tester.pump(const Duration(milliseconds: 400));
+
     if (expectPickerFits) {
       // 実フォント・実画像で、選択欄の下端が最初のビューポート（ウィンドウの高さ）に収まる（#130）。
       expect(
