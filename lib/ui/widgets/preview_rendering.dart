@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -242,7 +243,7 @@ class _UiImagePainter extends CustomPainter {
       !identical(oldDelegate.image, image);
 }
 
-/// 描画がこの時間を越えて続いたら「描画中…」（[PreviewBusyBadge]）を出す（#185）。
+/// 1 回の描画がこの時間を越えて続いたら「描画中…」（[PreviewBusyBadge]）を出す（#185）。
 ///
 /// CPU 描画は途中で止められず、組み合わせによっては 1 回に数十秒かかる（例: 明るい画像に
 /// 掛けた starbursts。sensus の starbursts は明るい画素の数に比例して重くなる）。その間は
@@ -250,12 +251,14 @@ class _UiImagePainter extends CustomPainter {
 /// 描画（数十〜数百 ms）では出ないよう、少し待ってから出す。
 const Duration kPreviewBusyThreshold = Duration(milliseconds: 500);
 
-/// 描画が [threshold] を越えて続いているかを数える（#185）。
+/// 描画 1 回が [threshold] を越えて続いているかを数える（#185）。
 ///
-/// 描画の列（実行中 + 保留）が始まったら [begin]、列が空になったら [end] を呼ぶ。
-/// [begin] から [threshold] 経っても [end] が来なければ [showing] が true になり、
-/// [onChanged] が呼ばれる（呼び出し側が `setState` する）。途中で [begin] が重なっても
-/// 時計は最初の [begin] から数える（保留の要求が続く間は出しっぱなし）。
+/// 描画を 1 回始めるたびに [begin]、その描画が終わってすぐ次の描画（保留していた要求）が
+/// 続くなら [pause]、列が空になったら [end] を呼ぶ。数えるのは**1 回の描画**の時間で、
+/// 列全体の時間ではない: 速い描画が続くだけ（スライダーのドラッグ中など）では出さず、
+/// 札の出し入れと読み上げを繰り返さない。一度出したら、列が空になる（[end]）まで
+/// 出しっぱなしにする（続けて重い描画が流れるときに消えて点き直さない）。
+/// 出し入れのたびに [onChanged] が呼ばれる（呼び出し側が `setState` する）。
 class PreviewBusyTracker {
   PreviewBusyTracker(this.onChanged, {this.threshold = kPreviewBusyThreshold});
 
@@ -268,8 +271,10 @@ class PreviewBusyTracker {
   /// 「描画中…」を出すべきか。
   bool get showing => _showing;
 
+  /// 描画を 1 回始めた。出ていなければ、ここから [threshold] を数え直す。
   void begin() {
-    if (_timer != null || _showing) return;
+    if (_showing) return;
+    _timer?.cancel();
     _timer = Timer(threshold, () {
       _timer = null;
       _showing = true;
@@ -277,9 +282,15 @@ class PreviewBusyTracker {
     });
   }
 
-  void end() {
+  /// 描画が 1 回終わり、すぐ次の描画が続く。時計は止めるが、出ている札は消さない。
+  void pause() {
     _timer?.cancel();
     _timer = null;
+  }
+
+  /// 描画の列が空になった（表示が最新の入力に追いついた）。
+  void end() {
+    pause();
     if (_showing) {
       _showing = false;
       onChanged();
@@ -294,7 +305,8 @@ class PreviewBusyTracker {
 
 /// 描画が長引いている間の「描画中…」の札（#185）。アニメーションはしない
 /// （widget test の pumpAndSettle を止めないため。「準備中」と同じ方針）。
-/// 現れたときに一度だけ読み上げる（liveRegion）。
+/// 現れたときと文言が変わったときに読み上げる（liveRegion）。明るい画像の上でも
+/// 輪郭が分かるよう `outlineVariant` の枠を付ける。
 class PreviewBusyBadge extends StatelessWidget {
   const PreviewBusyBadge({super.key, required this.label});
 
@@ -310,6 +322,7 @@ class PreviewBusyBadge extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: scheme.surfaceContainerHighest,
+          border: Border.all(color: scheme.outlineVariant),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Padding(
@@ -319,16 +332,189 @@ class PreviewBusyBadge extends StatelessWidget {
             children: [
               Icon(Icons.hourglass_top, size: 16, color: scheme.onSurface),
               const SizedBox(width: 6),
-              Text(
-                label,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: scheme.onSurface),
+              Flexible(
+                child: Text(
+                  label,
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: scheme.onSurface),
+                ),
               ),
             ],
           ),
         ),
       ),
     );
+  }
+}
+
+/// 画像の上端中央に [PreviewBusyBadge] を重ねる（[label] が null なら重ねない）。
+/// 札の有無で子の組み方（ツリーの形）を変えないよう、常に Stack で組む。
+class PreviewBusyOverlay extends StatelessWidget {
+  const PreviewBusyOverlay({super.key, required this.child, this.label});
+
+  final Widget child;
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = this.label;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        child,
+        if (label != null)
+          Align(
+            alignment: Alignment.topCenter,
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: PreviewBusyBadge(label: label),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// 重い描画のとき先に描く、低解像度の仮表示の一辺（px、#185）。
+///
+/// starbursts の計算量は一辺のほぼ 3 乗（明るい画素の数 × 光条の長さ）なので、
+/// 1024px の 1/2 で描けば 1/8 程度で済む。仮表示は [PreviewBusyBadge] に
+/// 「低解像度の仮表示」と出し、書き出しには使わない。フル解像度の結果が出たら差し替える。
+/// 画素数で効き方が決まるフィルタ（[kCanonicalSampleSize] の doc）は、仮表示の間だけ
+/// 見え方が少し違うことがある。
+const int kProvisionalPreviewSize = 512;
+
+/// 直前のフル解像度の描画がこの時間を越えたら、次の描画も先に低解像度で描く（#185）。
+const Duration kProvisionalRenderAfter = Duration(seconds: 2);
+
+/// 入力が重い（先に低解像度で描く）と分かっているフィルタか（#185）。
+///
+/// starbursts は明るい画像に 1024px で掛けると 1 回に数十秒かかる（kako-jun/sensus#196）。
+/// ほかのフィルタは重い画像でも数秒以内（#185 の計測）なので、ここでは名指ししない
+/// （それ以外で遅かったときは [kProvisionalRenderAfter] で拾う）。
+bool previewInputIsHeavy(VisionFilter? filter, List<VisionStep>? steps) {
+  bool heavy(VisionFilter? f) => f is VisionFilter_Starbursts;
+  if (steps != null) return steps.any((s) => heavy(s.filter));
+  return heavy(filter);
+}
+
+/// 正方形の画像を [size]×[size] へ縮める（低解像度の仮表示用、#185）。呼び出し側が
+/// 戻り値を dispose する。[source] は dispose しない。`toImageSync` なので待たない。
+ui.Image downscalePreviewImage(ui.Image source, int size) {
+  final recorder = ui.PictureRecorder();
+  final fSize = size.toDouble();
+  ui.Canvas(recorder).drawImageRect(
+    source,
+    Rect.fromLTWH(0, 0, source.width.toDouble(), source.height.toDouble()),
+    Rect.fromLTWH(0, 0, fSize, fSize),
+    Paint()..filterQuality = FilterQuality.medium,
+  );
+  final picture = recorder.endRecording();
+  try {
+    return picture.toImageSync(size, size);
+  } finally {
+    picture.dispose();
+  }
+}
+
+/// after 画像の描画結果のキャッシュの鍵（#185）: 元画像・解像度・描画の入力
+/// （複数層なら合成ステップ列、1 層ならフィルタ + 強度）。どれかが違えば別の画像。
+@immutable
+class PreviewRenderKey {
+  const PreviewRenderKey.single({
+    required this.source,
+    required this.size,
+    required VisionFilter this.filter,
+    required double this.strength,
+  }) : steps = null;
+
+  const PreviewRenderKey.pipeline({
+    required this.source,
+    required this.size,
+    required List<VisionStep> this.steps,
+  })  : filter = null,
+        strength = null;
+
+  final PreviewImageSource source;
+  final int size;
+  final VisionFilter? filter;
+  final double? strength;
+  final List<VisionStep>? steps;
+
+  @override
+  bool operator ==(Object other) =>
+      other is PreviewRenderKey &&
+      other.source == source &&
+      other.size == size &&
+      other.filter == filter &&
+      other.strength == strength &&
+      listEquals(other.steps, steps);
+
+  @override
+  int get hashCode => Object.hash(source, size, filter, strength,
+      steps == null ? null : Object.hashAll(steps!));
+}
+
+/// 描画結果のキャッシュの件数の上限（#185）。1024px の RGBA は 1 枚 4 MiB なので、
+/// 最大で約 24 MiB（GPU/ネイティブ側のメモリ）。
+const int kPreviewRenderCacheCapacity = 6;
+
+/// after 画像の描画結果を、入力（[PreviewRenderKey]）ごとに覚えておく小さな LRU（#185）。
+///
+/// 付ける → 外す → 付ける のように同じ入力に戻ったとき、重い CPU 描画をやり直さずに
+/// すぐ表示するためのもの。
+/// - メモリの中だけに置き、ディスクには書かない。持ち主のビューが外れたら [clear] で全部捨てる。
+/// - 件数は [capacity] まで。越えたら最も長く使っていないものから捨てる。
+/// - 読み込んだ画像（ユーザー画像）から描いたものは、元画像を切り替えたら捨てる
+///   （[retainWhere]。呼び出し側が行う）。
+/// - 画像の持ち主はキャッシュ。[lookup] / [store] はどちらも複製をやり取りするので、
+///   呼び出し側は受け取った画像を自由に dispose してよい。
+class PreviewRenderCache {
+  PreviewRenderCache({this.capacity = kPreviewRenderCacheCapacity});
+
+  final int capacity;
+
+  // 挿入順 = 使った順（末尾が最新）。
+  final Map<PreviewRenderKey, ui.Image> _entries = {};
+
+  /// いま持っている件数（テスト用）。
+  @visibleForTesting
+  int get length => _entries.length;
+
+  /// [key] の画像の複製（呼び出し側が持ち主）。無ければ null。
+  ui.Image? lookup(PreviewRenderKey key) {
+    final image = _entries.remove(key);
+    if (image == null) return null;
+    _entries[key] = image;
+    return image.clone();
+  }
+
+  /// [image] の複製を [key] で覚える（[image] 自体は呼び出し側のまま）。
+  void store(PreviewRenderKey key, ui.Image image) {
+    _entries.remove(key)?.dispose();
+    _entries[key] = image.clone();
+    while (_entries.length > capacity) {
+      final oldest = _entries.keys.first;
+      _entries.remove(oldest)!.dispose();
+    }
+  }
+
+  /// [keep] が false を返す鍵を捨てる。
+  void retainWhere(bool Function(PreviewRenderKey key) keep) {
+    final drop = [
+      for (final k in _entries.keys)
+        if (!keep(k)) k,
+    ];
+    for (final k in drop) {
+      _entries.remove(k)!.dispose();
+    }
+  }
+
+  void clear() {
+    for (final image in _entries.values) {
+      image.dispose();
+    }
+    _entries.clear();
   }
 }
 

@@ -35,6 +35,8 @@
   "previewPreparing": "プレビューを準備中…",
   "previewFailed": "プレビューの描画に失敗しました",
   "previewRendering": "描画中…",
+  "previewRenderingProvisional": "描画中…（低解像度の仮表示）",
+  "previewLoadingSource": "画像を読み込み中…",
   "previewStaticFrameNote": "時間の経過で変化する見え方です。プレビューは動きのない1コマの静止画で表示しています。",
 
   "changePattern": "パターンを変える",

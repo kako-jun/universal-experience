@@ -775,13 +775,19 @@ void main() {
 
         // 1回目の要求をようやく解決する。_runRebuild は mounted チェックに
         // より、保留中の要求（intensity=0.5 分）を再スケジュールしないはず。
-        completer.complete(before1);
+        // 描画器は新しい画像を返す（受け取った入力以外の、ビューが持つ画像を返さない）。
+        late ui.Image after1;
+        await tester.runAsync(() async {
+          after1 = await generateSampleImage(4);
+        });
+        completer.complete(after1);
         await tester.pump();
         await tester.pump();
 
         expect(rendererCallCount, 1,
             reason: 'dispose 後は保留中の要求があっても renderer が再度呼ばれて'
                 'はいけない');
+        expect(after1.debugDisposed, isTrue, reason: '外された後に届いた結果は捨てる');
       });
 
       testWidgets(
@@ -913,7 +919,7 @@ void main() {
         expect(goodAfter.debugDisposed, isFalse);
       });
 
-      testWidgets('renderer が例外を投げても新規生成した before はリークせず、次の更新で再試行できる',
+      testWidgets('renderer が例外を投げても before はリークせず（表示中のまま）、次の更新で再試行できる',
           (tester) async {
         suppressFlutterErrorReporting();
         late ui.Image before1, before2, goodAfter;
@@ -948,10 +954,12 @@ void main() {
         await tester.pump();
         await tester.pump();
 
-        // renderer が失敗しても、新規生成した before（1回目）はリークせず
-        // dispose される。
-        expect(before1.debugDisposed, isTrue);
+        // renderer が失敗しても「準備中」に固着しない。元画像の読み込みは after の描画と
+        // 分かれている（#185 (c)）ので、読み込んだ before はそのまま元画像側に表示し続ける
+        // （リークではなく表示中の画像。ビューを外したときに dispose する。下の確認）。
+        expect(before1.debugDisposed, isFalse);
         expect(find.text(en.previewPreparing), findsNothing);
+        expect(find.text(en.previewFailed), findsOneWidget);
 
         await tester.pumpWidget(localized(const BeforeAfterView(
           filter: VisionFilter.protanopia(),
@@ -964,7 +972,14 @@ void main() {
         await tester.pump();
 
         expect(rendererCallCount, 2);
+        expect(generatorCallCount, 1, reason: '元画像は読み直さず使い回す');
         expect(goodAfter.debugDisposed, isFalse);
+        expect(find.text(en.previewFailed), findsNothing);
+
+        await tester.pumpWidget(const SizedBox());
+        expect(before1.debugDisposed, isTrue, reason: 'ビューを外したら before を dispose する');
+        expect(before2.debugDisposed, isFalse, reason: '読み込まれていない');
+        before2.dispose();
       });
 
       // 旧タイトルの「auto モードで」は #85 で auto モード

@@ -11,6 +11,7 @@ import 'package:universal_experience/models/preview_image_source.dart';
 import 'package:universal_experience/rendering/cpu_vision_renderer.dart';
 import 'package:universal_experience/services/color_vision_compare.dart';
 import 'package:universal_experience/services/export_service.dart';
+import 'package:universal_experience/services/preview_diagnostics.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/widgets/preview_rendering.dart';
@@ -42,6 +43,12 @@ List<FlutterErrorDetails> _suppressFlutterErrorReporting() {
   FlutterError.onError = reported.add;
   addTearDown(() => FlutterError.onError = originalOnError);
   return reported;
+}
+
+class _MemorySink implements PreviewDiagnosticsSink {
+  final lines = <String>[];
+  @override
+  void write(String line) => lines.add(line);
 }
 
 Future<ui.Image> _solid(int size, int argb) async {
@@ -1324,6 +1331,88 @@ void main() {
         expect(id, 'color-vision-compare-vertigo-myopia-plus2');
         expect(captions.first.layers.length, 5, reason: 'キャプションの行は上限で落とさない');
       });
+    });
+  });
+
+  group('描画中…と診断ログ（#185）', () {
+    final en = lookupAppLocalizations(enLocale);
+
+    testWidgets('描けた後の長い再描画では見出し行に札を出し、画像は前のまま', (tester) async {
+      final second = Completer<void>();
+      final fakes =
+          await installFakes(tester, gate: (n) => n == 5 ? second.future : null);
+      await tester.pumpWidget(localized(view(0.6)));
+      await settle(tester);
+      final shown = [
+        for (final v in tester
+            .widgetList<PreviewImageView>(find.byType(PreviewImageView)))
+          v.image!,
+      ];
+      expect(fakes.calls, hasLength(4));
+
+      await tester.pumpWidget(localized(view(0.2)));
+      await tester.pump();
+      await tester.pump(kPreviewBusyThreshold ~/ 2);
+      expect(find.text(en.previewRendering), findsNothing);
+      await tester.pump(kPreviewBusyThreshold);
+      expect(find.text(en.previewRendering), findsOneWidget);
+      // 札は見出し行（「同じ強さ」の注記と同じ行）にあり、セルの画像は前の描画のまま。
+      expect(
+          find.ancestor(
+              of: find.text(en.previewRendering),
+              matching: find.byType(Row)),
+          findsWidgets);
+      final during = [
+        for (final v in tester
+            .widgetList<PreviewImageView>(find.byType(PreviewImageView)))
+          v.image!,
+      ];
+      for (var i = 0; i < 4; i++) {
+        expect(during[i], same(shown[i]));
+      }
+
+      second.complete();
+      await settle(tester);
+      expect(find.text(en.previewRendering), findsNothing);
+      expect(find.text(en.compareSharedStrengthNote(20)), findsOneWidget);
+    });
+
+    testWidgets('長引いた描画は stalled → recovered を記録する（段はセルの型）', (tester) async {
+      final sink = _MemorySink();
+      PreviewDiagnostics.sink = sink;
+      addTearDown(() => PreviewDiagnostics.sink = null);
+      final gate = Completer<void>();
+      await installFakes(tester, gate: (n) => n == 2 ? gate.future : null);
+      await tester.pumpWidget(localized(view(0.6)));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 11));
+      expect(sink.lines, hasLength(1));
+      expect(sink.lines.single,
+          contains('preview_stalled view=compare stage=cell:deuteranopia'));
+      expect(sink.lines.single, contains('sample=test'));
+      gate.complete();
+      await settle(tester);
+      expect(sink.lines.last, contains('preview_recovered view=compare'));
+      expect(sink.lines.last, contains('outcome=done'));
+    });
+
+    testWidgets('描画の失敗は段と例外の型名だけを記録する（メッセージのパスは書かない）',
+        (tester) async {
+      final sink = _MemorySink();
+      PreviewDiagnostics.sink = sink;
+      addTearDown(() => PreviewDiagnostics.sink = null);
+      _suppressFlutterErrorReporting();
+      await installFakes(tester,
+          failOn: (n) =>
+              n == 3 ? StateError('at /home/someone/secret.png') : null);
+      await tester.pumpWidget(localized(view(0.6)));
+      await settle(tester);
+      final failed = sink.lines.singleWhere((l) => l.contains('preview_failed'));
+      expect(failed, contains('view=compare'));
+      expect(failed, contains('stage=cell:tritanopia'));
+      expect(failed, contains('error=StateError'));
+      expect(failed, isNot(contains('someone')));
+      expect(failed, isNot(contains('secret')));
     });
   });
 }

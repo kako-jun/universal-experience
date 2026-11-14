@@ -124,7 +124,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
   /// 描画中に新しい要求が来たか。来ていたら進行中の描画は途中で打ち切る。
   bool _rebuildPending = false;
 
-  /// 描画の列が長引いている間の「描画中…」（#185。[BeforeAfterView] と同じ理由）。
+  /// 描画 1 回が長引いている間の「描画中…」（#185。[BeforeAfterView] と同じ理由）。
   late final PreviewBusyTracker _busy = PreviewBusyTracker(() {
     if (mounted) setState(() {});
   });
@@ -177,26 +177,32 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       return;
     }
     _rebuildInFlight = true;
-    _busy.begin();
     unawaited(_runRebuild());
   }
 
   Future<void> _runRebuild() async {
+    _busy.begin();
     _watchdog.start(_diagFields());
     var outcome = 'error';
     try {
       await _rebuild();
       outcome = 'done';
-    } catch (e) {
+    } catch (e, st) {
+      // 描画の段取りそのものの例外。unawaited の未処理例外にせず報告へ流す。
       PreviewDiagnostics.recordError(
           'preview_error', e, {'view': 'compare', ..._watchdog.fields});
-      rethrow;
+      FlutterError.reportError(FlutterErrorDetails(
+        exception: e,
+        stack: st,
+        library: 'color_vision_compare_view',
+      ));
     } finally {
       _watchdog.finish(outcome);
       _rebuildInFlight = false;
       if (mounted) {
         if (_rebuildPending) {
           _rebuildPending = false;
+          _busy.pause();
           _scheduleRebuild();
         } else {
           _busy.end();

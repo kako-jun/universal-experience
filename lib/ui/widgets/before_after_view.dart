@@ -149,10 +149,60 @@ class BeforeAfterView extends StatefulWidget {
   State<BeforeAfterView> createState() => _BeforeAfterViewState();
 }
 
+/// テスト用の差し替え口: [_BeforeAfterViewState] の描画 1 回（`_rebuild`）の冒頭で待つ。
+/// 描画の段取りそのものが（描画器の例外は `_rebuild` の中で失敗表示になるので、それ以外で）
+/// 例外で終わったときでも、待っている間に来て保留された要求が流れ、札が残らないことを
+/// 確かめるためのもの（#185）。本番では null のまま（待たない）。
+@visibleForTesting
+Future<void> Function()? debugBeforeAfterRebuildHook;
+
+/// 描画 1 回の入力。`_rebuild` の冒頭で `widget` から一度だけ読んで固定する（await の間に
+/// 親が再 build して `widget.*` が先へ進んでも、画像に写っている層・強度と、書き出しに
+/// 焼く値がずれないようにする、#121）。
+class _RenderInput {
+  _RenderInput(BeforeAfterView w, this.source, this.size)
+      : steps = w.steps,
+        filter = w.filter,
+        strength = w.strength,
+        filterId = w.filterId,
+        variantId = w.variantId,
+        exportLayers = w.exportLayers;
+
+  final PreviewImageSource source;
+  final int size;
+  final List<VisionStep>? steps;
+  final VisionFilter? filter;
+  final double strength;
+  final String? filterId;
+  final String? variantId;
+  final List<ExportLayer>? exportLayers;
+
+  /// 描画結果のキャッシュの鍵（#185）。何も掛けない（原画のまま）入力は描画が軽いので
+  /// 覚えない（null）。
+  PreviewRenderKey? get cacheKey {
+    final steps = this.steps;
+    if (steps != null) {
+      return steps.isEmpty
+          ? null
+          : PreviewRenderKey.pipeline(source: source, size: size, steps: steps);
+    }
+    final filter = this.filter;
+    return filter == null
+        ? null
+        : PreviewRenderKey.single(
+            source: source, size: size, filter: filter, strength: strength);
+  }
+
+  bool get heavy => previewInputIsHeavy(filter, steps);
+
+  Future<ui.Image?> render(ui.Image input) => steps == null
+      ? renderPreviewAfter(input, filter, strength)
+      : renderDefaultAfterPipeline(input, steps!);
+}
+
 class _BeforeAfterViewState extends State<BeforeAfterView> {
   ui.Image? _before;
   ui.Image? _after;
-  bool _loading = true;
   bool _exporting = false;
 
   /// Set when the most recently *applied* generation failed. Gates the "after" pane to a [PreviewErrorPlaceholder] instead of a
@@ -162,20 +212,12 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// site instead.
   bool _failed = false;
 
-  /// Resolution (square side, pixels) the currently-held [_before]/[_after]
-  /// were generated at. `null` until the first generation completes (#58).
-  /// Since pane-size-driven auto-sizing was removed, this only
-  /// changes if [BeforeAfterView.sampleSize] itself changes (test-only in
-  /// practice) — production always uses [kCanonicalSampleSize].
-  int? _currentSampleSize;
+  /// いまの [_after] が、重い描画の前に先に描いた低解像度の仮表示か（#185）。
+  /// true の間は札に「低解像度の仮表示」と出し、書き出しは出さない。
+  bool _afterProvisional = false;
 
-  /// The [PreviewImageSource] (#78) that actually produced the
-  /// currently-held [_before]. `null` until the first generation completes.
-  /// Set from the `source` local captured at the start of the [_rebuild]
-  /// call that produced [_before] — **not** re-read from
-  /// `widget.imageSource` at assignment time, which could have already moved
-  /// on to a newer value while this call was awaiting the loader (see
-  /// [_rebuild]'s doc).
+  /// [_before] を読み込んだ解像度と元画像（#58/#78）。[_before] と一緒にだけ変わる。
+  int? _currentSampleSize;
   PreviewImageSource? _currentImageSource;
 
   /// The `(filterId, variantId, strength)` that actually produced the
@@ -196,44 +238,46 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   double? _afterStrength;
 
   /// The actual [VisionFilter] that produced the currently-held [_after]
-  /// (#76). Captured alongside [_afterFilterId] for the same reason: the
-  /// export caption's urgency note must reflect the filter that produced the
-  /// exported pixels, not whatever `widget.filter` has moved on to while a
-  /// slower re-render is still in flight.
+  /// (#76). Captured alongside [_afterFilterId] for the same reason.
   VisionFilter? _afterFilter;
 
   /// [BeforeAfterView.exportLayers] のうち、現在の [_after] を描画した時点のもの（#121）。
-  /// [_afterFilter] などと同じ理由で、書き出しはこちらから作る。
   List<ExportLayer>? _afterExportLayers;
 
-  /// Monotonic request id. Bumped on every [_rebuild] call so a slow/late
-  /// async result can tell it has been superseded by a newer request and
-  /// discard (dispose) itself instead of overwriting `_before`/`_after` with
-  /// stale data or leaking GPU images (#58). [_scheduleRebuild]
-  /// now serializes calls to [_rebuild] so at most one is ever in flight
-  /// at a time, but this check stays as the defense against a slow result
-  /// racing a `dispose()` (see [_rebuild]'s own `mounted` guards).
+  /// 描画の要求の通し番号。描画 1 回の結果は、終わった時点でこれが変わっていれば
+  /// （新しい要求・キャッシュからの表示に追い越されていれば）表示に使わない（#58）。
   int _generation = 0;
 
-  /// Whether a [_rebuild] is currently in flight. While
-  /// `true`, [_scheduleRebuild] doesn't start another one — it just records
-  /// the request in [_pendingRebuildSampleSize] so the CPU `apply()` path
-  /// (heavier than the old GPU shader path) never has more than one job
-  /// running at once, e.g. while a slider is being dragged.
+  /// 描画（after）が走っているか。true の間は [_scheduleRebuild] は 2 本目を始めず、
+  /// 要求を [_pendingRebuildSampleSize] に集約する（CPU 描画を同時に 1 本までにする）。
   bool _rebuildInFlight = false;
 
-  /// The most recently requested sample size while a [_rebuild] is already
-  /// running. Overwritten by each new request — only the
-  /// latest survives. Consumed (and cleared) by [_runRebuild] once the
-  /// in-flight job finishes.
+  /// 描画中に来た最新の要求（解像度）。後の要求で上書きされ、最新だけが残る。
+  /// 走っている描画が終わったら [_runRebuild] が流す。
   int? _pendingRebuildSampleSize;
 
-  /// 描画の列（実行中 + 保留）が [kPreviewBusyThreshold] を越えて続いたら、after 側に
-  /// 「描画中…」を出す（#185）。ネイティブの描画は途中で止められず、明るい画像の
-  /// starbursts のように 1 回に数十秒かかることがある。その間 before / after は前の
-  /// 描画のまま（両方を 1 回の完了でそろえて差し替える）なので、止まっているのと
-  /// 見分けられるようにする。
+  /// 元画像（before）の読み込みの通し番号と、いま読み込んでいる入力（#185 (c)）。
+  /// 読み込みは after の直列描画とは別に走らせ、終わったらすぐ before を差し替える
+  /// （after の重い描画の最中にサンプルを替えても、元画像側が固まらない）。
+  int _beforeGeneration = 0;
+  (PreviewImageSource, int)? _beforeLoading;
+
+  /// after の描画結果の LRU（#185 (b)）。付ける → 外す → 付けるで再描画しない。
+  final PreviewRenderCache _cache = PreviewRenderCache();
+
+  /// 直前のフル解像度の描画にかかった時間（[kProvisionalRenderAfter] の判定用、#185 (a)）。
+  Duration? _lastFullRender;
+
+  /// 描画 1 回が [kPreviewBusyThreshold] を越えたら、after 側に「描画中…」を出す（#185）。
+  /// ネイティブの描画は途中で止められず、明るい画像の starbursts のように 1 回に数十秒
+  /// かかることがある。その間 after は前の描画のままなので、止まっているのと見分けられる
+  /// ようにする。
   late final PreviewBusyTracker _busy = PreviewBusyTracker(() {
+    if (mounted) setState(() {});
+  });
+
+  /// 元画像の読み込みが長引いたら、before 側に札を出す（#185）。
+  late final PreviewBusyTracker _beforeBusy = PreviewBusyTracker(() {
     if (mounted) setState(() {});
   });
 
@@ -241,8 +285,12 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   final PreviewRenderWatchdog _watchdog =
       PreviewRenderWatchdog(view: 'before_after');
 
-  /// 診断ログに添える入力の要約（カタログ id・層の数・強度・サンプル id。ユーザー画像は
-  /// `user` とだけ書く）。
+  /// 元画像の読み込み用（段は `load`）。
+  final PreviewRenderWatchdog _loadWatchdog =
+      PreviewRenderWatchdog(view: 'before_after');
+
+  /// 診断ログに添える入力の要約（カタログ id・層の数・強度・サンプル id・寸法。ユーザー
+  /// 画像は `user` とだけ書く）。
   Map<String, Object?> _diagFields(int sampleSize) {
     final source = widget.imageSource;
     return {
@@ -261,18 +309,25 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   int get _effectiveSampleSize =>
       widget.sampleSize ?? kCanonicalSampleSize;
 
+  bool _beforeMatches(PreviewImageSource source, int size) =>
+      _before != null &&
+      _currentImageSource == source &&
+      _currentSampleSize == size;
+
   @override
   void initState() {
     super.initState();
-    // The sample size no longer depends on the pane's
-    // layout (it's canonical/fixed), so there's no need to wait for a
-    // LayoutBuilder pass before triggering the first generation.
+    _requestBefore();
     _scheduleRebuild(_effectiveSampleSize);
   }
 
   @override
   void didUpdateWidget(BeforeAfterView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.sampleSize != widget.sampleSize ||
+        oldWidget.imageSource != widget.imageSource) {
+      _requestBefore();
+    }
     if (oldWidget.filter != widget.filter ||
         oldWidget.filterId != widget.filterId ||
         oldWidget.variantId != widget.variantId ||
@@ -284,49 +339,141 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     }
   }
 
-  /// Entry point for triggering a [_rebuild]. If one is
-  /// already running, records [sampleSize] as the pending request (replacing
-  /// any earlier pending one) and returns without starting a second job —
-  /// the CPU `apply()` path is heavier than the old GPU shader path, so
-  /// letting a rapidly-changing slider spawn one native-bridge call per
-  /// frame would waste work and could reorder unpredictably. Once the
-  /// in-flight job finishes, [_runRebuild] starts the pending request (if
-  /// any) using whatever [_effectiveSampleSize]/`widget.filter`/
-  /// `widget.strength` are current *at that time* — not stale snapshots
-  /// from when the request was made — so the final result always reflects
-  /// the latest inputs. [_rebuild]'s own generation/dispose/failure
-  /// bookkeeping (#58) is unchanged; this only gates how many are in flight.
+  // ── 元画像（before）の読み込み（#185 (c)） ──
+
+  /// いまの `widget.imageSource` の元画像が無ければ読み込みを始める。after の描画とは
+  /// 別に走る（読み込みは軽い。重いのは after の CPU 描画）。後から別の元画像を頼まれたら、
+  /// 先の読み込みの結果は捨てる（最新優先）。
+  void _requestBefore() {
+    final source = widget.imageSource;
+    final size = _effectiveSampleSize;
+    if (_beforeMatches(source, size)) {
+      if (_beforeLoading != null) {
+        // 読み込み中の別の元画像は要らなくなった（元に戻した）。
+        _beforeGeneration++;
+        _beforeLoading = null;
+        _loadWatchdog.finish('superseded');
+        _beforeBusy.end();
+      }
+      return;
+    }
+    if (_beforeLoading == (source, size)) return;
+    final generation = ++_beforeGeneration;
+    _beforeLoading = (source, size);
+    _beforeBusy.begin();
+    _loadWatchdog.start(_diagFields(size));
+    _loadWatchdog.stage = 'load';
+    unawaited(_loadBefore(generation, source, size));
+  }
+
+  Future<void> _loadBefore(
+      int generation, PreviewImageSource source, int size) async {
+    final ui.Image image;
+    try {
+      image = await loadPreviewImage(source, size);
+    } catch (e, st) {
+      if (generation != _beforeGeneration || !mounted) return;
+      _loadWatchdog.finish('error');
+      _beforeLoading = null;
+      _beforeBusy.end();
+      PreviewDiagnostics.recordError('preview_failed', e,
+          {'view': 'before_after', 'stage': 'load', ..._loadWatchdog.fields});
+      // 静かに握りつぶさず Flutter のエラー報告経路に乗せる（crash reporting 等が拾えるように）。
+      FlutterError.reportError(FlutterErrorDetails(
+        exception: e,
+        stack: st,
+        library: 'before_after_view',
+      ));
+      // 自動では再試行しない。次の入力の変化（[_rebuild] が [_requestBefore] を呼ぶ）で読み直す。
+      _showFailure();
+      return;
+    }
+    if (generation != _beforeGeneration || !mounted) {
+      image.dispose();
+      return;
+    }
+    _loadWatchdog.finish('done');
+    _beforeLoading = null;
+    _beforeBusy.end();
+    final old = _before;
+    setState(() {
+      _before = image;
+      _currentImageSource = source;
+      _currentSampleSize = size;
+    });
+    // 描画器へは常に複製を渡し、[_after] も複製から作るので、古い before は誰とも
+    // 共有していない。
+    old?.dispose();
+    // 読み込んだ画像（ユーザー画像）から描いた結果は、元画像を替えたら残さない
+    // （サンプルの分はいつでも同じなので残す）。
+    _cache.retainWhere(
+        (k) => k.source is! UserPreviewImageSource || k.source == source);
+    _scheduleRebuild(size);
+  }
+
+  // ── after の描画 ──
+
+  /// 描画の入口。まず描画結果のキャッシュ（#185 (b)）を見て、当たればすぐ表示する
+  /// （走っている描画があっても待たない。その結果は表示に使わず、キャッシュにだけ入る）。
+  /// 外れたら、走っている描画があれば要求を保留に集約し（最新だけが残る）、無ければ始める。
+  /// 保留は、走っている描画が終わった時点の `widget.*` で描く（古い控えでは描かない）。
   void _scheduleRebuild(int sampleSize) {
+    if (_applyFromCache(sampleSize)) {
+      _pendingRebuildSampleSize = null;
+      // 走っている描画の結果は古い入力のものなので、表示に使わせない。
+      _generation++;
+      _busy.end();
+      return;
+    }
     if (_rebuildInFlight) {
       _pendingRebuildSampleSize = sampleSize;
       return;
     }
     _rebuildInFlight = true;
-    _busy.begin();
     unawaited(_runRebuild(sampleSize));
   }
 
+  /// いまの入力の描画結果がキャッシュにあれば表示して true。
+  bool _applyFromCache(int sampleSize) {
+    if (!mounted || !_beforeMatches(widget.imageSource, sampleSize)) {
+      return false;
+    }
+    final input = _RenderInput(widget, widget.imageSource, sampleSize);
+    final key = input.cacheKey;
+    if (key == null) return false;
+    final hit = _cache.lookup(key);
+    if (hit == null) return false;
+    _applyAfter(hit, input, provisional: false);
+    return true;
+  }
+
   Future<void> _runRebuild(int sampleSize) async {
+    _busy.begin();
     _watchdog.start(_diagFields(sampleSize));
     var outcome = 'error';
     try {
       await _rebuild(sampleSize);
       outcome = 'done';
-    } catch (e) {
+    } catch (e, st) {
+      // 描画の段取りそのものの例外（描画器の例外は [_rebuild] の中で失敗表示にしている）。
+      // unawaited の未処理例外にせず、Flutter のエラー報告へ流す。
       PreviewDiagnostics.recordError(
           'preview_error', e, {'view': 'before_after', ..._watchdog.fields});
-      rethrow;
+      FlutterError.reportError(FlutterErrorDetails(
+        exception: e,
+        stack: st,
+        library: 'before_after_view',
+      ));
     } finally {
       _watchdog.finish(outcome);
-      // _rebuild が例外を投げても（現状は内部で catch して
-      // いるため起きない想定だが）_rebuildInFlight が true のまま固着して
-      // 以後の要求が永久に集約されたまま実行されなくなる事態を避ける。
-      // 保留中の要求も、例外のときでも流す（取りこぼすと次の操作まで追いつかない）。
+      // 例外で終わっても _rebuildInFlight を戻し、保留中の要求も流す（取りこぼすと、
+      // 以後の要求が集約されたまま実行されず、次の操作まで追いつかない）。
       _rebuildInFlight = false;
       if (mounted) {
         final pending = _pendingRebuildSampleSize;
         if (pending != null) {
           _pendingRebuildSampleSize = null;
+          _busy.pause();
           _scheduleRebuild(pending);
         } else {
           _busy.end();
@@ -335,130 +482,127 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     }
   }
 
-  /// Cleans up after a failed [_rebuild]: if this
-  /// call is still the latest request, resets `_loading` so the UI doesn't
-  /// stay stuck on the "preparing" placeholder, and shows a failure state
-  /// instead of the (possibly now-stale) `_after`. A permanent
-  /// failure doesn't retry itself (no timer, no auto-resize) — only a user
-  /// action (`didUpdateWidget` seeing a filter/strength/sampleSize
-  /// change) calls [_scheduleRebuild] again, so there's no busy-loop risk
-  /// (the resize-driven retry path no longer exists; retrying is now
-  /// inherently user-driven only). If a
-  /// newer request has already superseded this one, does nothing (that newer
-  /// request owns the state now).
+  /// 最新の要求の描画が失敗したら呼ぶ。after を失敗表示にする（古い・不整合な画像を
+  /// 出し続けない）。自動では再試行しない（次の入力の変化で [_scheduleRebuild] が呼ばれる）。
+  /// 新しい要求に追い越されていれば何もしない。
   void _onRebuildFailed(int generation) {
     if (generation != _generation || !mounted) return;
-    final oldAfter = _after;
-    setState(() {
-      _loading = false;
-      _failed = true;
-      _after = null;
-    });
-    // _after may have aliased _before (filter == null) — don't dispose
-    // the image that's still the current `_before`.
-    if (oldAfter != null && !identical(oldAfter, _before)) {
-      oldAfter.dispose();
-    }
+    _showFailure();
   }
 
-  /// [widget.imageSource] はこの関数の冒頭で一度だけ読み、
-  /// [source] に固定する。以後（[previewSourceImageLoader] の呼び出し・
-  /// [_currentImageSource] への記録のどちらも）は必ずこの [source] を使い、
-  /// `widget.imageSource` を読み直さない。
+  void _showFailure() {
+    final oldAfter = _after;
+    setState(() {
+      _failed = true;
+      _after = null;
+      _afterProvisional = false;
+    });
+    oldAfter?.dispose();
+  }
+
+  /// [image]（持ち主はこのビューへ移る）を after として表示する。
+  void _applyAfter(ui.Image image, _RenderInput input,
+      {required bool provisional}) {
+    final oldAfter = _after;
+    setState(() {
+      _after = image;
+      _afterProvisional = provisional;
+      _afterFilterId = input.filterId; // #60
+      _afterVariantId = input.variantId; // #60
+      _afterStrength = input.strength;
+      _afterFilter = input.filter; // #76
+      _afterExportLayers = input.exportLayers; // #121
+      _failed = false; // 成功したら失敗表示を解除する。
+    });
+    if (oldAfter != null && !identical(oldAfter, image)) oldAfter.dispose();
+  }
+
+  /// after を 1 回描く。
   ///
-  /// 理由: この関数は `await previewSourceImageLoader(...)` の間 sleep する。
-  /// その間に親が再 build して `didUpdateWidget` が `widget.imageSource` を
-  /// 新しい値へ更新しても、[_scheduleRebuild] は `_rebuildInFlight` が true の
-  /// 間は `_generation` を上げず新しい要求を待避させるだけなので、この呼び出し
-  /// の `generation` は最新のままになり得る（[isLatest] が true のまま）。
-  /// もし `widget.imageSource` を assignment 時点で読み直していたら、実際に
-  /// 読み込んだのは古い source の画像なのに `_currentImageSource` には新しい
-  /// source が記録され、以後の [reuseBefore] 判定が「新しい source の画像は
-  /// もう読み込み済み」と誤認して再読み込みをスキップしてしまう
-  /// （実際に表示されているのは古い source の画像のまま）。
+  /// 入力（[_RenderInput]）は冒頭で一度だけ読んで固定する。元画像がまだ読み込めて
+  /// いなければ描かずに戻る（読み込みが終わると [_loadBefore] が描画を頼み直す）。
+  /// 描画器には常に [_before] の複製を渡す（await の間に新しい元画像が読み込まれて
+  /// [_before] が dispose されても、描画中の入力は生きている）。
+  ///
+  /// 重い入力（[previewInputIsHeavy]、または直前のフル解像度の描画が
+  /// [kProvisionalRenderAfter] を越えたとき）は、先に [kProvisionalPreviewSize] で描いて
+  /// 仮表示し、その後フル解像度で描いて差し替える（#185 (a)）。仮表示の後に新しい要求が
+  /// 来ていれば、フル解像度は描かずに次の要求へ譲る。フル解像度の結果は、追い越されて
+  /// いてもキャッシュには入れる（同じ入力に戻ったとき描き直さない）。
   Future<void> _rebuild(int sampleSize) async {
+    final hook = debugBeforeAfterRebuildHook;
+    if (hook != null) await hook();
     if (!mounted) return;
     final generation = ++_generation;
-    final source = widget.imageSource;
-    final reuseBefore = _before != null &&
-        _currentSampleSize == sampleSize &&
-        _currentImageSource == source;
-    setState(() => _loading = true);
-
-    final ui.Image before;
-    if (reuseBefore) {
-      before = _before!;
-    } else {
-      try {
-        _watchdog.stage = 'load';
-        before = await loadPreviewImage(source, sampleSize);
-      } catch (e, st) {
-        PreviewDiagnostics.recordError('preview_failed', e,
-            {'view': 'before_after', 'stage': 'load', ..._watchdog.fields});
-        // 静かに握りつぶさず Flutter のエラー報告経路に
-        // 乗せる（crash reporting 等が拾えるように）。
-        FlutterError.reportError(FlutterErrorDetails(
-          exception: e,
-          stack: st,
-          library: 'before_after_view',
-        ));
-        // 生成に失敗しても loading に固着させず、次の
-        // レイアウト/更新で再試行できるようにする。
-        _onRebuildFailed(generation);
+    final input = _RenderInput(widget, widget.imageSource, sampleSize);
+    final before = _before;
+    if (before == null || !_beforeMatches(input.source, sampleSize)) {
+      _requestBefore();
+      return;
+    }
+    final key = input.cacheKey;
+    if (key != null) {
+      final hit = _cache.lookup(key);
+      if (hit != null) {
+        _applyAfter(hit, input, provisional: false);
         return;
       }
     }
 
-    if (generation != _generation || !mounted) {
-      // generator の後・renderer の前でも世代を確認し、既に
-      // 追い越されていれば（GPU コストのかかる）renderer を呼ばずに捨てる。
-      if (!reuseBefore && !identical(before, _before)) before.dispose();
-      return;
+    // ここから先の await の間に [_before] が入れ替わって dispose されても困らないよう、
+    // 描画器の入力は今のうちに複製しておく。
+    final fullInput = before.clone();
+    bool superseded() =>
+        generation != _generation ||
+        !mounted ||
+        _pendingRebuildSampleSize != null;
+
+    final slowLast = (_lastFullRender ?? Duration.zero) >= kProvisionalRenderAfter;
+    if (key != null &&
+        sampleSize > kProvisionalPreviewSize &&
+        (input.heavy || slowLast)) {
+      _watchdog.stage = 'provisional';
+      final small = downscalePreviewImage(fullInput, kProvisionalPreviewSize);
+      ui.Image? low;
+      try {
+        low = await input.render(small);
+      } catch (e) {
+        // 仮表示の失敗は表示に出さない（続けてフル解像度で描く）。記録だけ残す。
+        PreviewDiagnostics.recordError('preview_failed', e, {
+          'view': 'before_after',
+          'stage': 'provisional',
+          ..._watchdog.fields,
+        });
+      } finally {
+        if (!identical(low, small)) small.dispose();
+      }
+      if (low != null) {
+        if (superseded()) {
+          low.dispose();
+        } else {
+          _applyAfter(low, input, provisional: true);
+        }
+      }
+      if (superseded()) {
+        fullInput.dispose();
+        return;
+      }
     }
 
-    // `before` が再利用中の `_before` そのものだと、await
-    // している間に別の（より新しい）`_rebuild` がそれを dispose する可能性が
-    // ある。renderer には複製を渡し、`_before`/`_after` の実体には触れさせない。
-    // 新規生成した `before` はまだどこにも共有されていないため複製不要。
-    final bool clonedInput = reuseBefore;
-    final ui.Image rendererInput = clonedInput ? before.clone() : before;
-
-    // 描画器に渡す入力と、描画した画像に記録する値（書き出しのキャプション・強度・
-    // フィルタ）は、ここで一度だけ読んでローカルに固定する。描画器の await の間に親が
-    // 再 build して `widget.*` が新しい値になっても（[_scheduleRebuild] は実行中は世代を
-    // 上げず待避させるだけなので、この呼び出しが最新のまま完了し得る）、画像に写っている
-    // 層の集合・強度と、書き出しに焼く値がずれないようにする（#121）。
-    final steps = widget.steps;
-    final renderFilter = widget.filter;
-    final renderStrength = widget.strength;
-    final renderFilterId = widget.filterId;
-    final renderVariantId = widget.variantId;
-    final renderExportLayers = widget.exportLayers;
-
+    _watchdog.stage = 'render';
+    final watch = Stopwatch()..start();
     ui.Image? after;
     try {
-      _watchdog.stage = 'render';
-      after = steps == null
-          ? await renderPreviewAfter(
-              rendererInput,
-              renderFilter,
-              renderStrength,
-            )
-          : await renderDefaultAfterPipeline(rendererInput, steps);
+      after = await input.render(fullInput);
     } catch (e, st) {
       PreviewDiagnostics.recordError('preview_failed', e,
           {'view': 'before_after', 'stage': 'render', ..._watchdog.fields});
-      // こちらも同様に報告する。
       FlutterError.reportError(FlutterErrorDetails(
         exception: e,
         stack: st,
         library: 'before_after_view',
       ));
-      if (clonedInput) {
-        rendererInput.dispose();
-      } else if (!identical(before, _before)) {
-        before.dispose();
-      }
+      fullInput.dispose();
       _onRebuildFailed(generation);
       return;
     }
@@ -476,78 +620,33 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         exception: StateError('after renderer returned null'),
         library: 'before_after_view',
       ));
-      if (clonedInput) {
-        rendererInput.dispose();
-      } else if (!identical(before, _before)) {
-        before.dispose();
-      }
+      fullInput.dispose();
       _onRebuildFailed(generation);
       return;
     }
+    // 描画器が入力をそのまま返した（何も掛けない）ときは、その複製が結果になる。
+    if (!identical(after, fullInput)) fullInput.dispose();
+    _lastFullRender = watch.elapsed;
+    // 外された後はキャッシュ（dispose で空にした）へ入れない（入れると誰も捨てない）。
+    if (key != null && mounted) _cache.store(key, after);
 
-    final bool isLatest = generation == _generation && mounted;
-    if (!isLatest) {
-      // Superseded while we awaited the renderer, or disposed meanwhile —
-      // discard everything we produced instead of leaking or touching state
-      // a newer request already owns.
-      if (!reuseBefore && !identical(before, _before)) before.dispose();
-      // `rendererInput` は clone された時点でこの呼び出し
-      // だけが所有する私有オブジェクト。`after` と同一（filter == null で
-      // clone がそのまま返った場合）でも無条件に dispose する — 「同一なら
-      // どちらかに任せる」という以前の条件分岐は、両方の条件が同時に false に
-      // なる組み合わせで dispose 漏れ（リーク）を起こしていた。
-      if (clonedInput) rendererInput.dispose();
-      if (!identical(after, rendererInput) &&
-          !identical(after, before) &&
-          !identical(after, _after)) {
-        after.dispose();
-      }
+    if (generation != _generation || !mounted) {
+      // 追い越された・外された。表示には使わない（キャッシュには入れた）。
+      after.dispose();
       return;
     }
-
-    final oldBefore = _before;
-    final oldAfter = _after;
-    setState(() {
-      _before = before;
-      _after = after;
-      _afterFilterId = renderFilterId; // #60
-      _afterVariantId = renderVariantId; // #60
-      _afterStrength = renderStrength;
-      _afterFilter = renderFilter; // #76
-      _afterExportLayers = renderExportLayers; // #121
-      _currentSampleSize = sampleSize;
-      _currentImageSource = source; // widget.imageSource ではなく、冒頭で固定した source
-      _loading = false;
-      _failed = false; // 成功したら失敗表示を解除する。
-    });
-
-    if (clonedInput && !identical(rendererInput, after)) {
-      // The clone only exists to protect the renderer call; it never becomes
-      // the new `_after` unless the renderer returned it unchanged
-      // (filter == null), so dispose it now.
-      rendererInput.dispose();
-    }
-    if (!identical(oldBefore, before)) {
-      oldBefore?.dispose();
-    }
-    // _after may alias _before (filter == null) or the old _before —
-    // avoid double-disposing either.
-    if (oldAfter != null &&
-        !identical(oldAfter, oldBefore) &&
-        !identical(oldAfter, after)) {
-      oldAfter.dispose();
-    }
+    _applyAfter(after, input, provisional: false);
   }
 
   @override
   void dispose() {
     _busy.dispose();
+    _beforeBusy.dispose();
     _watchdog.dispose();
+    _loadWatchdog.dispose();
+    _cache.clear();
     _before?.dispose();
-    // _after may alias _before (when filter == null); avoid double dispose.
-    if (!identical(_after, _before)) {
-      _after?.dispose();
-    }
+    _after?.dispose();
     super.dispose();
   }
 
@@ -645,7 +744,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         // Stack the two panes vertically on narrow widths.
         final stackVertically = constraints.maxWidth < 420;
 
-        if (_loading && _before == null) {
+        if (_before == null && !_failed) {
           // Non-animating placeholder while the first sample image is
           // generated. (A CircularProgressIndicator would animate forever
           // and block pumpAndSettle in widget tests.)
@@ -675,7 +774,11 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
           wrapLabel: multiLayer,
           // 見出し「元の画像」が説明を担うので、画像には代替テキストを付けない
           // （同じ文言の二重読み上げを避ける、#45）。
-          child: PreviewImageView(image: _before),
+          // 元画像の読み込みが長引いたら、before 側にも札を出す（#185）。
+          child: PreviewBusyOverlay(
+            label: _beforeBusy.showing ? l10n.previewLoadingSource : null,
+            child: PreviewImageView(image: _before),
+          ),
         );
         // 最新世代が失敗した場合は _failed が立ち、
         // _after は null にされている。stale/不整合な画像を出し続けるより
@@ -704,22 +807,13 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
                         : l10n.previewImageFilteredSemantics(
                             multiLayer ? layerNames.join(' + ') : afterName),
               );
-        // 描画が長引いている間は、after の上に「描画中…」を重ねる（#185）。
-        final Widget afterChild = _busy.showing
-            ? Stack(
-                fit: StackFit.expand,
-                children: [
-                  afterImage,
-                  Align(
-                    alignment: Alignment.topCenter,
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: PreviewBusyBadge(label: l10n.previewRendering),
-                    ),
-                  ),
-                ],
-              )
-            : afterImage;
+        // 描画が長引いている間・低解像度の仮表示の間は、after の上に札を重ねる（#185）。
+        final Widget afterChild = PreviewBusyOverlay(
+          label: _afterProvisional
+              ? l10n.previewRenderingProvisional
+              : (_busy.showing ? l10n.previewRendering : null),
+          child: afterImage,
+        );
         // #60: 時間依存の注記は widget.filterId（カタログ id）からカタログを
         // 引いて解決する。after ペインの見出しは widget.variantId が
         // あればそちらを優先する（#60: -omaly の名前を正しく出すため、
@@ -742,7 +836,8 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
           // Export is only meaningful when a real "after" image exists.
           // The failed state (null _after) gets no button.
           // 複数層でも書き出せる（キャプションは層ごとの行、#121）。
-          trailing: _after != null
+          // 低解像度の仮表示（#185）は書き出さない（フル解像度の結果を待つ）。
+          trailing: _after != null && !_afterProvisional
               ? IconButton(
                   icon: const Icon(Icons.download_outlined),
                   iconSize: 20,
