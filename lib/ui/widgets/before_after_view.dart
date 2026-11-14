@@ -12,8 +12,8 @@ import '../../services/export_layers.dart';
 import '../../services/export_plan.dart';
 import '../../services/export_service.dart';
 import '../../src/rust/api/sensus_bridge.dart';
-import 'export_feedback.dart';
 import 'bypass_badge.dart';
+import 'export_feedback.dart';
 import 'preview_rendering.dart';
 
 /// 横並びのときの Before / After 2 枚の間隔（dp）。[BeforeAfterView.maxPaneSide] が
@@ -677,7 +677,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
           label: multiLayer ? layerNamesHead(layerNames) : afterName,
           labelSuffix: afterSuffix,
           semanticsLabel: afterName,
-          overlay: widget.bypassed ? const BypassBadge() : null,
+          showBypass: widget.bypassed,
           // 複数層の見出しも 1 行で省略する（#183）。折り返すと層数で画像の位置が動くため。
           // 全部の名前は帯のチップと画像の代替テキストに出る。
           // Export is only meaningful when a real "after" image exists.
@@ -768,7 +768,7 @@ class _Pane extends StatelessWidget {
     this.trailing,
     this.labelSuffix,
     this.semanticsLabel,
-    this.overlay,
+    this.showBypass = false,
   });
 
   final String label;
@@ -779,8 +779,8 @@ class _Pane extends StatelessWidget {
   /// 見出しの読み上げ（ラベルと接尾辞を分けて出すときの、つなげた全文）。
   final String? semanticsLabel;
 
-  /// 画像の左下に重ねるもの（原画表示中のバッジ）。
-  final Widget? overlay;
+  /// 画像の左下に「原画表示中」のバッジを重ねる。
+  final bool showBypass;
 
   final Widget child;
 
@@ -834,6 +834,8 @@ class _Pane extends StatelessWidget {
                         label,
                         style: style,
                         maxLines: 1,
+                        // 折り返さない: 折り返すと Text が幅いっぱいを取り、名前と接尾辞の間が空く。
+                        softWrap: false,
                         overflow: TextOverflow.clip,
                       ),
                     ),
@@ -858,29 +860,15 @@ class _Pane extends StatelessWidget {
 
   /// 画像（正方形）。
   Widget buildImage() {
-    final image = AspectRatio(
-      aspectRatio: 1,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: child,
-      ),
-    );
-    if (overlay == null) return image;
-    // 画像の枠の中の左下に重ねる（書き出しボタン・見出し・注記と重ならない）。
-    return Stack(
-      children: [
-        image,
-        Positioned(
-          left: 4,
-          right: 4,
-          bottom: 4,
-          // 画像より幅が広いときは縮めて、画像の枠からはみ出さない。
-          child: Align(
-            alignment: Alignment.bottomLeft,
-            child: FittedBox(fit: BoxFit.scaleDown, child: overlay!),
-          ),
+    return BypassBadge.overlaid(
+      AspectRatio(
+        aspectRatio: 1,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: child,
         ),
-      ],
+      ),
+      show: showBypass,
     );
   }
 

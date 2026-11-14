@@ -257,6 +257,10 @@ void main() {
             lessThanOrEqualTo(
                 tester.getRect(find.byType(BeforeAfterView)).right));
         expect(tester.getSize(heading).height, lessThanOrEqualTo(48));
+        // 名前と「…（+N）」の間に大きな空白が出ない（名前の Text が幅いっぱいを取って接尾辞が
+        // 右へ離れる退行）。
+        final gap = tester.getRect(suffix).left - tester.getRect(heading).right;
+        expect(gap, lessThanOrEqualTo(12), reason: '名前と接尾辞の間隔 $gap');
         baseTop ??= top;
         expect(top, baseTop, reason: '名前の長さに依らない');
       });

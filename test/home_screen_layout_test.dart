@@ -1046,7 +1046,9 @@ void main() {
               final h =
                   await pumpHomeScreen(tester, size: size, locale: locale);
               // 「原画表示中」も出した状態で測る（画像の枠の中に重なるだけで、帯・位置に影響しない）。
-              h.visionState.acquireBypass(Object());
+              // toggle() / clear() は bypass の保持を解除するので、操作のたびに保持し直す。
+              final bypassHolder = Object();
+              h.visionState.acquireBypass(bypassHolder);
               final firstSampleChip = find
                   .descendant(
                       of: find.byType(ImageSourcePicker),
@@ -1098,8 +1100,12 @@ void main() {
                       reason: '$reason: 「2×2 で比較」が帯の右に収まる');
                   expect(r.top, greaterThanOrEqualTo(strip.top),
                       reason: '$reason: 「2×2 で比較」が帯の上に収まる');
-                  expect(r.bottom, lessThanOrEqualTo(strip.bottom),
-                      reason: '$reason: 「2×2 で比較」が帯の下に収まる');
+                  // 帯の中身（スクロールバーの段 6dp を除く）に収まる。段で吸収されているだけではない。
+                  expect(
+                      r.bottom,
+                      lessThanOrEqualTo(
+                          strip.bottom - LayerChipStrip.scrollbarLane),
+                      reason: '$reason: 「2×2 で比較」が帯の中身に収まる');
                 }
               }
 
@@ -1107,6 +1113,8 @@ void main() {
               expectNoPageScroll();
               for (var n = 1; n <= 5; n++) {
                 h.visionState.toggle(ids[n - 1]);
+                h.visionState.acquireBypass(bypassHolder);
+                expect(h.visionState.bypassed, isTrue);
                 await tester.pump();
                 await tester.pump();
                 if (n == 1 || n == 2 || n == 5) {
@@ -1132,6 +1140,7 @@ void main() {
                 }
               }
               h.visionState.clear();
+              h.visionState.acquireBypass(bypassHolder);
               await tester.pump();
               expect(measure(), base, reason: '全解除して 0 層');
             } finally {
@@ -1199,6 +1208,60 @@ void main() {
             isTrue,
             reason: '2×2: バッジ $badge2 は右下のセル $last の中');
       });
+    }
+
+    // 色覚が 1 層だけ（初回起動の状態）: 「すべて解除」が無いので、×2 以上でも「2×2 で比較」が文字つきの
+    // まま置かれる幅がある。文字つきのチップの高さが帯の中身（スクロールバーの段を除く）に収まる。
+    for (final (label, size) in [
+      ('既定 800x600', defaultWindow),
+      ('広幅 1600x900', const Size(1600, 900)),
+    ]) {
+      for (final scale in [1.0, 2.0, 3.0]) {
+        for (final locale in [const Locale('ja'), const Locale('en')]) {
+          testWidgets(
+              '色覚 1 層・$label・文字 x$scale・${locale.languageCode}: 「2×2 で比較」が帯の中身に収まる',
+              (tester) async {
+            loadPreviewImages();
+            tester.platformDispatcher.textScaleFactorTestValue = scale;
+            addTearDown(
+                tester.platformDispatcher.clearTextScaleFactorTestValue);
+            final errors = <String>[];
+            final previousOnError = FlutterError.onError;
+            FlutterError.onError = (d) => errors.add(d.toString());
+            try {
+              await pumpHomeScreen(tester,
+                  size: size,
+                  locale: locale,
+                  select: (s) => selectColorVisionKey(s, 'protanopia'));
+              final strip = tester.getRect(find.byType(LayerChipStrip));
+              final compare = find.descendant(
+                  of: find.byType(LayerChipStrip),
+                  matching: find.byType(FilterChip));
+              expect(compare, findsOneWidget);
+              final r = tester.getRect(compare);
+              expect(
+                  r.height,
+                  lessThanOrEqualTo(
+                      strip.height - LayerChipStrip.scrollbarLane),
+                  reason: 'チップの高さ ${r.height} が帯の中身 '
+                      '${strip.height - LayerChipStrip.scrollbarLane} に収まる');
+              expect(r.top, greaterThanOrEqualTo(strip.top));
+              expect(
+                  r.bottom,
+                  lessThanOrEqualTo(
+                      strip.bottom - LayerChipStrip.scrollbarLane));
+            } finally {
+              FlutterError.onError = previousOnError;
+            }
+            final own = errors
+                .where((e) =>
+                    e.contains('layer_chip_strip') ||
+                    e.contains('LayerChipStrip'))
+                .toList();
+            expect(own, isEmpty, reason: '$own');
+          });
+        }
+      }
     }
 
     // 英語は実フォントでないと選択欄のチップの折り返しが測れない（テスト用フォントでは異常に

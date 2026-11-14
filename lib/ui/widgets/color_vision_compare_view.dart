@@ -474,13 +474,19 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       // インジケータは widget test の pumpAndSettle を止めてしまう）。
       return SizedBox(
         height: 180,
-        child: Center(
-          child: Text(
-            l10n.previewPreparing,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+        child: Stack(
+          children: [
+            if (widget.bypassed)
+              const Positioned(left: 4, bottom: 4, child: BypassBadge()),
+            Center(
+              child: Text(
+                l10n.previewPreparing,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       );
     }
@@ -505,9 +511,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
                   visionFilterName(l10n, entries[i].id),
                   percent,
                 ),
-          overlay: widget.bypassed && i == entries.length - 1
-              ? const BypassBadge()
-              : null,
+          showBypass: widget.bypassed && i == entries.length - 1,
           child: afters == null
               ? PreviewErrorPlaceholder(theme: theme, label: l10n.previewFailed)
               : PreviewImageView(image: afters[i]),
@@ -581,15 +585,15 @@ class _CompareCell extends StatelessWidget {
     required this.label,
     required this.semanticsLabel,
     required this.child,
-    this.overlay,
+    this.showBypass = false,
   });
 
   final String label;
   final String semanticsLabel;
   final Widget child;
 
-  /// 画像の左下に重ねるもの（原画表示中のバッジ）。
-  final Widget? overlay;
+  /// 画像の左下に「原画表示中」のバッジを重ねる。
+  final bool showBypass;
 
   @override
   Widget build(BuildContext context) {
@@ -615,27 +619,15 @@ class _CompareCell extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          Stack(
-            children: [
-              AspectRatio(
-                aspectRatio: 1,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: child,
-                ),
+          BypassBadge.overlaid(
+            AspectRatio(
+              aspectRatio: 1,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: child,
               ),
-              if (overlay != null)
-                Positioned(
-                  left: 4,
-                  right: 4,
-                  bottom: 4,
-                  // 画像より幅が広いときは縮めて、画像の枠からはみ出さない。
-                  child: Align(
-                    alignment: Alignment.bottomLeft,
-                    child: FittedBox(fit: BoxFit.scaleDown, child: overlay!),
-                  ),
-                ),
-            ],
+            ),
+            show: showBypass,
           ),
         ],
       ),

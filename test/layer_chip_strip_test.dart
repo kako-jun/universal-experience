@@ -419,4 +419,130 @@ void main() {
       expect(tester.getRect(chip('floaters')).right, lessThanOrEqualTo(280));
     });
   });
+
+  // 右端の固定枠（「2×2 で比較」）の縮み判定と高さ。選択中・未選択の両方で、幅を細かく動かして
+  // 縮む境目をまたぐ。縮む前でも縮んだ後でも、チップの領域が最小幅以上・溢れなし・チップが帯の
+  // 中身（スクロールバーの段を除く）に収まる。
+  group('右端の固定枠の縮み判定（境目をまたぐ）', () {
+    Future<void> pumpWith(WidgetTester tester,
+        {required double width,
+        required double scale,
+        required bool selected,
+        required int layers}) async {
+      tester.view.physicalSize = const Size(1400, 400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      state = VisionFilterState();
+      for (final id in ['myopia', 'protanopia'].take(layers)) {
+        state.toggle(id);
+      }
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<VisionFilterState>.value(value: state),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            locale: const Locale('ja'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: Align(
+                alignment: Alignment.topLeft,
+                child: SizedBox(
+                  width: width,
+                  child: LayerChipStrip(
+                    trailingLabel: '2×2 で比較',
+                    trailingBuilder: (context, compact) => FilterChip(
+                      label: compact
+                          ? const Icon(Icons.compare, size: 20)
+                          : const Text('2×2 で比較'),
+                      selected: selected,
+                      onSelected: (_) {},
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+    }
+
+    // 文字つきのチップは、親の高さの制約に潰されず、単体で置いたときの高さのまま（余白を削られない）。
+    for (final scale in [1.0, 2.0, 3.0]) {
+      testWidgets('文字 x$scale: 文字つきの「2×2 で比較」は単体と同じ高さで帯に置かれる', (tester) async {
+        await pumpWith(tester,
+            width: 1300, scale: scale, selected: true, layers: 1);
+        expect(find.byIcon(Icons.compare), findsNothing, reason: '幅が十分なので文字つき');
+        final inStrip = tester.getSize(find.byType(FilterChip)).height;
+        await tester.pumpWidget(MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.topLeft,
+              child: FilterChip(
+                label: const Text('2×2 で比較'),
+                selected: true,
+                onSelected: (_) {},
+              ),
+            ),
+          ),
+        ));
+        final natural = tester.getSize(find.byType(FilterChip)).height;
+        expect(inStrip, natural, reason: '帯の中のチップ $inStrip と単体 $natural');
+      });
+    }
+
+    for (final scale in [1.0, 2.0, 3.0]) {
+      for (final selected in [false, true]) {
+        for (final layers in [1, 2]) {
+          testWidgets(
+              '文字 x$scale・${selected ? '選択中' : '未選択'}・$layers 層: 幅 280〜700 を動かしても収まる',
+              (tester) async {
+            final errors = <String>[];
+            final previous = FlutterError.onError;
+            FlutterError.onError = (d) => errors.add(d.toString());
+            try {
+              for (var w = 280.0; w <= 700; w += 3) {
+                await pumpWith(tester,
+                    width: w, scale: scale, selected: selected, layers: layers);
+                final strip = tester.getRect(find.byType(LayerChipStrip));
+                final area = tester.getSize(find
+                    .descendant(
+                        of: find.byType(LayerChipStrip),
+                        matching: find.byType(Scrollable))
+                    .first);
+                expect(area.width,
+                    greaterThanOrEqualTo(LayerChipStrip.minChipAreaWidth),
+                    reason: '幅 $w: チップの領域');
+                final r = tester.getRect(find.byType(FilterChip));
+                expect(r.left, greaterThanOrEqualTo(strip.left),
+                    reason: '幅 $w');
+                expect(r.right, lessThanOrEqualTo(strip.right), reason: '幅 $w');
+                expect(r.top, greaterThanOrEqualTo(strip.top), reason: '幅 $w');
+                expect(
+                    r.bottom,
+                    lessThanOrEqualTo(
+                        strip.bottom - LayerChipStrip.scrollbarLane),
+                    reason: '幅 $w: チップ ${r.height} が帯の中身に収まる');
+              }
+            } finally {
+              FlutterError.onError = previous;
+            }
+            // この部品だけの試験なので、どんな例外（チップ内部の溢れも）も失敗にする。
+            expect(errors, isEmpty, reason: '${errors.take(1)}');
+          });
+        }
+      }
+    }
+  });
 }

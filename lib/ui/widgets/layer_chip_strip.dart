@@ -53,7 +53,7 @@ class LayerChipStrip extends StatefulWidget {
 
   /// 文字拡大を考慮した帯の中身の高さ。チップの本文（bodyLarge の 1 行）・最小タップ目標
   /// [chipHeight]・右端の「2×2 で比較」の**文字つきの** `FilterChip` の高さ（labelLarge の 1 行 +
-  /// 上下の余白と枠 18。実測: ×1.5 まで 48、×2.0 で 58、×3.0 で 78）の最大。文字つきの形のまま
+  /// 上下の余白と枠 22 の見積り。実測: ×1.5 まで 48、×2.0 で en 58 / ja 61、×3.0 で 78 以上）の最大。文字つきの形のまま
   /// 置くか、アイコンだけに縮むかは幅だけで決まり（層数で「すべて解除」が増えると変わる）、
   /// 高さで決まるわけではない。だから高さは常に文字つきの形の分を確保し、層数・色覚の層の有無・
   /// 縮み方で動かないようにする。
@@ -69,9 +69,10 @@ class LayerChipStrip extends StatefulWidget {
     return [chipHeight, line, compareChip].reduce((a, b) => a > b ? a : b);
   }
 
-  /// `FilterChip` の縦の余白と枠の合計（上下パディング + 枠）。実測: ラベル 1 行の高さに足すと
-  /// チップの高さになる（×2.0: 40.04 + 18 = 58）。
-  static const double filterChipVerticalExtra = 18;
+  /// `FilterChip` の縦の余白と枠の合計（上下パディング + 枠）の見積り。実測: ラベル 1 行の高さに
+  /// 足すとチップの高さになる（×2.0: en 58 = 40.04 + 18、ja 61 = 40.04 + 21）。フォントで 3dp 違うので
+  /// 大きい方（22）を取る。
+  static const double filterChipVerticalExtra = 22;
 
   /// 帯全体の高さ（チップ + スクロールバーの段）。層数に関わらず同じ値になる。
   static double heightFor(BuildContext context) =>
@@ -159,7 +160,11 @@ class _LayerChipStripState extends State<LayerChipStrip> {
                     ),
                     if (widget.trailingBuilder != null) ...[
                       const SizedBox(width: 8),
-                      widget.trailingBuilder!(context, compact),
+                      Padding(
+                        padding: const EdgeInsets.only(
+                            bottom: LayerChipStrip.scrollbarLane),
+                        child: widget.trailingBuilder!(context, compact),
+                      ),
                     ],
                   ],
                 ),
@@ -234,33 +239,44 @@ class _LayerChipStripState extends State<LayerChipStrip> {
                         ),
                       ),
                     ),
-                    if (layers.length >= 2) ...[
-                      const SizedBox(width: 8),
-                      if (compact)
-                        IconButton(
-                          key: const ValueKey('layer_strip_clear_all'),
-                          tooltip: l10n.layerStripClearAll,
-                          onPressed: () {
-                            state.clear();
-                            dismissWelcomeBannerOnUserChange(context);
-                          },
-                          icon: const Icon(Icons.clear),
-                        )
-                      else
-                        TextButton.icon(
-                          key: const ValueKey('layer_strip_clear_all'),
-                          onPressed: () {
-                            state.clear();
-                            dismissWelcomeBannerOnUserChange(context);
-                          },
-                          icon: const Icon(Icons.clear, size: 18),
-                          label: Text(l10n.layerStripClearAll),
-                        ),
-                    ],
-                    if (widget.trailingBuilder != null) ...[
-                      const SizedBox(width: 8),
-                      widget.trailingBuilder!(context, compact),
-                    ],
+                    // 右端の固定枠は、スクロールバーの段を除いた帯の中身の高さの中で縦中央に置く
+                    //（段にはみ出さない）。
+                    Padding(
+                      padding: const EdgeInsets.only(
+                          bottom: LayerChipStrip.scrollbarLane),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (layers.length >= 2) ...[
+                            const SizedBox(width: 8),
+                            if (compact)
+                              IconButton(
+                                key: const ValueKey('layer_strip_clear_all'),
+                                tooltip: l10n.layerStripClearAll,
+                                onPressed: () {
+                                  state.clear();
+                                  dismissWelcomeBannerOnUserChange(context);
+                                },
+                                icon: const Icon(Icons.clear),
+                              )
+                            else
+                              TextButton.icon(
+                                key: const ValueKey('layer_strip_clear_all'),
+                                onPressed: () {
+                                  state.clear();
+                                  dismissWelcomeBannerOnUserChange(context);
+                                },
+                                icon: const Icon(Icons.clear, size: 18),
+                                label: Text(l10n.layerStripClearAll),
+                              ),
+                          ],
+                          if (widget.trailingBuilder != null) ...[
+                            const SizedBox(width: 8),
+                            widget.trailingBuilder!(context, compact),
+                          ],
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -291,16 +307,19 @@ class _LayerChipStripState extends State<LayerChipStrip> {
       return w;
     }
 
-    // 文字を除いた幅の見積り（実測の最大に余裕を足した定数。文字倍率で余白も伸び縮みするので、
-    // どの倍率でも実測以上になるようにした）:
-    //  - 「すべて解除」TextButton.icon: 実測 53.3（×1.0）/ 29.3（×2.0）→ 56
-    //  - 「2×2 で比較」FilterChip: **選択中（チェックつき）の形**で見積もる。実測 53.0（×1.0）/
-    //    65.0（×2.0）→ 70。未選択の実測（33.0 / 25.0）より広いので、ON/OFF の切替で
-    //    縮み方が変わらない。
+    // 文字を除いた幅の見積り（実測に余裕を足した式）:
+    //  - 「すべて解除」TextButton.icon: 実測 53.3（×1.0）→ 29.3（×2.0）と倍率で縮むので、
+    //    最大の 56 を定数で使う（過大見積りで安全側）。
+    //  - 「2×2 で比較」FilterChip は**選択中（チェックつき）の形**で見積もる（未選択より広いので、
+    //    ON/OFF の切替で縮み方が変わらない）。余白は文字倍率にほぼ比例して伸びる。実測（文字を除いた幅）:
+    //    ja ×1 55 / ×1.19 57.5 / ×1.5 62 / ×2 69 / ×2.5 79 / ×3 90、en 54 / 56.5 / 60 / 66 / 76 / 86。
+    //    これを覆う式 `56 + 22 × (倍率 − 1)`（×1 56 / ×2 78 / ×3 100）にする。
+    final scale = scaler.scale(14) / 14;
+    final chipExtra = 56 + 22 * (scale - 1);
     final clearAll =
         hasClearAll ? 56 + textWidth(l10n.layerStripClearAll) : 0.0;
     final label = widget.trailingLabel;
-    final trailing = label == null ? 0.0 : 70 + textWidth(label);
+    final trailing = label == null ? 0.0 : chipExtra + textWidth(label);
     final gaps = (hasClearAll ? 8 : 0) + (label == null ? 0 : 8);
     return width - clearAll - trailing - gaps < LayerChipStrip.minChipAreaWidth;
   }
