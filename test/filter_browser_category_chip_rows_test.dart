@@ -4,8 +4,6 @@
 // 行の左右端を揃える（layoutCategoryChips）。省略は原則しない。48dp のタップ目標、
 // 行優先の Tab 順、一覧が潰れないこと、チップ余白の見積もりが実物と一致することを確かめる。
 
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
@@ -31,6 +29,21 @@ void main() {
   // 行（ExperimentalBadge など）があふれることがあるので、チップ帯（filter_browser.dart）
   // 由来のものだけを失敗にする。
   late List<String> renderErrors;
+  void Function(FlutterErrorDetails)? savedOnError;
+
+  // pumpBrowser が差し替えた FlutterError.onError を、テスト本体の終わり（expect が失敗した
+  // ときも含む）で必ず戻す。戻さないと binding のアサーションでテストが止まる。
+  void browserTest(
+      String description, Future<void> Function(WidgetTester) body) {
+    testWidgets(description, (tester) async {
+      try {
+        await body(tester);
+      } finally {
+        if (savedOnError != null) FlutterError.onError = savedOnError;
+        savedOnError = null;
+      }
+    });
+  }
 
   List<String> chipBandErrors() => [
         for (final e in renderErrors)
@@ -45,9 +58,8 @@ void main() {
     double height = 900,
   }) async {
     renderErrors = [];
-    final originalOnError = FlutterError.onError;
+    savedOnError = FlutterError.onError;
     FlutterError.onError = (d) => renderErrors.add(d.toString());
-    addTearDown(() => FlutterError.onError = originalOnError);
     tester.view.physicalSize = Size(width, height);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -57,6 +69,7 @@ void main() {
       ChangeNotifierProvider<VisionFilterState>.value(
         value: VisionFilterState(),
         child: MaterialApp(
+          theme: AppTheme.lightTheme,
           locale: Locale(locale),
           localizationsDelegates: const [
             AppLocalizations.delegate,
@@ -101,7 +114,7 @@ void main() {
 
   group('チップ余白の見積もりが実物の ChoiceChip と一致する（AppTheme・各倍率）', () {
     for (final scale in [1.0, 1.3, 1.5, 2.0]) {
-      testWidgets('文字倍率 $scale', (tester) async {
+      browserTest('文字倍率 $scale', (tester) async {
         Future<List<double>> measure(bool selected) async {
           await tester.pumpWidget(MaterialApp(
             theme: AppTheme.lightTheme,
@@ -133,7 +146,7 @@ void main() {
         final unselected = await measure(false);
         final selected = await measure(true);
         final height = unselected[1];
-        final check = math.max(kCategoryChipCheckReserve, height);
+        final check = categoryChipCheckWidth(height);
         // 見積もりは「実物以上」（安全側）で、等倍では一致する。
         expect(unselected[0], lessThanOrEqualTo(kCategoryChipBaseChrome + 0.5));
         expect(selected[0],
@@ -249,7 +262,7 @@ void main() {
     for (final width in locale == 'ja'
         ? [332.0, 420.0, 800.0, 1100.0]
         : [420.0, 800.0, 1100.0]) {
-      testWidgets('$locale 幅$width: 各行の左右端が揃い、全チップが 48dp 以上', (tester) async {
+      browserTest('$locale 幅$width: 各行の左右端が揃い、全チップが 48dp 以上', (tester) async {
         await pumpBrowser(tester, width: width, locale: locale);
         final rects = chipRects(tester);
         expect(rects, hasLength(8));
@@ -269,7 +282,7 @@ void main() {
       });
     }
 
-    testWidgets('$locale: 文字倍率 2.0 でも行の端が揃い、例外が出ない', (tester) async {
+    browserTest('$locale: 文字倍率 2.0 でも行の端が揃い、例外が出ない', (tester) async {
       await pumpBrowser(tester, width: 332, locale: locale, textScale: 2.0);
       final rows = rowsOf(chipRects(tester));
       for (final row in rows) {
@@ -280,7 +293,8 @@ void main() {
     });
   }
 
-  testWidgets('極端な狭幅では、入らないラベルを省略してツールチップに全文を出す（読み上げは二重にしない）', (tester) async {
+  browserTest('極端な狭幅（または大きい文字倍率）では、入らないラベルを省略してツールチップに全文を出す（読み上げは二重にしない）',
+      (tester) async {
     await pumpBrowser(tester, width: 250, locale: 'en');
     final tooltips = tester.widgetList<Tooltip>(find.byType(Tooltip)).toList();
     expect(tooltips, isNotEmpty);
@@ -290,7 +304,7 @@ void main() {
     expect(chipBandErrors(), isEmpty);
   });
 
-  testWidgets('低い画面でもチップ帯が一覧を押し潰さず、一覧がスクロールで読める', (tester) async {
+  browserTest('低い画面でもチップ帯が一覧を押し潰さず、一覧がスクロールで読める', (tester) async {
     await pumpBrowser(tester, width: 332, locale: 'en', height: 480);
     expect(chipBandErrors(), isEmpty);
     // チップ帯は一覧のスクロール領域の中にある（固定されていない）。
@@ -303,7 +317,7 @@ void main() {
     );
   });
 
-  testWidgets('Tab を送ると、チップを左上から右下の順（行優先）にフォーカスが進む', (tester) async {
+  browserTest('Tab を送ると、チップを左上から右下の順（行優先）にフォーカスが進む', (tester) async {
     await pumpBrowser(tester, width: 600, locale: 'ja');
     controller.searchFocus.requestFocus();
     await tester.pump();
@@ -331,7 +345,8 @@ void main() {
     for (var c = 0; c <= 7; c++) {
       controller
           .setCategory(c == 0 ? null : VisionFilterCategory.values[c - 1]);
-      await tester.pump();
+      // チェックの出現アニメ（150ms）が終わってから測る（途中は幅がほぼ 0）。
+      await tester.pumpAndSettle();
       for (final e in find.byType(ChoiceChip).evaluate()) {
         final chipFinder = find.byWidget(e.widget);
         final textFinder =
@@ -352,7 +367,7 @@ void main() {
   for (final scale in [1.3, 2.0]) {
     for (final locale in ['ja', 'en']) {
       for (final width in locale == 'ja' ? [332.0, 600.0] : [900.0, 1400.0]) {
-        testWidgets('倍率 $scale $locale 幅$width: 選択を切り替えても省略されない',
+        browserTest('倍率 $scale $locale 幅$width: 選択を切り替えても省略されない',
             (tester) async {
           await pumpBrowser(tester,
               width: width, locale: locale, textScale: scale);
@@ -364,8 +379,30 @@ void main() {
       }
     }
 
-    testWidgets('倍率 $scale 極端な狭幅: 省略されるチップ（選択中含む）にツールチップが付く', (tester) async {
+    browserTest('倍率 $scale 極端な狭幅（または大きい倍率）: 省略されるチップ（選択中含む）にツールチップが付く',
+        (tester) async {
       await pumpBrowser(tester, width: 300, locale: 'en', textScale: scale);
+      await expectNoSilentEllipsis(tester);
+      expect(chipBandErrors(), isEmpty);
+    });
+  }
+
+  // ぎりぎりの幅（既定の左ペイン幅 300〜340 や広幅）で、選択を切り替えても省略が黙って
+  // 起きない（省略されるチップは必ずツールチップ付き）。チェック幅の見積もりが足りないと落ちる。
+  const tight = <(String, double, double)>[
+    ('ja', 1.3, 300),
+    ('en', 1.3, 300),
+    ('en', 1.3, 1280),
+    ('ja', 1.5, 420),
+    ('ja', 1.5, 600),
+    ('en', 1.5, 420),
+    ('en', 1.5, 600),
+    ('en', 2.0, 340),
+  ];
+  for (final (locale, scale, width) in tight) {
+    browserTest('ぎりぎり幅 倍率 $scale $locale 幅$width: 省略は必ずツールチップ付き',
+        (tester) async {
+      await pumpBrowser(tester, width: width, locale: locale, textScale: scale);
       await expectNoSilentEllipsis(tester);
       expect(chipBandErrors(), isEmpty);
     });

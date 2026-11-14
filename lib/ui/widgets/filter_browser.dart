@@ -259,6 +259,12 @@ const double kCategoryChipBaseChrome = 34;
 /// よう、常に見込んで測る。ラベル左右の余白は倍率が上がると縮むので、34 は安全側。
 const double kCategoryChipCheckReserve = 20;
 
+/// 選択時のチェックの幅。ラベルの行の高さ [textHeight] と同じで、文字が大きいほど広がる
+/// （下限は [kCategoryChipCheckReserve]）。レイアウトの見積もりとテストが同じ式を使う。
+@visibleForTesting
+double categoryChipCheckWidth(double textHeight) =>
+    math.max(kCategoryChipCheckReserve, textHeight);
+
 /// カテゴリチップ帯の 1 行ぶん: 何番目のチップが、何 dp の幅で並ぶか。
 @visibleForTesting
 class CategoryChipRow {
@@ -353,7 +359,7 @@ class _CategoryChips extends StatelessWidget {
 
     final textWidths = [for (final l in labels) measure(l)];
     // チェックの幅はラベルの行の高さと同じ（文字が大きいほど広がる）。
-    final checkWidth = math.max(kCategoryChipCheckReserve, textHeight);
+    final checkWidth = categoryChipCheckWidth(textHeight);
     return Semantics(
       container: true,
       label: l10n.filterCategoryLabel,
