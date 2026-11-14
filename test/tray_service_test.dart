@@ -15,7 +15,7 @@ import 'support/color_vision_select.dart';
 const _labels = TrayMenuLabels(
   showLoupe: 'ウィンドウを表示',
   hideLoupe: 'ウィンドウを隠す',
-  clearFilter: 'フィルタを解除',
+  clearFilter: 'フィルタをすべて解除',
   openSettings: '設定を開く…',
   quit: '終了',
   filterLabels: {
@@ -244,7 +244,7 @@ void main() {
       String labelOf(TrayMenuKind kind) =>
           spec.firstWhere((e) => e.kind == kind).label!;
 
-      expect(labelOf(TrayMenuKind.clearFilter), 'フィルタを解除');
+      expect(labelOf(TrayMenuKind.clearFilter), 'フィルタをすべて解除');
       expect(labelOf(TrayMenuKind.openSettings), '設定を開く…');
       expect(labelOf(TrayMenuKind.quit), '終了');
       final proto = spec.firstWhere(
@@ -607,7 +607,7 @@ void main() {
     const enLabels = TrayMenuLabels(
       showLoupe: 'Show window',
       hideLoupe: 'Hide window',
-      clearFilter: 'Clear filter',
+      clearFilter: 'Clear all filters',
       openSettings: 'Open settings…',
       quit: 'Quit',
       filterLabels: {

@@ -20,8 +20,7 @@
   "strengthSliderName": "強さ",
   "previewImageFilteredSemantics": "{name}を適用した画像",
 
-  "clearFilter": "フィルタを解除",
-  "clear": "クリア",
+  "clearFilter": "フィルタをすべて解除",
 
   "previewSectionTitle": "ビフォー / アフター",
   "previewPaneOriginal": "元の画像",
@@ -94,7 +93,6 @@
   "trayAppModeLoupeUnavailable": "ルーペ窓（準備中）",
   "trayShowLoupe": "ウィンドウを表示",
   "trayHideLoupe": "ウィンドウを隠す",
-  "trayClearFilter": "フィルタを解除",
   "trayOpenSettings": "設定を開く…",
   "trayQuit": "終了",
   "trayAdvancedFilters": "高度なフィルタ",
@@ -255,7 +253,6 @@
   "filterListOrderSemantics": "適用順 {order} 番目",
   "layerSummaryMore": "{names} …（+{count}）",
   "layerStripSemantics": "適用中のフィルタ（適用順）",
-  "layerStripClearAll": "すべて解除",
   "layerChipLabel": "適用順 {order} 番目、{name}",
   "layerChipFocusHint": "押すと、このフィルタを調整します",
   "layerChipRemove": "{name}を外す",

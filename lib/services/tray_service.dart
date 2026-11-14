@@ -264,7 +264,7 @@ const String kQuitKey = 'quit';
 /// 層に対応する一覧の行（[FilterListEntry.key]）で、色覚のクイック 4 項目と「高度な
 /// フィルタ」サブメニュー（#65）の両方のチェックに使う。[disabledListEntryKeys] は
 /// 上限で新しく足せない行（色覚の置き換えは含めない）。[hasLayers] が false のとき
-/// だけ「フィルタを解除」にチェックを付ける。表示文言は呼び出し側が i18n 解決して
+/// だけ「フィルタをすべて解除」にチェックを付ける。表示文言は呼び出し側が i18n 解決して
 /// [labels] で渡す（純粋層は文言を持たない: #18）。
 List<TrayMenuEntry> buildTrayMenuSpec({
   required bool loupeVisible,
