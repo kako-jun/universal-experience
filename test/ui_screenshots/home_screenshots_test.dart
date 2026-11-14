@@ -261,8 +261,14 @@ void main() {
     String? revealEntryKey,
     // true なら、選択欄（ImageSourcePicker）の下端がウィンドウの高さ以内であることも確かめる（#130）。
     bool expectPickerFits = false,
+    // OS の文字拡大（#183。低い広幅の 5 層で見出しが溢れないかの実フォント確認用）。
+    double textScale = 1.0,
   }) async {
     if (compare) CpuVisionRenderer.applier = _tintedApplier;
+    if (textScale != 1.0) {
+      tester.platformDispatcher.textScaleFactorTestValue = textScale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    }
     tester.view.physicalSize = Size(width, height);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -342,6 +348,9 @@ void main() {
       );
       await tester.pump();
     }
+
+    // 帯のスクロールバーのつまみはフェードインするので、撮る前に時計を進めて出す（#183）。
+    await tester.pump(const Duration(milliseconds: 400));
 
     if (expectPickerFits) {
       // 実フォント・実画像で、選択欄の下端が最初のビューポート（ウィンドウの高さ）に収まる（#130）。
@@ -636,6 +645,75 @@ void main() {
     );
   }
 
+  // 既定ウィンドウ（800x600）で 5 層（上限）でも、選択欄が最初のビューポートに収まる（#183。
+  // 層数で画像・選択欄がずれないことの実フォント検査）。ファイル名は
+  // default-window-light-{ja|en}-multi5.png。
+  for (final locale in const ['ja', 'en']) {
+    testWidgets(
+      'screenshot default-window/light/$locale multi5',
+      (tester) => shoot(
+        tester,
+        widthLabel: 'default-window',
+        width: 800,
+        height: 600,
+        dark: false,
+        locale: locale,
+        suffix: '-multi5',
+        // 時間依存の層（vertigo）は静止フレームの注記が出て見積り外なので入れない。
+        extraLayers: const [
+          'myopia',
+          'glaucoma',
+          'cataract',
+          'night_blindness'
+        ],
+        layerStrengths: const {
+          'myopia': 0.6,
+          'glaucoma': 0.4,
+          'cataract': 0.8,
+          'night_blindness': 0.5,
+        },
+        focusId: 'myopia',
+        expectPickerFits: true,
+      ),
+      skip: !screenshotsEnabled,
+    );
+  }
+
+  // 低い広幅（1280x480。画像は下限 160dp）で 5 層でも、複数層の After 見出し（名前 + 「…（+N）」）と
+  // 書き出しボタンが横に溢れない（溢れると例外でテストが落ちる、#183）。ja/en × 文字 ×1.0/×2.0。
+  // ファイル名は wide-low-light-{ja|en}-multi5[-x2].png。
+  for (final locale in const ['ja', 'en']) {
+    for (final scale in const [1.0, 2.0]) {
+      testWidgets(
+        'screenshot wide-low/light/$locale multi5 x$scale',
+        (tester) => shoot(
+          tester,
+          widthLabel: 'wide-low',
+          width: 1280,
+          height: 480,
+          dark: false,
+          locale: locale,
+          suffix: '-multi5${scale == 1.0 ? '' : '-x2'}',
+          extraLayers: const [
+            'myopia',
+            'glaucoma',
+            'cataract',
+            'night_blindness'
+          ],
+          layerStrengths: const {
+            'myopia': 0.6,
+            'glaucoma': 0.4,
+            'cataract': 0.8,
+            'night_blindness': 0.5,
+          },
+          focusId: 'myopia',
+          textScale: scale,
+        ),
+        skip: !screenshotsEnabled,
+      );
+    }
+  }
+
   // 起動モードのダイアログ（ルーペ窓は準備中で無効、#156）。ファイル名は
   // wide-light-ja-dialog.png。
   testWidgets(
@@ -655,8 +733,7 @@ void main() {
 
   // クリックスルー ON の復帰バナー（#63, #72）。主画面の案内が見える。低い広幅（1280x480）と既定
   // ウィンドウ（800x600）でも、一覧とプレビューが破綻しないことを確認する。
-  for (final (label, width, height)
-      in const <(String, double, double)>[
+  for (final (label, width, height) in const <(String, double, double)>[
     ('wide', 1280, 800),
     ('wide-low', 1280, 480),
     ('default-window', 800, 600),

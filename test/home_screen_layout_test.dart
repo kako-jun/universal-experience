@@ -26,6 +26,7 @@ import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart'
     show kMinPreviewPaneSide, previewPaneSideFor;
 import 'package:universal_experience/ui/widgets/adjust_panel.dart';
+import 'package:universal_experience/ui/widgets/bypass_badge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 import 'package:universal_experience/ui/widgets/consult_notice_block.dart';
@@ -33,6 +34,7 @@ import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
 import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 import 'package:universal_experience/ui/widgets/image_source_picker.dart';
+import 'package:universal_experience/ui/widgets/layer_chip_strip.dart';
 import 'package:universal_experience/ui/widgets/welcome_banner.dart';
 import 'package:universal_experience/ui/widgets/language_dialog.dart';
 import 'package:universal_experience/ui/widgets/window_mode_panel.dart';
@@ -98,16 +100,16 @@ void main() {
   }
 
   group('previewPaneSideFor（#130）', () {
-    // 画像以外の高さ 360 を引いた残りが一辺。下限は kMinPreviewPaneSide。
-    test('下限 + 画像以外の高さ（520）ちょうどで下限、1 足すと 1 増える', () {
-      expect(previewPaneSideFor(520), kMinPreviewPaneSide);
-      expect(previewPaneSideFor(521), kMinPreviewPaneSide + 1);
-      expect(previewPaneSideFor(519), kMinPreviewPaneSide);
+    // 画像以外の高さ 354（チップ帯 54 を含む、#183）を引いた残りが一辺。下限は kMinPreviewPaneSide。
+    test('下限 + 画像以外の高さ（514）ちょうどで下限、1 足すと 1 増える', () {
+      expect(previewPaneSideFor(514), kMinPreviewPaneSide);
+      expect(previewPaneSideFor(515), kMinPreviewPaneSide + 1);
+      expect(previewPaneSideFor(513), kMinPreviewPaneSide);
     });
 
     test('小数の高さは切り捨てる', () {
-      expect(previewPaneSideFor(544), 184);
-      expect(previewPaneSideFor(544.9), 184);
+      expect(previewPaneSideFor(544), 190);
+      expect(previewPaneSideFor(544.9), 190);
     });
 
     test('負・0・極端に小さい高さは下限になる', () {
@@ -135,11 +137,18 @@ void main() {
       return paneSide(tester);
     }
 
-    testWidgets('既定 800x600: 画像は下限より大きく、選択欄の下に余白が残る', (tester) async {
-      final side = await sideAt(tester, defaultWindow);
+    testWidgets('既定 800x600: 画像は下限より大きく、選択欄の下に余白が残る（初回起動と同じ色覚 1 層）',
+        (tester) async {
+      // 見積り（_kPreviewChromeHeight）が測っている最悪の状態 = 初回起動の色覚層
+      //（帯の右端に「2×2 で比較」が出る。帯の高さは色覚の層の有無で動かない）。
+      loadPreviewImages();
+      await pumpHomeScreen(tester,
+          size: defaultWindow,
+          select: (s) => selectColorVisionKey(s, 'deuteranomaly'));
+      final side = paneSide(tester);
       expect(side, greaterThan(kMinPreviewPaneSide));
-      // 本体領域の高さ 544（600 - AppBar 56）から、画像以外の高さ 360 を引いた値。
-      expect(side, closeTo(184, 0.01));
+      // 本体領域の高さ 544（600 - AppBar 56）から、画像以外の高さ 354 を引いた値。
+      expect(side, closeTo(190, 0.01));
       final picker = tester.getRect(find.byType(ImageSourcePicker));
       expect(picker.bottom, lessThanOrEqualTo(defaultWindow.height - 8),
           reason: '選択欄の下端がウィンドウの縁に貼り付かない');
@@ -1002,5 +1011,217 @@ void main() {
     availableExperiences();
     expect(otherCalls, 1);
     expect(calls, 1);
+  });
+
+  // チップ帯（#183）: 層の数・種類（色覚か否か）が変わっても、帯・画像（PreviewImageView の上端）・
+  // 選択欄のサンプルチップ行の画面上の位置（絶対値）と画像の大きさが動かず、縦ページスクロールも動かない。
+  // After の見出しは複数層でも 1 行・省略なので、層数で画像の位置・大きさが変わらない。
+  group('チップ帯は層の数・種類でレイアウトをずらさない（#183）', () {
+    // 色覚の層（protanopia）と非色覚の層の両方を入れる。
+    const ids = ['myopia', 'protanopia', 'glaucoma', 'cataract', 'floaters'];
+    for (final (label, size) in [
+      ('広幅 1280x800', wide),
+      ('広幅 1600x900', const Size(1600, 900)),
+      ('既定 800x600', defaultWindow),
+      // 画像が下限 160dp になる低い広幅（複数層の After 見出しが最も狭い）。
+      ('低い広幅 1280x480', wideLow),
+    ]) {
+      // 1.19 = 「2×2 で比較」が文字つきの最大（実測でチップの領域が足りる）、2.0 = アイコンだけに縮む。
+      for (final scale in [1.0, 1.19, 2.0]) {
+        for (final locale in [const Locale('ja'), const Locale('en')]) {
+          testWidgets(
+              '$label・文字 x$scale・${locale.languageCode}: 0/1/2/5 層で位置が同一',
+              (tester) async {
+            loadPreviewImages();
+            tester.platformDispatcher.textScaleFactorTestValue = scale;
+            addTearDown(
+                tester.platformDispatcher.clearTextScaleFactorTestValue);
+            // 全ての例外を集める（最初の 1 件しか見ない takeException では、一覧の既存の溢れに
+            // 隠れて帯の溢れを見逃す）。帯（layer_chip_strip.dart）由来があれば失敗にする。
+            final errors = <String>[];
+            final previousOnError = FlutterError.onError;
+            // 木が生きているうちに文字にする（後からだと「無効な要素」で文字にできない）。
+            FlutterError.onError = (d) => errors.add(d.toString());
+            try {
+              final h =
+                  await pumpHomeScreen(tester, size: size, locale: locale);
+              // 「原画表示中」も出した状態で測る（画像の枠の中に重なるだけで、帯・位置に影響しない）。
+              h.visionState.acquireBypass(Object());
+              final firstSampleChip = find
+                  .descendant(
+                      of: find.byType(ImageSourcePicker),
+                      matching: find.byType(ChoiceChip))
+                  .first;
+              Map<String, Object> measure() {
+                final img = tester.getRect(find.byType(PreviewImageView).first);
+                return {
+                  'strip': tester.getRect(find.byType(LayerChipStrip)),
+                  'image': img,
+                  'sampleChipTop': tester.getTopLeft(firstSampleChip).dy,
+                };
+              }
+
+              void expectNoPageScroll() {
+                final scrollables = find.ancestor(
+                  of: find.byType(LayerChipStrip),
+                  matching: find.byType(Scrollable),
+                );
+                for (final e in scrollables.evaluate()) {
+                  final st = (e as StatefulElement).state as ScrollableState;
+                  expect(st.position.pixels, 0, reason: '縦ページスクロールは動かない');
+                }
+              }
+
+              // 「2×2 で比較」が出ているときは、帯の中に完全に収まり、チップの領域は最小幅以上。
+              void expectStripContents(String reason) {
+                final strip = tester.getRect(find.byType(LayerChipStrip));
+                final chipArea = tester.getSize(find
+                    .descendant(
+                        of: find.byType(LayerChipStrip),
+                        matching: find.byType(Scrollable))
+                    .first);
+                final layers = h.visionState.layers;
+                if (layers.isNotEmpty) {
+                  expect(chipArea.width,
+                      greaterThanOrEqualTo(LayerChipStrip.minChipAreaWidth),
+                      reason: '$reason: チップの領域の幅');
+                }
+                final compare = find.descendant(
+                    of: find.byType(LayerChipStrip),
+                    matching: find.byType(FilterChip));
+                if (layers.any((l) => l.id == 'protanopia')) {
+                  expect(compare, findsOneWidget, reason: reason);
+                  final r = tester.getRect(compare);
+                  expect(r.left, greaterThanOrEqualTo(strip.left),
+                      reason: '$reason: 「2×2 で比較」が帯の左に収まる');
+                  expect(r.right, lessThanOrEqualTo(strip.right),
+                      reason: '$reason: 「2×2 で比較」が帯の右に収まる');
+                  expect(r.top, greaterThanOrEqualTo(strip.top),
+                      reason: '$reason: 「2×2 で比較」が帯の上に収まる');
+                  expect(r.bottom, lessThanOrEqualTo(strip.bottom),
+                      reason: '$reason: 「2×2 で比較」が帯の下に収まる');
+                }
+              }
+
+              final base = measure();
+              expectNoPageScroll();
+              for (var n = 1; n <= 5; n++) {
+                h.visionState.toggle(ids[n - 1]);
+                await tester.pump();
+                await tester.pump();
+                if (n == 1 || n == 2 || n == 5) {
+                  expect(measure(), base, reason: '$n 層');
+                  expectNoPageScroll();
+                  expectStripContents('$n 層');
+                }
+                if (n == 2) {
+                  // 「2×2 で比較」を ON / OFF しても、帯に収まりチップ領域が最小幅以上（選択中の
+                  // チェックで幅が増えても縮み方が変わらない）。
+                  final compare = find.descendant(
+                      of: find.byType(LayerChipStrip),
+                      matching: find.byType(FilterChip));
+                  await tester.tap(compare);
+                  await tester.pump();
+                  await tester.pump();
+                  expectStripContents('2×2 で比較 ON');
+                  await tester.tap(compare);
+                  await tester.pump();
+                  await tester.pump();
+                  expectStripContents('2×2 で比較 OFF');
+                  expect(measure(), base, reason: 'ON/OFF のあと');
+                }
+              }
+              h.visionState.clear();
+              await tester.pump();
+              expect(measure(), base, reason: '全解除して 0 層');
+            } finally {
+              FlutterError.onError = previousOnError;
+            }
+            final fromStrip = errors
+                .where((e) =>
+                    e.contains('layer_chip_strip') ||
+                    e.contains('LayerChipStrip') ||
+                    // 複数層の After 見出し（画像が下限のとき横に溢れた、#183）。
+                    e.contains('before_after_view') ||
+                    e.contains('BeforeAfterView'))
+                .toList();
+            expect(fromStrip, isEmpty, reason: '帯・プレビュー由来の例外: $fromStrip');
+          });
+        }
+      }
+    }
+
+    for (final (label, size) in [
+      ('既定 800x600', defaultWindow),
+      ('低い広幅 1280x480', wideLow),
+    ]) {
+      testWidgets('$label: 「原画表示中」は After 画像の枠の中にあり、操作部品と重ならない',
+          (tester) async {
+        loadPreviewImages();
+        final h = await pumpHomeScreen(tester,
+            size: size, locale: const Locale('en'));
+        for (final id in ['myopia', 'protanopia', 'glaucoma']) {
+          h.visionState.toggle(id);
+        }
+        h.visionState.acquireBypass(Object());
+        await tester.pump();
+        await tester.pump();
+        final badge = tester.getRect(find.byType(BypassBadge));
+        final after = tester.getRect(find.byType(PreviewImageView).at(1));
+        expect(
+            after.contains(badge.topLeft) && after.contains(badge.bottomRight),
+            isTrue,
+            reason: 'バッジ $badge は After 画像 $after の中');
+        for (final f in [
+          find.byType(IconButton),
+          find.byType(FilterChip),
+          find.byType(ChoiceChip),
+          find.byType(LayerChipStrip),
+        ]) {
+          for (final e in f.evaluate()) {
+            final r = tester.getRect(find.byWidget(e.widget));
+            expect(r.overlaps(badge), isFalse, reason: '操作部品 $r と重ならない');
+          }
+        }
+        // 2×2 のとき: 右下のセルの画像の枠の中。
+        await tester.tap(find
+            .descendant(
+                of: find.byType(LayerChipStrip),
+                matching: find.byType(FilterChip))
+            .first);
+        await tester.pump();
+        await tester.pump();
+        final cells = find.byType(PreviewImageView);
+        final badge2 = tester.getRect(find.byType(BypassBadge));
+        final last = tester.getRect(cells.last);
+        expect(
+            last.contains(badge2.topLeft) && last.contains(badge2.bottomRight),
+            isTrue,
+            reason: '2×2: バッジ $badge2 は右下のセル $last の中');
+      });
+    }
+
+    // 英語は実フォントでないと選択欄のチップの折り返しが測れない（テスト用フォントでは異常に
+    // 折り返す）ので、UE_SCREENSHOTS の default-window（ja/en・明暗・5 層）の
+    // expectPickerFits で見る。
+    testWidgets('既定 800x600: 5 層でも選択欄が収まり、画像は 1 層のときと同じ大きさ（ja）',
+        (tester) async {
+      loadPreviewImages();
+      await pumpHomeScreen(tester, size: defaultWindow, select: (s) {
+        for (final id in [
+          'myopia',
+          'protanopia',
+          'glaucoma',
+          'cataract',
+          'night_blindness',
+        ]) {
+          s.toggle(id);
+        }
+      });
+      final picker = tester.getRect(find.byType(ImageSourcePicker));
+      expect(picker.bottom, lessThanOrEqualTo(defaultWindow.height - 8));
+      expect(tester.getRect(find.byType(PreviewImageView).first).width,
+          closeTo(190, 0.01));
+    });
   });
 }

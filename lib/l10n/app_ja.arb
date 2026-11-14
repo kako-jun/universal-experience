@@ -254,6 +254,7 @@
   "filterListLimitReached": "上限の {max} 件に達しています。ほかを外すと選べます",
   "filterListOrderSemantics": "適用順 {order} 番目",
   "layerSummaryMore": "{names} …（+{count}）",
+  "layerStripEmptyHint": "選んだフィルタがここに並びます",
   "layerStripSemantics": "適用中のフィルタ（適用順）",
   "layerStripClearAll": "すべて解除",
   "layerChipLabel": "適用順 {order} 番目、{name}",

@@ -90,9 +90,13 @@ void main() {
       h.visionState.toggle('vertigo');
       await pumpEn(tester, h);
 
-      expect(find.textContaining('… (+1)'), findsOneWidget);
-      final heading = tester.widget<Text>(find.textContaining('… (+1)'));
-      expect(heading.data, matches(RegExp(r'^.+ \+ .+ … \(\+1\)$')));
+      // 名前の部分（省略してよい）と「…（+N）」（常に見せる）は別の Text（#183）。
+      expect(find.text(' … (+1)'), findsOneWidget);
+      final names = tester
+          .widget<BeforeAfterView>(find.byType(BeforeAfterView))
+          .layerNames!;
+      expect(find.text(layerNamesHead(names)), findsOneWidget);
+      expect(layerNamesHead(names), matches(RegExp(r'^.+ \+ .+$')));
     });
 
     testWidgets('日本語: 「…（+N）」の全角括弧', (tester) async {
@@ -161,8 +165,7 @@ void main() {
   });
 
   group('静止フレームの注記（時間依存の層が 1 つでもあるとき）', () {
-    testWidgets('3 層（時間依存の vertigo を含む）で、調整中が myopia でも注記は出る',
-        (tester) async {
+    testWidgets('3 層（時間依存の vertigo を含む）で、調整中が myopia でも注記は出る', (tester) async {
       await installFakes(tester);
       final h =
           await pumpHomeScreen(tester, size: wide, locale: const Locale('en'));
@@ -202,9 +205,8 @@ void main() {
     });
   });
 
-  group('見出しが長く折り返しても、左右の画像の上端は揃う', () {
-    // 横並びになる最小幅（420）の半分のペインで、長い名前 2 つ + 「…（+N）」。見出しは 4 行以上に
-    // なりうる。
+  group('見出しは複数層でも 1 行で省略し、名前の長さで画像の位置が動かない（#183）', () {
+    // 横並びになる最小幅（420）の半分のペインで、長い名前 3 つ。
     Future<void> pumpPanes(WidgetTester tester, List<String> names) async {
       await installFakes(tester);
       tester.view.physicalSize = const Size(440, 900);
@@ -234,37 +236,29 @@ void main() {
       await settle(tester);
     }
 
+    double? baseTop;
     for (final length in [10, 40, 120]) {
-      testWidgets('名前の長さ $length 文字: 原画ペインと after ペインの画像の上端が同じ',
-          (tester) async {
+      testWidgets('名前の長さ $length 文字: 画像の上端は短い名前のときと同じで、左右も揃う', (tester) async {
         final name = List.filled(length, 'W').join();
         await pumpPanes(tester, [name, name, name]);
 
         final images = find.byType(PreviewImageView);
         expect(images, findsNWidgets(2));
-        expect(tester.getTopLeft(images.at(0)).dy,
-            tester.getTopLeft(images.at(1)).dy);
-        if (length == 120) {
-          // 見出しが 64dp（3 行分の最小の高さ）を超えて折り返している場合も測れている。
-          expect(tester.getTopLeft(images.at(0)).dy, greaterThan(64 + 8));
-        }
-      });
-
-      testWidgets('名前の長さ $length 文字: 左右の見出しのラベルの先頭行も同じ高さ', (tester) async {
-        final name = List.filled(length, 'W').join();
-        final names = [name, name, name];
-        await pumpPanes(tester, names);
-        final l10n =
-            AppLocalizations.of(tester.element(find.byType(BeforeAfterView)))!;
-
-        final before = find.text(l10n.previewPaneOriginal);
-        final after = find.text(layerNamesSummary(l10n, names));
-        expect(before, findsOneWidget);
-        expect(after, findsOneWidget);
-        expect(tester.getTopLeft(before).dy, tester.getTopLeft(after).dy);
-        // 書き出しボタンは見出しの行の先頭（ラベルの上の余白 14dp と同じ高さ）に置く。
-        expect(tester.getTopLeft(find.byType(IconButton)).dy,
-            tester.getTopLeft(before).dy - 14);
+        final top = tester.getTopLeft(images.at(0)).dy;
+        expect(tester.getTopLeft(images.at(1)).dy, top);
+        // 見出しは 48dp の 1 行 + 余白 8 の上に画像が来る（折り返しで伸びない）。
+        final heading = find.text(layerNamesHead([name, name, name]));
+        expect(heading, findsOneWidget);
+        // 名前が長くても「…（+N）」は省略されず見える。
+        final suffix = find.text(' … (+1)');
+        expect(suffix, findsOneWidget);
+        expect(
+            tester.getRect(suffix).right,
+            lessThanOrEqualTo(
+                tester.getRect(find.byType(BeforeAfterView)).right));
+        expect(tester.getSize(heading).height, lessThanOrEqualTo(48));
+        baseTop ??= top;
+        expect(top, baseTop, reason: '名前の長さに依らない');
       });
     }
   });

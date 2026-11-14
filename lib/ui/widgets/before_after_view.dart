@@ -13,6 +13,7 @@ import '../../services/export_plan.dart';
 import '../../services/export_service.dart';
 import '../../src/rust/api/sensus_bridge.dart';
 import 'export_feedback.dart';
+import 'bypass_badge.dart';
 import 'preview_rendering.dart';
 
 /// 横並びのときの Before / After 2 枚の間隔（dp）。[BeforeAfterView.maxPaneSide] が
@@ -56,6 +57,7 @@ class BeforeAfterView extends StatefulWidget {
     this.layerIds,
     this.exportLayers,
     this.maxPaneSide,
+    this.bypassed = false,
   }) : assert(
           (filter == null) == (filterId == null),
           'filter and filterId must both be null or both be set',
@@ -65,6 +67,9 @@ class BeforeAfterView extends StatefulWidget {
   /// `VisionFilterState` selection (payload included). `null` shows the
   /// original image on both sides.
   final VisionFilter? filter;
+
+  /// 原画比較中（bypass、#63）。After 画像の左下に「原画表示中」のバッジを重ねる（#183）。
+  final bool bypassed;
 
   /// The catalog id (snake_case) [filter] was built from — used to resolve
   /// the after-pane label / export caption ([visionFilterName]) and whether
@@ -230,8 +235,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
   /// The sample size to render at when [BeforeAfterView.sampleSize] isn't
   /// explicitly set — [kCanonicalSampleSize] in production;
   /// tests can override via the widget's `sampleSize` constructor param.
-  int get _effectiveSampleSize =>
-      widget.sampleSize ?? kCanonicalSampleSize;
+  int get _effectiveSampleSize => widget.sampleSize ?? kCanonicalSampleSize;
 
   @override
   void initState() {
@@ -596,20 +600,24 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
           // and block pumpAndSettle in widget tests.)
           return SizedBox(
             height: 180,
-            child: Center(
-              // 「準備中」が現れた瞬間だけ読み上げられる（#45）。完了すると
-              // この liveRegion のノード自体が消えるので、完了は読まれない
-              // （完了は画像の代替テキストが現れることで伝わる）。
-              child: Semantics(
-                liveRegion: true,
-                child: Text(
-                  l10n.previewPreparing,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+            child: Stack(children: [
+              if (widget.bypassed)
+                const Positioned(left: 4, bottom: 4, child: BypassBadge()),
+              Center(
+                // 「準備中」が現れた瞬間だけ読み上げられる（#45）。完了すると
+                // この liveRegion のノード自体が消えるので、完了は読まれない
+                // （完了は画像の代替テキストが現れることで伝わる）。
+                child: Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    l10n.previewPreparing,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ),
-            ),
+            ]),
           );
         }
 
@@ -617,7 +625,6 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         final multiLayer = layerNames != null && layerNames.length > 1;
         final beforePane = _Pane(
           label: l10n.previewPaneOriginal,
-          wrapLabel: multiLayer,
           // 見出し「元の画像」が説明を担うので、画像には代替テキストを付けない
           // （同じ文言の二重読み上げを避ける、#45）。
           child: PreviewImageView(image: _before),
@@ -659,15 +666,20 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
             ? layerIds.any(
                 (id) => kVisionFilterCatalogById[id]?.isTimeDependent ?? false)
             : (widget.filterId == null
-                    ? null
-                    : kVisionFilterCatalogById[widget.filterId])
-                ?.isTimeDependent ??
+                        ? null
+                        : kVisionFilterCatalogById[widget.filterId])
+                    ?.isTimeDependent ??
                 false;
+        // 複数層の見出しは、名前だけを省略し「…（+N）」の接尾辞は常に見せる（#183）。
+        final afterSuffix =
+            multiLayer ? layerNamesSuffix(l10n, layerNames) : null;
         final afterPane = _Pane(
-          label: afterName,
-          // 複数層の見出しは切らずに折り返す。両ペインとも折り返し方式にして、
-          // ラベルの縦位置を揃える（[_Pane.wrapLabel]）。
-          wrapLabel: multiLayer,
+          label: multiLayer ? layerNamesHead(layerNames) : afterName,
+          labelSuffix: afterSuffix,
+          semanticsLabel: afterName,
+          overlay: widget.bypassed ? const BypassBadge() : null,
+          // 複数層の見出しも 1 行で省略する（#183）。折り返すと層数で画像の位置が動くため。
+          // 全部の名前は帯のチップと画像の代替テキストに出る。
           // Export is only meaningful when a real "after" image exists.
           // The failed state (null _after) gets no button.
           // 複数層でも書き出せる（キャプションは層ごとの行、#121）。
@@ -754,13 +766,22 @@ class _Pane extends StatelessWidget {
     required this.label,
     required this.child,
     this.trailing,
-    this.wrapLabel = false,
+    this.labelSuffix,
+    this.semanticsLabel,
+    this.overlay,
   });
 
   final String label;
 
-  /// 見出しを切らずに折り返す（複数層の見出し、#120）。false なら 1 行で省略記号。
-  final bool wrapLabel;
+  /// 名前の省略に巻き込まず常に見せる接尾辞（「…（+N）」）。
+  final String? labelSuffix;
+
+  /// 見出しの読み上げ（ラベルと接尾辞を分けて出すときの、つなげた全文）。
+  final String? semanticsLabel;
+
+  /// 画像の左下に重ねるもの（原画表示中のバッジ）。
+  final Widget? overlay;
+
   final Widget child;
 
   /// Optional action shown to the right of the label (e.g. the export button).
@@ -772,30 +793,63 @@ class _Pane extends StatelessWidget {
     // 書き出しボタン（after 側だけ）を含む行は 48dp（タップ領域の下限、#45）。
     // before 側にも同じ高さを使うのは、左右の見出し行の高さを揃えて
     // 画像の上端をずらさないため。
-    final text = Text(
-      label,
-      style: theme.textTheme.labelLarge,
-      overflow: wrapLabel ? null : TextOverflow.ellipsis,
-    );
+    final suffix = labelSuffix;
+    final Widget text = suffix == null
+        ? Text(
+            label,
+            style: theme.textTheme.labelLarge,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          )
+        // 名前（省略してよい）と「…（+N）」（常に見せる）。接尾辞が収まらないほど狭いとき
+        // （画像が下限 160dp で書き出しボタンが 48dp を取るとき）は、名前を消して接尾辞だけを
+        // 省略記号つきで出す（横に溢れない、#183）。名前を省略するときは、接尾辞が「…」で
+        // 始まるので、名前側に省略記号は付けない（「…」が 2 つ続かない）。
+        : Semantics(
+            label: semanticsLabel,
+            excludeSemantics: true,
+            child: LayoutBuilder(
+              builder: (context, box) {
+                final style = theme.textTheme.labelLarge;
+                final painter = TextPainter(
+                  text: TextSpan(text: ' $suffix', style: style),
+                  textDirection: Directionality.of(context),
+                  textScaler: MediaQuery.textScalerOf(context),
+                  maxLines: 1,
+                )..layout();
+                final suffixWidth = painter.width;
+                painter.dispose();
+                if (box.maxWidth <= suffixWidth) {
+                  return Text(
+                    suffix,
+                    style: style,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  );
+                }
+                return Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        label,
+                        style: style,
+                        maxLines: 1,
+                        overflow: TextOverflow.clip,
+                      ),
+                    ),
+                    Text(' $suffix',
+                        style: style, maxLines: 1, softWrap: false),
+                  ],
+                );
+              },
+            ),
+          );
     return ConstrainedBox(
-      constraints: BoxConstraints(
-        minHeight: 48,
-        maxHeight: wrapLabel ? double.infinity : 48,
-      ),
+      constraints: const BoxConstraints(minHeight: 48, maxHeight: 48),
       child: Row(
-        // 折り返す見出し（複数層）は、ラベルの先頭行を左右で同じ高さに置く。左右で行数が違っても
-        // 縦位置がずれない。1 行の見出しは 48dp の中央（上下 14dp = (48 - 行高 20) / 2）。
-        crossAxisAlignment:
-            wrapLabel ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Expanded(
-            child: wrapLabel
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    child: text,
-                  )
-                : text,
-          ),
+          Expanded(child: text),
           if (trailing != null) trailing!,
         ],
       ),
@@ -804,12 +858,29 @@ class _Pane extends StatelessWidget {
 
   /// 画像（正方形）。
   Widget buildImage() {
-    return AspectRatio(
+    final image = AspectRatio(
       aspectRatio: 1,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
         child: child,
       ),
+    );
+    if (overlay == null) return image;
+    // 画像の枠の中の左下に重ねる（書き出しボタン・見出し・注記と重ならない）。
+    return Stack(
+      children: [
+        image,
+        Positioned(
+          left: 4,
+          right: 4,
+          bottom: 4,
+          // 画像より幅が広いときは縮めて、画像の枠からはみ出さない。
+          child: Align(
+            alignment: Alignment.bottomLeft,
+            child: FittedBox(fit: BoxFit.scaleDown, child: overlay!),
+          ),
+        ),
+      ],
     );
   }
 
@@ -826,4 +897,3 @@ class _Pane extends StatelessWidget {
     );
   }
 }
-

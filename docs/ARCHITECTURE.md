@@ -647,7 +647,7 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
   **行にフォーカスがある間の ←→ は、その 1 回では強度の 5% 刻み調整が効かず、フォーカスが必ず
   画面のショートカット受け口（`homeShortcuts`）へ出る**ので、次の ←→ から強度が動く。これは標準の
   方向フォーカス移動任せにしていない。標準の走査は幾何（隣のカラムのコントロールとの縦帯の重なり）で
-  着地点が決まり、色覚選択時に中央カラムへ出る「2×2 で比較」の切替が見出し行を高くすると、`→` が中央
+  着地点が決まり、色覚選択時に中央カラムへ出る「2×2 で比較」の切替が出て行を高くすると、`→` が中央
   カラムのサンプル切替チップへ着地して強度に届かなくなった。そこで「選ぶ」カードの `FocusTraversalGroup` に
   `_ListExitToShortcutsPolicy`（`ReadingOrderTraversalPolicy` を継承し、`FilterListTile` 上からの
   左右だけ受け口へ固定。体験プリセットの行も同じ `FilterListTile` なので含み、それ以外の方向・部品は
@@ -936,13 +936,13 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
 - `HomeScreen`: メイン画面（#72）。幅 1000dp 以上は 3 カラム（左「選ぶ」=`FilterBrowser`、
   中央「見る」=`BeforeAfterView` + `ImageSourcePicker`、右「調整」=`AdjustPanel`）、
   それ未満は プレビュー → 調整 → 選択 の縦積み。プレビュー画像の一辺は本体領域の高さから
-  `previewPaneSideFor` で上限を決め（高さ - 360dp、下限 `kMinPreviewPaneSide` = 160dp）、
+  `previewPaneSideFor` で上限を決め（高さ - 354dp、下限 `kMinPreviewPaneSide` = 160dp）、
   `BeforeAfterView.maxPaneSide` へ渡す。既定ウィンドウ 800x600 でも選択欄まで最初のビューポートに収める（#130）。`FilterBrowser` は検索・カテゴリ・
   統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行、ロジックは
   `filter_list_selection.dart`）と体験プリセットの最上段を持つ。`AdjustPanel` は選んだ
   症状の説明・強度スライダー 1 本・受診喚起（`ConsultNoticeBlock` 常時展開）を
   `FilterParamPanel` で持ち、2 層以上のときは層ごとの節（調整中の層だけ展開、#120）にする。
-  未選択時は空状態を出す。中央カラムの先頭には 2 層以上のときだけ `LayerChipStrip`（適用順のチップ・✕・すべて解除）を置く。起動モード・最前面・クリックスルー・
+  未選択時は空状態を出す。中央カラムの先頭には `LayerChipStrip`（適用順のチップ・✕・すべて解除。カードの先頭に常に置き（右端に「2×2 で比較」の固定枠。見出し行は廃止。「原画表示中」はプレビューの画像の枠の中に重ねる）、1 層以上でチップを出し、0 層でも同じ高さを確保、#183。「すべて解除」は 2 層以上のみ）を置く。起動モード・最前面・クリックスルー・
   ホットキー一覧（`WindowModePanel`）は AppBar のダイアログに退避し、クリックスルー ON
   の間は復帰方法を `ClickThroughRecoveryBanner` が画面最上部に常時出す（#63）。
   PNG エクスポートはプレビュー側に置く。選択の状態は従来どおり `VisionFilterState` が
@@ -1194,7 +1194,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
     選択の正本は `VisionFilterState` のまま
   - `FilterListTile`: 統合一覧の 1 行。種別（`FilterListTileKind`: preset / check / radio）で形を変え、選択中は色だけでなく
     チェック・適用順の番号で示す。上限で選べない行は理由を 2 行目に出す
-  - `LayerChipStrip`: プレビュー上の、重ねた層のチップ帯（適用順・✕ で 1 層除去・すべて解除）。2 層以上のときだけ出る
+  - `LayerChipStrip`: プレビュー上の、重ねた層のチップ帯（適用順・✕ で 1 層除去・すべて解除）。1 層以上でチップを出し、0 層でも同じ高さの領域を確保する（1 行の横スクロール、#183）
   - `AdjustPanel`: 右カラム「調整」。1 層は従来の 1 節、複数層は層ごとの節（調整中の層だけ展開）。何も選んでいなければ空状態
   - `FilterParamPanel`: 調整中の層の強度スライダー 1 本・推奨値に戻す・受診喚起・`VisionParam` から動的に作るパラメータ UI
   - `ConsultNoticeBlock`: 受診喚起（喚起文・escalation・免責文）の唯一の表示ウィジェット。`layerConsultNotice`
