@@ -343,22 +343,18 @@ void main() async {
       showAndFocusLoupe: trayService.onShowLoupe,
       toggleLoupeVisible: trayService.toggleLoupeVisible,
       setLoupeVisible: trayService.setLoupeVisible,
+      // #185 の切り分け: keyUp が届く環境かを後から確かめられるよう、原画比較の切り替えと
+      // keyUp を診断ログへ残す（キーリピートは書かない。どのキーかも書かない）。
+      onHoldOriginalEvent: (event) => PreviewDiagnostics.record(
+          'hotkey_hold_original', {'event': event}),
     );
     await hotkeyService.init({
       AppHotkeyAction.toggleClickThrough: HotkeyHandlers(
         onKeyDown: () => unawaited(hotkeyActions.toggleClickThrough()),
       ),
-      // #185 の切り分け: keyUp が届く環境かを後から確かめられるよう、押下・解放を
-      // 診断ログへ残す（どのキーかも書かない。出来事だけ）。
       AppHotkeyAction.holdOriginal: HotkeyHandlers(
-        onKeyDown: () {
-          PreviewDiagnostics.record('hotkey_hold_original', {'key': 'down'});
-          hotkeyActions.holdOriginalKeyDown();
-        },
-        onKeyUp: () {
-          PreviewDiagnostics.record('hotkey_hold_original', {'key': 'up'});
-          hotkeyActions.holdOriginalKeyUp();
-        },
+        onKeyDown: hotkeyActions.holdOriginalKeyDown,
+        onKeyUp: hotkeyActions.holdOriginalKeyUp,
       ),
       AppHotkeyAction.emergencyExit: HotkeyHandlers(
         onKeyDown: () => unawaited(hotkeyActions.emergencyExit()),
