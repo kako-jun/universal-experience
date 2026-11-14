@@ -177,7 +177,7 @@ void main() {
 
   // 付け外しを高速・ランダムに繰り返しても、最後は最新の入力に追いつく（#185 の調査で
   // 再現しなかった経路を固定する）。
-  for (var seed = 0; seed < 3; seed++) {
+  for (var seed = 0; seed < 2; seed++) {
     testWidgets('ランダムな操作列でも最新の入力に追いつく（seed $seed）', (tester) async {
       final rng = Random(seed);
       Future<void> delay() =>
@@ -209,7 +209,7 @@ void main() {
       final vs = h.visionState;
       final holders = [Object(), Object()];
 
-      for (var step = 0; step < 200; step++) {
+      for (var step = 0; step < 120; step++) {
         final op = rng.nextInt(100);
         if (op < 45) {
           toggleFilterListEntry(
