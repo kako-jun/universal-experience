@@ -65,8 +65,10 @@ class Backdrop {
   }
 
   // 上と同じだが、切り詰めた矩形の画素数が max_pixels（0 以下なら無制限）を超える
-  // ときは、縦横を同じ整数 step（ceil(sqrt(画素数 / max_pixels))）で割った大きさ
-  // （切り捨て、最小 1）へ最近傍で間引いて書き出す。間引いた画素は切り出した矩形の
+  // ときは、縦横を同じ整数 step で割った大きさ（切り捨て、最小 1）へ最近傍で間引いて
+  // 書き出す。step は ceil(sqrt(画素数 / max_pixels)) を基本に、細い矩形（短い辺が
+  // step 未満で最小 1 に張り付く）でも書き出す画素数が max_pixels を超えないよう、
+  // 長い辺だけで上限に収まるところまで大きくする。間引いた画素は切り出した矩形の
   // 全幅・全高へ均等に割り付ける（右端・下端を取りこぼして縮尺がずれないように）。
   // out_width / out_height には書き出した大きさを返す（null 可）。
   bool CropRgba(const Rect& rect, int64_t max_pixels, std::vector<uint8_t>* out,
@@ -115,6 +117,31 @@ class ExclusionTracker {
   int margin_;
   bool hidden_ = false;
   std::vector<Sample> samples_;
+};
+
+// 1 回の共有ぶんの控え・除外・フレーム番号。共有を始め直すたびに BeginSession() で
+// 番号を進めて控えを空にし、古い共有のフレーム（止める直前に PipeWire のスレッドから
+// 届いたもの）は MergeFrame() が番号の不一致で捨てる。呼び出し側が mutex で守る。
+class CaptureState {
+ public:
+  CaptureState(int64_t history_ms, int margin) : tracker(history_ms, margin) {}
+
+  // 新しい共有を始める。控え・フレーム番号を空にし、除外を再開する。新しい番号を返す。
+  uint64_t BeginSession();
+
+  // session の共有のフレームを控えへ書き込み、フレーム番号を進める。今の共有で
+  // なければ何もせず false。
+  bool MergeFrame(uint64_t session, const uint8_t* src, int width, int height,
+                  int stride, PixelOrder order, int64_t now_ms);
+
+  uint64_t session() const { return session_; }
+
+  Backdrop backdrop;
+  ExclusionTracker tracker;
+  int64_t sequence = 0;  // 今の共有で書き込んだフレームの数。
+
+ private:
+  uint64_t session_ = 0;
 };
 
 }  // namespace ue_capture

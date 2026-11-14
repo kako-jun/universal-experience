@@ -9,6 +9,7 @@
 #include <vector>
 
 using ue_capture::Backdrop;
+using ue_capture::CaptureState;
 using ue_capture::ExclusionTracker;
 using ue_capture::PixelOrder;
 using ue_capture::Rect;
@@ -255,6 +256,85 @@ void CropDecimatesOffsetRect() {
   assert(out[(2 * 3 + 2) * 4] == 12 && out[(2 * 3 + 2) * 4 + 1] == 12);
 }
 
+void CropThinRectStaysUnderLimit() {
+  Backdrop bd;
+  // 幅 1・高さ 1000（細い窓）を 100 画素へ。基本の step = ceil(sqrt(10)) = 4 だと
+  // 幅は最小 1 に張り付いて 1x250 になり上限を超える。
+  auto a = Coords(1, 1000);
+  bd.Merge(a.data(), 1, 1000, 4, PixelOrder::kBgrx, {});
+  std::vector<uint8_t> out;
+  Rect got;
+  int w = 0;
+  int h = 0;
+  assert(bd.CropRgba(Rect{0, 0, 1, 1000}, 100, &out, &got, &w, &h));
+  assert(w == 1);
+  assert(static_cast<int64_t>(w) * h <= 100);
+  assert(h >= 90);  // 必要以上に縮めない（step 10 → 100）。
+  assert(out.size() == static_cast<size_t>(w) * h * 4);
+  // 横長も同じ。
+  auto b = Coords(1000, 2);
+  bd.Merge(b.data(), 1000, 2, 4000, PixelOrder::kBgrx, {});
+  assert(bd.CropRgba(Rect{0, 0, 1000, 2}, 50, &out, &got, &w, &h));
+  assert(h == 1);
+  assert(static_cast<int64_t>(w) * h <= 50);
+  assert(w >= 45);
+}
+
+void CropDecimationNeverExceedsLimit() {
+  Backdrop bd;
+  auto a = Solid(300, 300, 0, 0, 1);
+  bd.Merge(a.data(), 300, 300, 1200, PixelOrder::kBgrx, {});
+  std::vector<uint8_t> out;
+  Rect got;
+  int w = 0;
+  int h = 0;
+  const int64_t limits[] = {1, 2, 7, 50, 99, 1000, 4321};
+  const Rect rects[] = {Rect{0, 0, 1, 300},  Rect{0, 0, 300, 1},
+                        Rect{0, 0, 2, 300},  Rect{0, 0, 300, 3},
+                        Rect{0, 0, 300, 300}, Rect{5, 7, 123, 45}};
+  for (int64_t limit : limits) {
+    for (const Rect& r : rects) {
+      assert(bd.CropRgba(r, limit, &out, &got, &w, &h));
+      assert(w >= 1 && h >= 1);
+      assert(static_cast<int64_t>(w) * h <= limit);
+    }
+  }
+}
+
+void SessionDropsFramesOfOldSession() {
+  CaptureState st(300, 0);
+  const uint64_t first = st.BeginSession();
+  auto a = Solid(4, 4, 0, 0, 10);
+  assert(st.MergeFrame(first, a.data(), 4, 4, 16, PixelOrder::kBgrx, 0));
+  assert(st.sequence == 1 && st.backdrop.width() == 4);
+
+  // 新しい共有を始めると控えとフレーム番号が空になる。
+  const uint64_t second = st.BeginSession();
+  assert(second != first);
+  assert(st.sequence == 0 && st.backdrop.width() == 0);
+
+  // 古い共有のフレーム（止める直前に届いたもの）は新しい控えに入らない。
+  auto old = Solid(4, 4, 0, 0, 99);
+  assert(!st.MergeFrame(first, old.data(), 4, 4, 16, PixelOrder::kBgrx, 0));
+  assert(st.sequence == 0 && st.backdrop.width() == 0);
+
+  auto b = Solid(4, 4, 0, 0, 20);
+  assert(st.MergeFrame(second, b.data(), 4, 4, 16, PixelOrder::kBgrx, 0));
+  std::vector<uint8_t> out;
+  Rect got;
+  assert(st.backdrop.CropRgba(Rect{0, 0, 4, 4}, &out, &got));
+  assert(RedAt(out, 4, 0, 0) == 20);
+}
+
+void SessionBeginResumesExclusion() {
+  CaptureState st(300, 0);
+  st.BeginSession();
+  st.tracker.Record(0, Rect{0, 0, 2, 2});
+  st.tracker.SetHidden(true);
+  st.BeginSession();
+  assert(!st.tracker.hidden());
+}
+
 void TrackerDropsOldButKeepsLatest() {
   ExclusionTracker t(300, 0);
   t.Record(0, Rect{0, 0, 10, 10});
@@ -304,6 +384,10 @@ const Case kCases[] = {
     {"crop_under_limit_is_not_decimated", CropUnderLimitIsNotDecimated},
     {"crop_decimates_across_full_extent", CropDecimatesAcrossFullExtent},
     {"crop_decimates_offset_rect", CropDecimatesOffsetRect},
+    {"crop_thin_rect_stays_under_limit", CropThinRectStaysUnderLimit},
+    {"crop_decimation_never_exceeds_limit", CropDecimationNeverExceedsLimit},
+    {"session_drops_frames_of_old_session", SessionDropsFramesOfOldSession},
+    {"session_begin_resumes_exclusion", SessionBeginResumesExclusion},
     {"tracker_drops_old_but_keeps_latest", TrackerDropsOldButKeepsLatest},
     {"tracker_hidden_excludes_nothing", TrackerHiddenExcludesNothing},
 };

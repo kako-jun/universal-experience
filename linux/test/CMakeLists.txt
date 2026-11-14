@@ -73,6 +73,10 @@ set(BACKDROP_CASES
   crop_under_limit_is_not_decimated
   crop_decimates_across_full_extent
   crop_decimates_offset_rect
+  crop_thin_rect_stays_under_limit
+  crop_decimation_never_exceeds_limit
+  session_drops_frames_of_old_session
+  session_begin_resumes_exclusion
   tracker_drops_old_but_keeps_latest
   tracker_hidden_excludes_nothing
 )

@@ -106,6 +106,16 @@ bool Backdrop::CropRgba(const Rect& rect, int64_t max_pixels,
   if (max_pixels > 0 && pixels > max_pixels) {
     step = static_cast<int>(
         std::ceil(std::sqrt(static_cast<double>(pixels) / max_pixels)));
+    // 短い辺が step 未満だと出力は最小 1 に張り付き、長い辺 / step だけで上限を
+    // 超えうる（例: 1x10000 を 100 画素へ → step 10 で 1x1000）。そのときは長い辺の
+    // 出力が max_pixels 以下になる step（floor(長い辺 / (max_pixels + 1)) + 1 以上）まで
+    // 大きくする。両辺とも step 以上なら (w/step)(h/step) <= 画素数/step^2 <= 上限。
+    const int short_side = std::min(c.width, c.height);
+    const int long_side = std::max(c.width, c.height);
+    if (short_side < step) {
+      const int64_t need = long_side / (max_pixels + 1) + 1;
+      if (need > step) step = static_cast<int>(need);
+    }
   }
   const int ow = std::max(1, c.width / step);
   const int oh = std::max(1, c.height / step);
@@ -186,6 +196,22 @@ std::vector<Rect> ExclusionTracker::Exclusions(int64_t now_ms) const {
     }
   }
   return out;
+}
+
+uint64_t CaptureState::BeginSession() {
+  backdrop = Backdrop();
+  sequence = 0;
+  tracker.SetHidden(false);
+  return ++session_;
+}
+
+bool CaptureState::MergeFrame(uint64_t session, const uint8_t* src, int width,
+                              int height, int stride, PixelOrder order,
+                              int64_t now_ms) {
+  if (session != session_) return false;
+  backdrop.Merge(src, width, height, stride, order, tracker.Exclusions(now_ms));
+  ++sequence;
+  return true;
 }
 
 }  // namespace ue_capture

@@ -17,8 +17,7 @@
 
 namespace {
 
-using ue_capture::Backdrop;
-using ue_capture::ExclusionTracker;
+using ue_capture::CaptureState;
 using ue_capture::PixelOrder;
 using ue_capture::Rect;
 using ue_capture::ScreenCast;
@@ -55,9 +54,7 @@ struct Plugin {
   ScreenCast cast;
 
   std::mutex mutex;  // 以下はストリームのスレッドと共有する。
-  Backdrop backdrop;
-  ExclusionTracker tracker{kExclusionHistoryMs, kExclusionMargin};
-  int64_t sequence = 0;
+  CaptureState state{kExclusionHistoryMs, kExclusionMargin};
 
   // メインスレッドだけで使う。
   FlMethodCall* pending_start = nullptr;
@@ -139,9 +136,10 @@ bool WindowRects(Plugin* self, int frame_w, int frame_h, Rect* view_rect,
 void RecordWindowLocked(Plugin* self) {
   Rect view_rect;
   Rect outer_rect;
-  if (WindowRects(self, self->backdrop.width(), self->backdrop.height(),
+  if (WindowRects(self, self->state.backdrop.width(),
+                  self->state.backdrop.height(),
                   &view_rect, &outer_rect)) {
-    self->tracker.Record(NowMs(), outer_rect);
+    self->state.tracker.Record(NowMs(), outer_rect);
   }
 }
 
@@ -201,21 +199,24 @@ void HandleStart(Plugin* self, FlMethodCall* call) {
       token = fl_value_get_string(t);
     }
   }
+  // 先に古いストリームを止めてから控えを空にする（逆だと、止まる直前に届いた
+  // 古い共有のフレームが新しい控えに入る）。止めた後に遅れて来たフレームも、
+  // 共有の番号の不一致で捨てる（CaptureState::MergeFrame）。
+  self->cast.Stop();
+  uint64_t session = 0;
   {
     std::lock_guard<std::mutex> lock(self->mutex);
-    self->backdrop = Backdrop();
-    self->sequence = 0;
-    self->tracker.SetHidden(false);
+    session = self->state.BeginSession();
   }
   self->last_sent_sequence = -1;
+  self->last_sent_rect = Rect();
   self->pending_start = FL_METHOD_CALL(g_object_ref(call));
   self->cast.Start(
       ParentWindow(self), token,
-      [self](const uint8_t* data, int w, int h, int stride, PixelOrder order) {
+      [self, session](const uint8_t* data, int w, int h, int stride,
+                      PixelOrder order) {
         std::lock_guard<std::mutex> lock(self->mutex);
-        self->backdrop.Merge(data, w, h, stride, order,
-                             self->tracker.Exclusions(NowMs()));
-        ++self->sequence;
+        self->state.MergeFrame(session, data, w, h, stride, order, NowMs());
       },
       [self](const StartResult& result) {
         if (self->pending_start == nullptr) return;
@@ -243,15 +244,16 @@ FlValue* ReadFrame(Plugin* self, int64_t max_pixels) {
   bool unprimed = false;
   {
     std::lock_guard<std::mutex> lock(self->mutex);
-    if (self->sequence == 0) return fl_value_new_null();
+    if (self->state.sequence == 0) return fl_value_new_null();
     Rect view_rect;
     Rect outer_rect;
-    if (!WindowRects(self, self->backdrop.width(), self->backdrop.height(),
+    if (!WindowRects(self, self->state.backdrop.width(),
+                     self->state.backdrop.height(),
                      &view_rect, &outer_rect)) {
       return fl_value_new_null();
     }
-    self->tracker.Record(NowMs(), outer_rect);
-    sequence = self->sequence;
+    self->state.tracker.Record(NowMs(), outer_rect);
+    sequence = self->state.sequence;
     if (sequence == self->last_sent_sequence &&
         view_rect.x == self->last_sent_rect.x &&
         view_rect.y == self->last_sent_rect.y &&
@@ -259,12 +261,13 @@ FlValue* ReadFrame(Plugin* self, int64_t max_pixels) {
         view_rect.height == self->last_sent_rect.height) {
       return fl_value_new_null();
     }
-    self->last_sent_rect = view_rect;
-    if (!self->backdrop.CropRgba(view_rect, max_pixels, &rgba, &got, &out_w,
-                                 &out_h)) {
+    if (!self->state.backdrop.CropRgba(view_rect, max_pixels, &rgba, &got,
+                                       &out_w, &out_h)) {
       return fl_value_new_null();
     }
-    unprimed = self->backdrop.has_unprimed();
+    // 切り出せたときだけ「送った」とする（失敗した矩形で次の比較を誤らない）。
+    self->last_sent_rect = view_rect;
+    unprimed = self->state.backdrop.has_unprimed();
   }
   self->last_sent_sequence = sequence;
 
@@ -341,9 +344,9 @@ void HandleMethodCall(FlMethodChannel*, FlMethodCall* call,
     int64_t sequence = 0;
     {
       std::lock_guard<std::mutex> lock(self->mutex);
-      self->tracker.SetHidden(hidden);
+      self->state.tracker.SetHidden(hidden);
       if (!hidden) RecordWindowLocked(self);
-      sequence = self->sequence;
+      sequence = self->state.sequence;
     }
     g_autoptr(FlValue) v = fl_value_new_int(sequence);
     Respond(call, v);
@@ -351,7 +354,7 @@ void HandleMethodCall(FlMethodChannel*, FlMethodCall* call,
     int64_t sequence = 0;
     {
       std::lock_guard<std::mutex> lock(self->mutex);
-      sequence = self->sequence;
+      sequence = self->state.sequence;
     }
     g_autoptr(FlValue) v = fl_value_new_int(sequence);
     Respond(call, v);
