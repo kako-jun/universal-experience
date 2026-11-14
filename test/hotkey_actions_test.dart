@@ -264,7 +264,7 @@ void main() {
   });
 
   group('HotkeyActions.emergencyExit', () {
-    // #121: 「フィルタ解除」のホットキーは、重ねている全層を外す（新しいホットキーは足さない）。
+    // #121: 「非常口」ホットキーは、重ねている全層を外す（新しいホットキーは足さない）。
     // main.dart が HotkeyActions へ渡す配線（`deactivateFilters: visionFilterState.clear`）と
     // 同じく、VisionFilterState.clear をそのまま渡して確かめる。
     test('重ねている全層（色覚を含む）を clear で外す', () async {

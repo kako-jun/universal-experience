@@ -66,6 +66,8 @@ class AdjustPanel extends StatelessWidget {
                 Flexible(
                   child: Tooltip(
                     message: l10n.clearFilter,
+                    // ボタンのラベルと同じ文言なので、読み上げは 1 回だけにする（#79 と同じ扱い）。
+                    excludeFromSemantics: true,
                     child: TextButton.icon(
                       // 色覚・advanced・プリセットのどの選択でも、選択を丸ごと
                       // 外す唯一の入口（`VisionFilterState.clear`）。

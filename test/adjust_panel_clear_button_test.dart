@@ -4,6 +4,7 @@
 // 全文がツールチップか折り返しで読める、を狭幅 / 英語 / 大きい文字倍率で確かめる。
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -62,11 +63,40 @@ void main() {
 
   Finder button() => find.byType(TextButton);
 
+  testWidgets('読み上げはボタンのラベルの 1 回だけ（Tooltip は意味を足さない）', (tester) async {
+    final handle = tester.ensureSemantics();
+    final l10n =
+        await pumpPanel(tester, width: 600, locale: const Locale('ja'));
+    final matches = <SemanticsNode>[];
+    void visit(SemanticsNode n) {
+      final d = n.getSemanticsData();
+      if (d.label.contains(l10n.clearFilter) ||
+          d.tooltip.contains(l10n.clearFilter)) {
+        matches.add(n);
+      }
+      n.visitChildren((c) {
+        visit(c);
+        return true;
+      });
+    }
+
+    visit(tester.getSemantics(find.byType(AdjustPanel)));
+    final text = matches
+        .map((n) =>
+            '${n.getSemanticsData().label}|${n.getSemanticsData().tooltip}')
+        .join(' / ');
+    final occurrences =
+        RegExp(RegExp.escape(l10n.clearFilter)).allMatches(text).length;
+    expect(occurrences, 1, reason: '二重読み上げ: $text');
+    handle.dispose();
+  });
+
   for (final locale in const [Locale('ja'), Locale('en')]) {
     for (final width in const [220.0, 268.0, 348.0, 600.0]) {
       for (final scale in const [1.0, 1.5, 2.0]) {
-        // 幅 220 に倍率 2.0 は想定外の極端な組み合わせ（アイコンと余白だけでボタンの
-        // 最小幅が見出しの残りを超える）。ここは対象外にする。
+        // 幅 220 に倍率 2.0 は対象外。実アプリの最小は、狭幅レイアウトで中身 256
+        // （最小ウィンドウ幅 320 − 外側余白 32 − カード余白 32）、3 カラムの右カラムで
+        // 最小 300 − カード余白 = 268 で、幅 220（中身 188）には届かない。
         if (width < 250 && scale > 1.5) continue;
         testWidgets('${locale.languageCode} 幅$width 倍率$scale: はみ出さず、全文が読める',
             (tester) async {
@@ -87,6 +117,20 @@ void main() {
           final rect = tester.getRect(button());
           expect(rect.left, greaterThanOrEqualTo(gutter - 0.01));
           expect(rect.right, lessThanOrEqualTo(width - gutter + 0.01));
+
+          // 省略（…）されていない：全文が折り返しで見える。overflow が ellipsis でない
+          // ことは常に見る。実際に切れていないかは、テストのフォント（Ahem は全角幅の
+          // 四角で、英字が実フォントよりずっと広い）で意味のある条件に絞る：
+          // 日本語は幅 250 以上、英語は十分広い幅（600）。
+          final label = tester.widget<Text>(find.text(l10n.clearFilter));
+          expect(label.overflow, isNot(TextOverflow.ellipsis));
+          final measurable =
+              locale.languageCode == 'ja' ? width >= 250 : width >= 600;
+          if (measurable) {
+            final render = tester
+                .renderObject<RenderParagraph>(find.text(l10n.clearFilter));
+            expect(render.didExceedMaxLines, isFalse, reason: '2 行に収まらず切れている');
+          }
 
           // 見出しは単語の途中で折れない（1 行のまま）。
           final heading = tester.getSize(find.text(l10n.adjustHeading));
