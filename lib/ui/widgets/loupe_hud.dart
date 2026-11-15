@@ -8,7 +8,9 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n_extensions.dart';
 import '../../models/vision_filter_contract_notes.dart' as contract_notes;
+import '../../rendering/live_filter_plan.dart';
 import '../../services/layer_consult_notice.dart';
+import '../../services/live_loupe_session.dart';
 import '../../services/loupe_window_controller.dart';
 import '../../services/preview_selection.dart';
 import '../../services/vision_filter_state.dart';
@@ -211,6 +213,14 @@ class _LoupeHudBar extends StatelessWidget {
         ];
         final hasEmergency =
             notices.any((n) => n.$2.urgency == Urgency.emergency);
+        // #180: ライブのルーペは GPU シェーダで描く。シェーダの無い層は飛ばして
+        // 描くので、どの層が静止画プレビューのみかを出す（#1 の制約）。
+        final stillOnly = <String>[
+          for (final layer in layers)
+            if (liveShaderAssetFor(visionState.buildLayer(layer)) == null)
+              visionLayerDisplayName(l10n, layer),
+        ];
+        final session = _maybeLiveSession(context);
 
         return Material(
           elevation: 4,
@@ -246,6 +256,13 @@ class _LoupeHudBar extends StatelessWidget {
                               color: scheme.onSurfaceVariant,
                             ),
                           ),
+                        if (stillOnly.isNotEmpty)
+                          Text(
+                            l10n.hudLiveStillOnlyNote(stillOnly.join(', ')),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -265,6 +282,13 @@ class _LoupeHudBar extends StatelessWidget {
                     ),
                   ),
                 const _CompareOriginalButton(),
+                if (session != null)
+                  _HudIconButton(
+                    icon: Icons.refresh,
+                    tooltip: l10n.hudRefreshBackdropTooltip,
+                    color: scheme.onSurface,
+                    onPressed: () => session.refreshBackdrop(),
+                  ),
                 _HudIconButton(
                   icon: Icons.settings_outlined,
                   tooltip: l10n.hudOpenSettingsTooltip,
@@ -279,6 +303,16 @@ class _LoupeHudBar extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// ライブキャプチャのセッション（#180）。ルーペ窓が使えない環境・widget test では
+  /// provide されないので null。
+  static LiveLoupeSession? _maybeLiveSession(BuildContext context) {
+    try {
+      return Provider.of<LiveLoupeSession>(context, listen: false);
+    } on ProviderNotFoundException {
+      return null;
+    }
   }
 
   void _showConsultDialog(

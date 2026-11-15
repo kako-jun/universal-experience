@@ -210,3 +210,12 @@ flutter_rust_bridge 経由での実際の呼び出し可否や、macOS の CGWin
 ### 関連
 
 - Issue #156
+
+## 追記（2026-11-14, #180）: Linux でルーペ窓モードを解禁
+
+`LoupeWindowPolicy.loupeModeAvailable` は固定の false から、起動時のライブキャプチャの可否
+（`probeLiveCapture`）へ切り替えた。Linux（X11 / XWayland バックエンドかつ xdg-desktop-portal の
+ScreenCast がある）では true、ほかの OS・ポータルの無い環境は従来どおり false で、理由を出す。
+キャプチャの方式（portal + PipeWire、自分の窓を撮り込まないための「下の画面の控え」）は
+`docs/adr/2026-11-14-linux-live-capture-portal-pipewire.md`。対象アプリ指定モードの Wayland での
+可否（提供しない）は変えない。

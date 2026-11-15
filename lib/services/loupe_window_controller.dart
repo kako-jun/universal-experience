@@ -2,11 +2,13 @@ import 'dart:async' show unawaited;
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' show HardwareKeyboard, KeyDownEvent, KeyEvent;
+import 'package:flutter/services.dart'
+    show HardwareKeyboard, KeyDownEvent, KeyEvent;
 import 'package:flutter/widgets.dart' show Color, Rect, Size;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'live_capture_service.dart';
 import 'loupe_rect_source.dart';
 
 /// ルーペ窓の表示状態。
@@ -73,23 +75,31 @@ class LoupeWindowPolicy {
   /// 起動時の既定モード。設定窓（通常ウィンドウ・不透明）から始める (#63)。
   static const AppMode defaultAppMode = AppMode.settings;
 
-  /// ルーペ窓モードを選べるか (#156)。
+  /// ライブ画面キャプチャ（#1）が使えるか (#180)。起動時に `main()` が
+  /// [probeLiveCapture] の結果を入れる。既定（未調査・テスト）は使えない側。
+  static LiveCaptureAvailability liveCapture =
+      const LiveCaptureAvailability.unavailable(
+    LiveCaptureUnavailableReason.unsupportedPlatform,
+  );
+
+  /// ルーペ窓モードを選べるか (#156/#180)。**判断はここ 1 箇所**。
   ///
-  /// ライブ画面キャプチャ（#1/#3/#5）が未実装の間は、ルーペ窓モードにしても
-  /// 透明な窓に設定 UI が載るだけで、下のアプリにフィルタはかからない。
-  /// クリックスルーと組み合わさると見えない下のアプリを操作する状態になるため、
-  /// キャプチャが入るまで **false** にして通常モード（[AppMode.settings]）へ
-  /// フォールバックさせる。キャプチャ実装時はここを true に戻すだけでよい。
-  static const bool loupeModeAvailable = false;
+  /// ルーペ窓は、窓の下の画面をキャプチャしてフィルタを掛けて映すので、ライブ
+  /// キャプチャ（[liveCapture]）が使える環境でだけ true。いま実装があるのは Linux
+  /// （X11 / XWayland バックエンドかつ xdg-desktop-portal の ScreenCast がある）だけで、
+  /// ほかの OS・ポータルの無い環境は false（設定窓へフォールバックし、理由を出す）。
+  /// キャプチャの無いままルーペ窓にすると透明な窓に設定 UI が載るだけで、クリック
+  /// スルーと組み合わさると見えない下のアプリを操作する状態になるため (#156)。
+  static bool get loupeModeAvailable => liveCapture.available;
 
   /// 要求されたモードを実効モードへ解決する唯一の入口 (#156)。
   /// 保存値・UI・トレイ・ホットキーなど、どの経路で [AppMode.loupe] が来ても
   /// [loupeModeAvailable] が false の間は [AppMode.settings] を返す。
   static AppMode resolveAppMode(
     AppMode requested, {
-    bool loupeAvailable = loupeModeAvailable,
+    bool? loupeAvailable,
   }) =>
-      requested == AppMode.loupe && !loupeAvailable
+      requested == AppMode.loupe && !(loupeAvailable ?? loupeModeAvailable)
           ? AppMode.settings
           : requested;
 
@@ -184,12 +194,18 @@ class LoupeWindowPolicy {
 class LoupeWindowController extends ChangeNotifier with WindowListener {
   LoupeWindowController({
     LoupeRectSource rectSource = const ManualLoupeRectSource(),
-    bool loupeModeAvailable = LoupeWindowPolicy.loupeModeAvailable,
+    bool? loupeModeAvailable,
   })  : _rectSource = rectSource,
-        _loupeModeAvailable = loupeModeAvailable;
+        _loupeModeAvailableOverride = loupeModeAvailable;
 
   final LoupeRectSource _rectSource;
-  final bool _loupeModeAvailable;
+
+  /// テスト用の上書き。null なら [LoupeWindowPolicy.loupeModeAvailable]（起動時の
+  /// 調査結果）をその都度読む。
+  final bool? _loupeModeAvailableOverride;
+
+  bool get _loupeModeAvailable =>
+      _loupeModeAvailableOverride ?? LoupeWindowPolicy.loupeModeAvailable;
 
   /// 保存済みの起動モードがルーペ窓だが、ルーペ窓が使えないため通常モードへ
   /// フォールバックしている間 true (#156)。この間は保存値を上書きしない
@@ -223,6 +239,15 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
   /// ルーペ窓モードを選べるか (#156)。UI・トレイの無効化に使う。
   bool get loupeModeAvailable => _loupeModeAvailable;
 
+  /// ルーペ窓モードを選べない理由 (#180)。選べるときは null。テストで可否だけを
+  /// 上書きしたときは、上書きが false なら [LoupeWindowPolicy.liveCapture] の理由
+  /// （既定は未実装の OS）を返す。
+  LiveCaptureUnavailableReason? get loupeUnavailableReason {
+    if (_loupeModeAvailable) return null;
+    return LoupeWindowPolicy.liveCapture.reason ??
+        LiveCaptureUnavailableReason.unsupportedPlatform;
+  }
+
   /// 現在のウィンドウサイズ (リサイズ追従で更新)。null は未取得。
   Size? get currentSize => _currentSize;
 
@@ -250,10 +275,10 @@ class LoupeWindowController extends ChangeNotifier with WindowListener {
       );
       _storedLoupeSuppressed = _appMode != stored;
     }
-    _alwaysOnTop =
-        prefs.getBool(_prefsAlwaysOnTop) ?? LoupeWindowPolicy.defaultAlwaysOnTop;
-    final storedClickThrough =
-        prefs.getBool(_prefsClickThrough) ?? LoupeWindowPolicy.defaultClickThrough;
+    _alwaysOnTop = prefs.getBool(_prefsAlwaysOnTop) ??
+        LoupeWindowPolicy.defaultAlwaysOnTop;
+    final storedClickThrough = prefs.getBool(_prefsClickThrough) ??
+        LoupeWindowPolicy.defaultClickThrough;
     if (_appMode == AppMode.settings && storedClickThrough) {
       // 保存値が不変条件（設定窓モードはクリックスルー禁止）と矛盾していた
       // 場合は正しい値へ正規化し、書き直す (#63)。

@@ -36,6 +36,7 @@ Universal Experience（ue）の主要な設計判断を記録する正本ディ�
 
 | ファイル | タイトル | 決定日 | ステータス |
 |---|---|---|---|
+| [2026-11-14-linux-live-capture-portal-pipewire.md](2026-11-14-linux-live-capture-portal-pipewire.md) | Linux のライブキャプチャは portal + PipeWire をランナーの C++ で受け、窓の下は「控え」で映す | 2026-11-14 | Accepted |
 | [2026-11-14-prefer-xwayland-on-linux-wayland.md](2026-11-14-prefer-xwayland-on-linux-wayland.md) | Linux の Wayland セッションでは XWayland (X11 バックエンド) を優先する | 2026-11-14 | Accepted |
 | [2026-11-14-preview-provisional-render-and-cache.md](2026-11-14-preview-provisional-render-and-cache.md) | 重いプレビュー描画は低解像度で先に見せ、描いた結果をメモリに覚える | 2026-11-14 | Accepted |
 | [2026-11-14-preview-diagnostics-log.md](2026-11-14-preview-diagnostics-log.md) | プレビュー描画の診断ログを、リリースでも利用者の端末へ書く | 2026-11-14 | Accepted |

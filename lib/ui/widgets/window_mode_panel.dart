@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../main.dart' show WindowModeUiContext;
 import '../../services/hotkey_service.dart';
+import '../../services/live_capture_service.dart';
 import '../../services/loupe_window_controller.dart';
 import 'click_through_dialog_scope.dart';
 
@@ -30,7 +31,8 @@ List<String> clickThroughRecoveryLines(
           LoupeWindowPolicy.currentEnvironment());
   AppHotkeyAction? hotkeyRecoveryAction;
   if (!isLikelyUnreliableHotkeyEnvironment) {
-    if (uiContext.hotkeyStatus.isRegistered(AppHotkeyAction.toggleClickThrough)) {
+    if (uiContext.hotkeyStatus
+        .isRegistered(AppHotkeyAction.toggleClickThrough)) {
       hotkeyRecoveryAction = AppHotkeyAction.toggleClickThrough;
     } else if (uiContext.hotkeyStatus
         .isRegistered(AppHotkeyAction.emergencyExit)) {
@@ -128,7 +130,8 @@ class ClickThroughRecoveryBanner extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.ads_click, size: 18, color: scheme.onTertiaryContainer),
+                    Icon(Icons.ads_click,
+                        size: 18, color: scheme.onTertiaryContainer),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -194,7 +197,7 @@ class WindowModePanel extends StatelessWidget {
                   value: AppMode.loupe,
                   label: Text(l10n.windowModeLoupe),
                   icon: const Icon(Icons.search),
-                  // ライブ画面キャプチャ未実装の間は選べない (#156)。
+                  // ライブ画面キャプチャが使えない環境では選べない (#156/#180)。
                   enabled: loupeWindow.loupeModeAvailable,
                 ),
               ],
@@ -208,7 +211,8 @@ class WindowModePanel extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  l10n.windowModeLoupeUnavailableNote,
+                  loupeUnavailableNote(
+                      l10n, loupeWindow.loupeUnavailableReason),
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: colorScheme.onSurfaceVariant),
                 ),
@@ -343,8 +347,8 @@ class _HotkeyRow extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               l10n.hotkeyRegistrationFailed,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: colorScheme.error),
+              style:
+                  theme.textTheme.bodySmall?.copyWith(color: colorScheme.error),
             ),
           ],
         ],
@@ -352,3 +356,18 @@ class _HotkeyRow extends StatelessWidget {
     );
   }
 }
+
+/// ルーペ窓を選べない理由の文言 (#180)。
+String loupeUnavailableNote(
+  AppLocalizations l10n,
+  LiveCaptureUnavailableReason? reason,
+) =>
+    switch (reason) {
+      LiveCaptureUnavailableReason.unsupportedBackend =>
+        l10n.windowModeLoupeUnavailableBackend,
+      LiveCaptureUnavailableReason.portalUnavailable =>
+        l10n.windowModeLoupeUnavailablePortal,
+      LiveCaptureUnavailableReason.unsupportedPlatform ||
+      null =>
+        l10n.windowModeLoupeUnavailablePlatform,
+    };
