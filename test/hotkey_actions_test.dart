@@ -397,4 +397,53 @@ void main() {
       expect(loupeVisiblePassed, isTrue);
     });
   });
+
+  group('原画比較の切り替えの記録（#185）', () {
+    HotkeyActions build(List<String> events, bool Function() held,
+            void Function(bool) set, DateTime Function() now) =>
+        HotkeyActions(
+          deactivateFilters: () {},
+          setClickThrough: (value) async {},
+          setAlwaysOnTop: (value) async {},
+          getClickThrough: () => false,
+          acquireBypass: () => set(true),
+          releaseBypass: () => set(false),
+          clearBypass: () => set(false),
+          isBypassHeldByHotkey: held,
+          showAndFocusLoupe: () async {},
+          toggleLoupeVisible: () async {},
+          setLoupeVisible: (value) async {},
+          onHoldOriginalEvent: events.add,
+          now: now,
+        );
+
+    test('keyUp が届かない環境: キーリピートの keyDown は記録せず、切り替えだけ記録する', () {
+      final events = <String>[];
+      var bypassed = false;
+      var now = DateTime(2026, 11, 14);
+      final a = build(events, () => bypassed, (v) => bypassed = v, () => now);
+      for (var i = 0; i < 50; i++) {
+        a.holdOriginalKeyDown(); // 長押し: OS が 30ms ごとに keyDown を送る
+        now = now.add(const Duration(milliseconds: 30));
+      }
+      now = now.add(const Duration(seconds: 2));
+      a.holdOriginalKeyDown();
+      expect(events, ['down_acquire', 'down_release']);
+    });
+
+    test('keyUp が届く環境: 確保したときと keyUp だけ記録する', () {
+      final events = <String>[];
+      var bypassed = false;
+      final now = DateTime(2026, 11, 14);
+      final a = build(events, () => bypassed, (v) => bypassed = v, () => now);
+      a.holdOriginalKeyDown();
+      a.holdOriginalKeyUp();
+      events.clear();
+      for (var i = 0; i < 50; i++) {
+        a.holdOriginalKeyDown();
+      }
+      a.holdOriginalKeyUp();
+      expect(events, ['down_acquire', 'up']);
+    });
+  });
 }
