@@ -13,9 +13,9 @@ import 'filter_list_tile.dart' show LayerOrderBadge;
 /// 適用順（= 一覧の番号バッジ・調整パネルの層の並びと同じ）にチップを並べ、各チップに ✕ を
 /// 付ける。チップを押すとそのフィルタが「調整中」になる（[VisionFilterState.focusLayer]。調整
 /// パネルで展開される層・推奨サンプル #78 の追従先・←→ の対象と同じ `focusedId`）。✕ は
-/// その 1 層だけを外し、末尾の「すべて解除」は全部を外す。
+/// その 1 層だけを外し、末尾の「フィルタをすべて解除」は全部を外す。
 ///
-/// 層が 2 つ以上のときだけ出す（1 つだけのときは従来どおり、調整パネルの「フィルタを解除」が
+/// 層が 2 つ以上のときだけ出す（1 つだけのときは従来どおり、調整パネルの「フィルタをすべて解除」が
 /// 入口で、見た目を変えない）。状態は形で伝える: 調整中のチップは塗り + 太い枠、それ以外は細い枠
 /// （色だけに頼らない、DESIGN §7）。
 class LayerChipStrip extends StatelessWidget {
@@ -56,7 +56,7 @@ class LayerChipStrip extends StatelessWidget {
                   dismissWelcomeBannerOnUserChange(context);
                 },
                 icon: const Icon(Icons.clear, size: 18),
-                label: Text(l10n.layerStripClearAll),
+                label: Text(l10n.clearFilter),
               ),
             ],
           ),

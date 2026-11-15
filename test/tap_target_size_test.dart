@@ -60,7 +60,7 @@ void main() {
 
       expectAtLeast48(find.byType(ChoiceChip), 'カテゴリの ChoiceChip');
       expectAtLeast48(
-        find.widgetWithText(TextButton, 'フィルタを解除'),
+        find.widgetWithText(TextButton, 'フィルタをすべて解除'),
         '選択解除の TextButton',
       );
       expectAtLeast48(
