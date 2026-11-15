@@ -1,7 +1,7 @@
 // 重ねているフィルタのチップ帯（#120）の widget test。
 //
 // 2 層以上のときだけ出る・適用順の番号・チップで「調整中」が移る・✕ で 1 層だけ外れる・
-// 「すべて解除」で全部外れる・別名（-omaly）のチップが variantId の表示名になる、を確認する。
+// 「フィルタをすべて解除」で全部外れる・別名（-omaly）のチップが variantId の表示名になる、を確認する。
 
 import 'dart:ui' show Tristate;
 
@@ -63,7 +63,7 @@ void main() {
       expect(clearAll, findsNothing);
     });
 
-    testWidgets('2 層で適用順のチップと「すべて解除」が出る', (tester) async {
+    testWidgets('2 層で適用順のチップと「フィルタをすべて解除」が出る', (tester) async {
       await pumpStrip(tester);
       state.toggle('glaucoma');
       state.toggle('myopia');
@@ -123,7 +123,7 @@ void main() {
       expect(clearAll, findsNothing);
     });
 
-    testWidgets('「すべて解除」で全部外れる', (tester) async {
+    testWidgets('「フィルタをすべて解除」で全部外れる', (tester) async {
       await pumpStrip(tester);
       state.toggle('myopia');
       state.toggle('glaucoma');

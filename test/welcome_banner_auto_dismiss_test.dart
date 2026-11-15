@@ -2,7 +2,7 @@
 //
 // フィルタ選択か原画がユーザー操作で変わったら、バナー（「推奨の既定で始めています」の案内）を
 // 自動で閉じる（dismissWelcomeBannerOnUserChange）。閉じる入口は
-// 一覧の行・体験プリセット・LayerChipStrip の ✕/すべて解除・サンプル切替・自分の画像チップ・
+// 一覧の行・体験プリセット・LayerChipStrip の ✕/フィルタをすべて解除・サンプル切替・自分の画像チップ・
 // 写真の読み込み/貼り付け/閉じる・おすすめに戻す。一方、起動時の復元・初期選択
 // （seedInitialLayers）・推奨サンプルへの自動追従・プログラムからの状態変更・
 // バナー自身の「写真ピッカーのキャンセル」では閉じない。
@@ -125,7 +125,7 @@ void main() {
       await expectBannerDismissed(tester, h);
     });
 
-    testWidgets('LayerChipStrip の「すべて解除」', (tester) async {
+    testWidgets('LayerChipStrip の「フィルタをすべて解除」', (tester) async {
       final h = await pumpHomeScreen(tester, size: tall);
       h.visionState.toggle('myopia');
       h.visionState.toggle('glaucoma');
@@ -138,7 +138,7 @@ void main() {
       await expectBannerDismissed(tester, h);
     });
 
-    testWidgets('調整パネルの「フィルタを解除」（1 層でも閉じる）', (tester) async {
+    testWidgets('調整パネルの「フィルタをすべて解除」（1 層でも閉じる）', (tester) async {
       final h = await pumpHomeScreen(
         tester,
         size: tall,
@@ -411,7 +411,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('LayerChipStrip の「すべて解除」', (tester) async {
+    testWidgets('LayerChipStrip の「フィルタをすべて解除」', (tester) async {
       final state = VisionFilterState()
         ..toggle('myopia')
         ..toggle('glaucoma');

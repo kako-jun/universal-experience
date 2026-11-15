@@ -62,13 +62,9 @@
     }
   },
 
-  "clearFilter": "Clear filter",
+  "clearFilter": "Clear all filters",
   "@clearFilter": {
-    "description": "Button that clears the selected color-vision filter."
-  },
-  "clear": "Clear",
-  "@clear": {
-    "description": "Button that clears the selected advanced (catalog) filter."
+    "description": "Button/menu item that removes every stacked filter at once (adjust panel, chip strip, tray)."
   },
 
   "previewSectionTitle": "Before / After",
@@ -371,10 +367,6 @@
   "trayHideLoupe": "Hide window",
   "@trayHideLoupe": {
     "description": "Tray menu item that hides the loupe (main) window."
-  },
-  "trayClearFilter": "Clear filter",
-  "@trayClearFilter": {
-    "description": "Tray menu item that clears the active color-vision filter."
   },
   "trayOpenSettings": "Open settings…",
   "@trayOpenSettings": {
@@ -783,10 +775,6 @@
   "layerStripSemantics": "Applied filters, in order",
   "@layerStripSemantics": {
     "description": "Screen-reader name of the chip strip above the preview that lists the stacked filters in application order (#120)."
-  },
-  "layerStripClearAll": "Clear all",
-  "@layerStripClearAll": {
-    "description": "Button in the chip strip that removes every stacked filter at once (#120)."
   },
   "layerChipLabel": "Order {order}, {name}",
   "@layerChipLabel": {

@@ -488,7 +488,7 @@ TrayMenuLabels trayMenuLabelsFrom(AppLocalizations l10n) {
   return TrayMenuLabels(
     showLoupe: l10n.trayShowLoupe,
     hideLoupe: l10n.trayHideLoupe,
-    clearFilter: l10n.trayClearFilter,
+    clearFilter: l10n.clearFilter,
     openSettings: l10n.trayOpenSettings,
     quit: l10n.trayQuit,
     // トップレベルのクイック 4 型に加え、「高度なフィルタ」サブメニュー（#65）の

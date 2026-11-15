@@ -286,8 +286,8 @@ main.dart が `windowManager.show()` / `hide()` を `onShowLoupe` / `onHideLoupe
    色覚の置き換えは対象外）。ラベルは `TrayMenuLabels` の
    `advancedFilters` / `categoryLabels` / `catalogNames` / `filterLabels` で、
    ARB（ja/en）から解決し `updateLocalization` で言語変更に追従する
-9. **フィルタを解除** — `VisionFilterState.clear()`（重ねている全層・プリセットを
-   まとめて未選択へ戻す）。何も選ばれていないときにチェックが付く。ホットキー（フィルタ解除）も
+9. **フィルタをすべて解除** — `VisionFilterState.clear()`（重ねている全層・プリセットを
+   まとめて未選択へ戻す）。何も選ばれていないときにチェックが付く。非常口ホットキーも
    同じく全層を外す（`test/hotkey_actions_test.dart`。新しいホットキーは足していない）
 10. (区切り線)
 11. **設定を開く…** — フィルタ選択 UI はメインウィンドウ内にあるため
@@ -942,7 +942,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   `filter_list_selection.dart`）と体験プリセットの最上段を持つ。`AdjustPanel` は選んだ
   症状の説明・強度スライダー 1 本・受診喚起（`ConsultNoticeBlock` 常時展開）を
   `FilterParamPanel` で持ち、2 層以上のときは層ごとの節（調整中の層だけ展開、#120）にする。
-  未選択時は空状態を出す。中央カラムの先頭には 2 層以上のときだけ `LayerChipStrip`（適用順のチップ・✕・すべて解除）を置く。起動モード・最前面・クリックスルー・
+  未選択時は空状態を出す。中央カラムの先頭には 2 層以上のときだけ `LayerChipStrip`（適用順のチップ・✕・フィルタをすべて解除）を置く。起動モード・最前面・クリックスルー・
   ホットキー一覧（`WindowModePanel`）は AppBar のダイアログに退避し、クリックスルー ON
   の間は復帰方法を `ClickThroughRecoveryBanner` が画面最上部に常時出す（#63）。
   PNG エクスポートはプレビュー側に置く。選択の状態は従来どおり `VisionFilterState` が
@@ -1184,7 +1184,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   試す」は `pickAndLoadUserImage` の成否（`bool`）を見て、キャンセル/失敗では
   dismiss しない（#78。ピッカーをキャンセルしただけなのにバナーが
   消えると再度の呼び出し手段を失うため）。さらに #143 で、ユーザー操作の入口（一覧の行・
-  体験プリセット・`LayerChipStrip` の ✕/すべて解除・調整パネルの「フィルタを解除」・`ImageSourcePicker` のサンプル切替/画像読込/解除/推奨へ戻す）
+  体験プリセット・`LayerChipStrip` の ✕/フィルタをすべて解除・調整パネルの「フィルタをすべて解除」・`ImageSourcePicker` のサンプル切替/画像読込/解除/推奨へ戻す）
   から `dismissWelcomeBannerOnUserChange(context)`（`settings_service.dart`）で閉じる。
   `VisionFilterState`/`ImageSourceState` 自体の変更は監視しない（起動時の復元・
   `seedInitialLayers`・推奨サンプルへの自動追従と区別するため）。トレイ・ホットキー経由の
@@ -1194,7 +1194,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
     選択の正本は `VisionFilterState` のまま
   - `FilterListTile`: 統合一覧の 1 行。種別（`FilterListTileKind`: preset / check / radio）で形を変え、選択中は色だけでなく
     チェック・適用順の番号で示す。上限で選べない行は理由を 2 行目に出す
-  - `LayerChipStrip`: プレビュー上の、重ねた層のチップ帯（適用順・✕ で 1 層除去・すべて解除）。2 層以上のときだけ出る
+  - `LayerChipStrip`: プレビュー上の、重ねた層のチップ帯（適用順・✕ で 1 層除去・フィルタをすべて解除）。2 層以上のときだけ出る
   - `AdjustPanel`: 右カラム「調整」。1 層は従来の 1 節、複数層は層ごとの節（調整中の層だけ展開）。何も選んでいなければ空状態
   - `FilterParamPanel`: 調整中の層の強度スライダー 1 本・推奨値に戻す・受診喚起・`VisionParam` から動的に作るパラメータ UI
   - `ConsultNoticeBlock`: 受診喚起（喚起文・escalation・免責文）の唯一の表示ウィジェット。`layerConsultNotice`

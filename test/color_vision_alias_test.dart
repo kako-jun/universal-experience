@@ -291,7 +291,7 @@ void main() {
       expect([for (final l in visionState.layers) l.id], ['myopia']);
     });
 
-    test('clear は重ねている全層を外す（ホットキー「フィルタ解除」・トレイの解除、#121）', () {
+    test('clear は重ねている全層を外す（非常口ホットキー・トレイの解除、#121）', () {
       selectColorVisionKey(visionState, 'protanopia');
       visionState
         ..toggle('myopia')
