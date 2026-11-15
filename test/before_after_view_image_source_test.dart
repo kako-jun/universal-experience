@@ -183,7 +183,7 @@ void main() {
     testWidgets(
         'source を読み込み中に imageSource が A→B に切り替わっても、最終的に B が'
         '読み込まれる', (tester) async {
-      // #78 の回帰テスト: 旧実装は _rebuild の最後で
+      // #78 の回帰テスト（#185 (c) で読み込みを after の描画から分けた後の形）: 旧実装は _rebuild の最後で
       // `_currentImageSource = widget.imageSource`（呼び出し時点の最新値）を
       // 読んでいた。A の読み込みが in-flight のまま widget.imageSource が B に
       // 進むと、A の画像を読み込んだのに `_currentImageSource` には B が
@@ -222,31 +222,32 @@ void main() {
       await tester.pump();
       expect(requested, ['a']);
 
-      // 2回目: imageSource を a→b に切り替える。1回目がまだ in-flight なので
-      // _scheduleRebuild が集約するだけで、この時点ではまだ b の読み込みは
-      // 始まらない。
+      // 2回目: imageSource を a→b に切り替える。元画像の読み込みは after の直列描画とは
+      // 別に走る（#185 (c)）ので、a の読み込みを待たずに b の読み込みが始まる。
       await tester.pumpWidget(build('b'));
       await tester.pump();
-      expect(requested, ['a'], reason: '2回目は集約されているだけでまだ呼ばれていない');
+      expect(requested, ['a', 'b'], reason: '元画像の読み込みは a の完了を待たない');
 
-      // ここで1回目（a）の読み込みを解決する。widget.imageSource は既に b に
-      // 進んでいるが、_rebuild はこの呼び出しの冒頭で捕まえた a を使うべき。
-      completers['a']!.complete(imageA);
-      await tester.pump();
-      await tester.pump();
-
-      // 集約されていた b への要求が続けて走り始めるはず。
-      expect(requested, ['a', 'b'],
-          reason: '_currentImageSource が正しく a として記録されていれば、b の'
-              '再読み込みが reuseBefore で誤ってスキップされない');
-
+      // b を先に解決する。表示は b になる。
       completers['b']!.complete(imageB);
       await tester.pump();
       await tester.pump();
 
+      // 遅れて届いた a は追い越されているので、表示に使わず dispose する（b を a で
+      // 上書きしない）。
+      completers['a']!.complete(imageA);
+      await tester.pump();
+      await tester.pump();
+      expect(requested, ['a', 'b']);
+
       expect(imageB.debugDisposed, isFalse);
       expect(imageA.debugDisposed, isTrue,
-          reason: '最終的に b の画像に差し替わり、a は dispose される');
+          reason: '遅れて届いた a は表示に使わず dispose される');
+      final shown = tester
+          .widgetList<PreviewImageView>(find.byType(PreviewImageView))
+          .first
+          .image!;
+      expect(shown, same(imageB));
     });
   });
 }

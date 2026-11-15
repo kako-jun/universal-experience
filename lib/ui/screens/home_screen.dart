@@ -42,15 +42,18 @@ const double _kNarrowPreviewMaxWidth = 560;
 /// これより小さくはしない（使い物にならない小ささになるより、縦にスクロールさせる）。
 const double kMinPreviewPaneSide = 160;
 
-/// プレビューカードのうち、画像以外が縦に使う高さ（dp、#130）。カード上端から画像の上端
-/// まで（余白・見出しの行 + 「2×2 で比較」・画像の見出し行 48・余白）と、画像の下端から選択欄の
-/// 下端まで（`ImageSourcePicker`。サンプルのチップが 3 行ほど折り返す）、選択欄の下の余白 16 の
-/// 合計。実フォントでの実測は日本語で約 324、英語（チップが長く折り返しが 1 行増える）で約 348。
+/// プレビューカードのうち、画像以外が縦に使う高さ（dp、#130）。カード上端の余白 16、チップ帯
+/// （#183。チップ 48 + スクロールバーの段 6 = 54。「2×2 で比較」も帯の右端に入る。「原画表示中」は画像の枠の中に重ねるので高さを足さない）、
+/// 画像の見出し行 48（書き出しボタン）と余白、画像の下端から選択欄の下端まで（`ImageSourcePicker`。
+/// サンプルのチップが 3 行ほど折り返す）、選択欄の下の余白 16 の合計。
+/// 実フォントでの実測は日本語で約 318、英語（チップが長く折り返しが 1 行増える）で約 342
+/// （帯の前の旧実測 324/348 から、廃止した見出し行 48 と余白 12 を引き、帯 54 を足した値）。
 /// この値は実測に余裕（英語で約 12）を足した値で、実測の最大より大きくしてある。
 /// 画像の一辺は「本体領域の高さ - この値」までに抑えて、既定のウィンドウ（800x600）でも選択欄の
-/// 下端が最初のビューポートに収まるようにする。
+/// 下端が最初のビューポートに収まるようにする（UE_SCREENSHOTS の default-window の
+/// expectPickerFits で確かめる）。
 /// 実測を超えてチップが折り返す（文字サイズ拡大など）ときは、選択欄が下にはみ出し、スクロールで届く。
-const double _kPreviewChromeHeight = 360;
+const double _kPreviewChromeHeight = 354;
 
 /// ウィンドウ（本体領域）の高さ [viewportHeight] に収まる、プレビュー画像の一辺の上限（#130）。
 /// 下限は [kMinPreviewPaneSide]。余裕のある高さでは画像の自然な大きさより大きい値になり、
@@ -382,7 +385,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _previewCard(double maxPaneSide) {
     return Consumer2<VisionFilterState, ImageSourceState>(
       builder: (context, visionState, imageSourceState, _) {
-        final theme = Theme.of(context);
         final l10n = AppLocalizations.of(context)!;
         // 「2×2 で比較」は、層の集合に色覚層があるときだけ出す（#122）。他の層を重ねていても
         // 出せて、そのとき 4 枚は「色覚以外の層を先に適用した画像」の上に色覚 4 型を 1 つずつ
@@ -398,56 +400,60 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+                // 見出し行は廃止した（#183）: 下の画像の見出し（「元の画像」/ フィルタ名）と内容が重複し、
+                // 48dp を食うため。「2×2 で比較」は帯の右端の固定枠へ移した（「原画表示中」は画像側に重ねる）。
+                // 見出しの読み上げは、見えない 1dp の Semantics(header) で残す（高さは足さない）。
+                Stack(
                   children: [
-                    Semantics(
-                      header: true,
-                      child: Text(
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      width: 1,
+                      height: 1,
+                      child: Semantics(
+                        header: true,
                         // 2×2 の間は Before / After ではないので、見出しも実態に合わせる。
-                        comparing
+                        label: comparing
                             ? l10n.compareSectionTitle
                             : l10n.previewSectionTitle,
-                        style: theme.textTheme.titleMedium,
                       ),
                     ),
-                    if (visionState.bypassed) ...[
-                      Chip(
-                        label: Text(l10n.bypassedBadgeLabel),
-                        backgroundColor: theme.colorScheme.secondaryContainer,
-                        labelStyle: theme.textTheme.labelLarge?.copyWith(
-                          color: theme.colorScheme.onSecondaryContainer,
-                        ),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ],
-                    if (canCompare)
-                      FilterChip(
-                        label: Text(l10n.compareToggleLabel),
-                        tooltip: l10n.compareToggleTooltip,
-                        selected: _compareColorVision,
-                        onSelected: (value) =>
-                            setState(() => _compareColorVision = value),
-                      ),
+                    LayerChipStrip(
+                      trailingLabel:
+                          canCompare ? l10n.compareToggleLabel : null,
+                      trailingBuilder: canCompare
+                          ? (context, compact) => FilterChip(
+                                // 文字が大きい・幅が狭いときは、アイコンだけ + tooltip にして
+                                // 帯のチップの領域を潰さない（#183）。
+                                label: compact
+                                    ? Icon(
+                                        Icons.compare,
+                                        size: 20,
+                                        semanticLabel: l10n.compareToggleLabel,
+                                      )
+                                    : Text(l10n.compareToggleLabel),
+                                tooltip: l10n.compareToggleTooltip,
+                                selected: _compareColorVision,
+                                onSelected: (value) =>
+                                    setState(() => _compareColorVision = value),
+                              )
+                          : null,
+                    ),
                   ],
                 ),
-                // 重ねている層のチップ帯（#120）。2 層以上のときだけ出る（1 層以下は高さ 0）。
-                if (visionState.layers.length > 1) ...[
-                  const SizedBox(height: 12),
-                  const LayerChipStrip(),
-                ],
-                const SizedBox(height: 12),
                 ImageSourcePicker(
+                  // 原画表示中のバッジは、表示側（After 画像・2×2 の右下のセル）が自分の画像の
+                  // 枠の中に重ねる（#183）。
                   child: comparing
                       ? ColorVisionCompareView(
                           strength: compareInput.strength,
                           baseSteps: compareInput.baseSteps,
                           baseLayers: compareInput.baseLayers,
                           imageSource: imageSourceState.current,
+                          bypassed: visionState.bypassed,
                         )
                       : BeforeAfterView(
+                          bypassed: visionState.bypassed,
                           filter: visionState.build(),
                           filterId: visionState.selectedId,
                           strength: strength,

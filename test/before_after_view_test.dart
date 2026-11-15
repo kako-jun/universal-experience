@@ -556,7 +556,7 @@ void main() {
       });
 
       testWidgets(
-          '_after を差し替えると旧 _after は dispose される。_before と同一なら dispose されない',
+          '_after を差し替えると旧 _after は dispose される。_before は dispose されない',
           (tester) async {
         late ui.Image before1, after1, after2;
         await tester.runAsync(() async {
@@ -566,9 +566,8 @@ void main() {
         });
         previewSourceImageLoader = (source, size) => Future.value(before1);
 
+        // phase1（filter=null）は描画器を呼ばず、原画の複製を after に出す（#185）。
         final responses = <Future<ui.Image?> Function(ui.Image)>[
-          (source) =>
-              Future.value(source), // phase1: filter=null → _after は _before と同一
           (source) => Future.value(after1), // phase2: 実描画（_before とは別物）
           (source) => Future.value(after2), // phase3: 再度差し替え
         ];
@@ -579,7 +578,7 @@ void main() {
           return response(source);
         };
 
-        // phase1: filter=null → _after は _before(before1) のエイリアス。
+        // phase1: filter=null → _after は _before(before1) の複製（描画器は呼ばない）。
         await tester.pumpWidget(localized(const BeforeAfterView(
           filter: null,
           filterId: null,
@@ -590,8 +589,8 @@ void main() {
         await tester.pump();
         await tester.pump();
 
-        // phase2: null → protanopia。旧 _after(=before1) は _before と同一なので
-        // dispose されてはいけない（_before として使われ続けている）。
+        // phase2: null → protanopia。旧 _after（before1 の複製）を捨てても、_before の
+        // before1 は dispose されてはいけない（_before として使われ続けている）。
         await tester.pumpWidget(localized(const BeforeAfterView(
           filter: VisionFilter.protanopia(),
           filterId: 'protanopia',
@@ -680,14 +679,11 @@ void main() {
         var callIndex = 0;
         afterImageRenderer = (source, filter, strength) {
           callIndex++;
-          if (callIndex == 1) {
-            return Future.value(source); // filter=null 相当: そのまま返す
-          }
           capturedRendererInput = source;
           return Future.value(realAfter);
         };
 
-        // 1回目: filter=null で _before=_after=before1 を確定させる。
+        // 1回目: filter=null で _before=before1 を確定させる（描画器は呼ばない、#185）。
         await tester.pumpWidget(localized(const BeforeAfterView(
           filter: null,
           filterId: null,
@@ -711,6 +707,7 @@ void main() {
         await tester.pump();
         await tester.pump();
 
+        expect(callIndex, 1, reason: 'filter=null の回は描画器を呼ばない');
         expect(capturedRendererInput, isNotNull);
         expect(identical(capturedRendererInput, before1), isFalse,
             reason: '_before と同一オブジェクトを渡すと、await 中の dispose に対して無防備になる');
@@ -775,13 +772,19 @@ void main() {
 
         // 1回目の要求をようやく解決する。_runRebuild は mounted チェックに
         // より、保留中の要求（intensity=0.5 分）を再スケジュールしないはず。
-        completer.complete(before1);
+        // 描画器は新しい画像を返す（受け取った入力以外の、ビューが持つ画像を返さない）。
+        late ui.Image after1;
+        await tester.runAsync(() async {
+          after1 = await generateSampleImage(4);
+        });
+        completer.complete(after1);
         await tester.pump();
         await tester.pump();
 
         expect(rendererCallCount, 1,
             reason: 'dispose 後は保留中の要求があっても renderer が再度呼ばれて'
                 'はいけない');
+        expect(after1.debugDisposed, isTrue, reason: '外された後に届いた結果は捨てる');
       });
 
       testWidgets(
@@ -913,7 +916,7 @@ void main() {
         expect(goodAfter.debugDisposed, isFalse);
       });
 
-      testWidgets('renderer が例外を投げても新規生成した before はリークせず、次の更新で再試行できる',
+      testWidgets('renderer が例外を投げても before はリークせず（表示中のまま）、次の更新で再試行できる',
           (tester) async {
         suppressFlutterErrorReporting();
         late ui.Image before1, before2, goodAfter;
@@ -948,10 +951,12 @@ void main() {
         await tester.pump();
         await tester.pump();
 
-        // renderer が失敗しても、新規生成した before（1回目）はリークせず
-        // dispose される。
-        expect(before1.debugDisposed, isTrue);
+        // renderer が失敗しても「準備中」に固着しない。元画像の読み込みは after の描画と
+        // 分かれている（#185 (c)）ので、読み込んだ before はそのまま元画像側に表示し続ける
+        // （リークではなく表示中の画像。ビューを外したときに dispose する。下の確認）。
+        expect(before1.debugDisposed, isFalse);
         expect(find.text(en.previewPreparing), findsNothing);
+        expect(find.text(en.previewFailed), findsOneWidget);
 
         await tester.pumpWidget(localized(const BeforeAfterView(
           filter: VisionFilter.protanopia(),
@@ -964,7 +969,14 @@ void main() {
         await tester.pump();
 
         expect(rendererCallCount, 2);
+        expect(generatorCallCount, 1, reason: '元画像は読み直さず使い回す');
         expect(goodAfter.debugDisposed, isFalse);
+        expect(find.text(en.previewFailed), findsNothing);
+
+        await tester.pumpWidget(const SizedBox());
+        expect(before1.debugDisposed, isTrue, reason: 'ビューを外したら before を dispose する');
+        expect(before2.debugDisposed, isFalse, reason: '読み込まれていない');
+        before2.dispose();
       });
 
       // 旧タイトルの「auto モードで」は #85 で auto モード

@@ -20,8 +20,7 @@
   "strengthSliderName": "強さ",
   "previewImageFilteredSemantics": "{name}を適用した画像",
 
-  "clearFilter": "フィルタを解除",
-  "clear": "クリア",
+  "clearFilter": "フィルタをすべて解除",
 
   "previewSectionTitle": "ビフォー / アフター",
   "previewPaneOriginal": "元の画像",
@@ -34,6 +33,9 @@
   "compareCellFailedSemanticsLabel": "{name}のシミュレーション、描画に失敗しました",
   "previewPreparing": "プレビューを準備中…",
   "previewFailed": "プレビューの描画に失敗しました",
+  "previewRendering": "描画中…",
+  "previewRenderingProvisional": "描画中…（低解像度の仮表示）",
+  "previewLoadingSource": "画像を読み込み中…",
   "previewStaticFrameNote": "時間の経過で変化する見え方です。プレビューは動きのない1コマの静止画で表示しています。",
 
   "changePattern": "パターンを変える",
@@ -94,7 +96,6 @@
   "trayAppModeLoupeUnavailable": "ルーペ窓（この環境では使えません）",
   "trayShowLoupe": "ウィンドウを表示",
   "trayHideLoupe": "ウィンドウを隠す",
-  "trayClearFilter": "フィルタを解除",
   "trayOpenSettings": "設定を開く…",
   "trayQuit": "終了",
   "trayAdvancedFilters": "高度なフィルタ",
@@ -264,8 +265,8 @@
   "filterListLimitReached": "上限の {max} 件に達しています。ほかを外すと選べます",
   "filterListOrderSemantics": "適用順 {order} 番目",
   "layerSummaryMore": "{names} …（+{count}）",
+  "layerStripEmptyHint": "選んだフィルタがここに並びます",
   "layerStripSemantics": "適用中のフィルタ（適用順）",
-  "layerStripClearAll": "すべて解除",
   "layerChipLabel": "適用順 {order} 番目、{name}",
   "layerChipFocusHint": "押すと、このフィルタを調整します",
   "layerChipRemove": "{name}を外す",

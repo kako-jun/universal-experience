@@ -46,7 +46,7 @@ lib/
 │   │                                 # 検索・選択入口 toggleFilterListEntry・↑↓ の順送りの純粋ロジック（#72）
 │   ├── export_plan.dart             # 書き出しの計画（UI 非依存の純粋ロジック）: buildExportCaption / buildLayeredExportCaption（描画時点の値からキャプションを解決）・planExport（キャプション + ファイル名の症状 id + 強度。複数層は層ごとの行）。BeforeAfterView と 2×2 比較が共有（#159）。PNG のエンコード encodePngAndDispose / encodeImagePng は export_service.dart
 │   ├── export_layers.dart           # 書き出しが数える層 effectiveExportLayers（強度 > 0 のみ。表示の整数パーセントが 0 になる強度も除く）・描画時点の控え ExportLayer / exportLayersOf（#121）
-│   ├── hotkey_actions.dart          # グローバルホットキー4アクションの実処理（#63。フィルタ解除は全層を外す、#121 でテスト固定）
+│   ├── hotkey_actions.dart          # グローバルホットキー4アクションの実処理（#63。非常口は全層を外す、#121 でテスト固定）
 │   ├── hotkey_service.dart          # hotkey_manager 登録の副作用層（#63）
 │   ├── image_source_state.dart      # プレビュー原画（サンプル/ユーザー画像）の選択の唯一の正本（#78）
 │   ├── layer_consult_notice.dart    # 層 1 つ単体の受診喚起 layerConsultNotice（調整パネルの層ごとの節が使う、#120）
@@ -56,6 +56,8 @@ lib/
 │   ├── live_capture_service.dart    # ライブ画面キャプチャのネイティブ境界（MethodChannel universal_experience/live_capture）・可否・失敗の分類（#180）
 │   ├── live_loupe_session.dart      # ルーペ窓モードと共有の寿命（開始・窓の真下の撮影・拒否/停止で設定窓へ戻す・restore token、#180）
 │   ├── native_bridge_service.dart   # flutter_rust_bridge（sensus-core）の bootstrap 初期化
+│   ├── preview_diagnostics.dart     # プレビュー描画の診断ログ（失敗・10 秒超の未完了・原画比較の切替を ~/.local/share/<アプリ id>/logs/ へ。
+│   │                                 # リリースでも有効・256 KiB で退避・個人情報なし・UE_PREVIEW_DIAGNOSTICS=0 で無効、#185）
 │   ├── preview_selection.dart       # プレビュー強度の出どころを一本化する判定（#60/#63）・
 │   │                                 # 複数層のプレビューに渡すステップ列 previewPipelineSteps（#119）
 │   ├── settings_service.dart        # テーマ・言語・welcomeBannerDismissed（#78）。選択状態は持たない（VisionFilterStore が正本、#124）
@@ -85,13 +87,16 @@ lib/
     ├── screens/home_screen.dart
     ├── widgets/                     # filter_browser（左カラム「選ぶ」: 検索・カテゴリ・統合一覧、#72）,
     │                                 # filter_list_tile（一覧の 1 行: チェック・適用順の番号バッジ、#120）,
-    │                                 # layer_chip_strip（プレビュー上の適用順チップ帯・✕・すべて解除、#120）,
+    │                                 # layer_chip_strip（プレビュー上の適用順チップ帯・✕・フィルタをすべて解除、#120）,
+    │                                 # bypass_badge（「原画表示中」のバッジ。画像の枠の中に重ねる・liveRegion・狭いとアイコン形、#183）,
     │                                 # adjust_panel（右カラム「調整」: 2 層以上は層ごとの節、#72/#120）,
     │                                 # before_after_view（複数層は名前の要約見出し・書き出しは層ごとの行と併合した受診喚起、#120/#121）, loupe_hud,
     │                                 # live_loupe_view（ルーペ窓で窓の下の画面をフィルタして映す・共有失敗のスナックバー、#180）,
     │                                 # preview_rendering（プレビュー描画の共有: before 読み込み・after 描画・書き出し合成の差し替え口
     │                                 # previewSourceImageLoader/afterImageRenderer/exportImageComposer と PreviewImageView・PreviewErrorPlaceholder。
-    │                                 # BeforeAfterView と 2×2 比較が共有し、互いを import しない、#159）,
+    │                                 # BeforeAfterView と 2×2 比較が共有し、互いを import しない、#159。1 回の描画が 500ms を越えた
+    │                                 # 間の「描画中…」PreviewBusyTracker/PreviewBusyBadge、低解像度の仮表示・描画結果の LRU
+    │                                 # PreviewRenderCache、#185）,
     │                                 # color_vision_compare_view（色覚 4 型の 2×2 比較と書き出し、#84。他の層の土台つき、#122）,
     │                                 # experience_presets（体験プリセットの行 ExperiencePresetTile）, filter_param_panel,
     │                                 # consult_notice_block（受診喚起の共有表示ウィジェット、#76）,
@@ -160,9 +165,10 @@ test/
 ├── tap_target_size_test.dart       # macOS 指定で操作領域が 48dp 以上（padded + standard・言語ダイアログの選択肢、#72/#82）
 ├── filter_browser_test.dart        # 統合一覧の検索・カテゴリ切替・行の選択（#72）
 ├── filter_browser_multi_select_test.dart # 統合一覧のチェック式・番号バッジが段順・色覚の排他置き換え・上限で未選択の行が無効（色覚置き換え行とプリセットは有効）・プリセット置換と一致時だけ強調・行フォーカス移動（#120）
+├── filter_browser_category_chip_rows_test.dart # カテゴリチップ帯の行ごと伸ばす並び（#184）: 改行は選択中とみなした Wrap と同じ・各行の左右端が揃う・省略なし（極端な狭幅だけ省略+ツールチップ）・文字倍率 1.3/2.0 で全選択でも省略なし・48dp・Tab が行優先・余白定数が実物と一致
 ├── filter_browser_category_chip_search_test.dart # 検索語があるあいだカテゴリチップを全て非選択表示（チェック・選択色なし）にし、消すと元の選択へ戻る・内部カテゴリ不変・チップ押下で検索語が消えてカテゴリ選択・検索中の文字色が通常の非選択チップと同じであることとコントラスト 4 テーマ（#143）
-├── welcome_banner_auto_dismiss_test.dart # ウェルカムバナーの自動 dismiss: 行・プリセット・✕/すべて解除・調整パネルの解除・サンプル切替・写真の読込/貼付/閉じる・おすすめに戻すで閉じ永続化／seed・プログラム変更・起動復元・ピッカーキャンセルでは残る／Provider 無しでも例外なし（#143）
-├── layer_chip_strip_test.dart      # チップ帯: 2 層以上で出る・チップで調整中が移る・✕ で 1 層除去・すべて解除・状態が形で分かる（#120）
+├── welcome_banner_auto_dismiss_test.dart # ウェルカムバナーの自動 dismiss: 行・プリセット・✕/フィルタをすべて解除・調整パネルの解除・サンプル切替・写真の読込/貼付/閉じる・おすすめに戻すで閉じ永続化／seed・プログラム変更・起動復元・ピッカーキャンセルでは残る／Provider 無しでも例外なし（#143）
+├── layer_chip_strip_test.dart      # チップ帯: 1 層以上で出る・0〜5 層で高さ一定・チップで調整中が移る・✕ で 1 層除去・フィルタをすべて解除・状態が形で分かる（#120）
 ├── adjust_panel_layers_test.dart   # 調整パネルの層ごとの節・調整中の層だけ展開・強度スライダー 1 本・1 層は従来の見た目（#120）
 ├── home_screen_multi_layer_heading_test.dart # 複数層の見出し（名前の要約）・書き出しボタンが複数層でも有効・2×2 スイッチが色覚層のあるときだけ（#120/#121/#122）
 ├── export_multi_layer_test.dart    # 複数層の書き出し: 層ごとの行・最大の緊急度と併合した escalation・実験的の注記・強度 0 の層を数えない・ファイル名・描画時点の控え・単一層の従来どおり（#121）
@@ -190,6 +196,8 @@ test/
 ├── consult_input_merge_test.dart   # 複数層の相談喚起入力の統合: urgency は最大・escalation は段ごとに重複除去（#119）
 ├── home_screen_harness_test.dart   # ハーネス（installHomeScreenFixtures）の契約: 差し替えと復元（読み込み・適用・複数層の合成）・アプリ本体経路で単一層/2 層のフィルタ選択・強度変更・画像読み込みを実時間（runAsync）で進めても RustLib 未初期化の例外が漏れない（#127/#131）
 ├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品。HomeScreen / UniversalExperienceApp を pump するテストは setUp で installHomeScreenFixtures（体験・メタデータ・プレビューの読み込み/適用・複数層の合成 pipelineApplier を Rust 非依存のフェイクに固定）、tearDown で resetHomeScreenFixtures を呼ぶ（独自 pump で実ローダ/実レンダラを残さない、#131）
+├── bypass_badge_test.dart          # 原画表示中のバッジ: liveRegion・狭いときのアイコン形・文字倍率を打ち消さない・fitsAsText の幅 3/4・高さ 1/4 の境界（#183）
+├── support/header_semantics.dart   # プレビューの見えない Semantics(header)（見出し行は廃止）を探す finder（#183）
 ├── support/color_vision_select.dart # 色覚 7 種のキーで単一選択するテスト用ヘルパ（別名を解いて replaceWith へ渡す）
 ├── support/screenshot_harness.dart # スクリーンショット用フォント読込・PNG 書出し（フォントはコミットしない）
 └── ui_screenshots/                 # HomeScreen の PNG 書出し。`UE_SCREENSHOTS=1` のときだけ実行（DESIGN.md §8）
@@ -286,7 +294,7 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 
 色覚 7 型・advanced 30 フィルタ・体験プリセットを 1 つの検索できる一覧に統合し、広幅は
 選ぶ / 見る / 調整の 3 カラム、狭幅は縦積み。起動モード等は AppBar のダイアログへ移した。
-カテゴリ切替を `NavigationRail` でなく `ChoiceChip` の `Wrap` にした理由と代替案（`NavigationRail`・
+カテゴリ切替を `NavigationRail` でなく `ChoiceChip`（当初 `Wrap`、#184 で行ごとに幅を伸ばして端を揃える形）にした理由と代替案（`NavigationRail`・
 ボトムシート）、ハイコントラスト対応は `docs/adr/2026-09-30-home-screen-unified-list-and-three-columns.md`。
 
 ### 色覚 4 型の 2×2 比較
@@ -326,7 +334,7 @@ UI は多選択（#120）:
 
 - 統合一覧はチェック式（色覚行はラジオ式の見た目・見出し「いずれか 1 つ」）で、チェック済みの行に適用順の
   番号バッジが付く。上限 5 に達すると未選択の行は無効になり理由を行内に出す（色覚の置き換えと体験プリセットは有効）。
-- プレビュー上のチップ帯（2 層以上のみ）で層の切替（調整中）・✕・「すべて解除」。調整パネルは 2 層以上で層ごとの
+- プレビュー上のチップ帯（1 層以上でチップを出し、0 層でも同じ高さを確保・1 行の横スクロール、#183）で層の切替（調整中）・✕・「フィルタをすべて解除」。調整パネルは 2 層以上で層ごとの
   節（調整中の層だけ展開）、強度スライダーは 1 本。1 層のときの見た目・挙動は従来どおり。
 - キー: ↑↓ は行フォーカスの移動だけ、Space / Enter が足し引き、←→ は調整中の層（`focusedId`）の強度。
 - 複数層の見出し・HUD は「名前 + 名前 …（+N）」（強度は出さない）。PNG 書き出しは複数層でも使え（#121）、画像に効いている層
@@ -334,7 +342,7 @@ UI は多選択（#120）:
   ファイル名に数えない（画像だけが共有されたとき実際の見え方と食い違わないため）。「2×2 で比較」は色覚層があるとき
   だけ出し、他の層は土台として重ねる（#122）。
 - トレイ（#121）: 「高度なフィルタ」はチェック式。クリックはメイン画面の一覧と同じ入口（`toggleFilterListEntry`）を通り、チェックは層の集合から導く。
-  色覚 4 項目は排他（別の型で置き換え）、上限 5 で未選択の項目は灰色（色覚の置き換えは有効）。フィルタ解除（トレイ・ホットキー）は全層を外す。
+  色覚 4 項目は排他（別の型で置き換え）、上限 5 で未選択の項目は灰色（色覚の置き換えは有効）。フィルタ解除（トレイ）と非常口ホットキーは全層を外す。
 
 ### iOS非対応
 

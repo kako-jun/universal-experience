@@ -1,4 +1,4 @@
-# backend_policy の単体テスト (#178)。linux/CMakeLists.txt (Flutter ビルド) からは
+# backend_policy (#178) と screen_capture/backdrop (#180) の単体テスト。linux/CMakeLists.txt (Flutter ビルド) からは
 # 参照しない独立プロジェクト。GTK / Flutter 不要。
 #   cmake -S linux/test -B <build> && cmake --build <build> && ctest --test-dir <build>
 cmake_minimum_required(VERSION 3.10)

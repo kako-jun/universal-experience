@@ -342,8 +342,10 @@ jobs:
           workspaces: |
             rust -> ../build/linux/x64/debug/plugins/universal_experience_rust/cargokit_build
 
-      # linux/main.cc の GDK バックエンド判定（純関数 backend_policy.cc、#178）の単体テスト。
-      # Flutter ビルドとは独立した CMake プロジェクト（GTK 不要）。
+      # linux/test の単体テスト（Flutter ビルドとは独立した CMake プロジェクト、GTK 不要）。
+      # linux/main.cc の GDK バックエンド判定（純関数 backend_policy.cc、#178）と、
+      # ライブキャプチャの下の画面の控え（screen_capture/backdrop.cc、#180）を 1 つの
+      # プロジェクトでまとめてビルドし、両方の ctest を回す。
       - name: Linux native unit tests (backend_policy + backdrop)
         run: |
           cmake -S linux/test -B build/linux_native_test

@@ -288,8 +288,8 @@ main.dart が `windowManager.show()` / `hide()` を `onShowLoupe` / `onHideLoupe
    色覚の置き換えは対象外）。ラベルは `TrayMenuLabels` の
    `advancedFilters` / `categoryLabels` / `catalogNames` / `filterLabels` で、
    ARB（ja/en）から解決し `updateLocalization` で言語変更に追従する
-9. **フィルタを解除** — `VisionFilterState.clear()`（重ねている全層・プリセットを
-   まとめて未選択へ戻す）。何も選ばれていないときにチェックが付く。ホットキー（フィルタ解除）も
+9. **フィルタをすべて解除** — `VisionFilterState.clear()`（重ねている全層・プリセットを
+   まとめて未選択へ戻す）。何も選ばれていないときにチェックが付く。非常口ホットキーも
    同じく全層を外す（`test/hotkey_actions_test.dart`。新しいホットキーは足していない）
 10. (区切り線)
 11. **設定を開く…** — フィルタ選択 UI はメインウィンドウ内にあるため
@@ -690,7 +690,7 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
   **行にフォーカスがある間の ←→ は、その 1 回では強度の 5% 刻み調整が効かず、フォーカスが必ず
   画面のショートカット受け口（`homeShortcuts`）へ出る**ので、次の ←→ から強度が動く。これは標準の
   方向フォーカス移動任せにしていない。標準の走査は幾何（隣のカラムのコントロールとの縦帯の重なり）で
-  着地点が決まり、色覚選択時に中央カラムへ出る「2×2 で比較」の切替が見出し行を高くすると、`→` が中央
+  着地点が決まり、色覚選択時に中央カラムへ出る「2×2 で比較」の切替が出て行を高くすると、`→` が中央
   カラムのサンプル切替チップへ着地して強度に届かなくなった。そこで「選ぶ」カードの `FocusTraversalGroup` に
   `_ListExitToShortcutsPolicy`（`ReadingOrderTraversalPolicy` を継承し、`FilterListTile` 上からの
   左右だけ受け口へ固定。体験プリセットの行も同じ `FilterListTile` なので含み、それ以外の方向・部品は
@@ -1034,13 +1034,13 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
 - `HomeScreen`: メイン画面（#72）。幅 1000dp 以上は 3 カラム（左「選ぶ」=`FilterBrowser`、
   中央「見る」=`BeforeAfterView` + `ImageSourcePicker`、右「調整」=`AdjustPanel`）、
   それ未満は プレビュー → 調整 → 選択 の縦積み。プレビュー画像の一辺は本体領域の高さから
-  `previewPaneSideFor` で上限を決め（高さ - 360dp、下限 `kMinPreviewPaneSide` = 160dp）、
+  `previewPaneSideFor` で上限を決め（高さ - 354dp、下限 `kMinPreviewPaneSide` = 160dp）、
   `BeforeAfterView.maxPaneSide` へ渡す。既定ウィンドウ 800x600 でも選択欄まで最初のビューポートに収める（#130）。`FilterBrowser` は検索・カテゴリ・
   統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行、ロジックは
   `filter_list_selection.dart`）と体験プリセットの最上段を持つ。`AdjustPanel` は選んだ
   症状の説明・強度スライダー 1 本・受診喚起（`ConsultNoticeBlock` 常時展開）を
   `FilterParamPanel` で持ち、2 層以上のときは層ごとの節（調整中の層だけ展開、#120）にする。
-  未選択時は空状態を出す。中央カラムの先頭には 2 層以上のときだけ `LayerChipStrip`（適用順のチップ・✕・すべて解除）を置く。起動モード・最前面・クリックスルー・
+  未選択時は空状態を出す。中央カラムの先頭には `LayerChipStrip`（適用順のチップ・✕・フィルタをすべて解除。カードの先頭に常に置き（右端に「2×2 で比較」の固定枠。見出し行は廃止。「原画表示中」はプレビューの画像の枠の中に重ねる）、1 層以上でチップを出し、0 層でも同じ高さを確保、#183。「フィルタをすべて解除」は 2 層以上のみ）を置く。起動モード・最前面・クリックスルー・
   ホットキー一覧（`WindowModePanel`）は AppBar のダイアログに退避し、クリックスルー ON
   の間は復帰方法を `ClickThroughRecoveryBanner` が画面最上部に常時出す（#63）。
   PNG エクスポートはプレビュー側に置く。選択の状態は従来どおり `VisionFilterState` が
@@ -1117,7 +1117,57 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   参照）。CPU `apply()` は GPU シェーダより重いため、`_scheduleRebuild` が
   `_rebuild` の実行を直列化し（同時に走るジョブは常に1本、#85）、
   スライダーを連続操作しても実ブリッジ呼び出しが積み上がらないようにしている
-  （#58 の世代管理・dispose・失敗表示の規約自体は変更していない）
+  （#58 の世代管理・dispose・失敗表示の規約自体は変更していない）。
+  ネイティブの描画は途中で止められないため、1 回が長いとその間は after が前の描画のまま
+  変わらない。sensus の starbursts は閾値を超える明るい画素の数に比例して重く、明るいサンプル
+  （info_board 等）に 1024px で掛けると 1 回に数十秒かかる（#185。推奨サンプルの夜景では数十 ms。
+  sensus 側の高速化は kako-jun/sensus#196）。そこで次のようにしている（#185）。
+  - **描画中の札**: 1 回の描画が `kPreviewBusyThreshold`（500ms）を越えたら、after 側に「描画中…」
+    （`PreviewBusyBadge` を `PreviewBusyOverlay` で重ねる。after 側は札の有無に関わらず常に Stack）。
+    計時は `PreviewBusyTracker`（`preview_rendering.dart`）で、数えるのは**1 回の描画**の時間（列全体
+    ではない。速い描画が続くスライダーのドラッグでは出さない）。一度出たら列が空になるまで出したまま。
+  - **低解像度の仮表示（(a)）**: 重い入力（`previewInputIsHeavy` = starbursts を含む、または直前の
+    フル解像度の描画が `kProvisionalRenderAfter`（2 秒）を越えた）は、先に `kProvisionalPreviewSize`
+    （512px）へ縮めた入力で描いて仮表示し（札は「描画中…（低解像度の仮表示）」、書き出しボタンは出さない）、
+    続けてフル解像度で描いて差し替える。仮表示の後に新しい要求が来ていれば、フル解像度は描かずに譲る。
+  - **描画結果のキャッシュ（(b)）**: `PreviewRenderCache`（LRU、`kPreviewRenderCacheCapacity` = 6 件、
+    1024px で約 24 MiB）。鍵 `PreviewRenderKey` は元画像・解像度・描画の入力（複数層は合成ステップ列、
+    1 層はフィルタ + 強度）。`_scheduleRebuild` はまずキャッシュを見て、当たれば走っている描画を待たずに
+    すぐ表示する（走っている描画の結果は表示に使わず、キャッシュにだけ入る）。メモリだけでディスクには
+    書かない。ユーザー画像の分は元画像を替えたら捨て、ビューが外れたら全部捨てる。何も掛けない入力は覚えない。
+  - **元画像の読み込みを分ける（(c)）**: before の読み込み（`_requestBefore` / `_loadBefore`）は after の
+    直列描画とは別に走り、終わったらすぐ before を差し替えて after の描画を頼み直す。after の重い描画の
+    最中にサンプルを替えても、元画像側は固まらない（その間 after は前の描画のまま、札つき）。読み込みが
+    500ms を越えたら before 側に「画像を読み込み中…」。描画器には常に before の複製を渡す。
+  - 判断の記録は `docs/adr/2026-11-14-preview-provisional-render-and-cache.md`。**2×2 比較には (a)(b)(c) を
+    入れていない**: 元画像を表示しないので (c) の効果が無く、色覚以外の層の土台は従来から入力ごとに
+    使い回している（色覚の強さだけの操作では再合成しない）。制約として、土台に starbursts を含む最初の
+    描画は今も数十秒かかる（その間は見出し行に「描画中…」）。
+  - **原画そのままの要求**（全解除・原画比較。複数層は空のステップ列、1 層は強度 0）は描画せず、
+    キャッシュ命中と同じく原画の複製をすぐ出す（重い描画が走っていても待たせない。走っている描画の結果は
+    世代で捨てる）。2×2 比較も、原画比較中（強さ 0・土台なし）は 4 セルとも原画の複製をすぐ出す。そのとき
+    作りかけの土台は、作り終えたら（世代がずれていても）保持し、解除して同じ層に戻ったときに再合成しない（#122）。
+    追い越された回のセルは描かずに抜ける。
+  - 札の時計: キャッシュ命中で表示が追いつくと札を消すが、走っている描画は止まらない。その後に来た
+    キャッシュに無い要求は保留に入り、`PreviewBusyTracker.resume` で時計を動かす（走っている描画の
+    終わりと次の描画を待つ間も「描画中…」を出す）。2×2 比較も同じ（原画比較で札を消した後、解除して戻った要求が
+    走っている土台の描画を待つ間）。
+  - 描画の段取りそのものが例外で終わっても（`_runRebuild` の catch。未処理例外にせず
+    `FlutterError.reportError` へ流す）、保留中の要求を流す。
+  **診断ログ（#185）**: `lib/services/preview_diagnostics.dart`。`main()` がアプリのサポート
+  ディレクトリ（Linux は `~/.local/share/<アプリ id>/`）の `logs/preview-diagnostics.log` を書き込み先にし、
+  リリースでも有効（判断は `docs/adr/2026-11-14-preview-diagnostics-log.md`。環境変数
+  `UE_PREVIEW_DIAGNOSTICS=0` で無効）。`BeforeAfterView` と `ColorVisionCompareView` が、描画の失敗
+  （`preview_failed`。段 = `load` / `provisional` / `render` / `base` / `cell:<id>`・例外の**型名だけ**）と、1 回の
+  描画が 10 秒を越えて終わらないこと（`preview_stalled`。止まっている段）・その後の完了（`preview_recovered`、
+  かかった時間）を 1 行ずつ残す（`PreviewRenderWatchdog`）。添える値はフィルタのカタログ id・層の数・強度・
+  サンプル id（ユーザー画像は `user`）・サイズだけ。例外のメッセージ・ファイル名・パス・画像は書かず、値は
+  英数字と `_.+:-` に絞る（それ以外は `_`）。切り分け用に、原画比較の開始・解除（`watchBypassForDiagnostics`）と、
+  ホットキー「押している間だけ原画」で原画比較が切り替わったときと keyUp も残す。keyUp が届かない環境では
+  押すたびに切り替わり、1 回押しただけで原画表示が残ると「フィルタが反映されない」と同じ見え方になるため
+  （フィルタの付け外し・強度変更は原画比較を解除する。自動解除が無い件は #193）。記録はキーリピートの判定の
+  後で書く（`HotkeyActions.onHoldOriginalEvent`。長押しでログを埋めない）。256 KiB を越えたら `.1` へ退避する
+  （最大 2 ファイル）。テストでは書き込み先を設定しないので何も書かない
 - `ColorVisionCompareView`（`lib/ui/widgets/color_vision_compare_view.dart`、#84）: 色覚 4 型の
   2×2 比較。`HomeScreen` の「2×2 で比較」が ON（かつ色覚カテゴリ選択中）の間、`BeforeAfterView` の
   代わりに `ImageSourcePicker` の中へ出る。並べる型は `kColorVisionCompareEntries`
@@ -1141,7 +1191,8 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   `ColorVisionCompareView` は `baseSteps` / `baseLayers` を受け取り、`_rebuild` の先頭で
   `renderDefaultAfterPipeline` を **1 回だけ**呼んで土台を作り（空なら原画）、4 セルは土台の複製に色覚 1 段を適用する。
   土台は「steps・元画像・サイズ」をキーに保持し、色覚の強度だけが動いたときは作り直さない（層・強度・パラメータが
-  変わると `didUpdateWidget` が再構築し、既存の直列・最新優先に乗る）。描画時点の値（強さ・土台の層）は控え
+  変わると `didUpdateWidget` が再構築し、既存の直列・最新優先に乗る。描画が長引けば見出しの行に
+  「描画中…」を出す、#185）。描画時点の値（強さ・土台の層）は控え
   （`_afterStrength` / `_afterBaseLayers`）に固定し、書き出し（キャプションの症状名行・ファイル名）はその控えから作るので
   画像と食い違わない。土台があるときのキャプションは `buildLayeredExportCaption`（土台の層 + 色覚 1 層）、ファイル名は
   `exportSymptomId`（比較の印 → 土台の id、適用順、48 文字上限）。色覚だけのときは従来と同一。
@@ -1280,7 +1331,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   試す」は `pickAndLoadUserImage` の成否（`bool`）を見て、キャンセル/失敗では
   dismiss しない（#78。ピッカーをキャンセルしただけなのにバナーが
   消えると再度の呼び出し手段を失うため）。さらに #143 で、ユーザー操作の入口（一覧の行・
-  体験プリセット・`LayerChipStrip` の ✕/すべて解除・調整パネルの「フィルタを解除」・`ImageSourcePicker` のサンプル切替/画像読込/解除/推奨へ戻す）
+  体験プリセット・`LayerChipStrip` の ✕/フィルタをすべて解除・調整パネルの「フィルタをすべて解除」・`ImageSourcePicker` のサンプル切替/画像読込/解除/推奨へ戻す）
   から `dismissWelcomeBannerOnUserChange(context)`（`settings_service.dart`）で閉じる。
   `VisionFilterState`/`ImageSourceState` 自体の変更は監視しない（起動時の復元・
   `seedInitialLayers`・推奨サンプルへの自動追従と区別するため）。トレイ・ホットキー経由の
@@ -1290,7 +1341,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
     選択の正本は `VisionFilterState` のまま
   - `FilterListTile`: 統合一覧の 1 行。種別（`FilterListTileKind`: preset / check / radio）で形を変え、選択中は色だけでなく
     チェック・適用順の番号で示す。上限で選べない行は理由を 2 行目に出す
-  - `LayerChipStrip`: プレビュー上の、重ねた層のチップ帯（適用順・✕ で 1 層除去・すべて解除）。2 層以上のときだけ出る
+  - `LayerChipStrip`: プレビュー上の、重ねた層のチップ帯（適用順・✕ で 1 層除去・フィルタをすべて解除）。1 層以上でチップを出し、0 層でも同じ高さの領域を確保する（1 行の横スクロール、#183）
   - `AdjustPanel`: 右カラム「調整」。1 層は従来の 1 節、複数層は層ごとの節（調整中の層だけ展開）。何も選んでいなければ空状態
   - `FilterParamPanel`: 調整中の層の強度スライダー 1 本・推奨値に戻す・受診喚起・`VisionParam` から動的に作るパラメータ UI
   - `ConsultNoticeBlock`: 受診喚起（喚起文・escalation・免責文）の唯一の表示ウィジェット。`layerConsultNotice`
@@ -1327,7 +1378,11 @@ macOS（CGSetDisplayTransferByTable）/ Linux（Wayland compositor / X11 XRandR�
   カタログ id・別名 id（`variantId`）→ `VisionFilter`・強度のマッピング契約（#57/#59 の不変条件）を
   検証する（実描画そのものは下記の実ブリッジ integration test が担う）。
   同ファイルは `_scheduleRebuild` が実行を直列化すること（同時に走るジョブは
-  常に1本、#85）も検証する。`cpu_vision_renderer_test.dart` は
+  常に1本、#85）も検証する。`preview_render_stall_test.dart` は、長い描画の間に「描画中…」が
+  出て終われば最新の選択に追いつくこと、低解像度の仮表示・描画結果のキャッシュ・元画像の読み込みの
+  分離、描画の段取りの例外の後も保留が流れること、付け外し等をシード固定でランダムに繰り返しても最後は
+  最新の入力に追いつくこと（`UE_SLOW_TESTS=1` で 8 シード × 300 手、通常は 2 × 120）を検証する（#185）。
+  `preview_render_cache_test.dart` は LRU（#185）を検証する。`cpu_vision_renderer_test.dart` は
   実ブリッジなしで検証できる部分（straight⇄premultiplied 変換の正しさ・
   `ImageDescriptor.raw` 経路のデコード失敗が例外として伝わること、#85）を担う
 - **GPU golden テスト**（`test/vision_filter_golden_test.dart` /
