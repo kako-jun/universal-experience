@@ -15,6 +15,7 @@ import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 import 'support/color_vision_select.dart';
 import 'support/home_screen_harness.dart';
 import 'support/sample_image_generator.dart';
+import 'support/header_semantics.dart';
 
 /// 「2×2 で比較」の切替（#84）が、層の集合に色覚層があるときだけ出て（#122）、
 /// ON の間は Before / After の代わりに 2×2 を出すことの確認。
@@ -268,9 +269,8 @@ void main() {
     expect(view.baseSteps, isEmpty);
     expect(find.text(l10n.compareSharedStrengthNote(0)), findsOneWidget);
     expect(h.visionState.layers.length, 2, reason: '選択は残る');
-    expect(renderedStrengths.length, 4, reason: 'バイパス中は 4 セルとも描き直す');
-    expect(renderedStrengths, everyElement(0.0),
-        reason: 'バイパス中は 4 セルとも強度 0（原画）');
+    expect(renderedStrengths, isEmpty,
+        reason: 'バイパス中は 4 セルとも原画そのものなので、描画せずに原画を出す（#185）');
     expect(pipelineCalls.length, composedBeforeBypass,
         reason: 'バイパス中は土台を合成しない');
 
@@ -315,22 +315,22 @@ void main() {
     final h = await pumpHomeScreen(tester, size: wide);
     selectColorVisionKey(h.visionState, 'protanopia');
     await tester.pump();
-    expect(find.text(l10n.previewSectionTitle), findsOneWidget);
-    expect(find.text(l10n.compareSectionTitle), findsNothing);
+    expect(headerSemantics(l10n.previewSectionTitle), findsOneWidget);
+    expect(headerSemantics(l10n.compareSectionTitle), findsNothing);
 
     await tester.tap(toggle());
     await tester.pump();
-    expect(find.text(l10n.compareSectionTitle), findsOneWidget);
-    expect(find.text(l10n.previewSectionTitle), findsNothing,
+    expect(headerSemantics(l10n.compareSectionTitle), findsOneWidget);
+    expect(headerSemantics(l10n.previewSectionTitle), findsNothing,
         reason: 'Before / After ではないので、その見出しは残さない');
 
     await tester.tap(toggle());
     await tester.pump();
-    expect(find.text(l10n.previewSectionTitle), findsOneWidget);
-    expect(find.text(l10n.compareSectionTitle), findsNothing);
+    expect(headerSemantics(l10n.previewSectionTitle), findsOneWidget);
+    expect(headerSemantics(l10n.compareSectionTitle), findsNothing);
   });
 
-  testWidgets('原画に戻す（bypass、強度 0）も 2×2 にそのまま効く（4 セルとも強さ 0 で描く）',
+  testWidgets('原画に戻す（bypass、強度 0）も 2×2 にそのまま効く（4 セルとも原画を描画せずに出す）',
       (tester) async {
     await installFakes(tester);
     final h = await pumpHomeScreen(tester, size: wide);
@@ -362,9 +362,8 @@ void main() {
           .strength,
       0.0,
     );
-    expect(renderedStrengths.length, 4);
-    expect(renderedStrengths, everyElement(0.0),
-        reason: '4 セルとも強さ 0（原画と同じ見え）で描き直す');
+    expect(renderedStrengths, isEmpty,
+        reason: '4 セルとも原画そのものなので、描画せずに原画を出す（#185）');
     expect(find.text(l10n.compareSharedStrengthNote(0)), findsOneWidget);
 
     // 解除すると元の強さに戻る。

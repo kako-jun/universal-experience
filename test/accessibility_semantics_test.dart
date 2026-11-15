@@ -308,7 +308,10 @@ void main() {
       handle.dispose();
     });
 
-    testWidgets('描画が済むまでは「準備中」だけで、適用後画像の代替テキストは読まれない', (tester) async {
+    testWidgets('描画が済むまでは適用後画像の代替テキストは読まれず、長引けば「描画中…」が読まれる',
+        (tester) async {
+      // 元画像の読み込みは after の描画と分かれている（#185 (c)）ので、after の描画中も
+      // 元画像は出る。after の枠は空のままで、画像としては読まない。
       final handle = tester.ensureSemantics();
       await installFakes(tester);
       final pending = Completer<ui.Image>();
@@ -322,11 +325,16 @@ void main() {
       selectColorVisionKey(h.visionState, 'protanopia');
       await settle(tester);
 
-      expect(find.text('プレビューを準備中…'), findsOneWidget);
-      expect(readoutCount(tester, 'を適用した画像'), 0, reason: '準備中は画像として読まない');
+      expect(find.text('プレビューを準備中…'), findsNothing);
+      expect(readoutCount(tester, 'を適用した画像'), 0, reason: '描画中は画像として読まない');
+      await tester.pump(kPreviewBusyThreshold * 2);
+      final busy = find.text('描画中…');
+      expect(busy, findsOneWidget);
+      expect(dataOf(tester, busy).flagsCollection.isLiveRegion, isTrue);
 
       pending.complete(rendered.clone());
       await settle(tester);
+      expect(find.text('描画中…'), findsNothing);
       expect(
           readLines(tester).where((l) => l.endsWith('を適用した画像')), hasLength(1));
       handle.dispose();
@@ -335,9 +343,8 @@ void main() {
     testWidgets('準備中の表示は liveRegion として読み上げられる', (tester) async {
       final handle = tester.ensureSemantics();
       await installFakes(tester);
-      // 描画が終わらないようにして、`_loading && _before == null` の準備中表示を保つ。
-      afterImageRenderer =
-          (source, filter, strength) => Completer<ui.Image>().future;
+      // 元画像の読み込みが終わらないようにして、最初の準備中表示を保つ。
+      previewSourceImageLoader = (source, size) => Completer<ui.Image>().future;
       await pumpHomeScreen(tester, size: wide);
       await settle(tester);
 

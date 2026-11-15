@@ -62,13 +62,9 @@
     }
   },
 
-  "clearFilter": "Clear filter",
+  "clearFilter": "Clear all filters",
   "@clearFilter": {
-    "description": "Button that clears the selected color-vision filter."
-  },
-  "clear": "Clear",
-  "@clear": {
-    "description": "Button that clears the selected advanced (catalog) filter."
+    "description": "Button/menu item that removes every stacked filter at once (adjust panel, chip strip, tray)."
   },
 
   "previewSectionTitle": "Before / After",
@@ -127,6 +123,18 @@
   "previewFailed": "Preview failed to render",
   "@previewFailed": {
     "description": "Shown in the 'after' pane when generating or rendering the latest preview failed (#58)."
+  },
+  "previewRendering": "Rendering…",
+  "@previewRendering": {
+    "description": "Badge shown on the preview while a render has been running for a while (some filter combinations take many seconds on the CPU), so the user can tell it is still working rather than frozen (#185)."
+  },
+  "previewRenderingProvisional": "Rendering… (low-resolution preview)",
+  "@previewRenderingProvisional": {
+    "description": "Badge shown on the after image while a quick low-resolution preview is displayed and the full-resolution render of a heavy filter combination is still running (#185). The export button is disabled meanwhile."
+  },
+  "previewLoadingSource": "Loading image…",
+  "@previewLoadingSource": {
+    "description": "Badge shown on the original (before) image when loading the newly selected sample or image takes a while (#185)."
   },
   "previewStaticFrameNote": "This is a time-based effect; the preview shows a single still frame rather than the motion.",
   "@previewStaticFrameNote": {
@@ -371,10 +379,6 @@
   "trayHideLoupe": "Hide window",
   "@trayHideLoupe": {
     "description": "Tray menu item that hides the loupe (main) window."
-  },
-  "trayClearFilter": "Clear filter",
-  "@trayClearFilter": {
-    "description": "Tray menu item that clears the active color-vision filter."
   },
   "trayOpenSettings": "Open settings…",
   "@trayOpenSettings": {
@@ -780,13 +784,13 @@
       "count": { "type": "int" }
     }
   },
+  "layerStripEmptyHint": "Selected filters line up here",
+  "@layerStripEmptyHint": {
+    "description": "Faint placeholder in the empty chip strip above the preview, shown while no filter is selected (#183)."
+  },
   "layerStripSemantics": "Applied filters, in order",
   "@layerStripSemantics": {
     "description": "Screen-reader name of the chip strip above the preview that lists the stacked filters in application order (#120)."
-  },
-  "layerStripClearAll": "Clear all",
-  "@layerStripClearAll": {
-    "description": "Button in the chip strip that removes every stacked filter at once (#120)."
   },
   "layerChipLabel": "Order {order}, {name}",
   "@layerChipLabel": {

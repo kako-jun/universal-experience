@@ -141,7 +141,7 @@ void main() {
       expect(_leaves(_spec()).every((e) => e.enabled), isTrue);
     });
 
-    test('層があるときは「フィルタを解除」にチェックを付けない', () {
+    test('層があるときは「フィルタをすべて解除」にチェックを付けない', () {
       TrayMenuEntry clear(List<TrayMenuEntry> s) =>
           s.singleWhere((e) => e.key == kClearFilterKey);
       expect(clear(_spec()).checked, isTrue);
