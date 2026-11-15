@@ -14,7 +14,7 @@ import 'filter_list_tile.dart' show LayerOrderBadge;
 /// 適用順（= 一覧の番号バッジ・調整パネルの層の並びと同じ）にチップを並べ、各チップに ✕ を
 /// 付ける。チップを押すとそのフィルタが「調整中」になる（[VisionFilterState.focusLayer]。調整
 /// パネルで展開される層・推奨サンプル #78 の追従先・←→ の対象と同じ `focusedId`）。✕ は
-/// その 1 層だけを外す。2 層以上のときだけ、右端に「すべて解除」を固定で出す（1 層は ✕ と
+/// その 1 層だけを外す。2 層以上のときだけ、右端に「フィルタをすべて解除」を固定で出す（1 層は ✕ と
 /// 調整パネルの解除で足りるので 3 重にしない）。
 ///
 /// 層が 0 個のときも同じ高さの領域を確保し、淡い案内文を出す。層数が変わっても下の
@@ -254,7 +254,7 @@ class _LayerChipStripState extends State<LayerChipStrip> {
                             if (compact)
                               IconButton(
                                 key: const ValueKey('layer_strip_clear_all'),
-                                tooltip: l10n.layerStripClearAll,
+                                tooltip: l10n.clearFilter,
                                 onPressed: () {
                                   state.clear();
                                   dismissWelcomeBannerOnUserChange(context);
@@ -269,7 +269,7 @@ class _LayerChipStripState extends State<LayerChipStrip> {
                                   dismissWelcomeBannerOnUserChange(context);
                                 },
                                 icon: const Icon(Icons.clear, size: 18),
-                                label: Text(l10n.layerStripClearAll),
+                                label: Text(l10n.clearFilter),
                               ),
                           ],
                           if (widget.trailingBuilder != null) ...[
@@ -318,8 +318,7 @@ class _LayerChipStripState extends State<LayerChipStrip> {
     //    これを覆う式 `56 + 22 × (倍率 − 1)`（×1 56 / ×2 78 / ×3 100）にする。
     final scale = scaler.scale(14) / 14;
     final chipExtra = 56 + 22 * (scale - 1);
-    final clearAll =
-        hasClearAll ? 56 + textWidth(l10n.layerStripClearAll) : 0.0;
+    final clearAll = hasClearAll ? 56 + textWidth(l10n.clearFilter) : 0.0;
     final label = widget.trailingLabel;
     final trailing = label == null ? 0.0 : chipExtra + textWidth(label);
     final gaps = (hasClearAll ? 8 : 0) + (label == null ? 0 : 8);

@@ -1,7 +1,7 @@
 // 重ねているフィルタのチップ帯（#120）の widget test。
 //
 // 1 層以上で出る・0 層でも同じ高さを確保する（#183）・適用順の番号・チップで「調整中」が移る・✕ で 1 層だけ外れる・
-// 「すべて解除」で全部外れる・別名（-omaly）のチップが variantId の表示名になる、を確認する。
+// 「フィルタをすべて解除」で全部外れる・別名（-omaly）のチップが variantId の表示名になる、を確認する。
 
 import 'dart:math' as math;
 import 'dart:ui' show PointerDeviceKind, Tristate;
@@ -161,7 +161,7 @@ void main() {
       expect(tester.getTopLeft(below).dy, dy0);
     });
 
-    testWidgets('2 層で適用順のチップと「すべて解除」が出る', (tester) async {
+    testWidgets('2 層で適用順のチップと「フィルタをすべて解除」が出る', (tester) async {
       await pumpStrip(tester);
       state.toggle('glaucoma');
       state.toggle('myopia');
@@ -204,6 +204,9 @@ void main() {
       state.toggle('glaucoma');
       state.toggle('cataract');
       await tester.pump();
+      // 「フィルタをすべて解除」が長くなり（#187）、末尾の層が調整中で右へ寄るので、2 番目の✕を見える位置へ。
+      await tester.ensureVisible(remove('glaucoma'));
+      await tester.pump();
       await tester.tap(remove('glaucoma'));
       await tester.pump();
       expect(state.layers.map((l) => l.id), ['myopia', 'cataract']);
@@ -232,7 +235,7 @@ void main() {
       expect(clearAll, findsNothing);
     });
 
-    testWidgets('「すべて解除」で全部外れる', (tester) async {
+    testWidgets('「フィルタをすべて解除」で全部外れる', (tester) async {
       await pumpStrip(tester);
       state.toggle('myopia');
       state.toggle('glaucoma');
