@@ -221,6 +221,16 @@ String layerNamesSummary(AppLocalizations l10n, List<String> names) {
   return rest > 0 ? l10n.layerSummaryMore(shown, rest) : shown;
 }
 
+/// 見出しで省略してよい部分: 先頭の [kLayerSummaryNamedCount] 個の名前を「 + 」でつないだもの。
+String layerNamesHead(List<String> names) =>
+    names.take(kLayerSummaryNamedCount).join(' + ');
+
+/// 見出しで常に見せる接尾辞「…（+N）」。残りが無ければ null（#183。名前の省略に巻き込まない）。
+String? layerNamesSuffix(AppLocalizations l10n, List<String> names) {
+  final rest = names.length - kLayerSummaryNamedCount;
+  return rest > 0 ? l10n.layerSummaryMore('', rest).trim() : null;
+}
+
 /// Advanced カタログの payload パラメータ labelKey → 表示名を解決する。
 ///
 /// labelKey はカタログが持つ安定キー（例 `param.astigmatism.axis_deg`）。
@@ -365,7 +375,7 @@ String escalationConditionText(AppLocalizations l10n, String condition) {
     case 'persistent pain or a change in vision':
       return l10n.escalationConditionDryEyePersistent;
     case 'a sudden drop in hearing, especially in one ear (possible sudden '
-        'sensorineural hearing loss)':
+          'sensorineural hearing loss)':
       return l10n.escalationConditionHearingSuddenOneEar;
     case 'a new or worsening change, particularly in one ear':
       return l10n.escalationConditionHearingNewWorseningOneEar;
@@ -450,7 +460,8 @@ ConsultNotice? resolveConsultNotice(
 
   final emergencyLines = [
     for (final e in escalation)
-      if (e.urgency == Urgency.emergency) escalationConditionText(l10n, e.condition),
+      if (e.urgency == Urgency.emergency)
+        escalationConditionText(l10n, e.condition),
   ];
   final earlyLines = [
     for (final e in escalation)

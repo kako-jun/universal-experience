@@ -15,6 +15,7 @@ import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 import 'support/color_vision_select.dart';
 import 'support/home_screen_harness.dart';
 import 'support/sample_image_generator.dart';
+import 'support/header_semantics.dart';
 
 /// 「2×2 で比較」の切替（#84）が、層の集合に色覚層があるときだけ出て（#122）、
 /// ON の間は Before / After の代わりに 2×2 を出すことの確認。
@@ -315,19 +316,19 @@ void main() {
     final h = await pumpHomeScreen(tester, size: wide);
     selectColorVisionKey(h.visionState, 'protanopia');
     await tester.pump();
-    expect(find.text(l10n.previewSectionTitle), findsOneWidget);
-    expect(find.text(l10n.compareSectionTitle), findsNothing);
+    expect(headerSemantics(l10n.previewSectionTitle), findsOneWidget);
+    expect(headerSemantics(l10n.compareSectionTitle), findsNothing);
 
     await tester.tap(toggle());
     await tester.pump();
-    expect(find.text(l10n.compareSectionTitle), findsOneWidget);
-    expect(find.text(l10n.previewSectionTitle), findsNothing,
+    expect(headerSemantics(l10n.compareSectionTitle), findsOneWidget);
+    expect(headerSemantics(l10n.previewSectionTitle), findsNothing,
         reason: 'Before / After ではないので、その見出しは残さない');
 
     await tester.tap(toggle());
     await tester.pump();
-    expect(find.text(l10n.previewSectionTitle), findsOneWidget);
-    expect(find.text(l10n.compareSectionTitle), findsNothing);
+    expect(headerSemantics(l10n.previewSectionTitle), findsOneWidget);
+    expect(headerSemantics(l10n.compareSectionTitle), findsNothing);
   });
 
   testWidgets('原画に戻す（bypass、強度 0）も 2×2 にそのまま効く（4 セルとも強さ 0 で描く）',

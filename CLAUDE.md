@@ -82,6 +82,7 @@ lib/
     ├── widgets/                     # filter_browser（左カラム「選ぶ」: 検索・カテゴリ・統合一覧、#72）,
     │                                 # filter_list_tile（一覧の 1 行: チェック・適用順の番号バッジ、#120）,
     │                                 # layer_chip_strip（プレビュー上の適用順チップ帯・✕・フィルタをすべて解除、#120）,
+    │                                 # bypass_badge（「原画表示中」のバッジ。画像の枠の中に重ねる・liveRegion・狭いとアイコン形、#183）,
     │                                 # adjust_panel（右カラム「調整」: 2 層以上は層ごとの節、#72/#120）,
     │                                 # before_after_view（複数層は名前の要約見出し・書き出しは層ごとの行と併合した受診喚起、#120/#121）, loupe_hud,
     │                                 # preview_rendering（プレビュー描画の共有: before 読み込み・after 描画・書き出し合成の差し替え口
@@ -152,7 +153,7 @@ test/
 ├── filter_browser_category_chip_rows_test.dart # カテゴリチップ帯の行ごと伸ばす並び（#184）: 改行は選択中とみなした Wrap と同じ・各行の左右端が揃う・省略なし（極端な狭幅だけ省略+ツールチップ）・文字倍率 1.3/2.0 で全選択でも省略なし・48dp・Tab が行優先・余白定数が実物と一致
 ├── filter_browser_category_chip_search_test.dart # 検索語があるあいだカテゴリチップを全て非選択表示（チェック・選択色なし）にし、消すと元の選択へ戻る・内部カテゴリ不変・チップ押下で検索語が消えてカテゴリ選択・検索中の文字色が通常の非選択チップと同じであることとコントラスト 4 テーマ（#143）
 ├── welcome_banner_auto_dismiss_test.dart # ウェルカムバナーの自動 dismiss: 行・プリセット・✕/フィルタをすべて解除・調整パネルの解除・サンプル切替・写真の読込/貼付/閉じる・おすすめに戻すで閉じ永続化／seed・プログラム変更・起動復元・ピッカーキャンセルでは残る／Provider 無しでも例外なし（#143）
-├── layer_chip_strip_test.dart      # チップ帯: 2 層以上で出る・チップで調整中が移る・✕ で 1 層除去・フィルタをすべて解除・状態が形で分かる（#120）
+├── layer_chip_strip_test.dart      # チップ帯: 1 層以上で出る・0〜5 層で高さ一定・チップで調整中が移る・✕ で 1 層除去・フィルタをすべて解除・状態が形で分かる（#120）
 ├── adjust_panel_layers_test.dart   # 調整パネルの層ごとの節・調整中の層だけ展開・強度スライダー 1 本・1 層は従来の見た目（#120）
 ├── home_screen_multi_layer_heading_test.dart # 複数層の見出し（名前の要約）・書き出しボタンが複数層でも有効・2×2 スイッチが色覚層のあるときだけ（#120/#121/#122）
 ├── export_multi_layer_test.dart    # 複数層の書き出し: 層ごとの行・最大の緊急度と併合した escalation・実験的の注記・強度 0 の層を数えない・ファイル名・描画時点の控え・単一層の従来どおり（#121）
@@ -178,6 +179,8 @@ test/
 ├── consult_input_merge_test.dart   # 複数層の相談喚起入力の統合: urgency は最大・escalation は段ごとに重複除去（#119）
 ├── home_screen_harness_test.dart   # ハーネス（installHomeScreenFixtures）の契約: 差し替えと復元（読み込み・適用・複数層の合成）・アプリ本体経路で単一層/2 層のフィルタ選択・強度変更・画像読み込みを実時間（runAsync）で進めても RustLib 未初期化の例外が漏れない（#127/#131）
 ├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品。HomeScreen / UniversalExperienceApp を pump するテストは setUp で installHomeScreenFixtures（体験・メタデータ・プレビューの読み込み/適用・複数層の合成 pipelineApplier を Rust 非依存のフェイクに固定）、tearDown で resetHomeScreenFixtures を呼ぶ（独自 pump で実ローダ/実レンダラを残さない、#131）
+├── bypass_badge_test.dart          # 原画表示中のバッジ: liveRegion・狭いときのアイコン形・文字倍率を打ち消さない・fitsAsText の幅 3/4・高さ 1/4 の境界（#183）
+├── support/header_semantics.dart   # プレビューの見えない Semantics(header)（見出し行は廃止）を探す finder（#183）
 ├── support/color_vision_select.dart # 色覚 7 種のキーで単一選択するテスト用ヘルパ（別名を解いて replaceWith へ渡す）
 ├── support/screenshot_harness.dart # スクリーンショット用フォント読込・PNG 書出し（フォントはコミットしない）
 └── ui_screenshots/                 # HomeScreen の PNG 書出し。`UE_SCREENSHOTS=1` のときだけ実行（DESIGN.md §8）
@@ -314,7 +317,7 @@ UI は多選択（#120）:
 
 - 統合一覧はチェック式（色覚行はラジオ式の見た目・見出し「いずれか 1 つ」）で、チェック済みの行に適用順の
   番号バッジが付く。上限 5 に達すると未選択の行は無効になり理由を行内に出す（色覚の置き換えと体験プリセットは有効）。
-- プレビュー上のチップ帯（2 層以上のみ）で層の切替（調整中）・✕・「フィルタをすべて解除」。調整パネルは 2 層以上で層ごとの
+- プレビュー上のチップ帯（1 層以上でチップを出し、0 層でも同じ高さを確保・1 行の横スクロール、#183）で層の切替（調整中）・✕・「フィルタをすべて解除」。調整パネルは 2 層以上で層ごとの
   節（調整中の層だけ展開）、強度スライダーは 1 本。1 層のときの見た目・挙動は従来どおり。
 - キー: ↑↓ は行フォーカスの移動だけ、Space / Enter が足し引き、←→ は調整中の層（`focusedId`）の強度。
 - 複数層の見出し・HUD は「名前 + 名前 …（+N）」（強度は出さない）。PNG 書き出しは複数層でも使え（#121）、画像に効いている層
