@@ -296,14 +296,25 @@ void main() {
       // filter が現在の BeforeAfterView.filter と一致することまで確認する。
       var renderCount = 0;
       VisionFilter? lastCompletedFilter;
+      // 実ブリッジの描画が完了した入力（filter, strength）。元画像・解像度はこのテストでは固定。
+      final realRendered = <(VisionFilter?, double)>{};
       final productionRenderer = afterImageRenderer;
       addTearDown(() => afterImageRenderer = productionRenderer);
       afterImageRenderer = (source, filter, strength) async {
         final result = await productionRenderer(source, filter, strength);
         renderCount++;
         lastCompletedFilter = filter;
+        realRendered.add((filter, strength));
         return result;
       };
+      // after に画像を表示した記録（#185）。BeforeAfterView は同じ入力の結果を描画結果の
+      // キャッシュから出す（描画器を呼ばない）。meniere と labyrinthitis はどちらも vertigo・
+      // 同じ強度（強度の記憶はフィルタごと）・同じ元画像なので、後に選んだ方はキャッシュから
+      // 出る。そのため「このタップの後に描画器が呼ばれたか」ではなく、「このタップの選択が
+      // （仮表示でなく）表示され、その入力を実ブリッジが例外なく描いたことがあるか」を見る。
+      final shown = <PreviewAfterShown>[];
+      debugBeforeAfterShownHook = shown.add;
+      addTearDown(() => debugBeforeAfterShownHook = null);
 
       final en = lookupAppLocalizations(const Locale('en'));
       // (experience id, 選択後の after ペインに出るはずのフィルタ名) の組。
@@ -327,7 +338,7 @@ void main() {
         // プレビューペインの下にあるため、タップ前に確実にヒットテストできる位置へ出す。
         await revealPresetCard(tester, cardFinder, scrollController);
 
-        final renderCountBeforeTap = renderCount;
+        final shownBeforeTap = shown.length;
         await tester.tap(cardFinder);
         await tester.pump();
 
@@ -336,19 +347,26 @@ void main() {
         expect(visionState.selectedPresetId, experienceId,
             reason: '$experienceId タップ直後に selectedPresetId が反映されていない');
 
-        // 実ブリッジの CPU apply() が「このタップの選択」で完了するまで待つ
-        // （renderCount が増えただけでなく、完了した filter が現在の
-        // BeforeAfterView.filter と一致することまで確認する、#60）。
+        // 「このタップの選択」が after に表示されるまで待つ（#60/#185）。表示された入力が
+        // 現在の BeforeAfterView.filter・strength と一致し、仮表示でなく、その入力を実ブリッジの
+        // CPU apply() が完了させたことがある（このタップで描いた、または同じ入力を前に描いて
+        // キャッシュから出した）ことまで確かめる。
         final deadline = DateTime.now().add(const Duration(seconds: 10));
-        VisionFilter? currentWidgetFilter() =>
-            tester.widget<BeforeAfterView>(find.byType(BeforeAfterView)).filter;
-        while ((renderCount <= renderCountBeforeTap ||
-                lastCompletedFilter != currentWidgetFilter()) &&
-            DateTime.now().isBefore(deadline)) {
+        BeforeAfterView currentWidget() =>
+            tester.widget<BeforeAfterView>(find.byType(BeforeAfterView));
+        bool shownCurrent() {
+          final w = currentWidget();
+          return shown.skip(shownBeforeTap).any((e) =>
+              !e.provisional &&
+              e.filter == w.filter &&
+              e.strength == w.strength &&
+              realRendered.contains((e.filter, e.strength)));
+        }
+
+        while (!shownCurrent() && DateTime.now().isBefore(deadline)) {
           await tester.pump(const Duration(milliseconds: 20));
         }
-        final rendered = renderCount > renderCountBeforeTap &&
-            lastCompletedFilter == currentWidgetFilter();
+        final rendered = shownCurrent();
         await tester.pump();
         await tester.pump();
         // tester.takeException() は呼ぶと例外キューを消費してしまうため、
@@ -358,9 +376,12 @@ void main() {
         expect(
           rendered,
           isTrue,
-          reason: '$experienceId タップ後、実ブリッジの描画が完了しなかった '
+          reason: '$experienceId タップ後、実ブリッジで描いた結果が表示されなかった '
               '(renderCount=$renderCount, lastCompletedFilter='
-              '$lastCompletedFilter, 例外の有無=${caughtException != null})',
+              '$lastCompletedFilter, 表示の記録=${[
+            for (final e in shown.skip(shownBeforeTap))
+              '${e.filter}/${e.origin.name}'
+          ]}, 例外の有無=${caughtException != null})',
         );
 
         // vestibular_neuritis はプリセットカードの見出し

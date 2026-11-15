@@ -156,6 +156,43 @@ class BeforeAfterView extends StatefulWidget {
 @visibleForTesting
 Future<void> Function()? debugBeforeAfterRebuildHook;
 
+/// after に表示した画像がどこから来たか（[debugBeforeAfterShownHook]、#185）。
+enum PreviewAfterOrigin {
+  /// 描画器で描いた（低解像度の仮表示を含む。[PreviewAfterShown.provisional]）。
+  rendered,
+
+  /// 同じ入力を以前に描いた結果（描画結果のキャッシュ）。
+  cache,
+
+  /// 何も掛けない入力なので、原画の複製をそのまま出した（描画しない）。
+  original,
+}
+
+/// after に画像を表示した 1 回の記録（[debugBeforeAfterShownHook]）。
+@immutable
+class PreviewAfterShown {
+  const PreviewAfterShown({
+    required this.filter,
+    required this.strength,
+    required this.steps,
+    required this.origin,
+    required this.provisional,
+  });
+
+  final VisionFilter? filter;
+  final double strength;
+  final List<VisionStep>? steps;
+  final PreviewAfterOrigin origin;
+  final bool provisional;
+}
+
+/// テスト用の観測口: after に画像を表示するたびに、その入力とどこから来たか（描画・
+/// キャッシュ・原画）を知らせる（#185）。描画結果のキャッシュや原画の即時表示では描画器が
+/// 呼ばれないので、描画器の呼び出しを数えるだけでは「このタップの選択が表示された」ことを
+/// 観測できない（`integration_test/experience_presets_smoke_test.dart`）。本番では null。
+@visibleForTesting
+void Function(PreviewAfterShown shown)? debugBeforeAfterShownHook;
+
 /// 描画 1 回の入力。`_rebuild` の冒頭で `widget` から一度だけ読んで固定する（await の間に
 /// 親が再 build して `widget.*` が先へ進んでも、画像に写っている層・強度と、書き出しに
 /// 焼く値がずれないようにする、#121）。
@@ -464,7 +501,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     }
     final input = _RenderInput(widget, widget.imageSource, sampleSize);
     if (!input.isOriginal) return false;
-    _applyAfter(before.clone(), input, provisional: false);
+    _applyAfter(before.clone(), input, provisional: false, origin: PreviewAfterOrigin.original);
     return true;
   }
 
@@ -478,7 +515,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     if (key == null) return false;
     final hit = _cache.lookup(key);
     if (hit == null) return false;
-    _applyAfter(hit, input, provisional: false);
+    _applyAfter(hit, input, provisional: false, origin: PreviewAfterOrigin.cache);
     return true;
   }
 
@@ -537,7 +574,14 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
 
   /// [image]（持ち主はこのビューへ移る）を after として表示する。
   void _applyAfter(ui.Image image, _RenderInput input,
-      {required bool provisional}) {
+      {required bool provisional, required PreviewAfterOrigin origin}) {
+    debugBeforeAfterShownHook?.call(PreviewAfterShown(
+      filter: input.filter,
+      strength: input.strength,
+      steps: input.steps,
+      origin: origin,
+      provisional: provisional,
+    ));
     final oldAfter = _after;
     setState(() {
       _after = image;
@@ -580,7 +624,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
     if (key != null) {
       final hit = _cache.lookup(key);
       if (hit != null) {
-        _applyAfter(hit, input, provisional: false);
+        _applyAfter(hit, input, provisional: false, origin: PreviewAfterOrigin.cache);
         return;
       }
     }
@@ -622,7 +666,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
         if (superseded()) {
           low.dispose();
         } else {
-          _applyAfter(low, input, provisional: true);
+          _applyAfter(low, input, provisional: true, origin: PreviewAfterOrigin.rendered);
         }
       }
       if (superseded()) {
@@ -685,7 +729,7 @@ class _BeforeAfterViewState extends State<BeforeAfterView> {
       after.dispose();
       return;
     }
-    _applyAfter(after, input, provisional: false);
+    _applyAfter(after, input, provisional: false, origin: PreviewAfterOrigin.rendered);
   }
 
   @override

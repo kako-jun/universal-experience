@@ -106,6 +106,56 @@ void main() {
     expect(rendered, [sourceA, sourceB, sourceA],
         reason: '遅れて終わった A の結果は覚えていないので、A に戻したら描き直す');
   });
+
+  testWidgets(
+      '同じ入力へ戻ってキャッシュから出したときも、原画を出したときも、表示を観測口へ知らせる'
+      '（integration_test のプリセット 4 種の結線テストが観測する、#185）', (tester) async {
+    final shown = <PreviewAfterShown>[];
+    debugBeforeAfterShownHook = shown.add;
+    addTearDown(() => debugBeforeAfterShownHook = null);
+    var calls = 0;
+    afterImageRenderer = (input, filter, strength) async {
+      calls++;
+      return fixturePreviewImage();
+    };
+    Widget withFilter(VisionFilter? filter, String? id) => MaterialApp(
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: BeforeAfterView(
+              filter: filter,
+              filterId: id,
+              strength: 0.5,
+              imageSource: const SamplePreviewImageSource('info_board'),
+              sampleSize: 16,
+            ),
+          ),
+        );
+    // meniere（vertigo）→ bppv（別のフィルタ）→ labyrinthitis（また vertigo・同じ強度）と同じ形。
+    await tester.pumpWidget(withFilter(const VisionFilter.vertigo(), 'vertigo'));
+    await settle(tester);
+    await tester.pumpWidget(
+        withFilter(const VisionFilter.bppvRotation(), 'bppv_rotation'));
+    await settle(tester);
+    await tester.pumpWidget(withFilter(const VisionFilter.vertigo(), 'vertigo'));
+    await settle(tester);
+    await tester.pumpWidget(withFilter(null, null));
+    await settle(tester);
+
+    expect(calls, 2, reason: '3 回目は同じ入力なので描画器を呼ばない');
+    expect([for (final e in shown) (e.filter, e.origin)], [
+      (const VisionFilter.vertigo(), PreviewAfterOrigin.rendered),
+      (const VisionFilter.bppvRotation(), PreviewAfterOrigin.rendered),
+      (const VisionFilter.vertigo(), PreviewAfterOrigin.cache),
+      (null, PreviewAfterOrigin.original),
+    ]);
+    expect(shown.every((e) => !e.provisional && e.strength == 0.5), isTrue);
+  });
 }
 
 /// いま組んでいるビューの元画像（フェイクの描画器が、どの元画像の描画かを記録するのに使う）。
