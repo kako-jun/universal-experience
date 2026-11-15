@@ -178,7 +178,7 @@ test/
 ├── consult_input_merge_test.dart   # 複数層の相談喚起入力の統合: urgency は最大・escalation は段ごとに重複除去（#119）
 ├── home_screen_harness_test.dart   # ハーネス（installHomeScreenFixtures）の契約: 差し替えと復元（読み込み・適用・複数層の合成）・アプリ本体経路で単一層/2 層のフィルタ選択・強度変更・画像読み込みを実時間（runAsync）で進めても RustLib 未初期化の例外が漏れない（#127/#131）
 ├── support/home_screen_harness.dart # HomeScreen を Provider 一式で組む widget test 用の共通部品。HomeScreen / UniversalExperienceApp を pump するテストは setUp で installHomeScreenFixtures（体験・メタデータ・プレビューの読み込み/適用・複数層の合成 pipelineApplier を Rust 非依存のフェイクに固定）、tearDown で resetHomeScreenFixtures を呼ぶ（独自 pump で実ローダ/実レンダラを残さない、#131）
-├── bypass_badge_test.dart          # 原画表示中のバッジ: liveRegion・狭いときのアイコン形・文字倍率を打ち消さない（#183）
+├── bypass_badge_test.dart          # 原画表示中のバッジ: liveRegion・狭いときのアイコン形・文字倍率を打ち消さない・fitsAsText の幅 3/4・高さ 1/4 の境界（#183）
 ├── support/header_semantics.dart   # プレビューの見えない Semantics(header)（見出し行は廃止）を探す finder（#183）
 ├── support/color_vision_select.dart # 色覚 7 種のキーで単一選択するテスト用ヘルパ（別名を解いて replaceWith へ渡す）
 ├── support/screenshot_harness.dart # スクリーンショット用フォント読込・PNG 書出し（フォントはコミットしない）

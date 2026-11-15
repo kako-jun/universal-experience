@@ -477,6 +477,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
         child: Stack(
           children: [
             if (widget.bypassed)
+              // 画像がまだ無いので `within` は渡さず、幅の上限だけで形を決める（読み込み中だけの表示で許容）。
               const Positioned(
                 left: 4,
                 right: 4,
