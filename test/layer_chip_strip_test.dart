@@ -6,8 +6,6 @@
 import 'dart:math' as math;
 import 'dart:ui' show PointerDeviceKind, Tristate;
 
-import 'package:flutter/foundation.dart'
-    show debugDefaultTargetPlatformOverride;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
@@ -340,10 +338,11 @@ void main() {
       }
     });
 
-    testWidgets('マウス（Linux）: Shift+ホイールとスクロールバーのつまみのドラッグで末尾へ届く',
+    // デスクトップ 3 種（Linux / macOS / Windows）の variant で回す。プラットフォームの上書きは
+    // フレームワークが後始末するので、自分で debugDefaultTargetPlatformOverride を触らない
+    // （戻し忘れると「debug variable was changed by the test」で落ちる）。
+    testWidgets('マウス（デスクトップ）: Shift+ホイールとスクロールバーのつまみのドラッグで末尾へ届く',
         (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
-      addTearDown(() => debugDefaultTargetPlatformOverride = null);
       await pumpStrip(tester, width: 280);
       for (final id in ['myopia', 'glaucoma', 'cataract', 'floaters']) {
         state.toggle(id);
@@ -390,7 +389,7 @@ void main() {
       await g.up();
       await tester.pump();
       expect(offset(), greaterThan(0), reason: 'つまみのドラッグで動く');
-    });
+    }, variant: TargetPlatformVariant.desktop());
 
     testWidgets('スクロールバーの段はチップの下（チップの枠と重ならない）', (tester) async {
       await pumpStrip(tester, width: 280);
