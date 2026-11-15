@@ -18,6 +18,7 @@ import '../../services/vision_layer.dart';
 import '../../src/rust/api/sensus_bridge.dart' show VisionStep;
 import 'preview_rendering.dart';
 import 'export_feedback.dart';
+import 'bypass_badge.dart';
 
 /// [ColorVisionCompareView] の書き出しファイル名に入れる識別子（`exportFilename` の
 /// `symptomId`）。単独の型ではなく 4 型の比較であることを名前で区別する。
@@ -58,10 +59,14 @@ class ColorVisionCompareView extends StatefulWidget {
     this.baseSteps = const [],
     this.baseLayers = const [],
     this.sampleSize,
+    this.bypassed = false,
   });
 
   /// 4 セル共通の強さ 0.0..1.0（色覚層の強度）。
   final double strength;
+
+  /// 原画比較中（bypass、#63）。右下のセルの画像の左下に「原画表示中」のバッジを重ねる（#183）。
+  final bool bypassed;
 
   /// 4 型の前に 1 回だけ適用する層のステップ列（適用順、強度 0 は除いたもの、#122）。
   /// 空なら土台 = 原画。
@@ -146,8 +151,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
     };
   }
 
-  int get _effectiveSampleSize =>
-      widget.sampleSize ?? kCanonicalSampleSize;
+  int get _effectiveSampleSize => widget.sampleSize ?? kCanonicalSampleSize;
 
   @override
   void initState() {
@@ -361,7 +365,8 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
         return;
       }
       // 作り終えた土台は、この回が追い越されていても保持する（世代がずれるのは、描画中に
-      // 原画比較で原画を出したとき [_applyOriginal] だけ。入力の変化は [_rebuildPending] で扱う）。土台は (steps, 元画像, サイズ) で引くので、別の入力に誤って使われることは
+      // 原画比較で原画を出したとき [_applyOriginal] だけ。入力の変化は [_rebuildPending] で
+      // 扱う）。土台は (steps, 元画像, サイズ) で引くので、別の入力に誤って使われることは
       // なく、原画比較を解除して同じ層に戻ったときに重い再合成をしなくて済む（#122/#185）。
       final old = _baseImage;
       _baseImage = composed;
@@ -558,13 +563,28 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
       // インジケータは widget test の pumpAndSettle を止めてしまう）。
       return SizedBox(
         height: 180,
-        child: Center(
-          child: Text(
-            l10n.previewPreparing,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+        child: Stack(
+          children: [
+            if (widget.bypassed)
+              // 画像がまだ無いので `within` は渡さず、幅の上限だけで形を決める（読み込み中だけの表示で許容）。
+              const Positioned(
+                left: 4,
+                right: 4,
+                bottom: 4,
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  child: BypassBadge(),
+                ),
+              ),
+            Center(
+              child: Text(
+                l10n.previewPreparing,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       );
     }
@@ -589,6 +609,7 @@ class _ColorVisionCompareViewState extends State<ColorVisionCompareView> {
                   visionFilterName(l10n, entries[i].id),
                   percent,
                 ),
+          showBypass: widget.bypassed && i == entries.length - 1,
           child: afters == null
               ? PreviewErrorPlaceholder(theme: theme, label: l10n.previewFailed)
               : PreviewImageView(image: afters[i]),
@@ -668,11 +689,15 @@ class _CompareCell extends StatelessWidget {
     required this.label,
     required this.semanticsLabel,
     required this.child,
+    this.showBypass = false,
   });
 
   final String label;
   final String semanticsLabel;
   final Widget child;
+
+  /// 画像の左下に「原画表示中」のバッジを重ねる。
+  final bool showBypass;
 
   @override
   Widget build(BuildContext context) {
@@ -698,12 +723,15 @@ class _CompareCell extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          AspectRatio(
-            aspectRatio: 1,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: child,
+          BypassBadge.overlaid(
+            AspectRatio(
+              aspectRatio: 1,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: child,
+              ),
             ),
+            show: showBypass,
           ),
         ],
       ),
