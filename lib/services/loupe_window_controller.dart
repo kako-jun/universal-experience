@@ -1,4 +1,5 @@
 import 'dart:async' show unawaited;
+import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show HardwareKeyboard, KeyDownEvent, KeyEvent;
@@ -141,12 +142,34 @@ class LoupeWindowPolicy {
   /// 信頼できない側に倒す — 判定を誤って「使える」と過信するより、ヒントから
   /// 除外しすぎる方が安全なため。[environment] は呼び出し側が `Platform.environment`
   /// を渡す想定（テストではフェイクの Map を渡せる）。
+  ///
+  /// #178 以降、Linux の Wayland セッションでは XWayland 上で動くが、Wayland ネイティブ
+  /// アプリへのキー入力は XWayland のグラブでは拾えないので、この判定はそのまま維持する。
   static bool isLikelyWaylandNativeSession(Map<String, String> environment) {
     final sessionType = environment['XDG_SESSION_TYPE'];
     final waylandDisplay = environment['WAYLAND_DISPLAY'];
     return sessionType == 'wayland' ||
         (waylandDisplay != null && waylandDisplay.isNotEmpty);
   }
+
+  /// [currentEnvironment] の供給源（テストで差し替え可能）。既定は `Platform.environment`。
+  ///
+  /// 実機が Wayland セッションだと [isLikelyWaylandNativeSession] が真になり、環境に
+  /// 依存するテストが落ちるため、widget test から固定の Map を注入できるようにする。
+  /// production からは [currentEnvironment] 経由で既定値をそのまま使う。
+  @visibleForTesting
+  static Map<String, String> Function() environmentProvider =
+      _platformEnvironment;
+
+  static Map<String, String> _platformEnvironment() => Platform.environment;
+
+  /// [environmentProvider] を既定（`Platform.environment`）へ戻す。テストの tearDown 用。
+  @visibleForTesting
+  static void resetEnvironmentProvider() =>
+      environmentProvider = _platformEnvironment;
+
+  /// 今のプロセス環境変数（[environmentProvider] の現在値）。
+  static Map<String, String> currentEnvironment() => environmentProvider();
 }
 
 /// window_manager の薄いラッパ。

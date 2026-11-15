@@ -26,7 +26,8 @@ List<String> clickThroughRecoveryLines(
   WindowModeUiContext uiContext,
 ) {
   final isLikelyUnreliableHotkeyEnvironment = Platform.isLinux &&
-      LoupeWindowPolicy.isLikelyWaylandNativeSession(Platform.environment);
+      LoupeWindowPolicy.isLikelyWaylandNativeSession(
+          LoupeWindowPolicy.currentEnvironment());
   AppHotkeyAction? hotkeyRecoveryAction;
   if (!isLikelyUnreliableHotkeyEnvironment) {
     if (uiContext.hotkeyStatus.isRegistered(AppHotkeyAction.toggleClickThrough)) {

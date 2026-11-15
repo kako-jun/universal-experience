@@ -1,5 +1,11 @@
 # Changelog
 
+## 未リリース
+
+- Linux の Wayland セッション（COSMIC など）で、起動してもウィンドウが描画されず操作できない問題を修正。Wayland セッションでは
+  XWayland（X11 バックエンド）を優先して起動する（`GDK_BACKEND=x11` の指定は不要。XWayland が無ければ Wayland にフォールバック。
+  `UE_ALLOW_WAYLAND=1` でネイティブ Wayland を強制可能）。
+
 ## 0.2.0 — 2026-10-15
 
 - Android 10+（arm64-v8a / armeabi-v7a / x86_64 の universal APK）を対応 OS に追加。フォト/ドキュメントピッカーから画像を選び、
