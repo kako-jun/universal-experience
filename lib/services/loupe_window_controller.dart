@@ -51,8 +51,28 @@ class LoupeWindowPolicy {
   /// 調整 (DPR 換算) は #5 DPR スコープで扱う。
   static const Size minimumSize = Size(320, 240);
 
-  /// 起動時の既定サイズ。最小より十分大きく、デスクトップの一角を覗ける程度。
-  static const Size defaultSize = Size(800, 600);
+  /// 起動時の既定サイズ（論理ピクセル）。主画面が 3 カラム（選ぶ / 見る / 調整）で出る幅
+  /// （`kWideLayoutBreakpoint` = 1000dp 以上）を確保する（#197）。1280x800 は DESIGN.md が
+  /// 広幅の基準にしている大きさで、プレビューと調整が最初の 1 画面に入る。
+  static const Size defaultSize = Size(1280, 800);
+
+  /// 起動時のウィンドウサイズ（#197）。既定は [defaultSize]。画面（[displaySize]、論理
+  /// ピクセル）がそれより小さいときは、軸ごとに画面の大きさまで縮める（画面からはみ出した
+  /// ウィンドウで起動しない。幅が 1000dp を切れば主画面は縦並びになり、スクロールで全部に
+  /// 届く）。[minimumSize] は下回らない。画面の大きさが取れない（null・0 以下・非有限）
+  /// ときは [defaultSize] のまま。
+  static Size initialSizeFor(Size? displaySize) {
+    if (displaySize == null ||
+        !displaySize.isFinite ||
+        displaySize.width <= 0 ||
+        displaySize.height <= 0) {
+      return defaultSize;
+    }
+    return Size(
+      displaySize.width.clamp(minimumSize.width, defaultSize.width),
+      displaySize.height.clamp(minimumSize.height, defaultSize.height),
+    );
+  }
 
   /// 既定: 最前面固定は **OFF**、切替式 (#63)。
   ///

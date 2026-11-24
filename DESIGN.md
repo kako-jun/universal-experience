@@ -178,7 +178,7 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
   その下に `WelcomeBanner`（プレビューを最初のビューポートから押し出さない位置）。フィルタ選択（層の追加・削除・プリセット・フィルタをすべて解除）か原画の変更（サンプル切替・ユーザー画像）が一度でもあれば自動で閉じる（#143。起動時の復元・初期選択・推奨サンプルへの自動追従では閉じない）。
   **プレビュー画像の大きさは本体領域の高さに追従する**（#130）。画像（Before / After 各 1 枚の正方形）の
   一辺は「本体領域の高さ - 354dp（画像以外のカードの高さ `_kPreviewChromeHeight`。カード上端の余白 16・帯 54（チップ 48 + スクロールバーの段 6）・画像の見出し行 48・選択欄・下の余白 16 の合計。実フォントの実測は日本語 約 318・英語 約 342 に余裕を足した値）」までに抑え
-  （`previewPaneSideFor`）、既定ウィンドウ（800x600）でも `ImageSourcePicker` の下端が最初の
+  （`previewPaneSideFor`）、狭くて低いウィンドウ（800x600）でも `ImageSourcePicker` の下端が最初の
   ビューポートに収まるようにする（実画像が載った状態で測る。日本語・英語とも）。下限は 160dp
   （`kMinPreviewPaneSide`。800x600 の画像は 190dp（帯の前は 184dp）。低い画面ではこれより縮めず、選択欄はスクロールで届く）。高さに余裕のある
   1280x800・800x700 では縮まない。縮めるときは 2 枚を中央に寄せ、見出しの行・書き出しボタンは 2 枚の幅に追従する
@@ -230,7 +230,7 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 - カテゴリ切替は `NavigationRail` ではなく `ChoiceChip` を行ごとに幅を伸ばして並べる形（当初は素の `Wrap` だったが行末が不揃いで空きが出たため #184 で変更。広幅の左カラム幅が 280〜340dp と
   狭く、Rail を置くと一覧の幅が足りなくなるため）。
 - 狭幅の選択は `NavigationBar` + ボトムシートではなく、縦積みの最下段に固定高（560dp）の一覧を置く（上の暫定状態の項を参照）。
-- 狭幅（800x600 の既定ウィンドウ）でクリックスルーの案内（約 115dp）が出ている間は、画像が下限
+- 狭幅（800x600 の狭くて低いウィンドウ）でクリックスルーの案内（約 115dp）が出ている間は、画像が下限
   （160dp）まで縮んでも `ImageSourcePicker` の選択欄が最初のビューポートに収まりきらず、画像
   （`BeforeAfterView`）と選択欄の先頭の行までが見える（案内が出ていないときは選択欄まで収まる、#130）。
 - 画像以外の高さ（`_kPreviewChromeHeight` = 354dp）は、実測（日本語 約 318・英語 約 342）に
@@ -240,7 +240,7 @@ UI を触る変更（色・余白・コンポーネント・画面構成）は�
 - 高さが足りないとき（低い広幅 1280x480・クリックスルーの案内が出ている間など）は、画像を下限（160dp）まで
   縮める現行の方針を保つ。選択欄の 1 行目が見えることを、画像の大きさより優先するため。下限まで縮めても収まらない
   ぶんはスクロールで届く（1280x480 では選択欄の 2 行目のチップが切れる）。
-- 英語の UI で選択欄が既定ウィンドウに収まることは、スクリーンショットのテスト（`UE_SCREENSHOTS=1`）でだけ検査する。
+- 英語の UI で選択欄が狭くて低いウィンドウ（800x600）に収まることは、スクリーンショットのテスト（`UE_SCREENSHOTS=1`）でだけ検査する。
   通常のウィジェットテスト（CI）はテスト用フォント（Ahem）で英語のチップが異常に折り返し、実フォントと高さが
   合わないため、日本語だけを検査する。
 - advanced の各フィルタには説明文の文字列と有病率が無い（sensus に無く、ue は数値を作らない）ため、右カラムの
@@ -359,12 +359,12 @@ UE_SCREENSHOTS=1 UE_SCREENSHOT_DIR=/path/to/out \
 - 出力: `wide-{light|dark}-{ja|en}.png`（広幅 1280×800）、`narrow-light-ja.png` / `narrow-dark-en.png`
   （狭幅 800×700。どちらもウィンドウ 1 枚ぶん）、狭幅だけ同名に `-full` を付けた縦長の全体像（縦積みの
   スクロール量の確認用）、`wide-{light|dark}-ja-hc.png`（ハイコントラスト）、
-  `default-window-{light|dark}-{ja|en}.png`（既定ウィンドウ 800×600 に実画像が載った状態。選択欄が最初のビューポートに
+  `small-window-{light|dark}-{ja|en}.png`（狭くて低いウィンドウ 800×600 に実画像が載った状態。選択欄が最初のビューポートに
   収まり、実フォントで下端がウィンドウ内に収まることも `expect` する。#130）、
   `wide-low-light-ja.png`（低い広幅 1280×480 に実画像が載った状態。画像は下限 160dp で止まり、選択欄の下側は
   スクロールで届く。収まることは検査しない）、
-  `{wide|wide-low|default-window}-light-ja-clickthrough.png`（クリックスルー ON の案内。`wide-low` は 1280×480、
-  `default-window` は 800×600）、`wide-light-ja-dialog.png`（起動モードのダイアログ）と
+  `{wide|wide-low|small-window}-light-ja-clickthrough.png`（クリックスルー ON の案内。`wide-low` は 1280×480、
+  `small-window` は 800×600）、`wide-light-ja-dialog.png`（起動モードのダイアログ）と
   `wide-{light|dark}-{ja|en}-languagedialog.png`（言語ダイアログ。light/ja と dark/en の 2 枚）、
   `wide-light-ja-tunnel-mid.png` / `wide-light-ja-tunnel-max.png` / `wide-dark-ja-tunnel-max.png` / `wide-light-en-tunnel-max.png` / `wide-light-ja-tunnel-max-hc.png`（tunnel_vision の強度スライダの印と警告の 5 通り。#66）、
   `{wide|narrow}-{light|dark}-{ja|en}-explain-{deutan|cataract|floaters|tetrachromacy}.png`（出典・限界を両方開いた状態。

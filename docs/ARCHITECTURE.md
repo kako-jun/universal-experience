@@ -123,6 +123,15 @@ XWayland でポータルがあるとき）では保存値どおりルーペ窓�
 対象アプリ指定モード（ルーペ窓の自動配置モード）の設計判断・要検証事項・OS ごとの
 提供可否は `docs/adr/2026-09-26-loupe-as-single-render-unit.md` 参照。
 
+### 起動時のサイズ
+
+- **1280x800**（`LoupeWindowPolicy.defaultSize`、論理ピクセル）。主画面が 3 カラム（選ぶ / 見る / 調整）で
+  出る幅（`kWideLayoutBreakpoint` = 1000dp 以上）を確保する（#197。それまでは 800x600 で、起動直後は縦並びだった）。
+- 画面がそれより小さいときは、軸ごとに画面の大きさまで縮めて起動する
+  （`LoupeWindowPolicy.initialSizeFor`。画面の大きさは Flutter の `Display` から取り、取れなければ 1280x800 のまま）。
+  幅が 1000dp を切れば主画面は縦並びになり、スクロールで全部に届く。最小サイズは下回らない。
+- 前回のウィンドウサイズは保存しない（毎回この大きさで起動する）。
+
 ### 最小サイズ
 
 - **320x240 (QVGA, 4:3)**。従来の 600x400 から引き下げた。
@@ -1035,7 +1044,7 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   中央「見る」=`BeforeAfterView` + `ImageSourcePicker`、右「調整」=`AdjustPanel`）、
   それ未満は プレビュー → 調整 → 選択 の縦積み。プレビュー画像の一辺は本体領域の高さから
   `previewPaneSideFor` で上限を決め（高さ - 354dp、下限 `kMinPreviewPaneSide` = 160dp）、
-  `BeforeAfterView.maxPaneSide` へ渡す。既定ウィンドウ 800x600 でも選択欄まで最初のビューポートに収める（#130）。`FilterBrowser` は検索・カテゴリ・
+  `BeforeAfterView.maxPaneSide` へ渡す。狭くて低いウィンドウ（800x600）でも選択欄まで最初のビューポートに収める（#130）。`FilterBrowser` は検索・カテゴリ・
   統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行、ロジックは
   `filter_list_selection.dart`）と体験プリセットの最上段を持つ。`AdjustPanel` は選んだ
   症状の説明・強度スライダー 1 本・受診喚起（`ConsultNoticeBlock` 常時展開）を

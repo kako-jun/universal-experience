@@ -241,6 +241,24 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
   return (app: UniversalExperienceApp(settings: s), bridgeReady: true);
 }
 
+/// 主画面（ウィンドウが乗る画面）の大きさ（論理ピクセル）。取れなければ null（#197）。
+///
+/// 起動時のウィンドウサイズを画面に収めるために使う
+/// （[LoupeWindowPolicy.initialSizeFor]）。Flutter の `Display` は物理ピクセルなので
+/// devicePixelRatio で割る。ビューがまだ無い・画面の情報が無いプラットフォームでは null。
+Size? _primaryDisplayLogicalSize() {
+  final dispatcher = WidgetsBinding.instance.platformDispatcher;
+  try {
+    final display = dispatcher.implicitView?.display ??
+        (dispatcher.displays.isEmpty ? null : dispatcher.displays.first);
+    if (display == null || display.devicePixelRatio <= 0) return null;
+    return display.size / display.devicePixelRatio;
+  } catch (_) {
+    // FlutterView.display は対応する画面が無いと StateError を投げる。
+    return null;
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -293,13 +311,14 @@ void main() async {
 
     // ルーペ窓の起動オプション。サイズ・最小サイズ・透過の既定は
     // LoupeWindowPolicy に集約 (testable な純粋ロジック)。
+    // - size: 3 カラムが出る既定サイズ。画面がそれより小さければ画面に収める (#197)。
     // - backgroundColor: 起動モード (#63) に応じて決める。設定モード（既定）は
     //   不透明、ルーペモードは透過（枠の外は透け、枠の中だけフィルタ描画する）。
     // マルチモニタ: 第1弾はメインモニタのみ対象 (docs/ARCHITECTURE.md 参照)。
     // window_manager の backgroundColor は非 null の Color のため、
     // 透過 ON のとき transparent、OFF のとき不透明黒を渡す。
     final windowOptions = WindowOptions(
-      size: LoupeWindowPolicy.defaultSize,
+      size: LoupeWindowPolicy.initialSizeFor(_primaryDisplayLogicalSize()),
       minimumSize: LoupeWindowPolicy.minimumSize,
       center: true,
       // 色の例外（DESIGN.md）: OS ウィンドウの下地色。Flutter のテーマが
@@ -362,8 +381,8 @@ void main() async {
       setLoupeVisible: trayService.setLoupeVisible,
       // #185 の切り分け: keyUp が届く環境かを後から確かめられるよう、原画比較の切り替えと
       // keyUp を診断ログへ残す（キーリピートは書かない。どのキーかも書かない）。
-      onHoldOriginalEvent: (event) => PreviewDiagnostics.record(
-          'hotkey_hold_original', {'event': event}),
+      onHoldOriginalEvent: (event) =>
+          PreviewDiagnostics.record('hotkey_hold_original', {'event': event}),
     );
     await hotkeyService.init({
       AppHotkeyAction.toggleClickThrough: HotkeyHandlers(

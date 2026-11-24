@@ -24,7 +24,7 @@ import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart'
-    show kMinPreviewPaneSide, previewPaneSideFor;
+    show kMinPreviewPaneSide, kWideLayoutBreakpoint, previewPaneSideFor;
 import 'package:universal_experience/ui/widgets/adjust_panel.dart';
 import 'package:universal_experience/ui/widgets/bypass_badge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
@@ -50,8 +50,8 @@ void main() {
 
   const wide = Size(1280, 800);
   const narrow = Size(800, 700);
-  // LoupeWindowPolicy.defaultSize（起動時の既定ウィンドウ）。
-  const defaultWindow = LoupeWindowPolicy.defaultSize;
+  // 狭くて低いウィンドウ（#130 の基準。#197 までは起動時の既定ウィンドウだった）。
+  const smallWindow = Size(800, 600);
   // 広幅で低い画面（ノート PC の縮めたウィンドウなど）。
   const wideLow = Size(1280, 480);
 
@@ -68,7 +68,7 @@ void main() {
       for (final (label, size) in [
         ('広幅 1280x800', wide),
         ('狭幅 800x700', narrow),
-        ('既定ウィンドウ 800x600', defaultWindow),
+        ('狭くて低い 800x600', smallWindow),
       ]) {
         testWidgets(label, (tester) async {
           if (loaded) loadPreviewImages();
@@ -137,20 +137,20 @@ void main() {
       return paneSide(tester);
     }
 
-    testWidgets('既定 800x600: 画像は下限より大きく、選択欄の下に余白が残る（初回起動と同じ色覚 1 層）',
+    testWidgets('狭くて低い 800x600: 画像は下限より大きく、選択欄の下に余白が残る（初回起動と同じ色覚 1 層）',
         (tester) async {
       // 見積り（_kPreviewChromeHeight）が測っている最悪の状態 = 初回起動の色覚層
       //（帯の右端に「2×2 で比較」が出る。帯の高さは色覚の層の有無で動かない）。
       loadPreviewImages();
       await pumpHomeScreen(tester,
-          size: defaultWindow,
+          size: smallWindow,
           select: (s) => selectColorVisionKey(s, 'deuteranomaly'));
       final side = paneSide(tester);
       expect(side, greaterThan(kMinPreviewPaneSide));
       // 本体領域の高さ 544（600 - AppBar 56）から、画像以外の高さ 354 を引いた値。
       expect(side, closeTo(190, 0.01));
       final picker = tester.getRect(find.byType(ImageSourcePicker));
-      expect(picker.bottom, lessThanOrEqualTo(defaultWindow.height - 8),
+      expect(picker.bottom, lessThanOrEqualTo(smallWindow.height - 8),
           reason: '選択欄の下端がウィンドウの縁に貼り付かない');
     });
 
@@ -189,14 +189,14 @@ void main() {
       });
     }
 
-    testWidgets('クリックスルーの案内が出ていても下限は守る（既定 800x600）', (tester) async {
+    testWidgets('クリックスルーの案内が出ていても下限は守る（狭くて低い 800x600）', (tester) async {
       loadPreviewImages();
       const uiContext = WindowModeUiContext(
         trayAvailable: true,
         hotkeyStatus: HotkeyStatus(),
       );
-      final h = await pumpHomeScreen(tester,
-          size: defaultWindow, uiContext: uiContext);
+      final h =
+          await pumpHomeScreen(tester, size: smallWindow, uiContext: uiContext);
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
       await tester.runAsync(() => h.loupe.setClickThrough(true));
       await tester.pump();
@@ -207,9 +207,11 @@ void main() {
     });
   });
 
-  testWidgets('既定ウィンドウは LoupeWindowPolicy.defaultSize（800x600）',
+  testWidgets('既定ウィンドウ（LoupeWindowPolicy.defaultSize）は 3 カラムが出る 1280x800（#197）',
       (tester) async {
-    expect(defaultWindow, const Size(800, 600));
+    expect(LoupeWindowPolicy.defaultSize, wide);
+    expect(LoupeWindowPolicy.defaultSize.width,
+        greaterThanOrEqualTo(kWideLayoutBreakpoint));
   });
 
   group('広幅で低い画面（1280x480）', () {
@@ -500,9 +502,9 @@ void main() {
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
     });
 
-    testWidgets('ON でも案内を出したままプレビューは最初のビューポートに収まる（狭幅・既定ウィンドウ 800x600）',
+    testWidgets('ON でも案内を出したままプレビューは最初のビューポートに収まる（狭幅・狭くて低い 800x600）',
         (tester) async {
-      final h = await pumpHomeScreen(tester, size: defaultWindow);
+      final h = await pumpHomeScreen(tester, size: smallWindow);
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
       await tester.runAsync(() => h.loupe.setClickThrough(true));
       await tester.pump();
@@ -510,14 +512,14 @@ void main() {
       expect(find.text('クリックスルーが ON です。解除するには:'), findsOneWidget);
       expect(
         tester.getRect(find.byType(BeforeAfterView)).bottom,
-        lessThanOrEqualTo(defaultWindow.height),
+        lessThanOrEqualTo(smallWindow.height),
       );
       // 案内（約 115dp）の分だけ本文が低くなるため、選択欄の下端までは収まらない
       // ことがある（DESIGN.md §6.1）。画像（BeforeAfterView）が収まり、選択欄の
       // 先頭の行が見えていて、スクロールで残りへ届くことを保証する。
       expect(
         tester.getRect(find.text('プレビュー画像')).bottom,
-        lessThanOrEqualTo(defaultWindow.height),
+        lessThanOrEqualTo(smallWindow.height),
       );
       await tester.runAsync(() => h.loupe.setClickThrough(false));
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
@@ -1022,7 +1024,7 @@ void main() {
     for (final (label, size) in [
       ('広幅 1280x800', wide),
       ('広幅 1600x900', const Size(1600, 900)),
-      ('既定 800x600', defaultWindow),
+      ('狭くて低い 800x600', smallWindow),
       // 画像が下限 160dp になる低い広幅（複数層の After 見出しが最も狭い）。
       ('低い広幅 1280x480', wideLow),
     ]) {
@@ -1161,7 +1163,7 @@ void main() {
     }
 
     for (final (label, size) in [
-      ('既定 800x600', defaultWindow),
+      ('狭くて低い 800x600', smallWindow),
       ('低い広幅 1280x480', wideLow),
     ]) {
       testWidgets('$label: 「原画表示中」は After 画像の枠の中にあり、操作部品と重ならない',
@@ -1213,7 +1215,7 @@ void main() {
     // 色覚が 1 層だけ（初回起動の状態）: 「すべて解除」が無いので、×2 以上でも「2×2 で比較」が文字つきの
     // まま置かれる幅がある。文字つきのチップの高さが帯の中身（スクロールバーの段を除く）に収まる。
     for (final (label, size) in [
-      ('既定 800x600', defaultWindow),
+      ('狭くて低い 800x600', smallWindow),
       ('広幅 1600x900', const Size(1600, 900)),
     ]) {
       for (final scale in [1.0, 2.0, 3.0]) {
@@ -1267,10 +1269,10 @@ void main() {
     // 英語は実フォントでないと選択欄のチップの折り返しが測れない（テスト用フォントでは異常に
     // 折り返す）ので、UE_SCREENSHOTS の default-window（ja/en・明暗・5 層）の
     // expectPickerFits で見る。
-    testWidgets('既定 800x600: 5 層でも選択欄が収まり、画像は 1 層のときと同じ大きさ（ja）',
+    testWidgets('狭くて低い 800x600: 5 層でも選択欄が収まり、画像は 1 層のときと同じ大きさ（ja）',
         (tester) async {
       loadPreviewImages();
-      await pumpHomeScreen(tester, size: defaultWindow, select: (s) {
+      await pumpHomeScreen(tester, size: smallWindow, select: (s) {
         for (final id in [
           'myopia',
           'protanopia',
@@ -1282,7 +1284,7 @@ void main() {
         }
       });
       final picker = tester.getRect(find.byType(ImageSourcePicker));
-      expect(picker.bottom, lessThanOrEqualTo(defaultWindow.height - 8));
+      expect(picker.bottom, lessThanOrEqualTo(smallWindow.height - 8));
       expect(tester.getRect(find.byType(PreviewImageView).first).width,
           closeTo(190, 0.01));
     });
