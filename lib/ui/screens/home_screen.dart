@@ -28,7 +28,7 @@ import '../widgets/layer_chip_strip.dart';
 import '../widgets/welcome_banner.dart';
 import '../widgets/window_mode_panel.dart';
 
-/// これ以上の幅（dp）で 3 カラム（選ぶ / 見る / 調整）、未満で縦に並べる（#72）。
+/// これ以上の幅（dp）で 3 カラム（選ぶ / 見る / 調整）、未満で同じ順に縦に並べる（#72/#198）。
 const double kWideLayoutBreakpoint = 1000;
 
 /// 狭幅レイアウトの内容の最大幅。
@@ -319,8 +319,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 縦積み: 上からプレビュー → 調整 → 選択（#72）。プレビューは最初の
-  /// 画面に収める。
+  /// 縦並び: 上から 選択 → プレビュー → 調整（#198）。3 カラムの左・中央・右と同じ順に
+  /// 並べる（Tab 順・読み上げ順も同じ）。一覧は固定の高さで内側がスクロールし、その下の
+  /// プレビューと調整へは画面のスクロールで届く。
   Widget _buildNarrow(double maxPaneSide) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -330,6 +331,8 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              SizedBox(height: _kNarrowBrowserHeight, child: _browserCard()),
+              const SizedBox(height: 16),
               Center(
                 child: ConstrainedBox(
                   constraints:
@@ -346,8 +349,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: AdjustPanel(),
                 ),
               ),
-              const SizedBox(height: 16),
-              SizedBox(height: _kNarrowBrowserHeight, child: _browserCard()),
             ],
           ),
         ),
@@ -355,7 +356,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 広幅の左カラム・狭幅の末尾で共通。一覧の行（体験プリセットの行も同じ
+  /// 広幅の左カラム・狭幅の先頭で共通。一覧の行（体験プリセットの行も同じ
   /// `FilterListTile`）からの ←→ を受け口へ固定する走査方針を付ける（#84）。
   Widget _browserCard() => FocusTraversalGroup(
         policy: _ListExitToShortcutsPolicy(_shortcutFocus),
@@ -574,7 +575,7 @@ class _RowAwareCycleAction extends CallbackAction<CycleFilterIntent> {
       !isFocusOnInteractiveControl();
 }
 
-/// 「選ぶ」カード（広幅は左カラム、狭幅は末尾）用のフォーカス走査。標準（読み順）と同じだが、**一覧の行にフォーカスが
+/// 「選ぶ」カード（広幅は左カラム、狭幅は先頭）用のフォーカス走査。標準（読み順）と同じだが、**一覧の行にフォーカスが
 /// ある間の ←→ は、常に画面のショートカット受け口へ出る**（#84）。
 ///
 /// 標準の方向フォーカス移動のままだと、行から → で出た先が「隣のカラムの、たまたま縦位置が

@@ -1042,9 +1042,9 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
 
 - `HomeScreen`: メイン画面（#72）。幅 1000dp 以上は 3 カラム（左「選ぶ」=`FilterBrowser`、
   中央「見る」=`BeforeAfterView` + `ImageSourcePicker`、右「調整」=`AdjustPanel`）、
-  それ未満は プレビュー → 調整 → 選択 の縦積み。プレビュー画像の一辺は本体領域の高さから
+  それ未満は 選択 → プレビュー → 調整 の縦積み（3 カラムの左・中央・右と同じ順、#198）。プレビュー画像の一辺は本体領域の高さから
   `previewPaneSideFor` で上限を決め（高さ - 354dp、下限 `kMinPreviewPaneSide` = 160dp）、
-  `BeforeAfterView.maxPaneSide` へ渡す。狭くて低いウィンドウ（800x600）でも選択欄まで最初のビューポートに収める（#130）。`FilterBrowser` は検索・カテゴリ・
+  `BeforeAfterView.maxPaneSide` へ渡す。狭くて低いウィンドウ（800x600）でもプレビューのカード（画像から選択欄まで）を 1 画面に収める（#130。縦積みでは一覧の下にあり、スクロールした先で収まる）。`FilterBrowser` は検索・カテゴリ・
   統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行、ロジックは
   `filter_list_selection.dart`）と体験プリセットの最上段を持つ。`AdjustPanel` は選んだ
   症状の説明・強度スライダー 1 本・受診喚起（`ConsultNoticeBlock` 常時展開）を

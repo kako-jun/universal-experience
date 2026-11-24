@@ -79,6 +79,7 @@ import 'package:universal_experience/ui/widgets/image_source_picker.dart';
 import '../support/screenshot_harness.dart';
 import '../support/vision_filter_metadata_fixture.dart';
 import '../support/color_vision_select.dart';
+import '../support/narrow_scroll.dart';
 
 /// sensus の experiences() と同じ id / vision / hearing / urgency の 4 体験
 /// （実ブリッジは native lib が要るため fixture で代替。experience_presets_test と同じ）。
@@ -355,11 +356,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     if (expectPickerFits) {
-      // 実フォント・実画像で、選択欄の下端が最初のビューポート（ウィンドウの高さ）に収まる（#130）。
+      // 縦積み（#198）ではプレビューは一覧の下にあるので、プレビューまでスクロールしてから測る・撮る。
+      await scrollPreviewIntoView(tester);
+      // 実フォント・実画像で、選択欄の下端が 1 画面（ウィンドウの高さ）に収まる（#130）。
       expect(
         tester.getRect(find.byType(ImageSourcePicker)).bottom,
         lessThanOrEqualTo(height),
-        reason: '$widthLabel/$locale: 選択欄が最初のビューポートに収まる',
+        reason: '$widthLabel/$locale: プレビューまでスクロールすると選択欄が 1 画面に収まる',
       );
     }
     final base = '$widthLabel-${dark ? 'dark' : 'light'}-$locale';
@@ -732,7 +735,8 @@ void main() {
           await tester.pump();
           final strip = tester.getRect(find.byType(LayerChipStrip));
           final chip = tester.getRect(find.byType(FilterChip));
-          expect(find.byIcon(Icons.compare), findsNothing, reason: '幅が十分なので文字つき');
+          expect(find.byIcon(Icons.compare), findsNothing,
+              reason: '幅が十分なので文字つき');
           expect(chip.height,
               lessThanOrEqualTo(strip.height - LayerChipStrip.scrollbarLane),
               reason: 'チップ ${chip.height} が帯の中身 '

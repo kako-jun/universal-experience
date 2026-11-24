@@ -41,6 +41,7 @@ import 'package:universal_experience/ui/widgets/window_mode_panel.dart';
 
 import 'support/home_screen_harness.dart';
 import 'support/color_vision_select.dart';
+import 'support/narrow_scroll.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -64,7 +65,9 @@ void main() {
   }
 
   for (final (stateLabel, loaded) in [('準備中', false), ('読み込み済み', true)]) {
-    group('プレビューは最初のビューポートに収まる（$stateLabel）', () {
+    // 広幅は最初のビューポート。縦積み（#198）ではプレビューは一覧の下にあるので、
+    // プレビューまでスクロールしたときに 1 画面に収まることを測る。
+    group('プレビューは 1 画面に収まる（広幅は最初のビューポート・縦積みはスクロールした先。$stateLabel）', () {
       for (final (label, size) in [
         ('広幅 1280x800', wide),
         ('狭幅 800x700', narrow),
@@ -73,6 +76,7 @@ void main() {
         testWidgets(label, (tester) async {
           if (loaded) loadPreviewImages();
           await pumpHomeScreen(tester, size: size);
+          if (size != wide) await scrollPreviewIntoView(tester);
           if (loaded) {
             // 画像が載っている（準備中のプレースホルダで測っていない）。
             final panes = tester.widgetList<PreviewImageView>(
@@ -145,6 +149,7 @@ void main() {
       await pumpHomeScreen(tester,
           size: smallWindow,
           select: (s) => selectColorVisionKey(s, 'deuteranomaly'));
+      await scrollPreviewIntoView(tester);
       final side = paneSide(tester);
       expect(side, greaterThan(kMinPreviewPaneSide));
       // 本体領域の高さ 544（600 - AppBar 56）から、画像以外の高さ 354 を引いた値。
@@ -358,14 +363,19 @@ void main() {
     expect(adjust.overlaps(focusedRect), isTrue);
   });
 
-  testWidgets('狭幅は縦積み（プレビューが選択より上）', (tester) async {
+  testWidgets('狭幅は縦積み（上から 選択 → プレビュー → 調整。3 カラムの左・中央・右の順、#198）',
+      (tester) async {
     await pumpHomeScreen(tester, size: narrow);
 
-    final preview = tester.getRect(find.byType(BeforeAfterView));
-    // 狭幅の一覧は縦積みの下端にあり、スクロールしないと描画されないことがある。
-    final browserFinder = find.byType(FilterBrowser, skipOffstage: false);
-    final browser = tester.getRect(browserFinder);
-    expect(preview.bottom, lessThanOrEqualTo(browser.top));
+    // プレビューと調整は一覧の下にあり、スクロールしないと描画されないことがある。
+    final browser = tester.getRect(find.byType(FilterBrowser));
+    final preview =
+        tester.getRect(find.byType(BeforeAfterView, skipOffstage: false));
+    final adjust =
+        tester.getRect(find.byType(AdjustPanel, skipOffstage: false));
+    expect(browser.top, lessThan(narrow.height), reason: '選択が最初の画面にある');
+    expect(browser.bottom, lessThanOrEqualTo(preview.top));
+    expect(preview.bottom, lessThanOrEqualTo(adjust.top));
   });
 
   group('空状態', () {
@@ -502,12 +512,13 @@ void main() {
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
     });
 
-    testWidgets('ON でも案内を出したままプレビューは最初のビューポートに収まる（狭幅・狭くて低い 800x600）',
+    testWidgets('ON でも案内を出したまま、プレビューまでスクロールすると画像が 1 画面に収まる（狭幅・狭くて低い 800x600）',
         (tester) async {
       final h = await pumpHomeScreen(tester, size: smallWindow);
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
       await tester.runAsync(() => h.loupe.setClickThrough(true));
       await tester.pump();
+      await scrollPreviewIntoView(tester);
 
       expect(find.text('クリックスルーが ON です。解除するには:'), findsOneWidget);
       expect(
@@ -1267,7 +1278,7 @@ void main() {
     }
 
     // 英語は実フォントでないと選択欄のチップの折り返しが測れない（テスト用フォントでは異常に
-    // 折り返す）ので、UE_SCREENSHOTS の default-window（ja/en・明暗・5 層）の
+    // 折り返す）ので、UE_SCREENSHOTS の small-window（ja/en・明暗・5 層）の
     // expectPickerFits で見る。
     testWidgets('狭くて低い 800x600: 5 層でも選択欄が収まり、画像は 1 層のときと同じ大きさ（ja）',
         (tester) async {
@@ -1283,6 +1294,7 @@ void main() {
           s.toggle(id);
         }
       });
+      await scrollPreviewIntoView(tester);
       final picker = tester.getRect(find.byType(ImageSourcePicker));
       expect(picker.bottom, lessThanOrEqualTo(smallWindow.height - 8));
       expect(tester.getRect(find.byType(PreviewImageView).first).width,
