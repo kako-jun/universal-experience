@@ -356,8 +356,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// 広幅の左カラム・狭幅の先頭で共通。一覧の行（体験プリセットの行も同じ
-  /// `FilterListTile`）からの ←→ を受け口へ固定する走査方針を付ける（#84）。
+  /// 広幅の左カラム・狭幅の先頭で共通。一覧の行
+  /// （`FilterListTile`）からの ←→ を受け口へ固定する走査方針を付ける（#84）。
   Widget _browserCard() => FocusTraversalGroup(
         policy: _ListExitToShortcutsPolicy(_shortcutFocus),
         child: Card(

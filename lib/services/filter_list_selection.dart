@@ -136,15 +136,6 @@ List<String> filterListEntrySearchTexts(FilterListEntry entry) => [
       if (entry.variantId != null) entry.variantId!,
     ];
 
-/// 体験プリセット [experienceId] が検索語 [query] に当たるか（ja・en 名と id）。
-/// 空の検索語は常に true。
-bool experienceMatchesQuery(String experienceId, String query) =>
-    matchesFilterQuery([
-      experienceName(_ja, experienceId),
-      experienceName(_en, experienceId),
-      experienceId,
-    ], query);
-
 /// [query]（インクリメンタル検索）と [category] で [kFilterListEntries] を絞る。
 ///
 /// 検索語があるときはカテゴリを無視して**全体**から探す（別カテゴリの見え方を
@@ -171,7 +162,7 @@ List<FilterListEntry> visibleFilterListEntries({
 /// （[layerForFilterListEntry]）。
 ///
 /// 層のカタログ id と別名が同じ行（色覚なら -opia / -omaly の別）。プリセット由来の選択は
-/// 一覧の行ではなく体験プリセットの行が点灯する（[VisionFilterState.selectedPresetId]）。
+/// 一覧の行ではなく体験プリセットのドロップダウンに名前が出る（[VisionFilterState.selectedPresetId]）。
 FilterListEntry? selectedFilterListEntry(VisionFilterState visionState) {
   if (visionState.selectedPresetId != null) return null;
   final layer = visionState.focusedLayer;

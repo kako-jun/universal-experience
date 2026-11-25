@@ -41,6 +41,7 @@ import 'package:universal_experience/ui/widgets/window_mode_panel.dart';
 
 import 'support/home_screen_harness.dart';
 import 'support/color_vision_select.dart';
+import 'support/experience_preset_select.dart';
 import 'support/narrow_scroll.dart';
 
 void main() {
@@ -458,10 +459,7 @@ void main() {
     testWidgets('体験プリセットを選ぶと右カラムに名前と説明が出る', (tester) async {
       final h = await pumpHomeScreen(tester, size: wide);
 
-      final tile = find.byKey(experienceCardKey('bppv'));
-      await tester.ensureVisible(tile);
-      await tester.tap(tile);
-      await tester.pump();
+      await selectExperiencePreset(tester, 'bppv');
 
       expect(h.visionState.selectedPresetId, 'bppv');
       expect(find.text('何も選択されていません'), findsNothing);
@@ -720,7 +718,6 @@ void main() {
     for (final (layoutLabel, size) in [('広幅', wide), ('狭幅', narrow)]) {
       for (final (rowLabel, rowKey) in [
         ('フィルタの行', filterListTileKey(entry('cv:protanopia'))),
-        ('体験プリセットの行', experienceCardKey('bppv')),
       ]) {
         for (final (dirLabel, key) in [
           ('→', LogicalKeyboardKey.arrowRight),

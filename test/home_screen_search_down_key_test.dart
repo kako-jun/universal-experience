@@ -192,26 +192,6 @@ void main() {
       expect(h.visionState.layers, isEmpty);
     });
 
-    testWidgets('体験プリセットだけ表示されている（行は 0 件）ときも奪わず入力欄に返す', (tester) async {
-      await pumpHomeScreen(tester, size: wide);
-      await typeSearch(tester, 'meniere');
-      expect(visibleFilterListEntries(query: 'meniere'), isEmpty,
-          reason: '前提: 絞り込みの行は 0 件');
-      expect(find.byType(FilterListTile), findsWidgets,
-          reason: '前提: 体験プリセットの行は見えている');
-      searchController(tester).selection =
-          const TextSelection.collapsed(offset: 2);
-      await tester.pump();
-
-      await press(tester, LogicalKeyboardKey.arrowDown);
-
-      expect(isSearchFocused(tester), isTrue,
-          reason: 'プリセット行へは移さない（フォーカスは検索欄のまま）');
-      expect(searchController(tester).selection.baseOffset, 7,
-          reason: '奪われず、入力欄がキャレットを末尾へ動かす');
-      expect(tester.takeException(), isNull);
-    });
-
     testWidgets('狭幅（縦積み）レイアウトでも ↓ で先頭行へ移り、先頭行の ↑ で検索欄へ戻る', (tester) async {
       await pumpHomeScreen(tester, size: narrow);
       await focusSearch(tester);

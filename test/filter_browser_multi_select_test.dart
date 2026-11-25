@@ -12,13 +12,14 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:universal_experience/l10n/app_localizations.dart';
+import 'package:universal_experience/l10n/l10n_extensions.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
-import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
 import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 
 import 'support/home_screen_harness.dart';
+import 'support/experience_preset_select.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -381,9 +382,7 @@ void main() {
       for (final key in five) {
         await tapRow(tester, key);
       }
-      await tester.ensureVisible(find.byKey(experienceCardKey('meniere')));
-      await tester.tap(find.byKey(experienceCardKey('meniere')));
-      await tester.pump();
+      await selectExperiencePreset(tester, 'meniere');
 
       expect(state.layers.length, 1);
       expect(state.selectedPresetId, 'meniere');
@@ -393,29 +392,25 @@ void main() {
   });
 
   group('体験プリセット', () {
-    Finder presetCheck(String id) => find.descendant(
-          of: find.byKey(experienceCardKey(id)),
-          matching: find.byIcon(Icons.check),
-        );
+    // ドロップダウン（閉じているとき）に、そのプリセットの名前が選択中として出ているか。
+    final ja = lookupAppLocalizations(const Locale('ja'));
+    Finder presetCheck(String id) =>
+        experiencePresetDropdownText(experienceName(ja, id));
 
-    testWidgets('プリセットを選ぶと層が置き換わり、その行だけが点灯する', (tester) async {
+    testWidgets('プリセットを選ぶと層が置き換わり、ドロップダウンにその名前だけが出る', (tester) async {
       await pumpBrowser(tester);
       await tapRow(tester, 'catalog:myopia');
       await tapRow(tester, 'catalog:glaucoma');
 
-      await tester.ensureVisible(find.byKey(experienceCardKey('meniere')));
-      await tester.tap(find.byKey(experienceCardKey('meniere')));
-      await tester.pump();
+      await selectExperiencePreset(tester, 'meniere');
       expect(state.layers.length, 1);
       expect(presetCheck('meniere'), findsOneWidget);
       expect(presetCheck('bppv'), findsNothing);
     });
 
-    testWidgets('層の集合がそのフィルタ 1 つでなくなると点灯は消え、戻っても点かない', (tester) async {
+    testWidgets('層の集合がそのフィルタ 1 つでなくなるとプリセットの表示は外れ、戻っても付かない', (tester) async {
       await pumpBrowser(tester);
-      await tester.ensureVisible(find.byKey(experienceCardKey('meniere')));
-      await tester.tap(find.byKey(experienceCardKey('meniere')));
-      await tester.pump();
+      await selectExperiencePreset(tester, 'meniere');
       expect(presetCheck('meniere'), findsOneWidget);
 
       await tapRow(tester, 'cv:protanopia');

@@ -204,7 +204,7 @@ class _LoupeHudBar extends StatelessWidget {
           selectedStrength(visionState),
         );
         // #76 と同じく、喚起の解決は resolveConsultNotice 1 箇所に集約する
-        // （FilterParamPanel・ExperiencePresetTile・export と同じ経路）。層ごとに
+        // （FilterParamPanel・ExperiencePresetPicker・export と同じ経路）。層ごとに
         // （名前, 喚起）を集める。1 層のときは従来どおり 1 件（名前は出さない）。
         final notices = <(String, ConsultNotice)>[
           for (final layer in layers)

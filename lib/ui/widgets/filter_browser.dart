@@ -13,7 +13,6 @@ import '../../services/settings_service.dart'
 import '../../services/vision_layer.dart';
 import '../../services/vision_filter_state.dart';
 import 'experience_presets.dart';
-import '../../src/rust/api/sensus_bridge.dart' show Experience;
 import 'filter_list_tile.dart';
 
 /// 統合フィルタ一覧（[FilterBrowser]）の検索語・カテゴリ・検索欄フォーカスを
@@ -118,7 +117,7 @@ class FilterBrowserController extends ChangeNotifier {
 
   /// 検索欄の ↓ を「先頭の行へ移す」に割り当てるか: 検索欄にフォーカスがあり、IME の
   /// 未確定文字（変換中）が無く、フォーカスできる行が 1 件以上あるとき。行が 0 件
-  /// （体験プリセットだけ見えている場合も含む）なら奪わず、入力欄に返す。
+  /// なら奪わず、入力欄に返す。
   bool get isSearchDownEnabled {
     if (!isSearchFocused) return false;
     if (_firstFocusableRow() == null) return false;
@@ -152,6 +151,11 @@ class FilterBrowserController extends ChangeNotifier {
   }
 }
 
+/// [FilterBrowser] の高さがこれ（dp）未満のときは、体験プリセット・見出し・検索欄を固定せず、
+/// 一覧と一緒に 1 つのスクロールにする（#199。固定の部分は約 200dp あり、低い画面で一覧が
+/// 潰れるのを避ける）。これ以上では体験プリセット・見出し・検索欄が固定で、一覧だけがスクロールする。
+const double kFilterBrowserCompactHeight = 380;
+
 /// 一覧の行 [entry] を一意に指す [Key]（テストと ↑↓ 追従の確認用）。
 Key filterListTileKey(FilterListEntry entry) =>
     ValueKey('filter_tile_${entry.key}');
@@ -163,12 +167,14 @@ Key filterListTileKey(FilterListEntry entry) =>
 /// もう一度選ぶと外す（[toggleFilterListEntry]）。色覚カテゴリの行は同時に 1 つのラジオ式
 /// （見出しに「いずれか 1 つ」）で、選んでいる間は適用順の番号が出る。層が上限に達すると、未選択の
 /// 行は理由つきで選べなくなる（色覚の行は色覚層があれば置き換えなので選べる）。体験プリセットは
-/// 一覧の最上段に置き、選ぶと層を全部そのフィルタ 1 つに置き換える。
+/// 一覧ではなくカラムの一番上のドロップダウン（`ExperiencePresetPicker`、#199）で、選ぶと層を
+/// 全部そのフィルタ 1 つに置き換える（結果は下の一覧のチェックに出る）。
 ///
 /// - 検索は日本語名・英語名のどちらでも当たる。検索語があるあいだは
 ///   カテゴリを無視して全体から探す。
 /// - カテゴリは「すべて」+ 7 カテゴリの `ChoiceChip` を行ごとに幅を伸ばして端を揃えて並べる（選択中は色とチェックで示す）。
-///   一覧のスクロール領域の先頭に置く（見出しと検索欄だけが固定）。
+///   一覧のスクロール領域の先頭に置く（体験プリセット・見出し・検索欄だけが固定。高さが
+///   [kFilterBrowserCompactHeight] 未満の低い画面では、それらも固定せず全体を 1 つのスクロールにする）。
 /// - 呼び出し側は**高さの制約が有限**の場所に置く（一覧は内側でスクロールする）。
 class FilterBrowser extends StatelessWidget {
   const FilterBrowser({
@@ -190,29 +196,55 @@ class FilterBrowser extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Semantics(
-          header: true,
-          child:
-              Text(l10n.filterListHeading, style: theme.textTheme.titleMedium),
-        ),
-        const SizedBox(height: 12),
-        _SearchField(controller: controller),
-        const SizedBox(height: 8),
-        // カテゴリのチップは一覧のスクロール領域の先頭に入れる（固定にすると、
-        // 低い画面でチップ帯（折り返して数行）が高さを食い潰して一覧が潰れる）。
-        Expanded(
-          child: ListenableBuilder(
+    // 体験プリセットは左カラムの一番上（#199）。下の一覧のフィルタ・強度をまとめて
+    // 切り替える入口なので、検索・カテゴリの絞り込みとは独立に常に出す。
+    // 上の余白は、枠の上に浮くラベルが切れないためのもの。
+    final header = <Widget>[
+      Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 16),
+        child: ExperiencePresetPicker(onActivated: onActivated),
+      ),
+      Semantics(
+        header: true,
+        child: Text(l10n.filterListHeading, style: theme.textTheme.titleMedium),
+      ),
+      const SizedBox(height: 12),
+      _SearchField(controller: controller),
+      const SizedBox(height: 8),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 低い画面（低い広幅のウィンドウ・クリックスルーの案内が出ている間など）では、
+        // 固定の部分（体験プリセット・見出し・検索欄）が高さを食い潰して一覧が潰れるので、
+        // 固定をやめて全体を 1 つのスクロールにする（並び順は同じ。一番上は体験プリセット）。
+        if (constraints.maxHeight < kFilterBrowserCompactHeight) {
+          return ListenableBuilder(
             listenable: controller,
             builder: (context, _) => _FilterList(
               controller: controller,
               onActivated: onActivated,
+              header: header,
             ),
-          ),
-        ),
-      ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ...header,
+            // カテゴリのチップは一覧のスクロール領域の先頭に入れる（固定にすると、
+            // 低い画面でチップ帯（折り返して数行）が高さを食い潰して一覧が潰れる）。
+            Expanded(
+              child: ListenableBuilder(
+                listenable: controller,
+                builder: (context, _) => _FilterList(
+                  controller: controller,
+                  onActivated: onActivated,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -447,23 +479,23 @@ class _CategoryChips extends StatelessWidget {
 }
 
 class _FilterList extends StatelessWidget {
-  const _FilterList({required this.controller, required this.onActivated});
+  const _FilterList({
+    required this.controller,
+    required this.onActivated,
+    this.header = const <Widget>[],
+  });
 
   final FilterBrowserController controller;
   final VoidCallback? onActivated;
+
+  /// スクロール領域の先頭（カテゴリのチップより上）に入れる部品。低い画面で、固定の部分
+  /// （体験プリセット・見出し・検索欄）を一覧と一緒にスクロールさせるときに渡す。
+  final List<Widget> header;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final query = controller.search.text;
-    final showPresets = controller.isSearching || controller.category == null;
-    final presets = showPresets
-        ? [
-            for (final exp in availableExperiences())
-              if (experienceMatchesQuery(exp.id, query)) exp,
-          ]
-        : const <Experience>[];
     final entries = controller.visibleEntries;
     // 検索語もカテゴリ指定も無いときだけ、カテゴリごとの小見出しを挟む。
     final showGroupHeaders =
@@ -482,14 +514,10 @@ class _FilterList extends StatelessWidget {
         );
 
     final children = <Widget>[
+      ...header,
       _CategoryChips(controller: controller),
       const SizedBox(height: 8),
-      if (presets.isNotEmpty) ...[
-        heading(l10n.experienceSectionTitle),
-        for (final exp in presets)
-          ExperiencePresetTile(experience: exp, onActivated: onActivated),
-      ],
-      if (entries.isEmpty && presets.isEmpty)
+      if (entries.isEmpty)
         Padding(
           padding: const EdgeInsets.all(12),
           child: Text(

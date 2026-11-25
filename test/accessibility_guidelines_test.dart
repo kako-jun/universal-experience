@@ -23,6 +23,7 @@ import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart'
     show Urgency;
+import 'package:universal_experience/ui/widgets/filter_browser.dart';
 import 'package:universal_experience/ui/widgets/loupe_hud.dart';
 import 'package:universal_experience/ui/theme/app_theme.dart';
 import 'package:universal_experience/ui/widgets/preview_rendering.dart';
@@ -59,6 +60,30 @@ void main() {
     for (var i = 0; i < 6; i++) {
       await tester.pump(const Duration(milliseconds: 300));
     }
+  }
+
+  /// 選んだ行へ一覧が自動でスクロールしたあと、一覧を先頭へ戻す。
+  ///
+  /// 自動スクロールは選んだ行を一覧の下端に揃えるので、上端で行や小見出しが半分だけ切れた
+  /// 状態になることがある。`textContrastGuideline` は切れた文字を拾うと、色が正しくても比を低く
+  /// 見積もって落ちる（どの行が切れるかは一覧の高さ次第で、色の問題ではない）。ここで見たいのは
+  /// 右カラム（調整）に出る部品なので、一覧は切れ目の無い先頭（「文字のコントラスト（主画面）」が
+  /// 測っている状態）へ戻してから当てる。
+  Future<void> settleWithListAtTop(WidgetTester tester) async {
+    await settle(tester);
+    final list = tester.state<ScrollableState>(
+      find
+          .descendant(
+            of: find.descendant(
+              of: find.byType(FilterBrowser),
+              matching: find.byType(SingleChildScrollView),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    list.position.jumpTo(0);
+    await tester.pump();
   }
 
   Future<void> pumpSelected(
@@ -147,7 +172,7 @@ void main() {
         final h = await pumpHomeScreen(tester,
             size: wide, theme: AppTheme.lightTheme);
         entry.value(h);
-        await settle(tester);
+        await settleWithListAtTop(tester);
         await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
         await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
         await expectLater(tester, meetsGuideline(textContrastGuideline));
@@ -186,7 +211,7 @@ void main() {
           final h =
               await pumpHomeScreen(tester, size: wide, theme: theme.value);
           entry.value(h);
-          await settle(tester);
+          await settleWithListAtTop(tester);
           await expectLater(tester, meetsGuideline(textContrastGuideline));
           handle.dispose();
         });

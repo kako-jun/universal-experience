@@ -24,6 +24,7 @@ import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart'
     show Urgency;
 import 'package:universal_experience/ui/widgets/preview_rendering.dart';
+import 'package:universal_experience/ui/widgets/adjust_panel.dart';
 import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 import 'package:universal_experience/ui/widgets/image_source_picker.dart';
 import 'package:universal_experience/ui/widgets/loupe_hud.dart';
@@ -103,7 +104,14 @@ void main() {
       final strength = dataOf(tester, find.byType(Slider));
       expect(strength.label, startsWith('強さ'));
       expect(strength.value, matches(RegExp(r'^\d+%$')));
-      final dropdown = dataOf(tester, find.byType(DropdownButton<String>));
+      // 左カラムの体験プリセットもドロップダウンなので、調整パネルの中に絞る（#199）。
+      final dropdown = dataOf(
+        tester,
+        find.descendant(
+          of: find.byType(AdjustPanel),
+          matching: find.byType(DropdownButton<String>),
+        ),
+      );
       expect(dropdown.label, contains('欠け方のタイプ'));
       handle.dispose();
     });

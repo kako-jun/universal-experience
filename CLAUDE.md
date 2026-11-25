@@ -98,7 +98,7 @@ lib/
     │                                 # 間の「描画中…」PreviewBusyTracker/PreviewBusyBadge、低解像度の仮表示・描画結果の LRU
     │                                 # PreviewRenderCache、#185）,
     │                                 # color_vision_compare_view（色覚 4 型の 2×2 比較と書き出し、#84。他の層の土台つき、#122）,
-    │                                 # experience_presets（体験プリセットの行 ExperiencePresetTile）, filter_param_panel,
+    │                                 # experience_presets（体験プリセットのドロップダウン ExperiencePresetPicker。左カラムの一番上、#199）, filter_param_panel,
     │                                 # consult_notice_block（受診喚起の共有表示ウィジェット、#76）,
     │                                 # strength_caution（強度スライダの上限付近の印・注記、#66）,
     │                                 # filter_provenance（モデルと出典・表現できないこと、#80）,
@@ -159,12 +159,12 @@ DESIGN.md                    # UI 設計原則（カラートークン・タイ�
 test/
 ├── no_hardcoded_colors_test.dart   # lib/ の色ハードコードを検出（例外は DESIGN.md の例外表と一致させる、#72）
 ├── app_theme_test.dart             # ハイコントラストテーマの生成と MaterialApp での切替（#72）
-├── home_screen_layout_test.dart    # 3 カラム/縦積み・プレビューの初回ビューポート（準備中・読み込み済みの両方で測定）と画像の高さ配分（#130）・空状態・キー操作（#72）
+├── home_screen_layout_test.dart    # 3 カラム/縦積み（選択 → プレビュー → 調整、#198）・プレビューが 1 画面に収まること（準備中・読み込み済みの両方で測定）と画像の高さ配分（#130）・空状態・キー操作（#72）
 ├── accessibility_guidelines_test.dart # Flutter 標準ガイドライン（タップ領域・ラベル・コントラスト）を主画面・選択別パネル・ダイアログ・HUD に 4 テーマ × ja/en で当てる（#45）
 ├── accessibility_semantics_test.dart  # スライダー/ドロップダウンの名前と値・見出し・選択状態・画像の代替テキスト・liveRegion・視差効果・Esc で閉じてフォーカスが戻る（#45）
 ├── tap_target_size_test.dart       # macOS 指定で操作領域が 48dp 以上（padded + standard・言語ダイアログの選択肢、#72/#82）
 ├── filter_browser_test.dart        # 統合一覧の検索・カテゴリ切替・行の選択（#72）
-├── filter_browser_multi_select_test.dart # 統合一覧のチェック式・番号バッジが段順・色覚の排他置き換え・上限で未選択の行が無効（色覚置き換え行とプリセットは有効）・プリセット置換と一致時だけ強調・行フォーカス移動（#120）
+├── filter_browser_multi_select_test.dart # 統合一覧のチェック式・番号バッジが段順・色覚の排他置き換え・上限で未選択の行が無効（色覚置き換え行とプリセットは有効）・プリセット置換と一致時だけドロップダウンに名前が出る・行フォーカス移動（#120）
 ├── filter_browser_category_chip_rows_test.dart # カテゴリチップ帯の行ごと伸ばす並び（#184）: 改行は選択中とみなした Wrap と同じ・各行の左右端が揃う・省略なし（極端な狭幅だけ省略+ツールチップ）・文字倍率 1.3/2.0 で全選択でも省略なし・48dp・Tab が行優先・余白定数が実物と一致
 ├── filter_browser_category_chip_search_test.dart # 検索語があるあいだカテゴリチップを全て非選択表示（チェック・選択色なし）にし、消すと元の選択へ戻る・内部カテゴリ不変・チップ押下で検索語が消えてカテゴリ選択・検索中の文字色が通常の非選択チップと同じであることとコントラスト 4 テーマ（#143）
 ├── welcome_banner_auto_dismiss_test.dart # ウェルカムバナーの自動 dismiss: 行・プリセット・✕/フィルタをすべて解除・調整パネルの解除・サンプル切替・写真の読込/貼付/閉じる・おすすめに戻すで閉じ永続化／seed・プログラム変更・起動復元・ピッカーキャンセルでは残る／Provider 無しでも例外なし（#143）
@@ -174,7 +174,7 @@ test/
 ├── export_multi_layer_test.dart    # 複数層の書き出し: 層ごとの行・最大の緊急度と併合した escalation・実験的の注記・強度 0 の層を数えない・ファイル名・描画時点の控え・単一層の従来どおり（#121）
 ├── home_screen_multi_select_keys_test.dart # ↑↓ は選択を変えず Space/Enter で足し引き・←→ は調整中の層の強度（#120）
 ├── home_screen_slash_key_test.dart # `/` のガードはテキスト入力中だけ: チップ・ボタン・スライダー・一覧の行にフォーカスがあっても検索欄へ移り全選択・検索欄の中では奪わない・↑↓←→ のガードは不変（#141）
-├── home_screen_search_down_key_test.dart # 検索欄の ↓ で先頭のフォーカス可能な行へ（選択は不変・空/絞り込み/上限無効/可視 0 件/プリセットのみは奪わず入力欄がキャレットを末尾へ/狭幅）・先頭行（上限で無効なら最初の有効行）の ↑ で検索欄へ戻る（折り返さない・キャレット維持）・IME 変換中は奪わない・検索欄の ↑←→Home/End`/`Ctrl+V・チップ/スライダー上の ↓ は不変（#141）
+├── home_screen_search_down_key_test.dart # 検索欄の ↓ で先頭のフォーカス可能な行へ（選択は不変・空/絞り込み/上限無効/可視 0 件は奪わず入力欄がキャレットを末尾へ/狭幅）・先頭行（上限で無効なら最初の有効行）の ↑ で検索欄へ戻る（折り返さない・キャレット維持）・IME 変換中は奪わない・検索欄の ↑←→Home/End`/`Ctrl+V・チップ/スライダー上の ↓ は不変（#141）
 ├── filter_list_selection_test.dart # 統合一覧の純粋ロジック（#72）
 ├── live_capture_test.dart         # ライブのルーペ: フィルタ → シェーダアセット（20 種・pubspec と一致）・段の計画・ネイティブ応答の読み取り・LiveLoupeSession（窓の真下の撮影順・token・拒否/停止で設定窓へ・再試行・撮り直し・開始待ち中に設定窓へ戻ると遅れた応答を捨てる・priming の待ち時間切れと静止画面・隠す途中に届いた枚では終えない・ネイティブ例外でも窓を戻して設定窓へ）・選べない理由と文言の対応表（#180）
 ├── live_loupe_view_test.dart      # ライブのルーペの描画: フェイクのネイティブから受けた画面を段のシェーダに通し、sensus 参照（deuteranopia_ref）と一致・設定窓では描かない・2 層以上は段順に 1 層 1 パスで重ね GPU の無い層は飛ばす・読み込み中に止まったら遅れた絵を書き戻さない・描画の失敗で failed として設定窓へ（#180）
@@ -292,8 +292,8 @@ sensus-core への一元化に伴い撤去した。判断の経緯・代替案�
 
 ### 主画面の構成（統合一覧 + 3 カラム）
 
-色覚 7 型・advanced 30 フィルタ・体験プリセットを 1 つの検索できる一覧に統合し、広幅は
-選ぶ / 見る / 調整の 3 カラム、狭幅は縦積み。起動モード等は AppBar のダイアログへ移した。
+色覚 7 型・advanced 30 フィルタを 1 つの検索できる一覧に統合し（体験プリセットは一覧の上のドロップダウン、#199）、広幅は
+選ぶ / 見る / 調整の 3 カラム、狭幅は同じ順の縦積み（#198）。起動時のウィンドウは 3 カラムが出る 1280x800（#197）。起動モード等は AppBar のダイアログへ移した。
 カテゴリ切替を `NavigationRail` でなく `ChoiceChip`（当初 `Wrap`、#184 で行ごとに幅を伸ばして端を揃える形）にした理由と代替案（`NavigationRail`・
 ボトムシート）、ハイコントラスト対応は `docs/adr/2026-09-30-home-screen-unified-list-and-three-columns.md`。
 

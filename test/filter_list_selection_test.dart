@@ -109,12 +109,6 @@ void main() {
       expect(rows.every((e) => e.category == category), isTrue);
     });
 
-    test('体験プリセットも ja/en/id で当たる', () {
-      expect(experienceMatchesQuery('meniere', 'meniere'), isTrue);
-      expect(experienceMatchesQuery('meniere', 'メニエール'), isTrue);
-      expect(experienceMatchesQuery('meniere', 'bppv'), isFalse);
-      expect(experienceMatchesQuery('meniere', ''), isTrue);
-    });
   });
 
   group('選択の書き込み', () {

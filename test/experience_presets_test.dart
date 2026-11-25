@@ -1,5 +1,6 @@
 // 体験プリセット (#19) の widget test。#72 で「プリセット欄のカード」から
-// 「統合フィルタ一覧の最上段の行 + 右カラムの調整パネル」へ移った。
+// 「統合フィルタ一覧の最上段の行 + 右カラムの調整パネル」へ移り、#199 で行から
+// 「左カラムの一番上のドロップダウン（ExperiencePresetPicker）」になった。
 //
 // 検証:
 // 1. 4 プリセットが i18n 名で一覧に描画される。
@@ -34,6 +35,7 @@ import 'package:universal_experience/ui/widgets/filter_browser.dart';
 
 import 'support/vision_filter_metadata_fixture.dart';
 import 'support/color_vision_select.dart';
+import 'support/experience_preset_select.dart';
 
 /// テスト用の 4 体験 fixture（sensus の experiences() と同じ id / vision / hearing /
 /// urgency）。実 bridge は native を要求するため fixture で代替する。
@@ -114,15 +116,16 @@ void main() {
     await tester.pump();
   }
 
-  /// 体験プリセットの行の中にあるテキスト。advanced カタログにも同名の行
-  /// （例: Vestibular neuritis）があるため、プリセットの行の中だけを探す。
+  /// 体験プリセットのメニュー（開いたドロップダウン）の項目の中にあるテキスト。advanced
+  /// カタログにも同名の行（例: Vestibular neuritis）があるため、メニューの項目の中だけを探す。
   Finder inPresetRow(String experienceId, String text) => find.descendant(
         of: find.byKey(experienceCardKey(experienceId)),
         matching: find.text(text),
       );
 
-  testWidgets('4 プリセットが i18n 名で描画される', (tester) async {
+  testWidgets('4 プリセットが i18n 名でメニューに並ぶ', (tester) async {
     await pumpPresets(tester, const Locale('en'));
+    await openExperiencePresetMenu(tester);
     final en = lookupAppLocalizations(const Locale('en'));
     expect(inPresetRow('meniere', en.experienceMeniere), findsOneWidget);
     expect(inPresetRow('bppv', en.experienceBppv), findsOneWidget);
@@ -134,6 +137,7 @@ void main() {
 
   testWidgets('ja でも日本語の体験名が出る', (tester) async {
     await pumpPresets(tester, const Locale('ja'));
+    await openExperiencePresetMenu(tester);
     final ja = lookupAppLocalizations(const Locale('ja'));
     expect(inPresetRow('meniere', ja.experienceMeniere), findsOneWidget);
     expect(inPresetRow('vestibular_neuritis', ja.experienceVestibularNeuritis),
@@ -150,8 +154,7 @@ void main() {
     selectColorVisionKey(visionState, 'protanopia');
     expect(visionState.layers.map((l) => l.id), ['protanopia']);
 
-    await tester.tap(find.byKey(experienceCardKey('meniere')));
-    await tester.pump();
+    await selectExperiencePreset(tester, 'meniere');
 
     expect(visionState.selectedId, 'vertigo');
     expect(visionState.selectedPresetId, 'meniere');
@@ -164,8 +167,7 @@ void main() {
       (tester) async {
     await pumpPresets(tester, const Locale('en'));
 
-    await tester.tap(find.byKey(experienceCardKey('bppv')));
-    await tester.pump();
+    await selectExperiencePreset(tester, 'bppv');
 
     expect(visionState.selectedId, 'bppv_rotation');
     expect(visionState.selectedPresetId, 'bppv');
@@ -173,43 +175,50 @@ void main() {
 
   testWidgets(
       'meniere と labyrinthitis は同じ catalog id (vertigo) だが、選んだ方だけが '
-      '点灯する（#60: 2 行同時点灯バグの修正）', (tester) async {
+      '選択中として表示される（#60: 2 行同時点灯バグの修正）', (tester) async {
     await pumpPresets(tester, const Locale('en'));
+    final en = lookupAppLocalizations(const Locale('en'));
 
-    // 何も選んでいない間はどの行にもチェックが付かない。
-    expect(find.byIcon(Icons.check), findsNothing);
+    // 何も選んでいない間は「プリセットなし」。
+    expect(experiencePresetDropdownText(en.experiencePresetNone),
+        findsOneWidget);
 
-    await tester.tap(find.byKey(experienceCardKey('meniere')));
-    await tester.pump();
+    await selectExperiencePreset(tester, 'meniere');
 
     expect(visionState.selectedPresetId, 'meniere');
-    // meniere の行だけにチェックマークが付き、labyrinthitis には付かない。
-    expect(find.byIcon(Icons.check), findsOneWidget);
+    // ドロップダウンには meniere だけが出て、labyrinthitis は出ない。
     expect(
-      find.descendant(
-        of: find.byKey(experienceCardKey('meniere')),
-        matching: find.byIcon(Icons.check),
-      ),
-      findsOneWidget,
-    );
+        experiencePresetDropdownText(en.experienceMeniere), findsOneWidget);
+    expect(experiencePresetDropdownText(en.experienceLabyrinthitis),
+        findsNothing);
+    expect(experiencePresetDropdownText(en.experiencePresetNone), findsNothing);
 
-    await tester.tap(find.byKey(experienceCardKey('labyrinthitis')));
-    await tester.pump();
+    await selectExperiencePreset(tester, 'labyrinthitis');
 
     expect(visionState.selectedId, 'vertigo');
     expect(visionState.selectedPresetId, 'labyrinthitis');
-    expect(find.byIcon(Icons.check), findsOneWidget,
-        reason: '切り替え後も点灯するのは 1 行だけであるべき');
-    expect(
-      find.descendant(
-        of: find.byKey(experienceCardKey('labyrinthitis')),
-        matching: find.byIcon(Icons.check),
-      ),
-      findsOneWidget,
-    );
+    expect(experiencePresetDropdownText(en.experienceLabyrinthitis),
+        findsOneWidget,
+        reason: '切り替え後に表示されるのは選んだ 1 件だけ');
+    expect(experiencePresetDropdownText(en.experienceMeniere), findsNothing);
   });
 
-  testWidgets('選ぶまでは受診喚起も聴覚注記も出さない（一覧の行には出さない）', (tester) async {
+  testWidgets('プリセットを選んだあとでフィルタを足すと、表示は「プリセットなし」へ戻る（#199）',
+      (tester) async {
+    await pumpPresets(tester, const Locale('en'));
+    final en = lookupAppLocalizations(const Locale('en'));
+    await selectExperiencePreset(tester, 'bppv');
+    expect(experiencePresetDropdownText(en.experienceBppv), findsOneWidget);
+
+    visionState.toggle('myopia');
+    await tester.pump();
+
+    expect(visionState.selectedPresetId, isNull);
+    expect(experiencePresetDropdownText(en.experiencePresetNone),
+        findsOneWidget);
+  });
+
+  testWidgets('選ぶまでは受診喚起も聴覚注記も出さない（ドロップダウンには出さない）', (tester) async {
     await pumpPresets(tester, const Locale('en'));
     final en = lookupAppLocalizations(const Locale('en'));
     expect(find.text(en.consultEmergency), findsNothing);
@@ -223,8 +232,7 @@ void main() {
     await pumpPresets(tester, const Locale('en'));
     final en = lookupAppLocalizations(const Locale('en'));
 
-    await tester.tap(find.byKey(experienceCardKey('vestibular_neuritis')));
-    await tester.pump();
+    await selectExperiencePreset(tester, 'vestibular_neuritis');
 
     expect(find.text(en.consultEmergency), findsOneWidget);
     expect(find.text(en.consultEarly), findsNothing);
@@ -234,8 +242,7 @@ void main() {
     await pumpPresets(tester, const Locale('en'));
     final en = lookupAppLocalizations(const Locale('en'));
 
-    await tester.tap(find.byKey(experienceCardKey('meniere')));
-    await tester.pump();
+    await selectExperiencePreset(tester, 'meniere');
 
     expect(find.text(en.consultEarly), findsOneWidget);
     expect(find.text(en.consultEmergency), findsNothing);
@@ -245,8 +252,7 @@ void main() {
     await pumpPresets(tester, const Locale('en'));
     final en = lookupAppLocalizations(const Locale('en'));
 
-    await tester.tap(find.byKey(experienceCardKey('bppv')));
-    await tester.pump();
+    await selectExperiencePreset(tester, 'bppv');
 
     expect(find.text(en.consultEarly), findsNothing);
     expect(find.text(en.consultEmergency), findsNothing);
@@ -256,12 +262,10 @@ void main() {
     await pumpPresets(tester, const Locale('en'));
     final en = lookupAppLocalizations(const Locale('en'));
 
-    await tester.tap(find.byKey(experienceCardKey('meniere')));
-    await tester.pump();
+    await selectExperiencePreset(tester, 'meniere');
     expect(find.text(en.experienceIncludesHearingNote), findsOneWidget);
 
-    await tester.tap(find.byKey(experienceCardKey('labyrinthitis')));
-    await tester.pump();
+    await selectExperiencePreset(tester, 'labyrinthitis');
     expect(find.text(en.experienceIncludesHearingNote), findsOneWidget);
   });
 
@@ -269,19 +273,17 @@ void main() {
     await pumpPresets(tester, const Locale('en'));
     final en = lookupAppLocalizations(const Locale('en'));
 
-    await tester.tap(find.byKey(experienceCardKey('bppv')));
-    await tester.pump();
+    await selectExperiencePreset(tester, 'bppv');
 
     expect(find.text(en.experienceIncludesHearingNote), findsNothing);
   });
 
-  testWidgets('体験の説明文は選んだあと右カラムに出る（一覧の行には出ない）', (tester) async {
+  testWidgets('体験の説明文は選んだあと右カラムに出る（ドロップダウンには出ない）', (tester) async {
     await pumpPresets(tester, const Locale('en'));
     final en = lookupAppLocalizations(const Locale('en'));
     expect(find.text(en.experienceBppvDesc), findsNothing);
 
-    await tester.tap(find.byKey(experienceCardKey('bppv')));
-    await tester.pump();
+    await selectExperiencePreset(tester, 'bppv');
 
     expect(find.text(en.experienceBppvDesc), findsOneWidget);
   });
@@ -310,8 +312,7 @@ void main() {
     await pumpPresets(tester, const Locale('en'));
     final en = lookupAppLocalizations(const Locale('en'));
 
-    await tester.tap(find.byKey(experienceCardKey('bppv')));
-    await tester.pump();
+    await selectExperiencePreset(tester, 'bppv');
 
     expect(find.text(en.consultEarly), findsNothing);
     expect(find.text(en.escalationHeaderEarly), findsOneWidget);
@@ -325,8 +326,7 @@ void main() {
     await pumpPresets(tester, const Locale('en'));
     final en = lookupAppLocalizations(const Locale('en'));
 
-    await tester.tap(find.byKey(experienceCardKey('vestibular_neuritis')));
-    await tester.pump();
+    await selectExperiencePreset(tester, 'vestibular_neuritis');
 
     expect(find.text(en.consultDisclaimer), findsOneWidget);
     expect(find.textContaining('sensus/blob/main/docs/overview.md'),
@@ -345,8 +345,7 @@ void main() {
     await pumpPresets(tester, const Locale('en'));
     final en = lookupAppLocalizations(const Locale('en'));
 
-    await tester.tap(find.byKey(experienceCardKey('bppv')));
-    await tester.pump();
+    await selectExperiencePreset(tester, 'bppv');
 
     expect(find.text(en.consultDisclaimer), findsNothing);
   });

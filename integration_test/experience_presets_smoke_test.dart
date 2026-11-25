@@ -32,9 +32,10 @@ import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
 import '../test/support/color_vision_select.dart';
+import '../test/support/experience_preset_select.dart';
 
-/// 統合フィルタ一覧（#72）を固定高さで置くヘルパ。体験プリセットは一覧の最上段に
-/// 並ぶので、4 行とも初期表示で見える高さにしてある。
+/// 統合フィルタ一覧（#72）を固定高さで置くヘルパ。体験プリセットは一番上のドロップダウン
+/// （`ExperiencePresetPicker`、#199）で、一覧のスクロールに関係なく常に出ている。
 class _BrowserBox extends StatefulWidget {
   const _BrowserBox();
 
@@ -83,7 +84,7 @@ Widget _presetsApp() {
 }
 
 /// home_screen.dart のプレビュー結線（#60）を最小構成で再現したアプリ。
-/// 体験プリセットの行（[ExperiencePresetTile]）のタップが実際に [BeforeAfterView] の描画へつながる
+/// 体験プリセットのドロップダウン（[ExperiencePresetPicker]）での選択が実際に [BeforeAfterView] の描画へつながる
 /// ことを、実ブリッジ（CPU `apply()`）込みで確かめる。
 Widget _previewWithPresetsApp(ScrollController scrollController) {
   final visionState = VisionFilterState();
@@ -104,7 +105,7 @@ Widget _previewWithPresetsApp(ScrollController scrollController) {
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: SingleChildScrollView(
-          // 外側のスクロールはテストが直接動かす（プリセットの行を確実にヒットテストできる
+          // 外側のスクロールはテストが直接動かす（プリセットのドロップダウンを確実にヒットテストできる
           // 位置へ出すため）。
           controller: scrollController,
           // home_screen.dart の ConstrainedBox(maxWidth: 800) を再現する
@@ -200,16 +201,25 @@ void main() {
     });
   });
 
-  group('プリセット行（統合フィルタ一覧の最上段、#72）', () {
-    testWidgets('実ブリッジで例外なく描画される（プリセットの行 4 つ）', (tester) async {
+  group('プリセットのドロップダウン（左カラムの一番上、#199）', () {
+    testWidgets('実ブリッジで例外なく描画され、開くと実ブリッジの体験が全部メニューに並ぶ', (tester) async {
       await tester.pumpWidget(_presetsApp());
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
-      expect(find.byType(ExperiencePresetTile), findsNWidgets(4));
+      expect(find.byType(ExperiencePresetPicker), findsOneWidget);
+      await openExperiencePresetMenu(tester);
+      expect(tester.takeException(), isNull);
+      // 件数は固定しない（sensus の experiences() の件数ぶん並ぶ）。いまの 4 体験は必ずある。
+      final all = experiences();
+      expect(all.length, greaterThanOrEqualTo(4));
+      for (final exp in all) {
+        expect(find.byKey(experienceCardKey(exp.id)), findsOneWidget,
+            reason: exp.id);
+      }
     });
 
-    testWidgets('行をタップすると層がそのプリセット 1 つに置き換わり、色覚クイック選択の層は無くなる（#120）',
+    testWidgets('メニューから選ぶと層がそのプリセット 1 つに置き換わり、色覚クイック選択の層は無くなる（#120）',
         (tester) async {
       await tester.pumpWidget(_presetsApp());
       await tester.pumpAndSettle();
@@ -223,8 +233,7 @@ void main() {
       selectColorVisionKey(visionState, 'protanopia');
       expect(visionState.layers.map((l) => l.id), ['protanopia']);
 
-      final en = lookupAppLocalizations(const Locale('en'));
-      await tester.tap(find.text(en.experienceMeniere));
+      await selectExperiencePreset(tester, 'meniere');
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
@@ -237,30 +246,21 @@ void main() {
   });
 
   group('プリセット → プレビュー結線（#60）', () {
-    /// [finder]（プリセットの行）が実際にヒットテストできる位置へ、一覧自身のスクロールと
-    /// 外側のスクロール（[scrollController]）を動かして出す。
+    /// 体験プリセットのドロップダウンが実際にヒットテストできる位置へ、外側のスクロール
+    /// （[scrollController]）を動かして出す。
     ///
-    /// 実ジェスチャの `drag` や `ensureVisible` には頼らない。外側のスクロールの中に一覧
-    /// 自身のスクロールが入れ子になっており、`drag` は画面中央の位置で始まるため、中央が
-    /// 一覧の上に来ると外側ではなく一覧側がスクロールする。また #120 では、プリセットを
-    /// タップすると層がそのプリセットの 1 つに置き換わり、置き換わった層に対応するフィルタの
-    /// 行（一覧の下の方）が選択中になって、[FilterListTile] が一覧の内側のスクロールを
-    /// その行まで動かす。すると一覧の最上段にあるほかのプリセットの行は、矩形が画面の中に
-    /// あっても一覧の表示領域の上へ出てしまい、ヒットテストが当たらない（2 枚目以降が
-    /// 外れる）。そのため、一覧を先頭へ戻し、外側を末尾まで動かして一覧の箱を画面の下端へ
-    /// 揃える。最後に実際のヒットテストで確かめ、外れるならタップの前に明示的に fail() する。
-    Future<void> revealPresetCard(
+    /// 実ジェスチャの `drag` には頼らない（外側のスクロールの中に一覧自身のスクロールが入れ子に
+    /// なっており、`drag` は画面中央で始まるため、一覧側がスクロールすることがある）。外側を
+    /// 末尾まで動かして一覧の箱を画面の下端へ揃える。ドロップダウンは一覧のスクロール領域の外
+    /// （箱の一番上）にあるので、一覧がどこまでスクロールしていても隠れない（#199）。最後に実際の
+    /// ヒットテストで確かめ、外れるならタップの前に明示的に fail() する。
+    Future<void> revealPresetDropdown(
       WidgetTester tester,
-      Finder finder,
       ScrollController scrollController,
     ) async {
-      // 一覧自身のスクロール（行から見て最も近い Scrollable）を先頭へ戻す。
-      final listScrollable = tester.state<ScrollableState>(
-        find.ancestor(of: finder, matching: find.byType(Scrollable)).first,
-      );
-      listScrollable.position.jumpTo(listScrollable.position.minScrollExtent);
       scrollController.jumpTo(scrollController.position.maxScrollExtent);
       await tester.pump();
+      final finder = experiencePresetDropdown();
       if (finder.hitTestable().evaluate().isEmpty) {
         fail(
           '$finder が外側を末尾までスクロールしてもヒットテストできない '
@@ -270,7 +270,7 @@ void main() {
       }
     }
 
-    testWidgets('プリセット 4 種すべてが、タップで実ブリッジ CPU apply() まで例外なく描画される',
+    testWidgets('プリセット 4 種すべてが、メニューからの選択で実ブリッジ CPU apply() まで例外なく描画される',
         (tester) async {
       final scrollController = ScrollController();
       addTearDown(scrollController.dispose);
@@ -321,11 +321,8 @@ void main() {
       // meniere と labyrinthitis はどちらも vertigo に写るため after ラベルは
       // 同じになる — それでも構わない（ここでの主張は「例外なく描画される」）。
       //
-      // カードは experience id ベースの Key（experienceCardKey）で見つける。
-      // 表示名の文字列は「上に積まれたプレビューペインのせいでカードが
-      // ビューポート外に出て tap のヒットテストが外れる」問題には無関係
-      // （原因は off-screen であることそのもの）だが、id ベースの Key の方が
-      // ロケール・レイアウトに依存せず安定して見つけられる。
+      // メニューの項目は experience id ベースの Key（experienceCardKey）で見つける
+      // （ロケール・レイアウトに依存せず安定して見つけられる）。
       final cases = <(String experienceId, String afterLabel)>[
         ('meniere', visionFilterName(en, 'vertigo')),
         ('bppv', visionFilterName(en, 'bppv_rotation')),
@@ -334,13 +331,11 @@ void main() {
       ];
 
       for (final (experienceId, afterLabel) in cases) {
-        final cardFinder = find.byKey(experienceCardKey(experienceId));
         // プレビューペインの下にあるため、タップ前に確実にヒットテストできる位置へ出す。
-        await revealPresetCard(tester, cardFinder, scrollController);
+        await revealPresetDropdown(tester, scrollController);
 
         final shownBeforeTap = shown.length;
-        await tester.tap(cardFinder);
-        await tester.pump();
+        await selectExperiencePreset(tester, experienceId);
 
         // タップ直後に選択状態そのものも確認する（実描画の結果だけを見て、
         // 選択が正しく反映されたことを間接的に推測しない、#60）。

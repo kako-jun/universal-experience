@@ -8,7 +8,8 @@ import 'experimental_badge.dart';
 
 /// 行の選び方の見た目（#120）。
 enum FilterListTileKind {
-  /// 体験プリセットの行。選ぶと単一選択に置き換わる。選択中は右端にチェック。
+  /// 単一選択の行。選ぶと単一選択に置き換わる。選択中は右端にチェック。#199 で体験プリセットが
+  /// ドロップダウンになってからは、製品コードでこの型の行を出す所は無い（部品のテストだけが使う）。
   preset,
 
   /// 足し引きできる行（チェック式）。先頭にチェックボックスの絵、選択中は右端に適用順の番号。
@@ -36,7 +37,7 @@ enum FilterListTileKind {
 ///   **一覧の内側のスクロール**だけを動かして画面内へ入れる。外側のページ
 ///   スクロールは動かさない（狭幅でプレビューが押し出されないため。
 ///   `Scrollable.ensureVisible` は使わない）。起動直後・再描画で最初から
-///   選択中の行は動かさない（一覧の最上段の体験プリセットを隠さないため）。
+///   選択中の行は動かさない（起動直後は一覧を先頭から見せるため）。
 class FilterListTile extends StatefulWidget {
   const FilterListTile({
     super.key,
@@ -67,7 +68,7 @@ class FilterListTile extends StatefulWidget {
   /// フォーカスを行に残し、次の Tab が先頭からやり直しにならないようにする）。
   final VoidCallback? onPointerActivated;
 
-  /// 先頭のアイコン（体験プリセットの行だけが使う）。
+  /// 先頭のアイコン（[FilterListTileKind.preset] の行だけが使う）。
   final Widget? leading;
 
   /// 名前の横に「実験的」バッジを出すか（#80、

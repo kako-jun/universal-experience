@@ -341,7 +341,7 @@ String experienceDescription(AppLocalizations l10n, String id) {
 ///
 /// advanced カタログ（`FilterParamPanel`、フィルタの [VisionFilter] を
 /// `visionFilterUrgencyProvider` に渡して得る）・体験プリセット
-/// （`ExperiencePresetTile`、`Experience.urgency`）・export の焼き込み
+/// （`ExperiencePresetPicker`、`Experience.urgency`）・export の焼き込み
 /// （`before_after_view.dart`）が、この 1 関数を共有する **唯一の正本**にする
 /// （#76: 「受診喚起は sensus の単一の正本に統一する」）。
 String? urgencyConsultMessage(AppLocalizations l10n, Urgency urgency) {
@@ -410,7 +410,7 @@ class ConsultEscalationGroup {
 ///
 /// urgency/escalation から「何を表示するか」を **1 箇所**（[resolveConsultNotice]）
 /// で決め、advanced カタログ（`FilterParamPanel`）・体験プリセットのカード
-/// （`ExperiencePresetTile`）・PNG export（`before_after_view.dart` /
+/// （`ExperiencePresetPicker`）・PNG export（`before_after_view.dart` /
 /// `export_service.dart`）の 3 箇所がこの結果を共有する。UI 表示は
 /// `ConsultNoticeBlock`（`lib/ui/widgets/consult_notice_block.dart`）が担う。
 class ConsultNotice {
@@ -447,7 +447,7 @@ class ConsultNotice {
 /// urgency/escalation から [ConsultNotice] を解決する。
 ///
 /// [urgency] が `none` かつ [escalation] が空なら、表示する喚起が無いので
-/// `null` を返す。呼び出し側（`FilterParamPanel`・`ExperiencePresetTile`・
+/// `null` を返す。呼び出し側（`FilterParamPanel`・`ExperiencePresetPicker`・
 /// `before_after_view.dart`）はこの 1 関数だけを呼べばよく、喚起文・
 /// escalation の訳・免責文をそれぞれ個別に解決しない。
 ConsultNotice? resolveConsultNotice(

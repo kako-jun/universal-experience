@@ -10,17 +10,19 @@ import '../../services/settings_service.dart'
 import '../../services/vision_filter_metadata.dart';
 import '../../services/vision_filter_state.dart';
 import '../../src/rust/api/sensus_bridge.dart';
-import 'filter_list_tile.dart';
 
 // 供給源の seam と検証は services 層にある（main.dart が widget を import せず
 // 済むように移した）。既存の import 経路を変えないよう再公開する。
 export '../../services/experience_source.dart';
 
-/// 体験プリセットの行（[ExperiencePresetTile]）を一意に指す [Key]。
+/// 体験プリセットのドロップダウン（[ExperiencePresetPicker]）を指す [Key]。
+const Key experiencePresetDropdownKey = ValueKey('experience_preset_dropdown');
+
+/// ドロップダウンを開いたメニューの中の、体験プリセット 1 件の項目を一意に指す [Key]。
 ///
-/// テストが表示名の文字列（ロケール依存・レイアウト変更で位置がずれる）ではなく
-/// experience id で安定して行を見つけ、タップ前にスクロールできるようにする
-/// ための公開ヘルパ（#60）。
+/// テストが表示名の文字列（ロケール依存）ではなく experience id で安定して項目を
+/// 見つけられるようにするための公開ヘルパ（#60）。メニューを開いている間だけ存在する
+/// （閉じているときのボタンの表示には付けない）。
 Key experienceCardKey(String experienceId) =>
     ValueKey('experience_card_$experienceId');
 
@@ -57,66 +59,145 @@ Experience? selectedExperience(VisionFilterState state) {
   return null;
 }
 
-/// 体験プリセット (#19) の一覧の 1 行。
+/// 体験プリセット (#19) の選択欄。左カラム「選ぶ」（`FilterBrowser`）の一番上に置く
+/// ドロップダウン（#199）。
 ///
-/// sensus の [experiences]（meniere / bppv / vestibular_neuritis /
-/// labyrinthitis の 4 体験）をタップで「視覚フィルタの選択」に橋渡しする。
-/// 統合フィルタ一覧（`FilterBrowser`、#72）の最上段に、色覚・advanced の行より
-/// 先に並べる。
+/// sensus の [experiences]（いまは meniere / bppv / vestibular_neuritis /
+/// labyrinthitis の 4 体験）を、選ぶだけで「下のフィルタ・強度・パラメータをまとめて
+/// 切り替える」入口にする。**件数は固定しない**: 選択肢は [availableExperiences] を
+/// そのまま並べるので、sensus に体験が増えればここにも増える（多いときはメニューが
+/// スクロールする。表示名は `experienceName` が ARB から引き、未登録の id は id のまま出す）。
+/// 体験が 0 件なら何も出さない。
 ///
 /// - 視覚: `Experience.vision`（bridge の [VisionFilter]）を [visionFilterCatalogId]
 ///   でカタログ id（snake_case）へ写し、[VisionFilterState.selectPreset] に渡す
-///   （層の集合はそのプリセット単体へ置き換わる。プレビューもトレイも
-///   [VisionFilterState] の選択だけを見る）。id をハードコードせずカタログを正本に引く。
+///   （層の集合はそのプリセット単体へ置き換わり、強度・パラメータは推奨値になる。一覧の
+///   チェック・プレビュー・調整パネル・トレイは [VisionFilterState] の選択だけを見るので、
+///   選んだ結果がそのまま下の設定に反映される）。id をハードコードせずカタログを正本に引く。
 /// - 選択表示: meniere と labyrinthitis はどちらもカタログ id `vertigo` に写る
 ///   ため、選択表示はカタログ id ではなく [VisionFilterState.selectedPresetId]
-///   （`Experience.id`）で比較する（#60: 2 行同時点灯バグの修正）。
-/// - 説明・受診喚起・聴覚症状の注記は一覧の行には出さず、選んだあと右カラム
-///   （`AdjustPanel`）に出す（#72）。免責文・根拠 URL も右カラムの
-///   `ConsultNoticeBlock` が常に表示する。
+///   （`Experience.id`）で比較する（#60）。プリセットを選んだあとでフィルタを足し引き
+///   すると選択は外れ（[VisionFilterState] の仕様）、表示は「プリセットなし」へ戻る。
+/// - 説明・受診喚起・聴覚症状の注記は、選んだあと右カラム（`AdjustPanel`）に出す（#72）。
 /// - 聴覚: hearing を含む体験（meniere / labyrinthitis）は右カラムの注記に留める。
-///   **音声再生は本 Issue 非スコープ**（聴覚モード設計に委ねる）。音は鳴らさない。
+///   **音声再生は非スコープ**（聴覚モード設計に委ねる）。音は鳴らさない。
 ///
 /// 文言は持たず、id / 分類から i18n で解決する（規律2）。
-class ExperiencePresetTile extends StatelessWidget {
-  const ExperiencePresetTile({
-    super.key,
-    required this.experience,
-    this.onActivated,
-  });
+class ExperiencePresetPicker extends StatefulWidget {
+  const ExperiencePresetPicker({super.key, this.onActivated});
 
-  final Experience experience;
-
-  /// ポインタで選択した直後に呼ばれる（一覧がキーボード操作の受け口へ
-  /// フォーカスを戻すために使う。キーボードでの活性化では呼ばれない。
-  /// `FilterBrowser` 参照）。
+  /// **ポインタで**開いて選んだ直後に呼ばれる（一覧の行と同じ扱い。画面がショートカットの
+  /// 受け口へフォーカスを戻し、続く ←→ で強度を動かせるようにする）。キーボード
+  /// （Enter/Space）で開いて選んだときは呼ばれず、フォーカスはドロップダウンに残る
+  /// （次の Tab が先頭からやり直しにならないようにする）。
   final VoidCallback? onActivated;
 
   @override
+  State<ExperiencePresetPicker> createState() => _ExperiencePresetPickerState();
+}
+
+class _ExperiencePresetPickerState extends State<ExperiencePresetPicker> {
+  /// 直近にドロップダウンを触ったのがポインタか（キーを押したら false に戻す）。
+  bool _lastInputWasPointer = false;
+
+  /// 体験の視覚フィルタが写るカタログ id。視覚フィルタが無い・カタログに無いなら null。
+  static String? _catalogIdOf(Experience experience) {
+    final vision = experience.vision;
+    return vision == null ? null : visionFilterCatalogId(vision);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final experiences = availableExperiences();
+    if (experiences.isEmpty) return const SizedBox.shrink();
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
     final state = context.watch<VisionFilterState>();
-    final catalogId = experience.vision == null
-        ? null
-        : visionFilterCatalogId(experience.vision!);
-    // #60: カタログ id ではなく experience id で比較する。
-    final isSelected = state.selectedPresetId == experience.id;
-    return FilterListTile(
-      key: experienceCardKey(experience.id),
-      leading: const Icon(Icons.auto_awesome),
-      title: experienceName(l10n, experience.id),
-      selected: isSelected,
-      // 視覚フィルタを持つ体験のみ適用可能（4 体験はすべて vision を持つ）。
-      onTap: catalogId == null
-          ? null
-          : () {
-              context.read<VisionFilterState>().selectPreset(
-                    experience.id,
-                    catalogId,
-                  );
-              dismissWelcomeBannerOnUserChange(context);
-            },
-      onPointerActivated: onActivated,
+    // #60: カタログ id ではなく experience id で比較する。一覧に無い id（古い保存値など）は
+    // 未選択として扱う（DropdownButton は items に無い value を受け付けない）。
+    final selectedId = state.selectedPresetId;
+    final value =
+        experiences.any((e) => e.id == selectedId) ? selectedId : null;
+    return Listener(
+      key: experiencePresetDropdownKey,
+      onPointerDown: (_) => _lastInputWasPointer = true,
+      child: Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onKeyEvent: (_, __) {
+          _lastInputWasPointer = false;
+          return KeyEventResult.ignored;
+        },
+        child: _dropdown(context, l10n, theme, experiences, value),
+      ),
+    );
+  }
+
+  Widget _dropdown(
+    BuildContext context,
+    AppLocalizations l10n,
+    ThemeData theme,
+    List<Experience> experiences,
+    String? value,
+  ) {
+    return DropdownButtonFormField<String>(
+      // 選択は VisionFilterState が正本。FormField は初期値しか見ないので、外から変わった値
+      // （フィルタの足し引きでプリセットが外れる等）に追従させるため、値ごとに作り直す。
+      key: ValueKey('experience_preset_field_${value ?? ''}'),
+      initialValue: value,
+      isExpanded: true,
+      // 長い名前（英語）は、メニューの中では折り返して全文を出す。
+      itemHeight: null,
+      menuMaxHeight: 480,
+      decoration: InputDecoration(
+        labelText: l10n.experienceSectionTitle,
+        helperText: l10n.experiencePresetHelper,
+        helperMaxLines: 4,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      hint: Text(
+        l10n.experiencePresetNone,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+      ),
+      // 閉じているときの表示は 1 行（入りきらなければ省略）。
+      selectedItemBuilder: (context) => [
+        for (final exp in experiences)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(
+              experienceName(l10n, exp.id),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      items: [
+        for (final exp in experiences)
+          DropdownMenuItem<String>(
+            value: exp.id,
+            // 視覚フィルタを持つ体験のみ適用可能（いまの 4 体験はすべて vision を持つ）。
+            enabled: _catalogIdOf(exp) != null,
+            child: Padding(
+              key: experienceCardKey(exp.id),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(experienceName(l10n, exp.id)),
+            ),
+          ),
+      ],
+      onChanged: (id) {
+        if (id == null) return;
+        for (final exp in experiences) {
+          if (exp.id != id) continue;
+          final catalogId = _catalogIdOf(exp);
+          if (catalogId == null) return;
+          context.read<VisionFilterState>().selectPreset(exp.id, catalogId);
+          dismissWelcomeBannerOnUserChange(context);
+          if (_lastInputWasPointer) widget.onActivated?.call();
+          return;
+        }
+      },
     );
   }
 }

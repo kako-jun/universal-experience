@@ -14,8 +14,10 @@ import 'package:universal_experience/services/filter_list_selection.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
+import 'package:universal_experience/ui/widgets/filter_list_tile.dart';
 
 import 'support/home_screen_harness.dart';
+import 'support/experience_preset_select.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -68,8 +70,24 @@ void main() {
 
   Finder tileOf(String key) => find.byKey(ValueKey('filter_tile_$key'));
 
-  testWidgets('初期状態は体験プリセット 4 件と一覧の行が並ぶ', (tester) async {
+  testWidgets('初期状態は一番上に体験プリセットのドロップダウン、その下に見出し・検索欄・一覧の行が並ぶ（#199）',
+      (tester) async {
     await pumpBrowser(tester);
+    // 体験プリセットは左カラムの一番上（見出し・検索欄・色覚の行より上）のドロップダウン。
+    final dropdown = tester.getRect(experiencePresetDropdown());
+    expect(dropdown.bottom,
+        lessThanOrEqualTo(tester.getRect(find.text('見え方を選ぶ')).top));
+    expect(dropdown.bottom,
+        lessThanOrEqualTo(tester.getRect(find.byType(TextField)).top));
+    expect(dropdown.top, lessThan(tester.getRect(tileOf('cv:protanopia')).top));
+    // 何の欄か（ラベル）と、選ぶと下の設定がまとめて切り替わること（説明）が出ている。
+    expect(find.text('体験プリセット'), findsOneWidget);
+    expect(find.text('下の設定をまとめて切り替えます。'), findsOneWidget);
+    // 何も選んでいない間は「プリセットなし」。
+    expect(experiencePresetDropdownText('プリセットなし'), findsOneWidget);
+    // 閉じている間はメニューの項目は無い。開くと供給源の 4 件が全部出る（件数は固定しない）。
+    expect(find.byKey(experienceCardKey('meniere')), findsNothing);
+    await openExperiencePresetMenu(tester);
     for (final id in [
       'meniere',
       'bppv',
@@ -78,12 +96,6 @@ void main() {
     ]) {
       expect(find.byKey(experienceCardKey(id)), findsOneWidget, reason: id);
     }
-    // 体験プリセットは一覧の最上段（色覚の行より上）。
-    expect(
-      tester.getRect(find.byKey(experienceCardKey('meniere'))).top,
-      lessThan(tester.getRect(tileOf('cv:protanopia')).top),
-    );
-    expect(find.text('見え方を選ぶ'), findsOneWidget);
   });
 
   group('検索', () {
@@ -94,8 +106,8 @@ void main() {
 
       expect(tileOf('cv:protanopia'), findsOneWidget);
       expect(tileOf('cv:deuteranopia'), findsNothing);
-      // 体験プリセットも検索語で絞られる。
-      expect(find.byKey(experienceCardKey('meniere')), findsNothing);
+      // 体験プリセットのドロップダウンは検索語と無関係に出たまま。
+      expect(experiencePresetDropdown(), findsOneWidget);
     });
 
     testWidgets('日本語名で絞り込める', (tester) async {
@@ -103,9 +115,10 @@ void main() {
       await tester.enterText(find.byType(TextField), 'メニエール');
       await tester.pump();
 
-      expect(find.byKey(experienceCardKey('meniere')), findsOneWidget);
-      expect(find.byKey(experienceCardKey('bppv')), findsNothing);
+      // 体験プリセットは一覧の行ではないので、検索には当たらない（#199）。
+      expect(find.byType(FilterListTile), findsNothing);
       expect(tileOf('cv:protanopia'), findsNothing);
+      expect(experiencePresetDropdown(), findsOneWidget);
     });
 
     testWidgets('英語ロケールでも日本語名で当たる（ja/en どちらでも検索できる）', (tester) async {
@@ -170,13 +183,13 @@ void main() {
       expect(tileOf('catalog:starbursts'), findsOneWidget);
       expect(find.byKey(filterListTileKey(outside)), findsNothing);
       expect(controller.visibleEntries, inCategory);
-      // カテゴリを絞ると体験プリセットは出ない（一覧の最上段はカテゴリ「すべて」のときだけ）。
-      expect(find.byKey(experienceCardKey('meniere')), findsNothing);
+      // カテゴリを絞っても体験プリセットのドロップダウンは出たまま（#199）。
+      expect(experiencePresetDropdown(), findsOneWidget);
 
       await tester.tap(find.widgetWithText(ChoiceChip, 'すべて'));
       await tester.pump();
       expect(controller.category, isNull);
-      expect(find.byKey(experienceCardKey('meniere')), findsOneWidget);
+      expect(experiencePresetDropdown(), findsOneWidget);
     });
 
     testWidgets('ChoiceChip をタップして切り替えられ、選択中はチェックで示す', (tester) async {
@@ -232,26 +245,19 @@ void main() {
       expect(activated, 1);
     });
 
-    testWidgets('体験プリセットの行は selectPreset で選ばれ、その行だけが点灯する', (tester) async {
+    testWidgets('体験プリセットはドロップダウンから selectPreset で選ばれ、選んだ名前が表示される',
+        (tester) async {
       await pumpBrowser(tester);
-      await tester.tap(find.byKey(experienceCardKey('meniere')));
-      await tester.pump();
+      await selectExperiencePreset(tester, 'meniere');
 
       expect(state.selectedPresetId, 'meniere');
+      expect(experiencePresetDropdownText('メニエール病'), findsOneWidget);
+      // meniere と labyrinthitis は同じカタログ id に写るが、表示は選んだ方だけ。
+      expect(experiencePresetDropdownText('迷路炎'), findsNothing);
+      // 選んだ結果は下の一覧に反映される（プリセットのフィルタの行にチェック）。
       expect(
-        find.descendant(
-          of: find.byKey(experienceCardKey('meniere')),
-          matching: find.byIcon(Icons.check),
-        ),
-        findsOneWidget,
-      );
-      // meniere と labyrinthitis は同じカタログ id に写るが、点灯は片方だけ。
-      expect(
-        find.descendant(
-          of: find.byKey(experienceCardKey('labyrinthitis')),
-          matching: find.byIcon(Icons.check),
-        ),
-        findsNothing,
+        tester.widget<FilterListTile>(tileOf('catalog:vertigo')).selected,
+        isTrue,
       );
       expect(activated, 1);
     });

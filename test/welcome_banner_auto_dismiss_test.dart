@@ -28,7 +28,6 @@ import 'package:universal_experience/services/settings_service.dart';
 import 'package:universal_experience/services/vision_filter_snapshot.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/services/vision_filter_store.dart';
-import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
 import 'package:universal_experience/ui/widgets/image_source_picker.dart';
 import 'package:universal_experience/ui/widgets/layer_chip_strip.dart';
@@ -36,6 +35,7 @@ import 'package:universal_experience/ui/widgets/welcome_banner.dart';
 
 import 'support/home_screen_harness.dart';
 import 'support/sample_image_generator.dart';
+import 'support/experience_preset_select.dart';
 
 class _FakeClipboardImageReader implements ClipboardImageReader {
   _FakeClipboardImageReader(this.bytes);
@@ -106,8 +106,7 @@ void main() {
     testWidgets('体験プリセットをタップ', (tester) async {
       final h = await pumpHomeScreen(tester, size: tall);
       expectBannerUp(h);
-      await tester.tap(find.byKey(experienceCardKey('bppv')));
-      await tester.pump();
+      await selectExperiencePreset(tester, 'bppv');
       expect(h.visionState.selectedPresetId, 'bppv');
       await expectBannerDismissed(tester, h);
     });
@@ -387,8 +386,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('filter_tile_cv:protanopia')));
       await tester.pump();
       expect(state.layers, isNotEmpty);
-      await tester.tap(find.byKey(experienceCardKey('bppv')));
-      await tester.pump();
+      await selectExperiencePreset(tester, 'bppv');
       expect(state.selectedPresetId, 'bppv');
       expect(tester.takeException(), isNull);
     });

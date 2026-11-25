@@ -82,6 +82,8 @@
   "exportPathCopied": "パスをコピーしました。",
 
   "experienceSectionTitle": "体験プリセット",
+  "experiencePresetHelper": "下の設定をまとめて切り替えます。",
+  "experiencePresetNone": "プリセットなし",
   "experienceMeniere": "メニエール病",
   "experienceMeniereDesc": "回転性めまいを繰り返し、低音域の難聴・耳のつまり感・低い唸るような耳鳴りを伴います。",
   "experienceBppv": "良性発作性頭位めまい症",
