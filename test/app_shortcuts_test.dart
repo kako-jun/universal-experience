@@ -39,7 +39,7 @@ void main() {
     // 前提にするため、使える設定のコントローラを用意する。
     testLoupe = LoupeWindowController(loupeModeAvailable: true);
     // 体験・メタデータ・プレビューの読み込み/適用をハーネスの fixture（Rust 非依存、
-    // #127/#131）に揃える。体験プリセットの行はキー移動の対象に混ざらないよう空にする。
+    // #127/#131）に揃える。体験プリセットのドロップダウン（#199）がキー移動（Tab 順）に混ざらないよう空にする（0 件ならドロップダウン自体を出さない）。
     installHomeScreenFixtures();
     experiencesProvider = () => const [];
   });

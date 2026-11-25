@@ -1057,7 +1057,8 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行、ロジックは
   `filter_list_selection.dart`）を持ち、その上（カラムの一番上）に体験プリセットのドロップダウン
   （`ExperiencePresetPicker`、#199。選ぶと `selectPreset` で下のフィルタ・強度・パラメータをまとめて切り替える。
-  選択肢は `availableExperiences()` をそのまま並べ、件数を固定しない。ポインタで選んだ直後だけショートカットの受け口へ
+  選択肢は `availableExperiences()` をそのまま並べ、件数を固定しない。「プリセットなし」は表示専用で、外すのはフィルタ側の操作。
+  検索語がプリセット名に当たったら一覧に案内 `filterListPresetHint` を出す（`experienceMatchesQuery`）。ポインタで選んだ直後だけショートカットの受け口へ
   フォーカスを戻す）を持つ。`AdjustPanel` は選んだ
   症状の説明・強度スライダー 1 本・受診喚起（`ConsultNoticeBlock` 常時展開）を
   `FilterParamPanel` で持ち、2 層以上のときは層ごとの節（調整中の層だけ展開、#120）にする。

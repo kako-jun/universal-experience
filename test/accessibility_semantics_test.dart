@@ -30,6 +30,7 @@ import 'package:universal_experience/ui/widgets/image_source_picker.dart';
 import 'package:universal_experience/ui/widgets/loupe_hud.dart';
 
 import 'support/color_vision_select.dart';
+import 'support/experience_preset_select.dart';
 import 'support/home_screen_harness.dart';
 import 'support/sample_image_generator.dart';
 
@@ -113,6 +114,60 @@ void main() {
         ),
       );
       expect(dropdown.label, contains('欠け方のタイプ'));
+      handle.dispose();
+    });
+
+    testWidgets('体験プリセットのドロップダウンは、名前（ラベル）と今の値を 1 つのノードで読み、操作できる（#199）',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      await installFakes(tester);
+      final h = await pumpHomeScreen(tester, size: wide);
+
+      // 何も選んでいない間: 「体験プリセット」+「プリセットなし」。
+      var data = dataOf(tester, experiencePresetDropdown());
+      expect(data.label, contains('体験プリセット'));
+      expect(data.label, contains('プリセットなし'));
+      expect(data.hasAction(ui.SemanticsAction.tap), isTrue);
+      expect(data.hasAction(ui.SemanticsAction.focus), isTrue,
+          reason: 'フォーカスできる');
+
+      // 選んだあと: 値が選んだプリセットの名前に変わる（「プリセットなし」は読まない）。
+      h.visionState.selectPreset('bppv', 'bppv_rotation');
+      await settle(tester);
+      data = dataOf(tester, experiencePresetDropdown());
+      expect(data.label, contains('体験プリセット'));
+      expect(data.label, contains('良性発作性頭位めまい症'));
+      expect(data.label, isNot(contains('プリセットなし')));
+
+      // フィルタを足してプリセットが外れると、読み上げも「プリセットなし」へ戻る。
+      h.visionState.toggle('myopia');
+      await settle(tester);
+      data = dataOf(tester, experiencePresetDropdown());
+      expect(data.label, contains('プリセットなし'));
+
+      // 説明文（下の設定をまとめて切り替える）も読み上げに出ている。
+      expect(find.bySemanticsLabel(RegExp('下の設定をまとめて切り替えます')), findsWidgets);
+      handle.dispose();
+    });
+
+    testWidgets('開いたメニューの項目は、プリセットの名前を読み、選べる（#199）', (tester) async {
+      final handle = tester.ensureSemantics();
+      await installFakes(tester);
+      await pumpHomeScreen(tester, size: wide);
+      await openExperiencePresetMenu(tester);
+
+      for (final name in ['メニエール病', '良性発作性頭位めまい症', '前庭神経炎', '迷路炎']) {
+        final item = find.ancestor(
+          of: find.descendant(
+            of: find.byWidgetPredicate((w) => w is DropdownMenuItem<String>),
+            matching: find.text(name),
+          ),
+          matching: find.byWidgetPredicate((w) => w is DropdownMenuItem<String>),
+        );
+        expect(item, findsOneWidget, reason: name);
+        final data = dataOf(tester, item);
+        expect(data.label, contains(name));
+      }
       handle.dispose();
     });
 

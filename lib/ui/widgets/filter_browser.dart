@@ -33,6 +33,14 @@ class FilterBrowserController extends ChangeNotifier {
   /// 検索欄の [FocusNode]（`/` の行き先）。
   final FocusNode searchFocus = FocusNode(debugLabel: 'filterSearch');
 
+  /// 体験プリセットのドロップダウンと検索欄の [GlobalKey]。[FilterBrowser] は高さが
+  /// [kFilterBrowserCompactHeight] をまたぐと、この 2 つを「固定の見出し」と「スクロールの中」の
+  /// 間で付け替える。キーが同じなら State ごと移るので、リサイズで境界をまたいでも
+  /// フォーカス・入力中の文字が落ちない。
+  final GlobalKey presetPickerKey =
+      GlobalKey(debugLabel: 'experiencePresetPicker');
+  final GlobalKey searchFieldKey = GlobalKey(debugLabel: 'filterSearchField');
+
   VisionFilterCategory? _category;
 
   /// 選択中のカテゴリ。null は「すべて」。
@@ -156,6 +164,10 @@ class FilterBrowserController extends ChangeNotifier {
 /// 潰れるのを避ける）。これ以上では体験プリセット・見出し・検索欄が固定で、一覧だけがスクロールする。
 const double kFilterBrowserCompactHeight = 380;
 
+/// 検索語が体験プリセットの名前に当たったときに一覧へ出す案内（上のドロップダウンから選べる旨）
+/// を指す [Key]（#199）。
+const Key filterListPresetHintKey = ValueKey('filter_list_preset_hint');
+
 /// 一覧の行 [entry] を一意に指す [Key]（テストと ↑↓ 追従の確認用）。
 Key filterListTileKey(FilterListEntry entry) =>
     ValueKey('filter_tile_${entry.key}');
@@ -168,7 +180,8 @@ Key filterListTileKey(FilterListEntry entry) =>
 /// （見出しに「いずれか 1 つ」）で、選んでいる間は適用順の番号が出る。層が上限に達すると、未選択の
 /// 行は理由つきで選べなくなる（色覚の行は色覚層があれば置き換えなので選べる）。体験プリセットは
 /// 一覧ではなくカラムの一番上のドロップダウン（`ExperiencePresetPicker`、#199）で、選ぶと層を
-/// 全部そのフィルタ 1 つに置き換える（結果は下の一覧のチェックに出る）。
+/// 全部そのフィルタ 1 つに置き換える（結果は下の一覧のチェックに出る）。プリセットの名前で検索したときは、
+/// 一覧に「上の体験プリセットから選べます」の案内を出す（行が 0 件でも「見つかりません」だけにしない）。
 ///
 /// - 検索は日本語名・英語名のどちらでも当たる。検索語があるあいだは
 ///   カテゴリを無視して全体から探す。
@@ -202,14 +215,17 @@ class FilterBrowser extends StatelessWidget {
     final header = <Widget>[
       Padding(
         padding: const EdgeInsets.only(top: 4, bottom: 16),
-        child: ExperiencePresetPicker(onActivated: onActivated),
+        child: ExperiencePresetPicker(
+          key: controller.presetPickerKey,
+          onActivated: onActivated,
+        ),
       ),
       Semantics(
         header: true,
         child: Text(l10n.filterListHeading, style: theme.textTheme.titleMedium),
       ),
       const SizedBox(height: 12),
-      _SearchField(controller: controller),
+      _SearchField(key: controller.searchFieldKey, controller: controller),
       const SizedBox(height: 8),
     ];
     return LayoutBuilder(
@@ -217,6 +233,8 @@ class FilterBrowser extends StatelessWidget {
         // 低い画面（低い広幅のウィンドウ・クリックスルーの案内が出ている間など）では、
         // 固定の部分（体験プリセット・見出し・検索欄）が高さを食い潰して一覧が潰れるので、
         // 固定をやめて全体を 1 つのスクロールにする（並び順は同じ。一番上は体験プリセット）。
+        // ドロップダウンと検索欄は GlobalKey で State ごと付け替わるので、リサイズで境界を
+        // またいでもフォーカスは落ちない。
         if (constraints.maxHeight < kFilterBrowserCompactHeight) {
           return ListenableBuilder(
             listenable: controller,
@@ -250,7 +268,7 @@ class FilterBrowser extends StatelessWidget {
 }
 
 class _SearchField extends StatelessWidget {
-  const _SearchField({required this.controller});
+  const _SearchField({super.key, required this.controller});
 
   final FilterBrowserController controller;
 
@@ -497,6 +515,14 @@ class _FilterList extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final entries = controller.visibleEntries;
+    // 検索語に当たった体験プリセットの表示名（検索していない間は空）。
+    final matchedPresets = controller.isSearching
+        ? [
+            for (final exp in availableExperiences())
+              if (experienceMatchesQuery(exp.id, controller.search.text))
+                experienceName(l10n, exp.id),
+          ]
+        : const <String>[];
     // 検索語もカテゴリ指定も無いときだけ、カテゴリごとの小見出しを挟む。
     final showGroupHeaders =
         !controller.isSearching && controller.category == null;
@@ -517,7 +543,36 @@ class _FilterList extends StatelessWidget {
       ...header,
       _CategoryChips(controller: controller),
       const SizedBox(height: 8),
-      if (entries.isEmpty)
+      // 検索語が体験プリセットの名前に当たったら、上のドロップダウンへ案内する（#199。
+      // プリセットは一覧の行ではないので、案内が無いと「見つからない」で終わってしまう）。
+      if (matchedPresets.isNotEmpty)
+        Padding(
+          key: filterListPresetHintKey,
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.arrow_upward,
+                size: 20,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  l10n.filterListPresetHint(
+                    matchedPresets.join(l10n.filterListPresetHintSeparator),
+                    l10n.experienceSectionTitle,
+                  ),
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ),
+            ],
+          ),
+        ),
+      // プリセットに当たっているときは「見つかりません」とは言わない（上の案内だけ出す）。
+      if (entries.isEmpty && matchedPresets.isEmpty)
         Padding(
           padding: const EdgeInsets.all(12),
           child: Text(

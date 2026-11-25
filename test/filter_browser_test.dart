@@ -120,15 +120,75 @@ void main() {
       expect(tileOf('cv:protanopia'), findsNothing);
     });
 
-    testWidgets('体験プリセットの名前は検索に当たらない（一覧の行ではない、#199）', (tester) async {
+    testWidgets('体験プリセットの名前で検索すると、行は無いが「上の体験プリセットから選べます」の案内が出る（#199）',
+        (tester) async {
       await pumpBrowser(tester);
       await tester.enterText(find.byType(TextField), 'メニエール');
       await tester.pump();
 
-      // 体験プリセットは一覧の行ではないので、検索には当たらない（#199）。
+      // 体験プリセットは一覧の行ではない。行は 0 件だが、「見つかりません」ではなく案内を出す。
       expect(find.byType(FilterListTile), findsNothing);
-      expect(tileOf('cv:protanopia'), findsNothing);
+      expect(find.byKey(filterListPresetHintKey), findsOneWidget);
+      expect(find.text('「メニエール病」は、上の「体験プリセット」から選べます。'), findsOneWidget);
+      expect(find.text('一致する見え方がありません。'), findsNothing);
       expect(experiencePresetDropdown(), findsOneWidget);
+    });
+
+    testWidgets('プリセットの id・英語名でも案内が出る。複数当たれば全部の名前を並べる', (tester) async {
+      await pumpBrowser(tester);
+      await tester.enterText(find.byType(TextField), 'bppv');
+      await tester.pump();
+      expect(find.text('「良性発作性頭位めまい症」は、上の「体験プリセット」から選べます。'),
+          findsOneWidget);
+
+      // 「炎」は 前庭神経炎・迷路炎 の 2 つのプリセットに当たる。
+      await tester.enterText(find.byType(TextField), '炎');
+      await tester.pump();
+      expect(find.text('「前庭神経炎」「迷路炎」は、上の「体験プリセット」から選べます。'), findsOneWidget);
+    });
+
+    testWidgets('プリセット名と行の両方に当たる検索語では、案内と行の両方が出る', (tester) async {
+      await pumpBrowser(tester);
+      // 「前庭神経炎」は体験プリセットにも advanced のフィルタにもある。
+      await tester.enterText(find.byType(TextField), '前庭神経炎');
+      await tester.pump();
+
+      expect(find.byKey(filterListPresetHintKey), findsOneWidget);
+      expect(tileOf('catalog:vestibular_neuritis'), findsOneWidget);
+      expect(
+        tester.getRect(find.byKey(filterListPresetHintKey)).bottom,
+        lessThanOrEqualTo(
+            tester.getRect(tileOf('catalog:vestibular_neuritis')).top),
+        reason: '案内は行より上',
+      );
+    });
+
+    testWidgets('どれにも当たらない検索語では案内は出ず、「一致する見え方がありません」だけ', (tester) async {
+      await pumpBrowser(tester);
+      await tester.enterText(find.byType(TextField), 'zzzzzzzz');
+      await tester.pump();
+
+      expect(find.byKey(filterListPresetHintKey), findsNothing);
+      expect(find.text('一致する見え方がありません。'), findsOneWidget);
+    });
+
+    testWidgets('検索していない間（カテゴリで絞っているだけ）は案内を出さない', (tester) async {
+      await pumpBrowser(tester);
+      expect(find.byKey(filterListPresetHintKey), findsNothing);
+      controller.setCategory(VisionFilterCategory.colorVision);
+      await tester.pump();
+      expect(find.byKey(filterListPresetHintKey), findsNothing);
+    });
+
+    testWidgets('英語ロケールの案内は英語（プリセット名・ラベルとも）', (tester) async {
+      await pumpBrowser(tester, locale: 'en');
+      await tester.enterText(find.byType(TextField), 'meniere');
+      await tester.pump();
+      expect(
+        find.text(
+            'Ménière\'s disease — choose it from “Experience Presets” above.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('英語ロケールでも日本語名で当たる（ja/en どちらでも検索できる）', (tester) async {

@@ -1,4 +1,7 @@
+import 'package:flutter/gestures.dart' show GestureBinding;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'
+    show HardwareKeyboard, KeyDownEvent, KeyEvent;
 import 'package:provider/provider.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -86,10 +89,13 @@ Experience? selectedExperience(VisionFilterState state) {
 class ExperiencePresetPicker extends StatefulWidget {
   const ExperiencePresetPicker({super.key, this.onActivated});
 
-  /// **ポインタで**開いて選んだ直後に呼ばれる（一覧の行と同じ扱い。画面がショートカットの
+  /// **ポインタで**選んだ直後に呼ばれる（一覧の行と同じ扱い。画面がショートカットの
   /// 受け口へフォーカスを戻し、続く ←→ で強度を動かせるようにする）。キーボード
-  /// （Enter/Space）で開いて選んだときは呼ばれず、フォーカスはドロップダウンに残る
+  /// （Enter/Space）で選んだときは呼ばれず、フォーカスはドロップダウンに残る
   /// （次の Tab が先頭からやり直しにならないようにする）。
+  ///
+  /// どちらで選んだかは、**メニューの項目を確定した入力**で決まる（開いたときの入力ではない）:
+  /// マウスで開いて ↑↓ Enter で選べばキーボード、Enter で開いてクリックで選べばポインタ。
   final VoidCallback? onActivated;
 
   @override
@@ -97,8 +103,36 @@ class ExperiencePresetPicker extends StatefulWidget {
 }
 
 class _ExperiencePresetPickerState extends State<ExperiencePresetPicker> {
-  /// 直近にドロップダウンを触ったのがポインタか（キーを押したら false に戻す）。
+  /// 直近の入力がポインタ（押下）か。キーを押したら false に戻す。
+  ///
+  /// 開いたメニューは別のルート（オーバーレイ）に出るので、このウィジェットの子孫の
+  /// `Listener` / `Focus` ではメニューの中のクリック・キー操作を拾えない。アプリ全体の入力
+  /// （[HardwareKeyboard] のハンドラと、ポインタのグローバルルート）を見て、項目を確定した
+  /// 入力の種類を知る。イベントは消費しない（見るだけ）。
   bool _lastInputWasPointer = false;
+
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_handleKey);
+    GestureBinding.instance.pointerRouter.addGlobalRoute(_handlePointer);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleKey);
+    GestureBinding.instance.pointerRouter.removeGlobalRoute(_handlePointer);
+    super.dispose();
+  }
+
+  bool _handleKey(KeyEvent event) {
+    if (event is KeyDownEvent) _lastInputWasPointer = false;
+    return false;
+  }
+
+  void _handlePointer(PointerEvent event) {
+    if (event is PointerDownEvent) _lastInputWasPointer = true;
+  }
 
   /// 体験の視覚フィルタが写るカタログ id。視覚フィルタが無い・カタログに無いなら null。
   static String? _catalogIdOf(Experience experience) {
@@ -118,18 +152,9 @@ class _ExperiencePresetPickerState extends State<ExperiencePresetPicker> {
     final selectedId = state.selectedPresetId;
     final value =
         experiences.any((e) => e.id == selectedId) ? selectedId : null;
-    return Listener(
+    return KeyedSubtree(
       key: experiencePresetDropdownKey,
-      onPointerDown: (_) => _lastInputWasPointer = true,
-      child: Focus(
-        canRequestFocus: false,
-        skipTraversal: true,
-        onKeyEvent: (_, __) {
-          _lastInputWasPointer = false;
-          return KeyEventResult.ignored;
-        },
-        child: _dropdown(context, l10n, theme, experiences, value),
-      ),
+      child: _dropdown(context, l10n, theme, experiences, value),
     );
   }
 

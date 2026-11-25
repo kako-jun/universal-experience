@@ -802,9 +802,23 @@
   "@filterListNoResults": {
     "description": "Shown in the filter list when the search matches nothing (#72)."
   },
-  "filterListSelectedSemantics": "Selected",
-  "@filterListSelectedSemantics": {
-    "description": "Semantics hint appended to the currently selected row of the filter list (#72)."
+  "filterListPresetHint": "{names} — choose it from “{label}” above.",
+  "@filterListPresetHint": {
+    "description": "Shown in the filter list when the search text matches the name of one or more experience presets: presets are not rows of the list but options of the dropdown at the top of the pane, so this points the user there (#199).",
+    "placeholders": {
+      "names": {
+        "type": "String",
+        "example": "Ménière's disease"
+      },
+      "label": {
+        "type": "String",
+        "example": "Experience Presets"
+      }
+    }
+  },
+  "filterListPresetHintSeparator": ", ",
+  "@filterListPresetHintSeparator": {
+    "description": "Separator between preset names inside filterListPresetHint when more than one preset matches the search (#199)."
   },
   "filterListExclusiveHeading": "{name} (pick one)",
   "@filterListExclusiveHeading": {

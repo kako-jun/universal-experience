@@ -28,7 +28,7 @@ void main() {
     // 前提にするため、使える設定のコントローラを用意する。
     testLoupe = LoupeWindowController(loupeModeAvailable: true);
     // 体験・メタデータ・プレビューの読み込み/適用をハーネスの fixture（Rust 非依存、
-    // #127/#131）に揃える。体験プリセットの行は不要なので空にする。
+    // #127/#131）に揃える。体験プリセット（ドロップダウンの選択肢）は不要なので空にする。
     installHomeScreenFixtures();
     experiencesProvider = () => const [];
     // 実機が Wayland セッションでもテストが変わらないよう、環境変数は非 Wayland の

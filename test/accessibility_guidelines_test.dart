@@ -23,11 +23,13 @@ import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/services/vision_filter_state.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart'
     show Urgency;
+import 'package:universal_experience/ui/widgets/experience_presets.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
 import 'package:universal_experience/ui/widgets/loupe_hud.dart';
 import 'package:universal_experience/ui/theme/app_theme.dart';
 import 'package:universal_experience/ui/widgets/preview_rendering.dart';
 
+import 'support/experience_preset_select.dart';
 import 'support/home_screen_harness.dart';
 import 'support/sample_image_generator.dart';
 import 'support/color_vision_select.dart';
@@ -216,6 +218,58 @@ void main() {
           handle.dispose();
         });
       }
+    }
+  });
+
+  // 体験プリセットのドロップダウンを開いたメニュー（別ルートに出る、#199）。項目のタップ領域
+  // （48dp）・ラベル・文字のコントラストを、4 テーマ × ja/en で当てる。
+  group('体験プリセットのメニュー（開いた状態）', () {
+    for (final theme in themes.entries) {
+      for (final locale in const [Locale('ja'), Locale('en')]) {
+        testWidgets('${theme.key} ${locale.languageCode}', (tester) async {
+          final handle = tester.ensureSemantics();
+          await installFakes(tester);
+          await pumpHomeScreen(tester,
+              size: wide, theme: theme.value, locale: locale);
+          await settle(tester);
+          await openExperiencePresetMenu(tester);
+          await settle(tester);
+          expect(find.byKey(experienceCardKey('meniere')), findsOneWidget,
+              reason: 'メニューが開いている');
+          // 項目の高さそのものも確かめる（ガイドラインが項目を拾っていることの裏取り）。
+          for (final id in [
+            'meniere',
+            'bppv',
+            'vestibular_neuritis',
+            'labyrinthitis'
+          ]) {
+            final item = find.ancestor(
+              of: find.byKey(experienceCardKey(id)),
+              matching:
+                  find.byWidgetPredicate((w) => w is DropdownMenuItem<String>),
+            );
+            expect(tester.getSize(item).height, greaterThanOrEqualTo(48),
+                reason: id);
+          }
+          await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+          await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+          await expectLater(tester, meetsGuideline(textContrastGuideline));
+          handle.dispose();
+        });
+      }
+    }
+
+    for (final theme in themes.entries) {
+      testWidgets('${theme.key}: プリセットを選んだあとの閉じたドロップダウン', (tester) async {
+        final handle = tester.ensureSemantics();
+        await installFakes(tester);
+        final h = await pumpHomeScreen(tester, size: wide, theme: theme.value);
+        h.visionState.selectPreset('meniere', 'vertigo');
+        await settleWithListAtTop(tester);
+        await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+        await expectLater(tester, meetsGuideline(textContrastGuideline));
+        handle.dispose();
+      });
     }
   });
 

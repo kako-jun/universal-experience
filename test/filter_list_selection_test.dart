@@ -111,6 +111,18 @@ void main() {
 
   });
 
+  group('体験プリセットの検索一致（一覧の案内に使う、#199）', () {
+    test('ja 名・en 名・id で当たり、別のプリセットの語には当たらない', () {
+      expect(experienceMatchesQuery('meniere', 'meniere'), isTrue);
+      expect(experienceMatchesQuery('meniere', 'メニエール'), isTrue);
+      expect(experienceMatchesQuery('meniere', 'bppv'), isFalse);
+    });
+
+    test('空の検索語は常に true（呼び出し側は検索中だけ使う）', () {
+      expect(experienceMatchesQuery('meniere', ''), isTrue);
+    });
+  });
+
   group('選択の書き込み', () {
     test('色覚の別名の行は variantId 付きの層になる', () {
       final state = VisionFilterState();

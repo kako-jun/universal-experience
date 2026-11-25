@@ -536,6 +536,129 @@ void main() {
     });
   });
 
+  group('選んだ入力の種類は、メニューの項目を確定した入力で決まる（#199）', () {
+    testWidgets('マウスで開いて ↑↓ Enter で選ぶ → キーボード扱い（onActivated を呼ばず、フォーカスはドロップダウン）',
+        (tester) async {
+      await pumpBrowser(tester);
+      await openExperiencePresetMenu(tester);
+      expect(find.byKey(experienceCardKey('meniere')), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(state.selectedPresetId, isNotNull, reason: '↑↓ Enter で選べる');
+      expect(find.byKey(experienceCardKey('meniere')), findsNothing,
+          reason: 'メニューは閉じている');
+      expect(activated, 0, reason: '確定したのはキーボード');
+      expect(focusIsInPicker(tester), isTrue);
+    });
+
+    testWidgets('Enter で開いてクリックで選ぶ → ポインタ扱い（onActivated を呼ぶ）', (tester) async {
+      await pumpBrowser(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byKey(experienceCardKey('bppv')), findsOneWidget,
+          reason: 'Enter でメニューが開く');
+
+      await tester.tap(find.byKey(experienceCardKey('bppv')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(state.selectedPresetId, 'bppv');
+      expect(activated, 1, reason: '確定したのはポインタ');
+    });
+
+    testWidgets('メニューの中でキーを押したあとでも、クリックで確定すればポインタ扱い', (tester) async {
+      await pumpBrowser(tester);
+      await openExperiencePresetMenu(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+
+      await tester.tap(find.byKey(experienceCardKey('labyrinthitis')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(state.selectedPresetId, 'labyrinthitis');
+      expect(activated, 1);
+    });
+  });
+
+  group('高さの境界（kFilterBrowserCompactHeight）をまたいでも状態が落ちない（#199）', () {
+    Future<void> resize(WidgetTester tester, double height) async {
+      tester.view.physicalSize = Size(400, height + 100);
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<VisionFilterState>.value(value: state),
+          ],
+          child: MaterialApp(
+            locale: const Locale('ja'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: Align(
+                alignment: Alignment.topCenter,
+                child: SizedBox(
+                  height: height,
+                  child: FilterBrowser(
+                    controller: controller,
+                    onActivated: () => activated++,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+    }
+
+    for (final (label, from, to) in [
+      ('固定 → 全体スクロール', 600.0, 300.0),
+      ('全体スクロール → 固定', 300.0, 600.0),
+    ]) {
+      testWidgets('$label: 検索欄のフォーカスと入力中の文字が残る', (tester) async {
+        await pumpBrowser(tester, height: from);
+        await tester.tap(find.byType(TextField));
+        await tester.pump();
+        await tester.enterText(find.byType(TextField), 'prot');
+        await tester.pump();
+        expect(controller.isSearchFocused, isTrue);
+
+        await resize(tester, to);
+
+        expect(controller.isSearchFocused, isTrue, reason: 'フォーカスが落ちない');
+        expect(controller.search.text, 'prot');
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('$label: ドロップダウンのフォーカスが残る', (tester) async {
+        await pumpBrowser(tester, height: from);
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        expect(focusIsInPicker(tester), isTrue);
+
+        await resize(tester, to);
+
+        expect(focusIsInPicker(tester), isTrue, reason: 'フォーカスが落ちない');
+        expect(tester.takeException(), isNull);
+      });
+    }
+  });
+
   group('低い画面（高さが kFilterBrowserCompactHeight 未満）', () {
     testWidgets('閾値以上では体験プリセット・見出し・検索欄は固定で、一覧だけがスクロールする', (tester) async {
       await pumpBrowser(tester, height: kFilterBrowserCompactHeight);

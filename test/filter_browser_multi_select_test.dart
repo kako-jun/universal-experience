@@ -455,7 +455,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    // 行の型（チェック式）はプリセットの行と別。
+    // 一覧の行はチェック式（体験プリセットは行ではなく上のドロップダウン、#199）。
     expect(find.byType(FilterListTile), findsWidgets);
   });
 }
