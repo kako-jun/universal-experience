@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:screen_retriever/screen_retriever.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:io' show Platform;
 // AppLifecycleListener.onExitRequested の戻り値型（AppExitResponse）は dart:ui
@@ -241,22 +242,34 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
   return (app: UniversalExperienceApp(settings: s), bridgeReady: true);
 }
 
-/// 主画面（ウィンドウが乗る画面）の大きさ（論理ピクセル）。取れなければ null（#197）。
+/// 主画面の**作業領域**（タスクバー・パネル・Dock を除いた領域）の大きさ（論理ピクセル）。
+/// 取れなければ null（#197）。
 ///
-/// 起動時のウィンドウサイズを画面に収めるために使う
-/// （[LoupeWindowPolicy.initialSizeFor]）。Flutter の `Display` は物理ピクセルなので
-/// devicePixelRatio で割る。ビューがまだ無い・画面の情報が無いプラットフォームでは null。
-Size? _primaryDisplayLogicalSize() {
-  final dispatcher = WidgetsBinding.instance.platformDispatcher;
+/// 起動時のウィンドウサイズを作業領域に収めるために使う
+/// （[LoupeWindowPolicy.initialSizeFor]）。window_manager の `center: true` と同じ
+/// screen_retriever の主画面の `visibleSize` を使う（同じ領域の中央に置かれるので、
+/// 大きさもその領域に合わせる）。`visibleSize` が無いプラットフォームでは画面全体。
+/// `windowManager.ensureInitialized()` のあとに呼ぶ。
+Future<Size?> _primaryWorkAreaSize() async {
   try {
-    final display = dispatcher.implicitView?.display ??
-        (dispatcher.displays.isEmpty ? null : dispatcher.displays.first);
-    if (display == null || display.devicePixelRatio <= 0) return null;
-    return display.size / display.devicePixelRatio;
+    final display = await screenRetriever.getPrimaryDisplay();
+    return display.visibleSize ?? display.size;
   } catch (_) {
-    // FlutterView.display は対応する画面が無いと StateError を投げる。
+    // プラグインが無い・画面の情報が取れない環境。既定サイズで起動する。
     return null;
   }
+}
+
+/// ウィンドウ枠（タイトルバー）の高さ（論理ピクセル）。取れない・0 のときは
+/// [LoupeWindowPolicy.fallbackTitleBarHeight] を見込む（#197）。
+Future<double> _titleBarHeight() async {
+  try {
+    final height = await windowManager.getTitleBarHeight();
+    if (height > 0) return height.toDouble();
+  } catch (_) {
+    // 未対応のプラットフォーム。下の見込み値を使う。
+  }
+  return LoupeWindowPolicy.fallbackTitleBarHeight;
 }
 
 void main() async {
@@ -311,14 +324,19 @@ void main() async {
 
     // ルーペ窓の起動オプション。サイズ・最小サイズ・透過の既定は
     // LoupeWindowPolicy に集約 (testable な純粋ロジック)。
-    // - size: 3 カラムが出る既定サイズ。画面がそれより小さければ画面に収める (#197)。
+    // - size: 設定モードは 3 カラムが出る 1280x800、ルーペ窓モードは 800x600。作業領域
+    //   （タスクバー等を除く）に収まらなければ、枠ごと収まる大きさへ縮める (#197)。
     // - backgroundColor: 起動モード (#63) に応じて決める。設定モード（既定）は
     //   不透明、ルーペモードは透過（枠の外は透け、枠の中だけフィルタ描画する）。
     // マルチモニタ: 第1弾はメインモニタのみ対象 (docs/ARCHITECTURE.md 参照)。
     // window_manager の backgroundColor は非 null の Color のため、
     // 透過 ON のとき transparent、OFF のとき不透明黒を渡す。
     final windowOptions = WindowOptions(
-      size: LoupeWindowPolicy.initialSizeFor(_primaryDisplayLogicalSize()),
+      size: LoupeWindowPolicy.initialSizeFor(
+        await _primaryWorkAreaSize(),
+        mode: loupeWindow.appMode,
+        titleBarHeight: await _titleBarHeight(),
+      ),
       minimumSize: LoupeWindowPolicy.minimumSize,
       center: true,
       // 色の例外（DESIGN.md）: OS ウィンドウの下地色。Flutter のテーマが
@@ -381,8 +399,8 @@ void main() async {
       setLoupeVisible: trayService.setLoupeVisible,
       // #185 の切り分け: keyUp が届く環境かを後から確かめられるよう、原画比較の切り替えと
       // keyUp を診断ログへ残す（キーリピートは書かない。どのキーかも書かない）。
-      onHoldOriginalEvent: (event) =>
-          PreviewDiagnostics.record('hotkey_hold_original', {'event': event}),
+      onHoldOriginalEvent: (event) => PreviewDiagnostics.record(
+          'hotkey_hold_original', {'event': event}),
     );
     await hotkeyService.init({
       AppHotkeyAction.toggleClickThrough: HotkeyHandlers(

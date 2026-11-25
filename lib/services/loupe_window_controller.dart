@@ -51,26 +51,49 @@ class LoupeWindowPolicy {
   /// 調整 (DPR 換算) は #5 DPR スコープで扱う。
   static const Size minimumSize = Size(320, 240);
 
-  /// 起動時の既定サイズ（論理ピクセル）。主画面が 3 カラム（選ぶ / 見る / 調整）で出る幅
-  /// （`kWideLayoutBreakpoint` = 1000dp 以上）を確保する（#197）。1280x800 は DESIGN.md が
-  /// 広幅の基準にしている大きさで、プレビューと調整が最初の 1 画面に入る。
+  /// 設定モード（主画面）で起動するときの既定サイズ（論理ピクセル）。主画面が 3 カラム
+  /// （選ぶ / 見る / 調整）で出る幅（`kWideLayoutBreakpoint` = 1000dp 以上）を確保する（#197）。
+  /// 1280x800 は DESIGN.md が広幅の基準にしている大きさで、プレビューと調整が最初の 1 画面に入る。
   static const Size defaultSize = Size(1280, 800);
 
-  /// 起動時のウィンドウサイズ（#197）。既定は [defaultSize]。画面（[displaySize]、論理
-  /// ピクセル）がそれより小さいときは、軸ごとに画面の大きさまで縮める（画面からはみ出した
-  /// ウィンドウで起動しない。幅が 1000dp を切れば主画面は縦並びになり、スクロールで全部に
-  /// 届く）。[minimumSize] は下回らない。画面の大きさが取れない（null・0 以下・非有限）
-  /// ときは [defaultSize] のまま。
-  static Size initialSizeFor(Size? displaySize) {
-    if (displaySize == null ||
-        !displaySize.isFinite ||
-        displaySize.width <= 0 ||
-        displaySize.height <= 0) {
-      return defaultSize;
+  /// ルーペ窓モードで起動するときの既定サイズ（論理ピクセル）。ルーペは「画面の一部に
+  /// かざす覗き窓」なので、最小より十分大きく、デスクトップの一角を覗ける程度に留める
+  /// （#197 までの既定サイズ。主画面の 3 カラムを出す [defaultSize] は設定モードだけに使う）。
+  static const Size loupeDefaultSize = Size(800, 600);
+
+  /// タイトルバー（ウィンドウ枠）の高さが取れないときに見込む値（論理ピクセル）。
+  /// [initialSizeFor] が作業領域からこのぶんを引いて、枠ごと作業領域に収める。
+  static const double fallbackTitleBarHeight = 40;
+
+  /// 起動時のウィンドウサイズ（#197）。既定は、設定モードが [defaultSize]、ルーペ窓モードが
+  /// [loupeDefaultSize]（[mode]）。
+  ///
+  /// [workArea] は画面の**作業領域**（タスクバー・パネル・Dock を除いた、ウィンドウを置ける
+  /// 領域。論理ピクセル）。既定サイズがそれに収まらないときは、軸ごとに作業領域まで縮める
+  /// （画面からはみ出したウィンドウで起動しない。幅が 1000dp を切れば主画面は縦並びになり、
+  /// スクロールで全部に届く）。高さは、ウィンドウ枠（タイトルバー）ぶんの [titleBarHeight] を
+  /// 作業領域から引いて、枠ごと収める。基準を画面全体でなく作業領域にするのは、起動時に
+  /// ウィンドウを作業領域の中央へ置く（`center: true`）ためで、画面全体を基準にすると
+  /// タスクバーぶんが画面の外へ出る。
+  ///
+  /// [minimumSize] は下回らない。作業領域が取れない（null・0 以下・非有限）ときは既定サイズのまま。
+  static Size initialSizeFor(
+    Size? workArea, {
+    AppMode mode = AppMode.settings,
+    double titleBarHeight = 0,
+  }) {
+    final preferred = mode == AppMode.loupe ? loupeDefaultSize : defaultSize;
+    if (workArea == null ||
+        !workArea.isFinite ||
+        workArea.width <= 0 ||
+        workArea.height <= 0) {
+      return preferred;
     }
+    final frame =
+        titleBarHeight.isFinite && titleBarHeight > 0 ? titleBarHeight : 0.0;
     return Size(
-      displaySize.width.clamp(minimumSize.width, defaultSize.width),
-      displaySize.height.clamp(minimumSize.height, defaultSize.height),
+      workArea.width.clamp(minimumSize.width, preferred.width),
+      (workArea.height - frame).clamp(minimumSize.height, preferred.height),
     );
   }
 

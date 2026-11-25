@@ -146,6 +146,104 @@ void main() {
     });
   });
 
+  group('LoupeWindowPolicy.initialSizeFor: 作業領域とウィンドウ枠（#197）', () {
+    const def = LoupeWindowPolicy.defaultSize;
+    const min = LoupeWindowPolicy.minimumSize;
+
+    test('作業領域が画面より小さい（1366x768 の画面でタスクバー 40 → 作業領域 1366x728）: 枠ぶんも引いて収める', () {
+      // 画面全体（1366x768）を基準にすると高さ 768 になり、作業領域 728 からはみ出す。
+      const workArea = Size(1366, 728);
+      final size = LoupeWindowPolicy.initialSizeFor(workArea, titleBarHeight: 40);
+      expect(size, const Size(1280, 688));
+      expect(size.height + 40, lessThanOrEqualTo(workArea.height),
+          reason: 'タイトルバーを足しても作業領域に収まる');
+    });
+
+    test('作業領域に余裕があれば、枠ぶんを引いても既定のまま', () {
+      expect(
+        LoupeWindowPolicy.initialSizeFor(const Size(1920, 1040),
+            titleBarHeight: 40),
+        def,
+      );
+      // ちょうど「既定 + 枠」の高さ。
+      expect(
+        LoupeWindowPolicy.initialSizeFor(const Size(1280, 840),
+            titleBarHeight: 40),
+        def,
+      );
+      // 1 dp 足りない。
+      expect(
+        LoupeWindowPolicy.initialSizeFor(const Size(1280, 839),
+            titleBarHeight: 40),
+        const Size(1280, 799),
+      );
+    });
+
+    test('枠ぶんは高さだけから引く（幅は作業領域いっぱいまで）', () {
+      expect(
+        LoupeWindowPolicy.initialSizeFor(const Size(1024, 700),
+            titleBarHeight: 40),
+        const Size(1024, 660),
+      );
+    });
+
+    test('枠ぶんを引いても最小サイズは下回らない', () {
+      expect(
+        LoupeWindowPolicy.initialSizeFor(const Size(400, 250),
+            titleBarHeight: 40),
+        Size(400, min.height),
+      );
+    });
+
+    test('タイトルバーの高さが 0・負・NaN・無限大なら引かない', () {
+      for (final h in [0.0, -10.0, double.nan, double.infinity]) {
+        expect(
+          LoupeWindowPolicy.initialSizeFor(const Size(1366, 728),
+              titleBarHeight: h),
+          const Size(1280, 728),
+          reason: '$h',
+        );
+      }
+    });
+
+    test('見込みのタイトルバーの高さ（取れないとき用）は正の値', () {
+      expect(LoupeWindowPolicy.fallbackTitleBarHeight, greaterThan(0));
+    });
+  });
+
+  group('LoupeWindowPolicy.initialSizeFor: 起動モード（#197）', () {
+    const loupe = LoupeWindowPolicy.loupeDefaultSize;
+
+    test('ルーペ窓モードの既定は 800x600（覗き窓。主画面の 1280x800 にしない）', () {
+      expect(loupe, const Size(800, 600));
+      expect(
+          LoupeWindowPolicy.initialSizeFor(null, mode: AppMode.loupe), loupe);
+      expect(
+        LoupeWindowPolicy.initialSizeFor(const Size(1920, 1040),
+            mode: AppMode.loupe, titleBarHeight: 40),
+        loupe,
+      );
+    });
+
+    test('設定モード（既定の引数）は 1280x800', () {
+      expect(
+        LoupeWindowPolicy.initialSizeFor(const Size(1920, 1040),
+            mode: AppMode.settings),
+        LoupeWindowPolicy.defaultSize,
+      );
+      expect(LoupeWindowPolicy.initialSizeFor(const Size(1920, 1040)),
+          LoupeWindowPolicy.defaultSize);
+    });
+
+    test('ルーペ窓モードでも、作業領域に収まらなければ枠ごと収める', () {
+      expect(
+        LoupeWindowPolicy.initialSizeFor(const Size(640, 480),
+            mode: AppMode.loupe, titleBarHeight: 40),
+        const Size(640, 440),
+      );
+    });
+  });
+
   group('LoupeWindowPolicy defaults', () {
     test('always-on-top is off by default (#63, toggle-style)', () {
       expect(LoupeWindowPolicy.defaultAlwaysOnTop, isFalse);
