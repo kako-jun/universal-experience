@@ -9,6 +9,7 @@
 // - ポインタ / キーボードで選んだあとのフォーカス
 // - 低い画面（`kFilterBrowserCompactHeight` 未満）でのスクロール
 
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart'
     show SemanticsAction, SemanticsActionEvent;
@@ -621,6 +622,44 @@ void main() {
       expect(find.byKey(experienceCardKey('bppv')), findsNothing,
           reason: 'メニューは閉じている');
       expect(activated, 0, reason: '古いマウスの記録を使わず、受け口へ戻さない');
+      handle.dispose();
+    });
+
+    testWidgets('何も再描画しないクリックのあとでもフレームが予約され、続くスクリーンリーダーの確定はキーボード扱い',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpBrowser(tester);
+      // キーを 1 度押して、フォーカスの表示モードの切り替え（再描画のもと）を先に済ませる。
+      await tester.sendKeyEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(tester.binding.hasScheduledFrame, isFalse,
+          reason: '前提: 予約済みのフレームが無い');
+
+      // 何も無い場所（左カラムの下の余白）をクリックする。画面は何も変わらない。
+      // マウスで押す（タッチだとフォーカスの表示モードが切り替わり、それ自体が再描画になる）。
+      final gesture = await tester.startGesture(const Offset(200, 895),
+          kind: PointerDeviceKind.mouse);
+      await gesture.up();
+      expect(tester.binding.hasScheduledFrame, isTrue,
+          reason: 'クリックの記録を消すためのフレームが予約される');
+      await tester.pump();
+
+      // 入力イベントを伴わずにメニューを開き、項目を確定する（スクリーンリーダー）。
+      final button = tester.getSemantics(experiencePresetDropdown());
+      tester.binding.performSemanticsAction(SemanticsActionEvent(
+        type: SemanticsAction.tap,
+        viewId: tester.view.viewId,
+        nodeId: button.id,
+      ));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byKey(experienceCardKey('bppv')), findsOneWidget,
+          reason: 'スクリーンリーダーでメニューが開く');
+      await semanticsTap(tester, 'bppv');
+
+      expect(state.selectedPresetId, 'bppv');
+      expect(activated, 0, reason: '前のクリックの記録は消えている');
       handle.dispose();
     });
 

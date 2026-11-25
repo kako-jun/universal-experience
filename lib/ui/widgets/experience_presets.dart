@@ -126,10 +126,15 @@ class _ExperiencePresetPickerState extends State<ExperiencePresetPicker> {
     _inputWasPointer = pointer;
     if (_clearScheduled) return;
     _clearScheduled = true;
-    SchedulerBinding.instance.addPostFrameCallback((_) {
+    final scheduler = SchedulerBinding.instance;
+    scheduler.addPostFrameCallback((_) {
+      if (!mounted) return;
       _clearScheduled = false;
       _inputWasPointer = null;
     });
+    // addPostFrameCallback は自分ではフレームを予約しない。何も再描画しない入力
+    // （空いた場所のクリックなど）のあとでもフレームが来て、記録が確実に消えるようにする。
+    scheduler.ensureVisualUpdate();
   }
 
   @override
