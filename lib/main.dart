@@ -260,9 +260,18 @@ Future<Size?> _primaryWorkAreaSize() async {
   }
 }
 
-/// ウィンドウ枠（タイトルバー）の高さ（論理ピクセル）。取れない・0 のときは
-/// [LoupeWindowPolicy.fallbackTitleBarHeight] を見込む（#197）。
+/// 起動サイズで作業領域から引くウィンドウ枠（タイトルバー）の高さの**見込み値**（#197）。
+///
+/// 正確な論理ピクセルではなく、**多めに引く側（作業領域からはみ出さない側）に倒れる**値:
+/// - Windows の `getTitleBarHeight` は DPI で割らない物理ピクセルなので、拡大率 100% を超えると
+///   論理ピクセルより大きい。
+/// - macOS / Windows はウィンドウサイズが外枠込みなので、さらに枠を引くと二重に引くことになる。
+/// どちらもウィンドウが少し小さくなるだけで、はみ出す方向には出ない。
+/// - Linux では呼ばず [LoupeWindowPolicy.fallbackTitleBarHeight] を使う。枠を WM が描く
+///   （サーバ側描画）と GTK のタイトルバーが無く、`getTitleBarHeight` が GTK の警告を出すため。
+/// 取れない・0 のときも [LoupeWindowPolicy.fallbackTitleBarHeight]。
 Future<double> _titleBarHeight() async {
+  if (Platform.isLinux) return LoupeWindowPolicy.fallbackTitleBarHeight;
   try {
     final height = await windowManager.getTitleBarHeight();
     if (height > 0) return height.toDouble();

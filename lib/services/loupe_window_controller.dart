@@ -61,8 +61,9 @@ class LoupeWindowPolicy {
   /// （#197 までの既定サイズ。主画面の 3 カラムを出す [defaultSize] は設定モードだけに使う）。
   static const Size loupeDefaultSize = Size(800, 600);
 
-  /// タイトルバー（ウィンドウ枠）の高さが取れないときに見込む値（論理ピクセル）。
-  /// [initialSizeFor] が作業領域からこのぶんを引いて、枠ごと作業領域に収める。
+  /// タイトルバー（ウィンドウ枠）の高さの見込み値（論理ピクセル）。取れないとき・Linux
+  /// （枠を WM が描くと取れないため）に使う。[initialSizeFor] が作業領域からこのぶんを引いて、
+  /// 枠ごと作業領域に収める。一般的なタイトルバーより少し大きめにして、はみ出さない側に倒す。
   static const double fallbackTitleBarHeight = 40;
 
   /// 起動時のウィンドウサイズ（#197）。既定は、設定モードが [defaultSize]、ルーペ窓モードが
