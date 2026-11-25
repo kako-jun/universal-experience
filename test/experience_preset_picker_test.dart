@@ -10,6 +10,8 @@
 // - 低い画面（`kFilterBrowserCompactHeight` 未満）でのスクロール
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart'
+    show SemanticsAction, SemanticsActionEvent;
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -588,6 +590,51 @@ void main() {
 
       expect(state.selectedPresetId, 'labyrinthitis');
       expect(activated, 1);
+    });
+
+    // スクリーンリーダーの確定（セマンティクスのタップ）は入力イベントを伴わない。
+    // マウスで開いた記録が残っていても、安全側（受け口へ戻さない）に倒す。
+    Future<void> semanticsTap(WidgetTester tester, String experienceId) async {
+      final node = tester.getSemantics(find.ancestor(
+        of: find.byKey(experienceCardKey(experienceId)),
+        matching: find.byWidgetPredicate((w) => w is DropdownMenuItem<String>),
+      ));
+      tester.binding.performSemanticsAction(SemanticsActionEvent(
+        type: SemanticsAction.tap,
+        viewId: tester.view.viewId,
+        nodeId: node.id,
+      ));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+
+    testWidgets('マウスで開いてスクリーンリーダーで確定 → 入力イベントなしなので onActivated を呼ばない',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpBrowser(tester);
+      await openExperiencePresetMenu(tester);
+      expect(find.byKey(experienceCardKey('bppv')), findsOneWidget);
+
+      await semanticsTap(tester, 'bppv');
+
+      expect(state.selectedPresetId, 'bppv', reason: 'スクリーンリーダーでも選べる');
+      expect(find.byKey(experienceCardKey('bppv')), findsNothing,
+          reason: 'メニューは閉じている');
+      expect(activated, 0, reason: '古いマウスの記録を使わず、受け口へ戻さない');
+      handle.dispose();
+    });
+
+    testWidgets('スクリーンリーダーで確定したあとでも、クリックで確定すればポインタ扱い', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpBrowser(tester);
+      await openExperiencePresetMenu(tester);
+      await semanticsTap(tester, 'bppv');
+      expect(activated, 0);
+
+      await selectExperiencePreset(tester, 'labyrinthitis');
+      expect(state.selectedPresetId, 'labyrinthitis');
+      expect(activated, 1);
+      handle.dispose();
     });
   });
 

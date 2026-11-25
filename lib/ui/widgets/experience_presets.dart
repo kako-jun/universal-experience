@@ -1,7 +1,8 @@
 import 'package:flutter/gestures.dart' show GestureBinding;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:flutter/services.dart'
-    show HardwareKeyboard, KeyDownEvent, KeyEvent;
+    show HardwareKeyboard, KeyDownEvent, KeyEvent, KeyRepeatEvent;
 import 'package:provider/provider.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -96,6 +97,7 @@ class ExperiencePresetPicker extends StatefulWidget {
   ///
   /// どちらで選んだかは、**メニューの項目を確定した入力**で決まる（開いたときの入力ではない）:
   /// マウスで開いて ↑↓ Enter で選べばキーボード、Enter で開いてクリックで選べばポインタ。
+  /// 入力イベントを伴わない確定（スクリーンリーダーの操作など）では呼ばない（安全側）。
   final VoidCallback? onActivated;
 
   @override
@@ -103,13 +105,32 @@ class ExperiencePresetPicker extends StatefulWidget {
 }
 
 class _ExperiencePresetPickerState extends State<ExperiencePresetPicker> {
-  /// 直近の入力がポインタ（押下）か。キーを押したら false に戻す。
+  /// いまのフレームで受けた入力がポインタ（押下・離し）なら true、キーなら false、
+  /// 入力が無ければ null。
   ///
   /// 開いたメニューは別のルート（オーバーレイ）に出るので、このウィジェットの子孫の
   /// `Listener` / `Focus` ではメニューの中のクリック・キー操作を拾えない。アプリ全体の入力
   /// （[HardwareKeyboard] のハンドラと、ポインタのグローバルルート）を見て、項目を確定した
   /// 入力の種類を知る。イベントは消費しない（見るだけ）。
-  bool _lastInputWasPointer = false;
+  ///
+  /// 記録は**そのフレームの終わりで null に戻す**。項目の確定（`onChanged`）は確定した入力と
+  /// 同じフレームの中で起きるので、それより前のフレームの古い入力は使わない。スクリーン
+  /// リーダーの操作（セマンティクスのタップ）のように入力イベントを伴わない確定では null になり、
+  /// 安全側としてキーボードと同じ扱い（[ExperiencePresetPicker.onActivated] を呼ばず、
+  /// フォーカスをドロップダウンに残す）にする。マウスで開いたあとの古い記録で、読み上げ中の
+  /// フォーカスを受け口へ飛ばさないため。
+  bool? _inputWasPointer;
+  bool _clearScheduled = false;
+
+  void _record(bool pointer) {
+    _inputWasPointer = pointer;
+    if (_clearScheduled) return;
+    _clearScheduled = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _clearScheduled = false;
+      _inputWasPointer = null;
+    });
+  }
 
   @override
   void initState() {
@@ -126,12 +147,12 @@ class _ExperiencePresetPickerState extends State<ExperiencePresetPicker> {
   }
 
   bool _handleKey(KeyEvent event) {
-    if (event is KeyDownEvent) _lastInputWasPointer = false;
+    if (event is KeyDownEvent || event is KeyRepeatEvent) _record(false);
     return false;
   }
 
   void _handlePointer(PointerEvent event) {
-    if (event is PointerDownEvent) _lastInputWasPointer = true;
+    if (event is PointerDownEvent || event is PointerUpEvent) _record(true);
   }
 
   /// 体験の視覚フィルタが写るカタログ id。視覚フィルタが無い・カタログに無いなら null。
@@ -221,7 +242,8 @@ class _ExperiencePresetPickerState extends State<ExperiencePresetPicker> {
           if (catalogId == null) return;
           context.read<VisionFilterState>().selectPreset(exp.id, catalogId);
           dismissWelcomeBannerOnUserChange(context);
-          if (_lastInputWasPointer) widget.onActivated?.call();
+          // 入力イベントの無い確定（null）は、キーボードと同じく受け口へ戻さない。
+          if (_inputWasPointer == true) widget.onActivated?.call();
           return;
         }
       },
