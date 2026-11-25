@@ -112,6 +112,16 @@ void main() {
 
     testWidgets('日本語名で絞り込める', (tester) async {
       await pumpBrowser(tester);
+      await tester.enterText(find.byType(TextField), '緑内障');
+      await tester.pump();
+
+      expect(tileOf('catalog:glaucoma'), findsOneWidget);
+      expect(tileOf('catalog:myopia'), findsNothing);
+      expect(tileOf('cv:protanopia'), findsNothing);
+    });
+
+    testWidgets('体験プリセットの名前は検索に当たらない（一覧の行ではない、#199）', (tester) async {
+      await pumpBrowser(tester);
       await tester.enterText(find.byType(TextField), 'メニエール');
       await tester.pump();
 

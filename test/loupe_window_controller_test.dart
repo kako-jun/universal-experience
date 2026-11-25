@@ -38,6 +38,114 @@ void main() {
     });
   });
 
+  group('LoupeWindowPolicy.initialSizeFor（起動時のウィンドウサイズ、#197）', () {
+    const def = LoupeWindowPolicy.defaultSize;
+    const min = LoupeWindowPolicy.minimumSize;
+
+    test('既定は 1280x800', () {
+      expect(def, const Size(1280, 800));
+    });
+
+    test('画面の大きさが取れない（null）ときは既定のまま', () {
+      expect(LoupeWindowPolicy.initialSizeFor(null), def);
+    });
+
+    test('既定より大きい画面では既定のまま（画面いっぱいには広げない）', () {
+      for (final display in const [
+        Size(1920, 1080),
+        Size(2560, 1440),
+        Size(3840, 2160),
+        Size(1281, 801),
+      ]) {
+        expect(LoupeWindowPolicy.initialSizeFor(display), def,
+            reason: '$display');
+      }
+    });
+
+    test('画面がちょうど既定と同じなら既定', () {
+      expect(LoupeWindowPolicy.initialSizeFor(def), def);
+    });
+
+    test('既定より小さい画面では、軸ごとに画面の大きさまで縮める', () {
+      // 幅は足りるが高さが足りない（1366x768 のノート PC）。
+      expect(LoupeWindowPolicy.initialSizeFor(const Size(1366, 768)),
+          const Size(1280, 768));
+      // 高さは足りるが幅が足りない（縦置きの画面）。
+      expect(LoupeWindowPolicy.initialSizeFor(const Size(1080, 1920)),
+          const Size(1080, 800));
+      // 両方足りない。
+      expect(LoupeWindowPolicy.initialSizeFor(const Size(1024, 768)),
+          const Size(1024, 768));
+      expect(LoupeWindowPolicy.initialSizeFor(const Size(800, 600)),
+          const Size(800, 600));
+      // 1 dp だけ小さい。
+      expect(LoupeWindowPolicy.initialSizeFor(const Size(1279, 799)),
+          const Size(1279, 799));
+      // 小数の論理ピクセル（物理 1920x1080 を DPR 1.75 で割った画面）。
+      final fractional =
+          LoupeWindowPolicy.initialSizeFor(const Size(1920, 1080) / 1.75);
+      expect(fractional.width, closeTo(1920 / 1.75, 1e-9));
+      expect(fractional.height, closeTo(1080 / 1.75, 1e-9));
+    });
+
+    test('最小サイズ以上の画面では、どの軸も画面・既定より大きくならず、最小を下回らない', () {
+      for (var w = min.width; w <= 2000; w += 53) {
+        for (var h = min.height; h <= 1400; h += 47) {
+          final display = Size(w, h);
+          final size = LoupeWindowPolicy.initialSizeFor(display);
+          expect(size.width, lessThanOrEqualTo(display.width),
+              reason: '$display');
+          expect(size.height, lessThanOrEqualTo(display.height),
+              reason: '$display');
+          expect(size.width, lessThanOrEqualTo(def.width), reason: '$display');
+          expect(size.height, lessThanOrEqualTo(def.height),
+              reason: '$display');
+          expect(size.width, greaterThanOrEqualTo(min.width),
+              reason: '$display');
+          expect(size.height, greaterThanOrEqualTo(min.height),
+              reason: '$display');
+        }
+      }
+    });
+
+    test('画面がちょうど最小サイズなら最小サイズ', () {
+      expect(LoupeWindowPolicy.initialSizeFor(min), min);
+    });
+
+    test('最小サイズより小さい画面では最小サイズで止まる（軸ごと。このときだけ画面より大きくなる）', () {
+      expect(LoupeWindowPolicy.initialSizeFor(const Size(200, 100)), min);
+      expect(LoupeWindowPolicy.initialSizeFor(const Size(1, 1)), min);
+      expect(LoupeWindowPolicy.initialSizeFor(const Size(0.5, 0.5)), min);
+      // 片方の軸だけ最小より小さい。
+      expect(LoupeWindowPolicy.initialSizeFor(const Size(200, 600)),
+          const Size(320, 600));
+      expect(LoupeWindowPolicy.initialSizeFor(const Size(1000, 100)),
+          const Size(1000, 240));
+    });
+
+    test('0・負・NaN・無限大の画面は「取れない」扱いで既定のまま（片方の軸だけでも）', () {
+      for (final display in const [
+        Size.zero,
+        Size(0, 600),
+        Size(800, 0),
+        Size(-1, -1),
+        Size(-800, 600),
+        Size(800, -600),
+        Size(double.nan, double.nan),
+        Size(double.nan, 600),
+        Size(800, double.nan),
+        Size.infinite,
+        Size(double.infinity, 600),
+        Size(800, double.infinity),
+        Size(double.negativeInfinity, 600),
+      ]) {
+        final size = LoupeWindowPolicy.initialSizeFor(display);
+        expect(size, def, reason: '$display');
+        expect(size.isFinite, isTrue, reason: '$display');
+      }
+    });
+  });
+
   group('LoupeWindowPolicy defaults', () {
     test('always-on-top is off by default (#63, toggle-style)', () {
       expect(LoupeWindowPolicy.defaultAlwaysOnTop, isFalse);
