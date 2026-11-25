@@ -141,9 +141,11 @@ class _ExperiencePresetPickerState extends State<ExperiencePresetPicker> {
     String? value,
   ) {
     return DropdownButtonFormField<String>(
-      // 選択は VisionFilterState が正本。FormField は初期値しか見ないので、外から変わった値
-      // （フィルタの足し引きでプリセットが外れる等）に追従させるため、値ごとに作り直す。
-      key: ValueKey('experience_preset_field_${value ?? ''}'),
+      // 選択は VisionFilterState が正本。外から変わった値（フィルタの足し引きでプリセットが
+      // 外れる等）には、DropdownButtonFormField が initialValue の変化を見て追従する
+      // （didUpdateWidget で setValue）。値ごとに key を変えて作り直さないこと: 作り直すと
+      // ドロップダウンのフォーカスノードが捨てられ、キーボードで選んだ直後にフォーカスが
+      // 外へ飛ぶ（次の Tab が先頭からやり直しになる）。
       initialValue: value,
       isExpanded: true,
       // 長い名前（英語）は、メニューの中では折り返して全文を出す。
