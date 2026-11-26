@@ -82,6 +82,8 @@
   "exportPathCopied": "パスをコピーしました。",
 
   "experienceSectionTitle": "体験プリセット",
+  "experiencePresetHelper": "下の設定をまとめて切り替えます。",
+  "experiencePresetNone": "プリセットなし",
   "experienceMeniere": "メニエール病",
   "experienceMeniereDesc": "回転性めまいを繰り返し、低音域の難聴・耳のつまり感・低い唸るような耳鳴りを伴います。",
   "experienceBppv": "良性発作性頭位めまい症",
@@ -260,7 +262,8 @@
   "filterCategoryAll": "すべて",
   "filterCategoryLabel": "カテゴリ",
   "filterListNoResults": "一致する見え方がありません。",
-  "filterListSelectedSemantics": "選択中",
+  "filterListPresetHint": "「{names}」は、上の「{label}」から選べます。",
+  "filterListPresetHintSeparator": "」「",
   "filterListExclusiveHeading": "{name}（いずれか 1 つ）",
   "filterListLimitReached": "上限の {max} 件に達しています。ほかを外すと選べます",
   "filterListOrderSemantics": "適用順 {order} 番目",

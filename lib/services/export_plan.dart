@@ -17,7 +17,7 @@ import 'vision_filter_metadata.dart';
 /// （規律2）。引数は **画像を描画した時点の値** を渡すこと（呼び出し時点の現在の
 /// widget props ではなく）。
 ///
-/// - 受診喚起は プレビューの注記（`FilterParamPanel`・`ExperiencePresetTile`）と同じ
+/// - 受診喚起は プレビューの注記（`FilterParamPanel`・`ExperiencePresetPicker`）と同じ
 ///   正本・同じ解決経路（[resolveConsultNotice]）を使う。色覚 7 型は urgency=none
 ///   かつ escalation も無いので notice は自然に null になる。
 /// - 実験的なフィルタ（四色覚）には、近似であることに加えて「実験的」も焼き込む。

@@ -123,6 +123,27 @@ XWayland でポータルがあるとき）では保存値どおりルーペ窓�
 対象アプリ指定モード（ルーペ窓の自動配置モード）の設計判断・要検証事項・OS ごとの
 提供可否は `docs/adr/2026-09-26-loupe-as-single-render-unit.md` 参照。
 
+### 起動時のサイズ
+
+- **設定モード（主画面）は 1280x800**（`LoupeWindowPolicy.defaultSize`、論理ピクセル）。主画面が 3 カラム（選ぶ / 見る / 調整）で
+  出る幅（`kWideLayoutBreakpoint` = 1000dp 以上）を確保する（#197。それまでは 800x600 で、起動直後は縦並びだった）。
+- **ルーペ窓モードで起動するとき（保存された起動モードがルーペ窓）は 800x600**（`LoupeWindowPolicy.loupeDefaultSize`）。
+  ルーペは画面の一部にかざす覗き窓で、「最小より十分大きく、デスクトップの一角を覗ける程度」という元の意図を保つ
+  （主画面を出さないので 3 カラムの幅は要らない）。起動後にモードを切り替えても、ウィンドウの大きさは変えない
+  （ルーペ窓モードで起動して設定モードへ戻すと 800x600 のままで、主画面は縦並びになる。大きさは利用者が変える）。
+- **作業領域に収める**: 既定サイズが画面の作業領域（タスクバー・パネル・Dock を除いた領域）に収まらないときは、
+  軸ごとに作業領域まで縮め、高さはウィンドウ枠（タイトルバー）ぶんも引いて、枠ごと収める
+  （`LoupeWindowPolicy.initialSizeFor`）。基準を画面全体でなく作業領域にするのは、起動時にウィンドウを作業領域の
+  中央へ置く（window_manager の `center: true`）ためで、画面全体を基準にするとタスクバーぶんが画面の外へ出る。
+  作業領域は `center` と同じ screen_retriever の主画面の `visibleSize`、タイトルバーの高さは
+  `windowManager.getTitleBarHeight()`（取れない・0 のとき、および Linux では 40dp を見込む）から取る。
+  タイトルバーの高さは正確な論理ピクセルでなく**見込み値**で、多めに引く側（はみ出さない側）に倒れる
+  （Windows の値は DPI で割らない物理ピクセル、macOS / Windows のウィンドウサイズは外枠込みなので二重に引きうる。
+  どちらもウィンドウが少し小さくなるだけ）。Linux では呼ばない（枠を WM が描くと GTK のタイトルバーが無く、GTK の警告が出るため）。作業領域が取れなければ既定サイズのまま。
+  幅が 1000dp を切れば主画面は縦並びになり、スクロールで全部に届く。最小サイズは下回らない。
+  例: 画面 1366x768・作業領域 1366x728・タイトルバー 40 → 1280x688。
+- 前回のウィンドウサイズは保存しない（毎回この大きさで起動する）。
+
 ### 最小サイズ
 
 - **320x240 (QVGA, 4:3)**。従来の 600x400 から引き下げた。
@@ -650,7 +671,7 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
 | キー | 効果 |
 |---|---|
 | `/` | 左カラムの検索欄（`FilterBrowserController.searchFocus`）にフォーカスを移し、入力済みの文字を全選択する |
-| `↑` / `↓` | 統合フィルタ一覧（色覚 7 型 + advanced 30 件）の、今見えている行への**フォーカスの**逆送り/順送り（wraparound。選択は変えない。#120）。足し引きは行で `Space` / `Enter`。検索欄にフォーカスがある間の `↓` だけは、今見えている先頭の行（体験プリセットの行は除く）へ入る（空でも。フィルタの行が 0 件（プリセットだけ見えている場合も含む）なら奪わず入力欄に返す。IME 変換中も奪わない）。先頭の行の `↑` は折り返さず検索欄へ戻る（#141） |
+| `↑` / `↓` | 統合フィルタ一覧（色覚 7 型 + advanced 30 件）の、今見えている行への**フォーカスの**逆送り/順送り（wraparound。選択は変えない。#120）。足し引きは行で `Space` / `Enter`。検索欄にフォーカスがある間の `↓` だけは、今見えている先頭の行へ入る（空でも。フィルタの行が 0 件なら奪わず入力欄に返す。IME 変換中も奪わない）。先頭の行の `↑` は折り返さず検索欄へ戻る（#141） |
 | `←` / `→` | 調整中の層（`VisionFilterState.focusedId`）の強度を `kKeyboardStrengthStep`（5%）刻みで増減 |
 | `Esc` | クリックスルーが ON のとき解除する（クリックスルーの復帰経路。上記「クリックスルーの復帰経路」参照） |
 | `Cmd+V`（macOS）/ `Ctrl+V` | クリップボードの画像をプレビューの原画として貼り付ける（#97。下記） |
@@ -679,8 +700,8 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
   部分は #120 で上のとおり置き換わった）。
 - **↑↓ の対象は統合一覧の「今見えている行」**（#72）。色覚 7 型 + advanced 30 件を
   1 つの一覧にまとめたので、順送りもその一覧を対象にする（`nextFilterListEntry()`。
-  検索・カテゴリで絞っていれば絞った行だけ）。体験プリセットは一覧の最上段にあるが
-  送りの対象外（選択は行のタップ/Enter）。検索欄の ↑ は奪わず（`↓` だけは下記の例外で先頭の行へ送る）、
+  検索・カテゴリで絞っていれば絞った行だけ）。体験プリセットは一覧の行ではなく、左カラムの一番上の
+  ドロップダウン（`ExperiencePresetPicker`、#199）なので送りの対象外（選択はドロップダウンを開いて選ぶ）。検索欄の ↑ は奪わず（`↓` だけは下記の例外で先頭の行へ送る）、
   行を**ポインタで**選ぶと `HomeScreen` がショートカットの受け口へフォーカスを戻し、そこから
   ↑↓・←→ が効く。**Enter/Space で選んだときはフォーカスを行に残す**（キーボード利用者の
   現在位置を奪わない）。
@@ -693,14 +714,14 @@ hold ジェスチャだが、一部 OS のグローバルホットキーでは k
   着地点が決まり、色覚選択時に中央カラムへ出る「2×2 で比較」の切替が出て行を高くすると、`→` が中央
   カラムのサンプル切替チップへ着地して強度に届かなくなった。そこで「選ぶ」カードの `FocusTraversalGroup` に
   `_ListExitToShortcutsPolicy`（`ReadingOrderTraversalPolicy` を継承し、`FilterListTile` 上からの
-  左右だけ受け口へ固定。体験プリセットの行も同じ `FilterListTile` なので含み、それ以外の方向・部品は
-  標準）を、広幅の左カラム・狭幅の末尾で共通の `_browserCard()` に付け、着地点を幾何から切り離した
+  左右だけ受け口へ固定。それ以外の方向・部品（体験プリセットのドロップダウンを含む）は
+  標準）を、広幅の左カラム・狭幅の先頭で共通の `_browserCard()` に付け、着地点を幾何から切り離した
   （`home_screen_layout_test.dart` / `home_screen_color_vision_compare_test.dart` がウィンドウ高さを
   変えて確認）。他のカラムへは Tab で行く。ポインタで行を選び直しても、フォーカスはショートカット
   受け口へ戻る。
   キーボード起点かポインタ起点かは、タップ処理の中で `HardwareKeyboard` の Enter/Space の
   押下状態を見て判定する。
-- **検索欄の `↓` だけは奪う**（#141）: `_RowAwareCycleAction` が `FilterBrowserController.isSearchDownEnabled`（検索欄にフォーカス・IME 未確定文字なし・フォーカスできる行が 1 件以上）のとき `↓` を有効にし、`focusFirstRow()` が先頭の（フォーカスできる）行へ移す。体験プリセットの行は対象外で、フィルタの行が 0 件（プリセットだけ見えている場合も含む）のときは `isEnabled` が false になり `↓` は入力欄が処理する。`moveRowFocus` は先頭行での逆送りを検索欄へのフォーカスに置き換える。検索欄の `←→`・Home/End・文字入力は従来どおり入力欄が処理する。
+- **検索欄の `↓` だけは奪う**（#141）: `_RowAwareCycleAction` が `FilterBrowserController.isSearchDownEnabled`（検索欄にフォーカス・IME 未確定文字なし・フォーカスできる行が 1 件以上）のとき `↓` を有効にし、`focusFirstRow()` が先頭の（フォーカスできる）行へ移す。フィルタの行が 0 件のときは `isEnabled` が false になり `↓` は入力欄が処理する。`moveRowFocus` は先頭行での逆送りを検索欄へのフォーカスに置き換える。検索欄の `←→`・Home/End・文字入力は従来どおり入力欄が処理する。
 - **↑↓・←→ はテキスト入力・ボタン・スイッチ等にフォーカスがある間は無効化される**
   （`isFocusOnInteractiveControl()` による `isEnabled` ガード、#63）。`/` と `Cmd/Ctrl+V` は
   上記の狭いガード（テキスト入力中のみ、#97/#141）。`Esc` だけはこのガードの対象外 —
@@ -734,7 +755,7 @@ LoupeHud()])` として組み立て、`LoupeHud` を `HomeScreen` とは別の�
   #76）が非 null を返すときだけ表示する。押すと `ConsultNoticeBlock`
   （`lib/ui/widgets/consult_notice_block.dart`）で全文（免責文込み）をダイアログ
   表示する。advanced カタログ（`FilterParamPanel`）・体験プリセット
-  （`ExperiencePresetTile` の選択後は `AdjustPanel`）・PNG export と同じ解決経路・同じ表示ウィジェットを
+  （`ExperiencePresetPicker` の選択後は `AdjustPanel`）・PNG export と同じ解決経路・同じ表示ウィジェットを
   共有する。
 - **原画比較ボタン**: 押している間だけ `VisionFilterState.bypassed` を true に
   し、離すと false に戻す（#63 のホットキー「押している間だけ原画」と同じ
@@ -1033,11 +1054,15 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
 
 - `HomeScreen`: メイン画面（#72）。幅 1000dp 以上は 3 カラム（左「選ぶ」=`FilterBrowser`、
   中央「見る」=`BeforeAfterView` + `ImageSourcePicker`、右「調整」=`AdjustPanel`）、
-  それ未満は プレビュー → 調整 → 選択 の縦積み。プレビュー画像の一辺は本体領域の高さから
+  それ未満は 選択 → プレビュー → 調整 の縦積み（3 カラムの左・中央・右と同じ順、#198）。プレビュー画像の一辺は本体領域の高さから
   `previewPaneSideFor` で上限を決め（高さ - 354dp、下限 `kMinPreviewPaneSide` = 160dp）、
-  `BeforeAfterView.maxPaneSide` へ渡す。既定ウィンドウ 800x600 でも選択欄まで最初のビューポートに収める（#130）。`FilterBrowser` は検索・カテゴリ・
+  `BeforeAfterView.maxPaneSide` へ渡す。狭くて低いウィンドウ（800x600）でもプレビューのカード（画像から選択欄まで）を 1 画面に収める（#130。縦積みでは一覧の下にあり、スクロールした先で収まる）。`FilterBrowser` は検索・カテゴリ・
   統合フィルタ一覧（色覚 7 型 + advanced 30 = 33 行、ロジックは
-  `filter_list_selection.dart`）と体験プリセットの最上段を持つ。`AdjustPanel` は選んだ
+  `filter_list_selection.dart`）を持ち、その上（カラムの一番上）に体験プリセットのドロップダウン
+  （`ExperiencePresetPicker`、#199。選ぶと `selectPreset` で下のフィルタ・強度・パラメータをまとめて切り替える。
+  選択肢は `availableExperiences()` をそのまま並べ、件数を固定しない。「プリセットなし」は表示専用で、外すのはフィルタ側の操作。
+  検索語がプリセット名に当たったら一覧に案内 `filterListPresetHint` を出す（`experienceMatchesQuery`）。ポインタで選んだ直後だけショートカットの受け口へ
+  フォーカスを戻す。確定した入力をフレーム単位で見て、入力イベントの無い確定（スクリーンリーダー）は戻さない）を持つ。`AdjustPanel` は選んだ
   症状の説明・強度スライダー 1 本・受診喚起（`ConsultNoticeBlock` 常時展開）を
   `FilterParamPanel` で持ち、2 層以上のときは層ごとの節（調整中の層だけ展開、#120）にする。
   未選択時は空状態を出す。中央カラムの先頭には `LayerChipStrip`（適用順のチップ・✕・フィルタをすべて解除。カードの先頭に常に置き（右端に「2×2 で比較」の固定枠。見出し行は廃止。「原画表示中」はプレビューの画像の枠の中に重ねる）、1 層以上でチップを出し、0 層でも同じ高さを確保、#183。「フィルタをすべて解除」は 2 層以上のみ）を置く。起動モード・最前面・クリックスルー・
@@ -1241,9 +1266,9 @@ trayService の初期化・配線は `buildRootApp()` の外、`main()` 内に�
   「保存場所を選ぶ」（保存先なし・書き込み不可・空き容量不足のとき）で `file_selector` の `getSaveLocation`（seam `saveLocationPicker`）から選んだ場所へ
   `writePngToPath` で書く（`.png` が無ければ `ensurePngExtension` で足し、足したときは非上書き。macOS は `user-selected.read-write` entitlement、#162）。判断の経緯は
   `docs/adr/2026-09-30-export-png-to-downloads.md`
-- `ExperiencePresetTile`（`lib/ui/widgets/experience_presets.dart`）: sensus の
-  `experiences()` をワンタップ適用の行として消費する（複合体験、#19）。統合一覧
-  `FilterBrowser` の最上段に並ぶ（#72）
+- `ExperiencePresetPicker`（`lib/ui/widgets/experience_presets.dart`）: sensus の
+  `experiences()` を、選ぶだけで下の設定をまとめて切り替えるドロップダウンとして消費する（複合体験、#19）。
+  左カラム `FilterBrowser` の一番上に置く（#199。それまでは統合一覧の最上段の行だった、#72）
 - `ImageSourceState`（`lib/services/image_source_state.dart`）: プレビューの
   **原画**（before ペインの元画像）の選択状態を持つ、唯一の正本（#78）。
   `VisionFilterState`（フィルタの選択）とは独立した軸で、内蔵サンプル 8 種

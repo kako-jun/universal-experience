@@ -11,13 +11,13 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:universal_experience/l10n/app_localizations.dart';
 import 'package:universal_experience/models/vision_filter_catalog.dart';
 import 'package:universal_experience/services/filter_list_selection.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
 import 'package:universal_experience/ui/widgets/filter_browser.dart';
 
 import 'support/color_vision_select.dart';
+import 'support/experience_preset_select.dart';
 import 'support/home_screen_harness.dart';
 
 void main() {
@@ -143,7 +143,6 @@ void main() {
 
     final protanopiaEntry =
         kFilterListEntries.firstWhere((e) => e.key == 'cv:protanopia');
-    final en = lookupAppLocalizations(const Locale('en'));
     BeforeAfterView currentPreview() =>
         tester.widget<BeforeAfterView>(find.byType(BeforeAfterView));
     // 統合フィルタ一覧（#72）の protanopia の行。選択中は行にチェックが付く。
@@ -164,8 +163,7 @@ void main() {
 
     // 2. プリセット（meniere）をタップする。層が vertigo 1 つに置き換わるので、
     //    プレビュー・行の点灯は色覚からプリセット側に切り替わる（#60）。
-    await tester.tap(find.text(en.experienceMeniere));
-    await tester.pump();
+    await selectExperiencePreset(tester, 'meniere');
 
     expect(currentPreview().filterId, 'vertigo');
     expect(visionState.layers.map((l) => l.id), ['vertigo']);

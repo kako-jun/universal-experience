@@ -68,7 +68,7 @@ class VisionFilterState extends ChangeNotifier {
   /// meniere と labyrinthitis はどちらもカタログ id `vertigo` に写るため、
   /// `selectedId` だけでは「どちらのプリセットが選ばれているか」を区別できない
   /// （#60 の「2 枚同時に点灯」バグの原因）。この id を正本にして、
-  /// `ExperiencePresetTile` の選択表示（`isSelected`）はカタログ id ではなく
+  /// `ExperiencePresetPicker` の選択表示（`isSelected`）はカタログ id ではなく
   /// これを比較する。
   String? _selectedPresetId;
 
@@ -408,7 +408,7 @@ class VisionFilterState extends ChangeNotifier {
     replaceWith(target.id, variantId: target.variantId);
   }
 
-  /// 体験プリセット（`ExperiencePresetTile`）からフィルタを選択する（#60）。
+  /// 体験プリセット（`ExperiencePresetPicker`）からフィルタを選択する（#60）。
   /// [presetId] は `Experience.id`、[catalogId] はその体験の視覚フィルタに
   /// 対応するカタログ id。**層全体をその 1 フィルタに置き換える**（上限・排他に関わらず
   /// 常に受け付ける）。強度・パラメータは

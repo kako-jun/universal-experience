@@ -51,11 +51,16 @@ void main() {
     expect(RustLib.instance.initialized, isTrue);
     expect(find.byType(HomeScreen), findsOneWidget);
 
-    // #72: 統合フィルタ一覧の最上段に、実ブリッジの experiences() 由来の体験
-    // プリセット 4 行が出ていること（#52: 本番でプリセットが例外表示になった
-    // 退行の検知）。一覧は遅延構築されない（SingleChildScrollView）ので、画面外でも
-    // ツリー上に存在する。
-    expect(find.byType(ExperiencePresetTile), findsNWidgets(4));
+    // #199: 左カラムの一番上に、実ブリッジの experiences() 由来の体験プリセットの
+    // ドロップダウンが出ていること（#52: 本番でプリセットが例外表示になった退行の検知。
+    // 体験が 0 件だとドロップダウン自体を出さないので、DropdownButton の有無で見る）。
+    expect(
+      find.descendant(
+        of: find.byType(ExperiencePresetPicker),
+        matching: find.byWidgetPredicate((w) => w is DropdownButton<String>),
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:screen_retriever/screen_retriever.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:io' show Platform;
 // AppLifecycleListener.onExitRequested の戻り値型（AppExitResponse）は dart:ui
@@ -241,6 +242,45 @@ Future<({Widget app, bool bridgeReady})> buildRootApp({
   return (app: UniversalExperienceApp(settings: s), bridgeReady: true);
 }
 
+/// 主画面の**作業領域**（タスクバー・パネル・Dock を除いた領域）の大きさ（論理ピクセル）。
+/// 取れなければ null（#197）。
+///
+/// 起動時のウィンドウサイズを作業領域に収めるために使う
+/// （[LoupeWindowPolicy.initialSizeFor]）。window_manager の `center: true` と同じ
+/// screen_retriever の主画面の `visibleSize` を使う（同じ領域の中央に置かれるので、
+/// 大きさもその領域に合わせる）。`visibleSize` が無いプラットフォームでは画面全体。
+/// `windowManager.ensureInitialized()` のあとに呼ぶ。
+Future<Size?> _primaryWorkAreaSize() async {
+  try {
+    final display = await screenRetriever.getPrimaryDisplay();
+    return display.visibleSize ?? display.size;
+  } catch (_) {
+    // プラグインが無い・画面の情報が取れない環境。既定サイズで起動する。
+    return null;
+  }
+}
+
+/// 起動サイズで作業領域から引くウィンドウ枠（タイトルバー）の高さの**見込み値**（#197）。
+///
+/// 正確な論理ピクセルではなく、**多めに引く側（作業領域からはみ出さない側）に倒れる**値:
+/// - Windows の `getTitleBarHeight` は DPI で割らない物理ピクセルなので、拡大率 100% を超えると
+///   論理ピクセルより大きい。
+/// - macOS / Windows はウィンドウサイズが外枠込みなので、さらに枠を引くと二重に引くことになる。
+/// どちらもウィンドウが少し小さくなるだけで、はみ出す方向には出ない。
+/// - Linux では呼ばず [LoupeWindowPolicy.fallbackTitleBarHeight] を使う。枠を WM が描く
+///   （サーバ側描画）と GTK のタイトルバーが無く、`getTitleBarHeight` が GTK の警告を出すため。
+/// 取れない・0 のときも [LoupeWindowPolicy.fallbackTitleBarHeight]。
+Future<double> _titleBarHeight() async {
+  if (Platform.isLinux) return LoupeWindowPolicy.fallbackTitleBarHeight;
+  try {
+    final height = await windowManager.getTitleBarHeight();
+    if (height > 0) return height.toDouble();
+  } catch (_) {
+    // 未対応のプラットフォーム。下の見込み値を使う。
+  }
+  return LoupeWindowPolicy.fallbackTitleBarHeight;
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -293,13 +333,19 @@ void main() async {
 
     // ルーペ窓の起動オプション。サイズ・最小サイズ・透過の既定は
     // LoupeWindowPolicy に集約 (testable な純粋ロジック)。
+    // - size: 設定モードは 3 カラムが出る 1280x800、ルーペ窓モードは 800x600。作業領域
+    //   （タスクバー等を除く）に収まらなければ、枠ごと収まる大きさへ縮める (#197)。
     // - backgroundColor: 起動モード (#63) に応じて決める。設定モード（既定）は
     //   不透明、ルーペモードは透過（枠の外は透け、枠の中だけフィルタ描画する）。
     // マルチモニタ: 第1弾はメインモニタのみ対象 (docs/ARCHITECTURE.md 参照)。
     // window_manager の backgroundColor は非 null の Color のため、
     // 透過 ON のとき transparent、OFF のとき不透明黒を渡す。
     final windowOptions = WindowOptions(
-      size: LoupeWindowPolicy.defaultSize,
+      size: LoupeWindowPolicy.initialSizeFor(
+        await _primaryWorkAreaSize(),
+        mode: loupeWindow.appMode,
+        titleBarHeight: await _titleBarHeight(),
+      ),
       minimumSize: LoupeWindowPolicy.minimumSize,
       center: true,
       // 色の例外（DESIGN.md）: OS ウィンドウの下地色。Flutter のテーマが

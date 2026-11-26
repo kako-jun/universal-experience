@@ -12,16 +12,16 @@
 //   {wide|narrow}-{light|dark}-{ja|en}.png        — ウィンドウ 1 枚ぶん
 //                                                    （wide=1280x800、narrow=800x700）
 //   wide-{light|dark}-ja-hc.png                    — ハイコントラストテーマ
-//   default-window-{light|dark}-{ja|en}.png
-//                                                  — 既定ウィンドウ（800x600）に実画像が載った状態。
+//   small-window-{light|dark}-{ja|en}.png
+//                                                  — 狭くて低いウィンドウ（800x600。#197 までの既定ウィンドウ）に実画像が載った状態。
 //                                                    選択欄が最初のビューポートに収まる
 //                                                    （収まりを expect する、#130）
 //   wide-low-light-ja.png                          — 低い広幅（1280x480）に実画像が載った状態。
 //                                                    画像は下限（160dp）で止まり、選択欄の下側は
 //                                                    スクロールで届く（#130）
-//   {wide|wide-low|default-window}-light-ja-clickthrough.png
+//   {wide|wide-low|small-window}-light-ja-clickthrough.png
 //                                                  — クリックスルー ON の復帰バナー
-//                                                    （wide-low=1280x480、default-window=800x600）
+//                                                    （wide-low=1280x480、small-window=800x600）
 //   wide-light-ja-dialog.png                       — 起動モードのダイアログ（ON にする前）
 //   wide-{light|dark}-{ja|en}-languagedialog.png   — 言語ダイアログ（#82）
 //   narrow-{light|dark}-{ja|en}-full.png          — 縦に十分長い画面で全体を撮ったもの
@@ -79,6 +79,7 @@ import 'package:universal_experience/ui/widgets/image_source_picker.dart';
 import '../support/screenshot_harness.dart';
 import '../support/vision_filter_metadata_fixture.dart';
 import '../support/color_vision_select.dart';
+import '../support/narrow_scroll.dart';
 
 /// sensus の experiences() と同じ id / vision / hearing / urgency の 4 体験
 /// （実ブリッジは native lib が要るため fixture で代替。experience_presets_test と同じ）。
@@ -355,11 +356,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     if (expectPickerFits) {
-      // 実フォント・実画像で、選択欄の下端が最初のビューポート（ウィンドウの高さ）に収まる（#130）。
+      // 縦積み（#198）ではプレビューは一覧の下にあるので、プレビューまでスクロールしてから測る・撮る。
+      await scrollPreviewIntoView(tester);
+      // 実フォント・実画像で、選択欄の下端が 1 画面（ウィンドウの高さ）に収まる（#130）。
       expect(
         tester.getRect(find.byType(ImageSourcePicker)).bottom,
         lessThanOrEqualTo(height),
-        reason: '$widthLabel/$locale: 選択欄が最初のビューポートに収まる',
+        reason: '$widthLabel/$locale: プレビューまでスクロールすると選択欄が 1 画面に収まる',
       );
     }
     final base = '$widthLabel-${dark ? 'dark' : 'light'}-$locale';
@@ -616,18 +619,18 @@ void main() {
     );
   }
 
-  // 既定ウィンドウ（800x600）と低い広幅（1280x480）に、実画像が載った状態（#130）。
-  // 既定ウィンドウ（default-window）では、選択欄（ImageSourcePicker）の下端が
+  // 狭くて低いウィンドウ（800x600。#197 までの既定ウィンドウ）と低い広幅（1280x480）に、実画像が載った状態（#130）。
+  // 狭くて低いウィンドウ（small-window）では、選択欄（ImageSourcePicker）の下端が
   // 最初のビューポートに収まるよう、プレビュー画像の高さを配分している。
   // 低い広幅（wide-low）は画像が下限（160dp）で止まり、選択欄の下側は収まらず
   // スクロールで届く（目視確認のみ）。ファイル名は
-  // default-window-{light|dark}-{ja|en}.png と wide-low-light-ja.png。
+  // small-window-{light|dark}-{ja|en}.png と wide-low-light-ja.png。
   for (final (label, width, height, dark, locale)
       in const <(String, double, double, bool, String)>[
-    ('default-window', 800, 600, false, 'ja'),
-    ('default-window', 800, 600, true, 'ja'),
-    ('default-window', 800, 600, false, 'en'),
-    ('default-window', 800, 600, true, 'en'),
+    ('small-window', 800, 600, false, 'ja'),
+    ('small-window', 800, 600, true, 'ja'),
+    ('small-window', 800, 600, false, 'en'),
+    ('small-window', 800, 600, true, 'en'),
     ('wide-low', 1280, 480, false, 'ja'),
   ]) {
     testWidgets(
@@ -640,22 +643,22 @@ void main() {
         dark: dark,
         locale: locale,
         suffix: '',
-        // 既定ウィンドウは収まる。低い広幅（1280x480）は最小の高さを守るので、スクロールで届く。
-        expectPickerFits: label == 'default-window',
+        // 狭くて低いウィンドウは収まる。低い広幅（1280x480）は最小の高さを守るので、スクロールで届く。
+        expectPickerFits: label == 'small-window',
       ),
       skip: !screenshotsEnabled,
     );
   }
 
-  // 既定ウィンドウ（800x600）で 5 層（上限）でも、選択欄が最初のビューポートに収まる（#183。
+  // 狭くて低いウィンドウ（800x600。#197 までの既定ウィンドウ）で 5 層（上限）でも、選択欄が最初のビューポートに収まる（#183。
   // 層数で画像・選択欄がずれないことの実フォント検査）。ファイル名は
-  // default-window-light-{ja|en}-multi5.png。
+  // small-window-light-{ja|en}-multi5.png。
   for (final locale in const ['ja', 'en']) {
     testWidgets(
-      'screenshot default-window/light/$locale multi5',
+      'screenshot small-window/light/$locale multi5',
       (tester) => shoot(
         tester,
-        widthLabel: 'default-window',
+        widthLabel: 'small-window',
         width: 800,
         height: 600,
         dark: false,
@@ -732,7 +735,8 @@ void main() {
           await tester.pump();
           final strip = tester.getRect(find.byType(LayerChipStrip));
           final chip = tester.getRect(find.byType(FilterChip));
-          expect(find.byIcon(Icons.compare), findsNothing, reason: '幅が十分なので文字つき');
+          expect(find.byIcon(Icons.compare), findsNothing,
+              reason: '幅が十分なので文字つき');
           expect(chip.height,
               lessThanOrEqualTo(strip.height - LayerChipStrip.scrollbarLane),
               reason: 'チップ ${chip.height} が帯の中身 '
@@ -867,7 +871,7 @@ void main() {
   for (final (label, width, height) in const <(String, double, double)>[
     ('wide', 1280, 800),
     ('wide-low', 1280, 480),
-    ('default-window', 800, 600),
+    ('small-window', 800, 600),
   ]) {
     testWidgets(
       'screenshot $label click-through banner',

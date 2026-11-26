@@ -8,9 +8,6 @@ import 'experimental_badge.dart';
 
 /// 行の選び方の見た目（#120）。
 enum FilterListTileKind {
-  /// 体験プリセットの行。選ぶと単一選択に置き換わる。選択中は右端にチェック。
-  preset,
-
   /// 足し引きできる行（チェック式）。先頭にチェックボックスの絵、選択中は右端に適用順の番号。
   check,
 
@@ -21,22 +18,20 @@ enum FilterListTileKind {
 
 /// 統合フィルタ一覧（`FilterBrowser`、#72）の 1 行。
 ///
-/// 体験プリセット・色覚・advanced の全行が同じ見た目・同じ操作領域を持つように
-/// する共通部品。
+/// 色覚・advanced の全行が同じ見た目・同じ操作領域を持つようにする共通部品
+/// （体験プリセットは行ではなく、一覧の上のドロップダウン `ExperiencePresetPicker`、#199）。
 ///
 /// - 選択中は色（`secondaryContainer`）に加えて**形**でも示す（DESIGN §7: 色だけで状態を
-///   区別しない）。[FilterListTileKind.preset] は右端のチェックマーク、
-///   [FilterListTileKind.check]/[FilterListTileKind.radio] は先頭のチェックボックス/ラジオの
-///   絵と右端の適用順の番号（[orderNumber]）。スクリーンリーダー向けには
-///   [ListTile.selected] に加え、プリセットはチェックに「選択中」ラベル、チェック式/ラジオ式は
-///   checked の状態と「適用順 N 番目」を付ける。
+///   区別しない）。先頭のチェックボックス/ラジオの絵（[kind]）と、右端の適用順の番号
+///   （[orderNumber]）。スクリーンリーダー向けには [ListTile.selected] に加え、checked の状態と
+///   「適用順 N 番目」を付ける。
 /// - [disabledReason] があるとその行は選べない（上限に達したとき）。理由を行の 2 行目に文字で出す。
 /// - 行の高さは 48dp 以上（#45 の最小タップ領域）、角丸は 8（DESIGN §4.2）。
 /// - この行が選択中になったとき、またはフォーカスが入ったとき（↑↓ の行移動・Tab）、
 ///   **一覧の内側のスクロール**だけを動かして画面内へ入れる。外側のページ
 ///   スクロールは動かさない（狭幅でプレビューが押し出されないため。
 ///   `Scrollable.ensureVisible` は使わない）。起動直後・再描画で最初から
-///   選択中の行は動かさない（一覧の最上段の体験プリセットを隠さないため）。
+///   選択中の行は動かさない（起動直後は一覧を先頭から見せるため）。
 class FilterListTile extends StatefulWidget {
   const FilterListTile({
     super.key,
@@ -44,9 +39,8 @@ class FilterListTile extends StatefulWidget {
     required this.selected,
     required this.onTap,
     this.onPointerActivated,
-    this.leading,
     this.isExperimental = false,
-    this.kind = FilterListTileKind.preset,
+    this.kind = FilterListTileKind.check,
     this.orderNumber,
     this.disabledReason,
     this.focusNode,
@@ -67,17 +61,14 @@ class FilterListTile extends StatefulWidget {
   /// フォーカスを行に残し、次の Tab が先頭からやり直しにならないようにする）。
   final VoidCallback? onPointerActivated;
 
-  /// 先頭のアイコン（体験プリセットの行だけが使う）。
-  final Widget? leading;
-
   /// 名前の横に「実験的」バッジを出すか（#80、
   /// `VisionFilterEntry.isExperimental`）。
   final bool isExperimental;
 
-  /// 行の選び方の見た目。既定はプリセット（従来どおり）。
+  /// 行の選び方の見た目。既定はチェック式。
   final FilterListTileKind kind;
 
-  /// 選択中の行の適用順の番号（1 始まり）。[kind] が check/radio のときだけ使う。
+  /// 選択中の行の適用順の番号（1 始まり）。
   final int? orderNumber;
 
   /// 非 null なら選べない行（[onTap] は無視）。値は理由の文言で、行の 2 行目に出す。
@@ -161,28 +152,20 @@ class _FilterListTileState extends State<FilterListTile> {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final isPreset = widget.kind == FilterListTileKind.preset;
     final disabled = widget.disabledReason != null;
     final order = widget.orderNumber;
 
-    Widget? leading = widget.leading;
-    if (!isPreset) {
-      final isRadio = widget.kind == FilterListTileKind.radio;
-      final icon = isRadio
-          ? (widget.selected
-              ? Icons.radio_button_checked
-              : Icons.radio_button_unchecked)
-          : (widget.selected ? Icons.check_box : Icons.check_box_outline_blank);
-      // 状態は行の Semantics（checked）が伝えるので、絵は読み上げから外す。
-      leading = ExcludeSemantics(child: Icon(icon));
-    }
+    final isRadio = widget.kind == FilterListTileKind.radio;
+    final icon = isRadio
+        ? (widget.selected
+            ? Icons.radio_button_checked
+            : Icons.radio_button_unchecked)
+        : (widget.selected ? Icons.check_box : Icons.check_box_outline_blank);
+    // 状態は行の Semantics（checked）が伝えるので、絵は読み上げから外す。
+    final leading = ExcludeSemantics(child: Icon(icon));
 
     Widget? trailing;
-    if (isPreset) {
-      trailing = widget.selected
-          ? Icon(Icons.check, semanticLabel: l10n.filterListSelectedSemantics)
-          : null;
-    } else if (widget.selected && order != null) {
+    if (widget.selected && order != null) {
       trailing = Semantics(
         label: l10n.filterListOrderSemantics(order),
         excludeSemantics: true,
@@ -219,11 +202,10 @@ class _FilterListTileState extends State<FilterListTile> {
       trailing: trailing,
       onTap: widget.onTap == null || disabled ? null : _handleTap,
     );
-    if (isPreset) return tile;
     return MergeSemantics(
       child: Semantics(
         checked: widget.selected,
-        inMutuallyExclusiveGroup: widget.kind == FilterListTileKind.radio,
+        inMutuallyExclusiveGroup: isRadio,
         child: tile,
       ),
     );

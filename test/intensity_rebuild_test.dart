@@ -23,7 +23,7 @@ import 'support/color_vision_select.dart';
 import 'support/home_screen_harness.dart';
 
 void main() {
-  // 統合フィルタ一覧（#72）が体験プリセットの行を組み、フィルタ選択はメタデータを
+  // 左カラム（#72）が体験プリセットのドロップダウン（#199）を組み、フィルタ選択はメタデータを
   // 引き、プレビューは読み込み・適用を行う。いずれも実ブリッジ（native lib）が要る
   // ため、ハーネスの fixture（Rust 非依存、#127/#131）に差し替える。
   setUp(installHomeScreenFixtures);

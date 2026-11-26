@@ -1,7 +1,8 @@
 // HomeScreen の画面構成（#72 フェーズ B）の widget test。
 //
-// 広幅（>=1000dp）は 3 カラム「選ぶ / 見る / 調整」、狭幅は縦積み（プレビュー →
-// 調整 → 選択）。プレビューが最初のビューポートに収まること、一覧の選択が右カラムに
+// 広幅（>=1000dp）は 3 カラム「選ぶ / 見る / 調整」、狭幅は同じ順の縦積み（選択 →
+// プレビュー → 調整、#198）。プレビューが 1 画面に収まること（広幅は最初のビューポート、
+// 縦積みはプレビューまでスクロールした先）、一覧の選択が右カラムに
 // 反映されること、クリックスルー ON の復帰方法が主画面に常時見えること、`/` で検索欄へ
 // 移ること、何も選んでいないときの空状態を確認する。
 //
@@ -24,7 +25,7 @@ import 'package:universal_experience/services/loupe_window_controller.dart';
 import 'package:universal_experience/services/vision_filter_metadata.dart';
 import 'package:universal_experience/src/rust/api/sensus_bridge.dart';
 import 'package:universal_experience/ui/screens/home_screen.dart'
-    show kMinPreviewPaneSide, previewPaneSideFor;
+    show kMinPreviewPaneSide, kWideLayoutBreakpoint, previewPaneSideFor;
 import 'package:universal_experience/ui/widgets/adjust_panel.dart';
 import 'package:universal_experience/ui/widgets/bypass_badge.dart';
 import 'package:universal_experience/ui/widgets/before_after_view.dart';
@@ -41,6 +42,8 @@ import 'package:universal_experience/ui/widgets/window_mode_panel.dart';
 
 import 'support/home_screen_harness.dart';
 import 'support/color_vision_select.dart';
+import 'support/experience_preset_select.dart';
+import 'support/narrow_scroll.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -50,8 +53,8 @@ void main() {
 
   const wide = Size(1280, 800);
   const narrow = Size(800, 700);
-  // LoupeWindowPolicy.defaultSize（起動時の既定ウィンドウ）。
-  const defaultWindow = LoupeWindowPolicy.defaultSize;
+  // 狭くて低いウィンドウ（#130 の基準。#197 までは起動時の既定ウィンドウだった）。
+  const smallWindow = Size(800, 600);
   // 広幅で低い画面（ノート PC の縮めたウィンドウなど）。
   const wideLow = Size(1280, 480);
 
@@ -64,15 +67,18 @@ void main() {
   }
 
   for (final (stateLabel, loaded) in [('準備中', false), ('読み込み済み', true)]) {
-    group('プレビューは最初のビューポートに収まる（$stateLabel）', () {
+    // 広幅は最初のビューポート。縦積み（#198）ではプレビューは一覧の下にあるので、
+    // プレビューまでスクロールしたときに 1 画面に収まることを測る。
+    group('プレビューは 1 画面に収まる（広幅は最初のビューポート・縦積みはスクロールした先。$stateLabel）', () {
       for (final (label, size) in [
         ('広幅 1280x800', wide),
         ('狭幅 800x700', narrow),
-        ('既定ウィンドウ 800x600', defaultWindow),
+        ('狭くて低い 800x600', smallWindow),
       ]) {
         testWidgets(label, (tester) async {
           if (loaded) loadPreviewImages();
           await pumpHomeScreen(tester, size: size);
+          if (size != wide) await scrollPreviewIntoView(tester);
           if (loaded) {
             // 画像が載っている（準備中のプレースホルダで測っていない）。
             final panes = tester.widgetList<PreviewImageView>(
@@ -137,20 +143,21 @@ void main() {
       return paneSide(tester);
     }
 
-    testWidgets('既定 800x600: 画像は下限より大きく、選択欄の下に余白が残る（初回起動と同じ色覚 1 層）',
+    testWidgets('狭くて低い 800x600: 画像は下限より大きく、選択欄の下に余白が残る（初回起動と同じ色覚 1 層）',
         (tester) async {
       // 見積り（_kPreviewChromeHeight）が測っている最悪の状態 = 初回起動の色覚層
       //（帯の右端に「2×2 で比較」が出る。帯の高さは色覚の層の有無で動かない）。
       loadPreviewImages();
       await pumpHomeScreen(tester,
-          size: defaultWindow,
+          size: smallWindow,
           select: (s) => selectColorVisionKey(s, 'deuteranomaly'));
+      await scrollPreviewIntoView(tester);
       final side = paneSide(tester);
       expect(side, greaterThan(kMinPreviewPaneSide));
       // 本体領域の高さ 544（600 - AppBar 56）から、画像以外の高さ 354 を引いた値。
       expect(side, closeTo(190, 0.01));
       final picker = tester.getRect(find.byType(ImageSourcePicker));
-      expect(picker.bottom, lessThanOrEqualTo(defaultWindow.height - 8),
+      expect(picker.bottom, lessThanOrEqualTo(smallWindow.height - 8),
           reason: '選択欄の下端がウィンドウの縁に貼り付かない');
     });
 
@@ -189,14 +196,14 @@ void main() {
       });
     }
 
-    testWidgets('クリックスルーの案内が出ていても下限は守る（既定 800x600）', (tester) async {
+    testWidgets('クリックスルーの案内が出ていても下限は守る（狭くて低い 800x600）', (tester) async {
       loadPreviewImages();
       const uiContext = WindowModeUiContext(
         trayAvailable: true,
         hotkeyStatus: HotkeyStatus(),
       );
-      final h = await pumpHomeScreen(tester,
-          size: defaultWindow, uiContext: uiContext);
+      final h =
+          await pumpHomeScreen(tester, size: smallWindow, uiContext: uiContext);
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
       await tester.runAsync(() => h.loupe.setClickThrough(true));
       await tester.pump();
@@ -207,9 +214,11 @@ void main() {
     });
   });
 
-  testWidgets('既定ウィンドウは LoupeWindowPolicy.defaultSize（800x600）',
+  testWidgets('既定ウィンドウ（LoupeWindowPolicy.defaultSize）は 3 カラムが出る 1280x800（#197）',
       (tester) async {
-    expect(defaultWindow, const Size(800, 600));
+    expect(LoupeWindowPolicy.defaultSize, wide);
+    expect(LoupeWindowPolicy.defaultSize.width,
+        greaterThanOrEqualTo(kWideLayoutBreakpoint));
   });
 
   group('広幅で低い画面（1280x480）', () {
@@ -356,14 +365,19 @@ void main() {
     expect(adjust.overlaps(focusedRect), isTrue);
   });
 
-  testWidgets('狭幅は縦積み（プレビューが選択より上）', (tester) async {
+  testWidgets('狭幅は縦積み（上から 選択 → プレビュー → 調整。3 カラムの左・中央・右の順、#198）',
+      (tester) async {
     await pumpHomeScreen(tester, size: narrow);
 
-    final preview = tester.getRect(find.byType(BeforeAfterView));
-    // 狭幅の一覧は縦積みの下端にあり、スクロールしないと描画されないことがある。
-    final browserFinder = find.byType(FilterBrowser, skipOffstage: false);
-    final browser = tester.getRect(browserFinder);
-    expect(preview.bottom, lessThanOrEqualTo(browser.top));
+    // プレビューと調整は一覧の下にあり、スクロールしないと描画されないことがある。
+    final browser = tester.getRect(find.byType(FilterBrowser));
+    final preview =
+        tester.getRect(find.byType(BeforeAfterView, skipOffstage: false));
+    final adjust =
+        tester.getRect(find.byType(AdjustPanel, skipOffstage: false));
+    expect(browser.top, lessThan(narrow.height), reason: '選択が最初の画面にある');
+    expect(browser.bottom, lessThanOrEqualTo(preview.top));
+    expect(preview.bottom, lessThanOrEqualTo(adjust.top));
   });
 
   group('空状態', () {
@@ -446,10 +460,7 @@ void main() {
     testWidgets('体験プリセットを選ぶと右カラムに名前と説明が出る', (tester) async {
       final h = await pumpHomeScreen(tester, size: wide);
 
-      final tile = find.byKey(experienceCardKey('bppv'));
-      await tester.ensureVisible(tile);
-      await tester.tap(tile);
-      await tester.pump();
+      await selectExperiencePreset(tester, 'bppv');
 
       expect(h.visionState.selectedPresetId, 'bppv');
       expect(find.text('何も選択されていません'), findsNothing);
@@ -500,24 +511,25 @@ void main() {
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
     });
 
-    testWidgets('ON でも案内を出したままプレビューは最初のビューポートに収まる（狭幅・既定ウィンドウ 800x600）',
+    testWidgets('ON でも案内を出したまま、プレビューまでスクロールすると画像が 1 画面に収まる（狭幅・狭くて低い 800x600）',
         (tester) async {
-      final h = await pumpHomeScreen(tester, size: defaultWindow);
+      final h = await pumpHomeScreen(tester, size: smallWindow);
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.loupe));
       await tester.runAsync(() => h.loupe.setClickThrough(true));
       await tester.pump();
+      await scrollPreviewIntoView(tester);
 
       expect(find.text('クリックスルーが ON です。解除するには:'), findsOneWidget);
       expect(
         tester.getRect(find.byType(BeforeAfterView)).bottom,
-        lessThanOrEqualTo(defaultWindow.height),
+        lessThanOrEqualTo(smallWindow.height),
       );
       // 案内（約 115dp）の分だけ本文が低くなるため、選択欄の下端までは収まらない
       // ことがある（DESIGN.md §6.1）。画像（BeforeAfterView）が収まり、選択欄の
       // 先頭の行が見えていて、スクロールで残りへ届くことを保証する。
       expect(
         tester.getRect(find.text('プレビュー画像')).bottom,
-        lessThanOrEqualTo(defaultWindow.height),
+        lessThanOrEqualTo(smallWindow.height),
       );
       await tester.runAsync(() => h.loupe.setClickThrough(false));
       await tester.runAsync(() => h.loupe.setAppMode(AppMode.settings));
@@ -707,7 +719,6 @@ void main() {
     for (final (layoutLabel, size) in [('広幅', wide), ('狭幅', narrow)]) {
       for (final (rowLabel, rowKey) in [
         ('フィルタの行', filterListTileKey(entry('cv:protanopia'))),
-        ('体験プリセットの行', experienceCardKey('bppv')),
       ]) {
         for (final (dirLabel, key) in [
           ('→', LogicalKeyboardKey.arrowRight),
@@ -1022,7 +1033,7 @@ void main() {
     for (final (label, size) in [
       ('広幅 1280x800', wide),
       ('広幅 1600x900', const Size(1600, 900)),
-      ('既定 800x600', defaultWindow),
+      ('狭くて低い 800x600', smallWindow),
       // 画像が下限 160dp になる低い広幅（複数層の After 見出しが最も狭い）。
       ('低い広幅 1280x480', wideLow),
     ]) {
@@ -1161,7 +1172,7 @@ void main() {
     }
 
     for (final (label, size) in [
-      ('既定 800x600', defaultWindow),
+      ('狭くて低い 800x600', smallWindow),
       ('低い広幅 1280x480', wideLow),
     ]) {
       testWidgets('$label: 「原画表示中」は After 画像の枠の中にあり、操作部品と重ならない',
@@ -1213,7 +1224,7 @@ void main() {
     // 色覚が 1 層だけ（初回起動の状態）: 「すべて解除」が無いので、×2 以上でも「2×2 で比較」が文字つきの
     // まま置かれる幅がある。文字つきのチップの高さが帯の中身（スクロールバーの段を除く）に収まる。
     for (final (label, size) in [
-      ('既定 800x600', defaultWindow),
+      ('狭くて低い 800x600', smallWindow),
       ('広幅 1600x900', const Size(1600, 900)),
     ]) {
       for (final scale in [1.0, 2.0, 3.0]) {
@@ -1265,12 +1276,12 @@ void main() {
     }
 
     // 英語は実フォントでないと選択欄のチップの折り返しが測れない（テスト用フォントでは異常に
-    // 折り返す）ので、UE_SCREENSHOTS の default-window（ja/en・明暗・5 層）の
+    // 折り返す）ので、UE_SCREENSHOTS の small-window（ja/en・明暗・5 層）の
     // expectPickerFits で見る。
-    testWidgets('既定 800x600: 5 層でも選択欄が収まり、画像は 1 層のときと同じ大きさ（ja）',
+    testWidgets('狭くて低い 800x600: 5 層でも選択欄が収まり、画像は 1 層のときと同じ大きさ（ja）',
         (tester) async {
       loadPreviewImages();
-      await pumpHomeScreen(tester, size: defaultWindow, select: (s) {
+      await pumpHomeScreen(tester, size: smallWindow, select: (s) {
         for (final id in [
           'myopia',
           'protanopia',
@@ -1281,8 +1292,9 @@ void main() {
           s.toggle(id);
         }
       });
+      await scrollPreviewIntoView(tester);
       final picker = tester.getRect(find.byType(ImageSourcePicker));
-      expect(picker.bottom, lessThanOrEqualTo(defaultWindow.height - 8));
+      expect(picker.bottom, lessThanOrEqualTo(smallWindow.height - 8));
       expect(tester.getRect(find.byType(PreviewImageView).first).width,
           closeTo(190, 0.01));
     });
